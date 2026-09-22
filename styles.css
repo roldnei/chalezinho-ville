@@ -1079,3 +1079,10 @@ img{max-width:100%;height:auto}
  .location-map{width:100%!important;min-height:330px!important}
  .location-map iframe{height:330px!important}
 }
+
+/* Footer contact */
+footer{justify-content:space-between!important}
+.footer-brand{display:flex;align-items:center;gap:30px}
+.footer-contact{display:flex;align-items:center;gap:18px;font-size:10px;letter-spacing:.13em;text-transform:uppercase}
+.footer-contact>span:first-child{color:#766d65}.footer-contact a{color:#d8b88f;border-bottom:1px solid rgba(216,184,143,.45);padding-bottom:3px}.footer-instagram{color:#625b55}
+@media(max-width:800px){footer{align-items:flex-start!important}.footer-brand{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.footer-contact{margin-top:18px;flex-wrap:wrap;gap:14px 18px}.footer-contact>span:first-child{width:100%}}
