@@ -1112,3 +1112,8 @@ footer{justify-content:space-between!important}
 .chalet-page .detail-intro .amenity-cloud{display:flex!important;flex-wrap:wrap!important;gap:10px!important;margin-top:38px!important;padding-top:28px!important;border-top:1px solid rgba(198,166,136,.14)!important}
 .chalet-page .detail-intro .amenity-cloud span{display:inline-flex!important;align-items:center!important;width:auto!important;min-height:40px!important;padding:9px 15px!important;border:1px solid rgba(198,166,136,.24)!important;border-radius:999px!important;color:#b8ada3!important;font-size:10px!important;line-height:1.2!important;letter-spacing:.07em!important;text-transform:uppercase!important;white-space:normal!important}
 @media(max-width:800px){.chalet-page .detail-intro .amenity-cloud{gap:8px!important;margin-top:32px!important;padding-top:24px!important}.chalet-page .detail-intro .amenity-cloud span{min-height:38px!important;padding:8px 13px!important;font-size:9px!important}}
+
+/* Center consultation helper text consistently */
+.collection .cards>article>.availability-box{display:flex!important;flex-direction:column!important;align-items:center!important}
+.collection .cards>article>.availability-box .availability-toggle{align-self:center!important}
+.collection .cards>article>.availability-box .availability-hint{width:100%!important;max-width:280px!important;margin:10px auto 0!important;text-align:center!important}
