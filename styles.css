@@ -1337,3 +1337,16 @@ footer{justify-content:space-between!important}
  .hero .button.light{background:#8a3f05!important;border:1px solid #b86a2a!important;color:#fff!important;min-width:230px!important;min-height:52px!important;padding:0 28px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;font-weight:700!important;letter-spacing:.15em!important;box-shadow:0 8px 26px rgba(0,0,0,.28)!important;transition:transform .2s ease,background .2s ease,box-shadow .2s ease!important}
  .hero .button.light:hover{background:#9b4a09!important;transform:translateY(-2px)!important;box-shadow:0 11px 30px rgba(0,0,0,.34)!important}
 }
+
+
+/* Notebook/desktop: preserve the darker, immersive rhythm of the mobile experience */
+@media (min-width:801px){
+ .manifesto{background:#1c1815!important;color:#f2e9df!important}
+ .manifesto .copy,.manifesto .copy p{color:#b8ada3!important}
+ .manifesto small{color:#c49a72!important}
+ .experience-editorial{background:#191613!important;color:#f2e9df!important}
+ .experience-intro p,.story-copy p{color:#b8ada3!important}
+ .experience-intro .eyebrow,.story-copy span{color:#c49a72!important}
+ .experience-quote{color:#eee5dc!important}
+ .night-main figcaption{color:#eee5dc!important}
+}
