@@ -513,3 +513,15 @@ img{max-width:100%;height:auto}
  .laurel{font-size:20px!important}
  .trust-reviews span{font-size:10px!important}
 }
+
+/* Center the guest-favorite content within the middle column */
+.trust-strip .guest-favorite{
+ justify-self:center!important;
+ justify-content:center!important;
+ width:100%!important;
+ text-align:center!important;
+}
+.trust-strip .guest-favorite strong{
+ display:block!important;
+ text-align:center!important;
+}
