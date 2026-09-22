@@ -1132,3 +1132,9 @@ footer{justify-content:space-between!important}
  .collection .cards>article>.availability-box.open{height:auto!important;padding:0 28px 18px!important}
  .collection .cards>article>.availability-box.open>.availability-toggle{left:auto!important;transform:none!important;margin:0 auto!important}
 }
+
+/* Secondary chalet detail CTA — preserve existing consultation layout */
+.collection .cards>article>.chalet-explore{display:flex!important;align-items:center!important;justify-content:space-between!important;box-sizing:border-box!important;margin:0 40px 18px!important;padding:12px 0!important;border-top:1px solid rgba(198,166,136,.16)!important;border-bottom:1px solid rgba(198,166,136,.16)!important;color:#b9a898!important;font-size:9px!important;font-weight:500!important;letter-spacing:.15em!important;text-transform:uppercase!important;text-decoration:none!important}
+.collection .cards>article>.chalet-explore span{font-size:16px!important;color:#d5a86f!important;transition:transform .2s ease}
+.collection .cards>article>.chalet-explore:hover{color:#eadbc9!important}.collection .cards>article>.chalet-explore:hover span{transform:translateX(4px)}
+@media(max-width:800px){.collection .cards>article>.chalet-explore{margin:0 40px 18px!important;padding:12px 0!important}}
