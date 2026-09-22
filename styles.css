@@ -19,3 +19,14 @@
 
 .manifesto-photo{max-width:1180px;margin:60px auto 0;overflow:hidden}.manifesto-photo img{width:100%;height:min(70vw,720px);object-fit:cover;object-position:center;display:block}
 @media(max-width:760px){.manifesto-photo{margin:45px -22px -75px}.manifesto-photo img{height:auto;width:100%;object-fit:contain}}
+
+/* Hero reset + manifesto photo placement */
+.hero{position:relative;display:flex!important;background:linear-gradient(90deg,rgba(14,10,7,.67),rgba(14,10,7,.05)),url("assets/hero-signature.webp") center/cover no-repeat!important}
+.hero>.manifesto-photo{display:none!important}
+.manifesto .manifesto-photo{grid-column:1/-1;width:100%;max-width:1180px;margin:55px auto 0}
+@media(max-width:800px){
+ header .brand{white-space:nowrap;font-size:22px}
+ .hero{background-position:center!important}
+ .manifesto .manifesto-photo{margin:35px 0 0}
+ .manifesto .manifesto-photo img{width:100%;height:auto;display:block;object-fit:contain}
+}
