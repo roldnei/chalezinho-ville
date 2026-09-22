@@ -459,3 +459,27 @@ img{max-width:100%;height:auto}
  .trust-strip{gap:8px;padding:13px 12px;font-size:10px;letter-spacing:.035em}
  .trust-strip i{height:12px}
 }
+
+/* Guest recognition — compact Airbnb-inspired award treatment */
+.trust-strip{
+ display:flex!important;align-items:center!important;justify-content:center!important;flex-wrap:nowrap!important;
+ gap:30px!important;padding:22px 24px!important;background:#17120d!important;color:#eee6dc!important;
+ border-top:1px solid rgba(198,166,136,.14)!important;border-bottom:1px solid rgba(198,166,136,.14)!important;
+ text-transform:none!important;letter-spacing:0!important;
+}
+.guest-favorite{display:flex;align-items:center;gap:7px;text-align:center;font-family:Georgia,serif;font-size:15px;line-height:1.05}
+.guest-favorite b{font-weight:600}.laurel{font-size:27px;color:#c7a17d;transform:rotate(-18deg)}.laurel.mirror{transform:scaleX(-1) rotate(-18deg)}
+.trust-rating{display:grid;grid-template-columns:auto auto;column-gap:9px;align-items:center;padding:0 28px;border-left:1px solid rgba(198,166,136,.2);border-right:1px solid rgba(198,166,136,.2)}
+.trust-rating strong{grid-row:1/3;font-family:Georgia,serif;font-size:34px;line-height:1;font-weight:500;color:#fff}
+.trust-rating .stars{font-size:9px;letter-spacing:1px;color:#c7a17d}
+.trust-rating small,.trust-host small{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#9f958c}
+.trust-host{display:flex;flex-direction:column;gap:4px}.trust-host strong{font-family:Georgia,serif;font-size:18px;font-weight:500}
+@media(max-width:800px){
+ .trust-strip{gap:12px!important;padding:18px 12px!important}
+ .guest-favorite{gap:4px;font-size:11px}.laurel{font-size:20px}
+ .trust-rating{column-gap:6px;padding:0 12px}
+ .trust-rating strong{font-size:29px}
+ .trust-rating .stars{font-size:7px}
+ .trust-rating small,.trust-host small{font-size:8px}
+ .trust-host strong{font-size:14px}
+}
