@@ -374,3 +374,30 @@ img{max-width:100%;height:auto}
   line-height:1.4!important;
  }
 }
+
+/* Compact amenities — editorial tags instead of a long list */
+.collection .amenity-cloud{
+ display:flex;
+ flex-wrap:wrap;
+ gap:8px 9px;
+ margin-top:22px;
+ padding-top:18px;
+ border-top:1px solid rgba(198,166,136,.16);
+}
+.collection .amenity-cloud span{
+ display:inline-flex;
+ align-items:center;
+ min-height:30px;
+ padding:6px 11px;
+ border:1px solid rgba(198,166,136,.22);
+ border-radius:999px;
+ color:#aaa099;
+ font-size:12px;
+ line-height:1.15;
+ letter-spacing:.02em;
+ white-space:nowrap;
+}
+@media(max-width:800px){
+ .collection .amenity-cloud{gap:7px;margin-top:20px;padding-top:17px}
+ .collection .amenity-cloud span{min-height:28px;padding:5px 9px;font-size:11.5px}
+}
