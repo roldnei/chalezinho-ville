@@ -107,3 +107,10 @@
  }
  .mobile-book-now span{color:#6e4f32;font-size:24px!important}
 }
+
+/* Footer mobile layout fix */
+@media(max-width:800px){
+ footer{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:10px!important;padding:46px 24px 110px!important}
+ footer .brand{margin:0!important;font-size:28px!important;line-height:1.05!important;white-space:nowrap}
+ footer>span:last-child{display:block!important;font-size:13px!important;line-height:1.5!important;letter-spacing:.04em;color:#a49a91}
+}
