@@ -434,3 +434,28 @@ img{max-width:100%;height:auto}
  .collection .amenity-cloud span{font-size:12.5px!important;line-height:1.9!important}
  .collection .amenity-cloud span:not(:last-child)::after{margin:0 6px!important}
 }
+
+/* Discreet social proof directly below hero */
+.trust-strip{
+ display:flex;
+ align-items:center;
+ justify-content:center;
+ flex-wrap:wrap;
+ gap:12px;
+ padding:16px 24px;
+ background:#17120d;
+ border-top:1px solid rgba(198,166,136,.12);
+ border-bottom:1px solid rgba(198,166,136,.12);
+ color:#b9aea5;
+ font-size:12px;
+ line-height:1.3;
+ letter-spacing:.055em;
+ text-transform:uppercase;
+}
+.trust-strip span{white-space:nowrap}
+.trust-strip b{color:#eee6dc;font-weight:500}
+.trust-strip i{width:1px;height:14px;background:rgba(198,166,136,.25)}
+@media(max-width:800px){
+ .trust-strip{gap:8px;padding:13px 12px;font-size:10px;letter-spacing:.035em}
+ .trust-strip i{height:12px}
+}
