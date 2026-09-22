@@ -1154,3 +1154,15 @@ footer{justify-content:space-between!important}
  .collection .cards>article .amenity-cloud{min-width:0!important;max-width:100%!important}
  .collection .cards>article .amenity-cloud span{max-width:100%!important;box-sizing:border-box!important;white-space:normal!important}
 }
+
+/* True landscape mobile layout: remove desktop fixed card heights */
+@media (orientation:landscape) and (max-height:650px){
+ .collection{padding-top:48px!important;padding-bottom:48px!important}
+ .collection .cards{align-items:start!important}
+ .collection .cards>article .chalet-heading{min-height:0!important;height:auto!important;padding-top:22px!important;padding-bottom:18px!important}
+ .collection .cards>article .chalet-heading h3{min-height:0!important;height:auto!important;margin:8px 0 0!important;font-size:clamp(28px,3.3vw,42px)!important;line-height:1.05!important}
+ .collection .cards>article>.chalet-explore{margin-top:0!important}
+ .collection .cards>article>.availability-box{height:auto!important;min-height:0!important}
+ .collection .cards>article>.availability-box>.availability-toggle{width:calc(100% - 36px)!important;min-width:0!important;max-width:220px!important}
+ .collection .cards>article>.availability-box>.availability-hint{width:calc(100% - 28px)!important;max-width:240px!important}
+}
