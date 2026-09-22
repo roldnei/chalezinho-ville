@@ -25,3 +25,24 @@ document.addEventListener('DOMContentLoaded',()=>{
   show(0);
  });
 });
+
+document.addEventListener('DOMContentLoaded',()=>{
+ const phone='5593991592266';
+ const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset());
+ const min=today.toISOString().slice(0,10);
+ document.querySelectorAll('.availability-box').forEach(box=>{
+  const toggle=box.querySelector('.availability-toggle'),form=box.querySelector('.availability-form');
+  const din=box.querySelector('.date-in'),dout=box.querySelector('.date-out'),send=box.querySelector('.whatsapp-check'),err=box.querySelector('.date-error');
+  din.min=min; dout.min=min;
+  toggle.addEventListener('click',()=>box.classList.toggle('open'));
+  din.addEventListener('change',()=>{dout.min=din.value||min;if(dout.value&&dout.value<=din.value)dout.value=''});
+  send.addEventListener('click',()=>{
+   if(!din.value||!dout.value){err.textContent='Selecione as datas de check-in e check-out.';return}
+   if(dout.value<=din.value){err.textContent='O check-out deve ser depois do check-in.';return}
+   err.textContent='';
+   const fmt=v=>{const [y,m,d]=v.split('-');return d+'/'+m+'/'+y};
+   const msg='Olá! Gostaria de verificar a disponibilidade do '+box.dataset.chalet+' para o período de '+fmt(din.value)+' a '+fmt(dout.value)+'.';
+   window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank','noopener');
+  });
+ });
+});
