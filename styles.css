@@ -1034,3 +1034,26 @@ img{max-width:100%;height:auto}
   padding-top:0!important;
  }
 }
+
+/* Guest essentials + compact policies */
+.collection-summary.global-info{grid-template-columns:repeat(4,1fr)!important;gap:10px!important}
+.collection-summary.global-info>span{min-height:108px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;gap:5px!important;padding:16px 10px!important}
+.collection-summary.global-info b{font:500 25px/1 "Playfair Display",serif!important;color:#e6c49e!important}
+.collection-summary.global-info strong{font-size:11px!important;font-weight:500!important;letter-spacing:.12em!important;text-transform:uppercase!important;color:#eee5dc!important}
+.collection-summary.global-info small{font-size:9px!important;letter-spacing:.08em!important;color:#8e8278!important;text-transform:none!important}
+.consult-note{font-size:12px!important;line-height:1.6!important;color:#8f8175!important;border-left:1px solid #9b7043!important;padding-left:12px!important;margin:15px 0 18px!important}
+.important-info{background:#0b0907;color:#eee5dc;padding:0 6vw 80px}
+.important-info details{max-width:1180px;margin:auto;border-top:1px solid rgba(198,166,136,.2);border-bottom:1px solid rgba(198,166,136,.2)}
+.important-info summary{list-style:none;cursor:pointer;padding:24px 0;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase;letter-spacing:.16em;font-size:11px}
+.important-info summary::-webkit-details-marker{display:none}.important-info summary b{font-size:22px;font-weight:300;color:#c49a6c;transition:transform .25s}
+.important-info details[open] summary b{transform:rotate(45deg)}
+.important-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:28px;padding:0 0 28px}
+.important-grid p{margin:0;color:#91867d;font-size:12px;line-height:1.65}.important-grid strong{color:#ddd1c5;font-weight:500}
+.location strong{color:#fff;font-weight:500}
+@media(max-width:800px){
+ .collection-summary.global-info{grid-template-columns:1fr 1fr!important}
+ .collection-summary.global-info>span{min-height:102px!important;padding:14px 8px!important}
+ .collection-summary.global-info strong{font-size:10px!important}
+ .important-info{padding:0 24px 64px}
+ .important-grid{grid-template-columns:1fr 1fr;gap:22px 18px}
+}
