@@ -988,3 +988,27 @@ img{max-width:100%;height:auto}
   transform:none!important;height:auto!important;padding:0 40px 12px!important;
  }
 }
+
+/* Chalet title first, consultation second */
+.collection article .chalet-heading{
+ padding:34px 40px 20px!important;
+ background:#050403!important;
+}
+.collection article .chalet-heading small{
+ display:block!important;margin:0 0 12px!important;
+}
+.collection article .chalet-heading h3{
+ margin:0!important;
+}
+.collection article>.availability-box{
+ padding:0 40px 24px!important;
+ height:auto!important;
+}
+.collection article>.availability-box.open{
+ padding:0 40px 16px!important;
+}
+@media(max-width:800px){
+ .collection article .chalet-heading{padding:30px 40px 18px!important}
+ .collection article>.availability-box{height:auto!important;padding:0 40px 24px!important}
+ .collection article>.availability-box.open{padding:0 40px 16px!important}
+}
