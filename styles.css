@@ -289,3 +289,11 @@ img{max-width:100%;height:auto}
  .chalet-arrow.prev{left:12px}.chalet-arrow.next{right:12px}
  .chalet-dots{bottom:13px}
 }
+
+/* Carousel controls must stay above slides and receive touch/clicks */
+.chalet-carousel .chalet-slide{z-index:1!important}
+.chalet-carousel>strong,.chalet-carousel>.type-badge{z-index:5!important;pointer-events:none!important}
+.chalet-carousel .chalet-arrow{z-index:10!important;pointer-events:auto!important;touch-action:manipulation!important}
+.chalet-carousel .chalet-dots{z-index:10!important;pointer-events:auto!important}
+.chalet-carousel .chalet-dots button{pointer-events:auto!important;touch-action:manipulation!important}
+.chalet-carousel{touch-action:pan-y!important}
