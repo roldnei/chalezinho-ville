@@ -769,3 +769,42 @@ img{max-width:100%;height:auto}
  .collection article>.availability-box .availability-toggle{height:34px!important;padding:0 13px!important;font-size:8.5px!important}
  .collection article>.availability-box.open{left:40px!important;right:40px!important;transform:translateY(61px)!important}
 }
+
+/* CONSULTAR — stronger warm-gold CTA, separated from chalet title */
+.collection article>.availability-box{
+ right:40px!important;
+ transform:translateY(76px)!important;
+}
+.collection article>.availability-box .availability-toggle{
+ height:38px!important;
+ padding:0 17px!important;
+ border:1px solid #d6a735!important;
+ border-radius:999px!important;
+ background:#d6a735!important;
+ color:#171008!important;
+ box-shadow:0 5px 16px rgba(214,167,53,.18)!important;
+ font-weight:700!important;
+ letter-spacing:.14em!important;
+}
+.collection article>.availability-box .availability-toggle span{
+ color:#171008!important;
+ font-size:15px!important;
+}
+.collection article>.availability-box.open{
+ transform:translateY(76px)!important;
+}
+@media(max-width:800px){
+ .collection article>.availability-box{
+  right:40px!important;
+  transform:translateY(76px)!important;
+ }
+ .collection article>.availability-box .availability-toggle{
+  height:36px!important;
+  padding:0 15px!important;
+  font-size:9px!important;
+ }
+ .collection article>.availability-box.open{
+  left:40px!important;right:40px!important;
+  transform:translateY(76px)!important;
+ }
+}
