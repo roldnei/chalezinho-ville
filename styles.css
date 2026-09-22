@@ -271,3 +271,21 @@ img{max-width:100%;height:auto}
    display:inline-flex!important;gap:10px!important;align-items:center!important;
  }
 }
+
+/* Chalet photo carousels */
+.chalet-carousel{position:relative;overflow:hidden;aspect-ratio:4/3;background:#17130f}
+.chalet-carousel .chalet-slide{position:absolute!important;inset:0;width:100%!important;height:100%!important;object-fit:cover!important;opacity:0;transform:scale(1.015);transition:opacity .5s ease,transform .7s ease;pointer-events:none}
+.chalet-carousel .chalet-slide.active{opacity:1;transform:scale(1);z-index:1}
+.chalet-carousel>strong,.chalet-carousel>.type-badge,.chalet-arrow,.chalet-dots{z-index:4}
+.chalet-arrow{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(18,14,11,.52);color:#fff;font-size:25px;display:grid;place-items:center;backdrop-filter:blur(7px);cursor:pointer}
+.chalet-arrow.prev{left:14px}.chalet-arrow.next{right:14px}
+.chalet-dots{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:7px;padding:7px 9px;border-radius:20px;background:rgba(18,14,11,.38);backdrop-filter:blur(5px)}
+.chalet-dots button{width:6px;height:6px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.48)}
+.chalet-dots button.active{background:#fff;transform:scale(1.3)}
+@media(max-width:800px){
+ .collection .cards .chalet-carousel{width:100%!important;max-width:100%!important;aspect-ratio:4/3!important;touch-action:pan-y!important}
+ .collection .cards .chalet-carousel img{width:100%!important;max-width:100%!important;height:100%!important}
+ .chalet-arrow{width:34px;height:34px;font-size:22px}
+ .chalet-arrow.prev{left:12px}.chalet-arrow.next{right:12px}
+ .chalet-dots{bottom:13px}
+}
