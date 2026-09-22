@@ -944,3 +944,47 @@ img{max-width:100%;height:auto}
   left:40px!important;right:40px!important;top:auto!important;transform:translateY(46px)!important;
  }
 }
+
+/* CONSULTAR v10 — reserve a real header row; no absolute overlap with title */
+.collection article>.availability-box{
+ position:relative!important;
+ left:auto!important;right:auto!important;top:auto!important;
+ transform:none!important;
+ width:100%!important;height:48px!important;
+ margin:0!important;padding:0 40px!important;
+ box-sizing:border-box!important;
+ display:flex!important;justify-content:flex-end!important;align-items:flex-start!important;
+ background:#050403!important;z-index:25!important;
+}
+.collection article>.availability-box .availability-toggle{
+ position:static!important;transform:none!important;
+ width:176px!important;min-width:176px!important;height:40px!important;
+ margin:0!important;padding:0 18px!important;
+ border-radius:8px!important;
+ background:#a96d08!important;border:1px solid #c78b22!important;
+ font-size:9px!important;letter-spacing:.15em!important;
+ box-shadow:0 5px 14px rgba(0,0,0,.25)!important;
+}
+.collection article>.availability-box.open{
+ position:relative!important;left:auto!important;right:auto!important;top:auto!important;
+ transform:none!important;height:auto!important;
+ padding:0 40px 12px!important;
+ display:flex!important;flex-direction:column!important;align-items:flex-end!important;
+ background:#050403!important;
+}
+.collection article>.availability-box .availability-form{
+ width:100%!important;max-width:560px!important;margin:8px 0 0!important;
+}
+@media(max-width:800px){
+ .collection article>.availability-box{
+  position:relative!important;right:auto!important;top:auto!important;transform:none!important;
+  height:48px!important;padding:0 40px!important;
+ }
+ .collection article>.availability-box .availability-toggle{
+  width:176px!important;min-width:176px!important;height:40px!important;
+ }
+ .collection article>.availability-box.open{
+  position:relative!important;left:auto!important;right:auto!important;top:auto!important;
+  transform:none!important;height:auto!important;padding:0 40px 12px!important;
+ }
+}
