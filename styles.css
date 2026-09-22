@@ -1138,3 +1138,19 @@ footer{justify-content:space-between!important}
 .collection .cards>article>.chalet-explore span{font-size:16px!important;color:#d5a86f!important;transition:transform .2s ease}
 .collection .cards>article>.chalet-explore:hover{color:#eadbc9!important}.collection .cards>article>.chalet-explore:hover span{transform:translateX(4px)}
 @media(max-width:800px){.collection .cards>article>.chalet-explore{margin:0 40px 18px!important;padding:12px 0!important}}
+
+/* Landscape phones/tablets: fit collection to viewport, never create horizontal page overflow */
+@media (orientation:landscape) and (max-width:1000px){
+ .collection{box-sizing:border-box!important;width:100%!important;max-width:100vw!important;padding-left:18px!important;padding-right:18px!important;overflow:hidden!important}
+ .collection-head{box-sizing:border-box!important;width:100%!important;max-width:100%!important;padding-left:0!important;padding-right:0!important}
+ .collection .cards{box-sizing:border-box!important;width:100%!important;max-width:100%!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:12px!important;margin-left:0!important;margin-right:0!important}
+ .collection .cards>article{box-sizing:border-box!important;width:auto!important;min-width:0!important;max-width:100%!important;overflow:hidden!important}
+ .collection .cards .chalet-photo,.collection .cards img{width:100%!important;max-width:100%!important;min-width:0!important}
+ .collection .cards>article .chalet-heading{padding-left:18px!important;padding-right:18px!important;min-width:0!important}
+ .collection .cards>article .chalet-heading h3,.collection .cards>article .chalet-heading a{max-width:100%!important;overflow-wrap:anywhere!important}
+ .collection .cards>article>.chalet-explore{margin-left:18px!important;margin-right:18px!important}
+ .collection .cards>article>div:last-child{box-sizing:border-box!important;min-width:0!important;padding-left:18px!important;padding-right:18px!important}
+ .collection .cards>article p{overflow-wrap:anywhere!important}
+ .collection .cards>article .amenity-cloud{min-width:0!important;max-width:100%!important}
+ .collection .cards>article .amenity-cloud span{max-width:100%!important;box-sizing:border-box!important;white-space:normal!important}
+}
