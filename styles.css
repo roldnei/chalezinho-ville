@@ -1012,3 +1012,25 @@ img{max-width:100%;height:auto}
  .collection article>.availability-box{height:auto!important;padding:0 40px 24px!important}
  .collection article>.availability-box.open{padding:0 40px 16px!important}
 }
+
+/* Landscape/desktop: equal title zone keeps all CONSULTAR buttons aligned */
+@media(min-width:801px){
+ .collection .cards>article{
+  display:flex!important;
+  flex-direction:column!important;
+ }
+ .collection .cards>article .chalet-heading{
+  box-sizing:border-box!important;
+  min-height:310px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:flex-start!important;
+ }
+ .collection .cards>article .chalet-heading h3{
+  min-height:132px!important;
+ }
+ .collection .cards>article>.availability-box{
+  flex:0 0 auto!important;
+  padding-top:0!important;
+ }
+}
