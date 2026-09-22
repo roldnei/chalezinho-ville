@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   const toggle=box.querySelector('.availability-toggle'),form=box.querySelector('.availability-form');
   const din=box.querySelector('.date-in'),dout=box.querySelector('.date-out'),send=box.querySelector('.whatsapp-check'),err=box.querySelector('.date-error');
   din.min=min; dout.min=min;
-  toggle.addEventListener('click',()=>box.classList.toggle('open'));
+  if(toggle) toggle.addEventListener('click',()=>box.classList.toggle('open'));
   din.addEventListener('change',()=>{dout.min=din.value||min;if(dout.value&&dout.value<=din.value)dout.value=''});
   send.addEventListener('click',()=>{
    if(!din.value||!dout.value){err.textContent='Selecione as datas de check-in e check-out.';return}
