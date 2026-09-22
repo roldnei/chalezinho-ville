@@ -173,3 +173,33 @@ img{max-width:100%;height:auto}
  .review-card blockquote{font-size:19px}
 }
 @media(prefers-reduced-motion:reduce){.reviews-track{animation:none}}
+
+/* Reviews: contained swipe carousel on mobile */
+@media(max-width:800px){
+ .reviews{width:100%!important;max-width:100%!important;overflow:hidden!important}
+ .reviews-marquee{
+   width:100%!important;max-width:100%!important;
+   overflow-x:auto!important;overflow-y:hidden!important;
+   overscroll-behavior-x:contain!important;
+   scroll-snap-type:x mandatory!important;
+   scrollbar-width:none!important;
+   -webkit-overflow-scrolling:touch;
+   touch-action:pan-x!important;
+ }
+ .reviews-marquee::-webkit-scrollbar{display:none!important}
+ .reviews-track{
+   width:max-content!important;max-width:none!important;
+   display:flex!important;gap:12px!important;
+   padding:4px 18px 26px!important;
+   animation:none!important;transform:none!important;
+ }
+ .review-card{
+   flex:0 0 calc(100vw - 54px)!important;
+   width:calc(100vw - 54px)!important;
+   max-width:calc(100vw - 54px)!important;
+   min-height:310px!important;
+   scroll-snap-align:center!important;
+   scroll-snap-stop:always;
+ }
+ .reviews-link{max-width:calc(100% - 48px)!important}
+}
