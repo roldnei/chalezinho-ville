@@ -30,3 +30,41 @@
  .manifesto .manifesto-photo{margin:35px 0 0}
  .manifesto .manifesto-photo img{width:100%;height:auto;display:block;object-fit:contain}
 }
+
+/* Responsive editorial media system */
+:root{--media-max:1180px;--media-gutter:clamp(18px,5vw,72px)}
+.manifesto-photo,.story figure,.night-grid figure{position:relative;background:#181511;isolation:isolate}
+.manifesto-photo img,.story figure img,.night-grid figure img{display:block;width:100%;height:100%;object-fit:cover;transition:transform 1.4s cubic-bezier(.2,.65,.2,1),filter 1.1s ease}
+.manifesto-photo:after,.story figure:after,.night-grid figure:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(12,9,6,.03) 52%,rgba(12,9,6,.30) 100%);opacity:.72;transition:opacity 1s ease}
+.manifesto-photo:hover img,.story figure:hover img,.night-grid figure:hover img{transform:scale(1.025)}
+.manifesto-photo:hover:after,.story figure:hover:after,.night-grid figure:hover:after{opacity:.38}
+.manifesto .manifesto-photo{aspect-ratio:16/9;max-width:var(--media-max);overflow:hidden}.manifesto .manifesto-photo img{object-position:center 52%}
+.story{grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);width:100%}.story.reverse{grid-template-columns:minmax(240px,.65fr) minmax(0,1.35fr)}
+.story figure{aspect-ratio:4/3;min-height:0!important}.story img{min-height:0!important}
+.story-pool img{object-position:center 52%}.story-romance img{object-position:center 62%}
+.night-grid{width:100%}.night-main{aspect-ratio:4/3}.night-side{aspect-ratio:4/3}.night-main img,.night-side img{height:100%!important}.night-main img{object-position:center 56%}.night-side img{object-position:center 45%}
+@media(prefers-reduced-motion:no-preference){
+ .reveal{transform:translateY(34px) scale(.992);filter:blur(3px);transition:opacity 1s ease,transform 1.15s cubic-bezier(.16,1,.3,1),filter 1.1s ease}
+ .reveal.visible{transform:none;filter:none}
+}
+@media(max-width:800px){
+ .manifesto,.experience-editorial{overflow:hidden}
+ .manifesto .manifesto-photo{width:calc(100% + 48px);margin:38px -24px -10px;aspect-ratio:4/3}
+ .manifesto .manifesto-photo img{height:100%!important;object-fit:cover!important;object-position:center 48%}
+ .story,.story.reverse{display:grid;grid-template-columns:1fr!important;width:100%;gap:24px}
+ .story figure,.night-main,.night-side{width:100%!important;margin:0!important;aspect-ratio:4/3}
+ .story figure img,.night-main img,.night-side img{width:100%!important;height:100%!important;object-fit:cover!important}
+ .story-pool img{object-position:center 54%!important}
+ .story-romance img{object-position:center 66%!important}
+ .night-main img{object-position:center 58%!important}
+ .night-side img{object-position:center 42%!important}
+ .night-grid{grid-template-columns:1fr!important;gap:28px;width:100%}
+ .night-main figcaption{font-size:clamp(1.7rem,7vw,2.35rem);line-height:1.15}
+}
+@media(min-width:801px) and (max-width:1180px){
+ .manifesto .manifesto-photo,.story,.night-grid{max-width:calc(100vw - 2*var(--media-gutter))}
+ .story figure{aspect-ratio:5/4}.night-main,.night-side{aspect-ratio:4/3}
+}
+@media(min-width:1181px){
+ .story-pool figure{transform:translateX(-2vw)}.story-romance figure{transform:translateX(2vw)}
+}
