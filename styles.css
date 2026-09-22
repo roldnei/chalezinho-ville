@@ -858,3 +858,52 @@ img{max-width:100%;height:auto}
   width:100%!important;margin-top:12px!important;
  }
 }
+
+/* CONSULTAR v8 — overlay on photo, styled like feature label but roomier */
+.collection article>.availability-box{
+ position:absolute!important;
+ left:auto!important;right:24px!important;top:0!important;
+ transform:translateY(18px)!important;
+ width:auto!important;height:auto!important;
+ margin:0!important;padding:0!important;
+ display:block!important;background:transparent!important;
+ z-index:30!important;
+}
+.collection article>.availability-box .availability-toggle{
+ position:static!important;transform:none!important;
+ width:auto!important;min-width:190px!important;height:52px!important;
+ margin:0!important;padding:0 24px!important;
+ display:flex!important;justify-content:center!important;gap:18px!important;
+ border-radius:0!important;
+ background:#a96d08!important;border:1px solid #c78b22!important;
+ color:#fff7e8!important;
+ font-size:10px!important;font-weight:700!important;letter-spacing:.16em!important;
+ box-shadow:0 8px 22px rgba(0,0,0,.30)!important;
+ white-space:nowrap!important;
+}
+.collection article>.availability-box .availability-toggle span{color:#fff7e8!important}
+.collection article>.availability-box.open{
+ left:18px!important;right:18px!important;top:0!important;
+ transform:translateY(18px)!important;
+ padding:0!important;background:transparent!important;
+ display:flex!important;flex-direction:column!important;align-items:flex-end!important;
+}
+.collection article>.availability-box.open .availability-toggle{margin:0!important}
+.collection article>.availability-box .availability-form{
+ width:min(560px,100%)!important;
+ margin:10px 0 0!important;padding:16px!important;
+ background:#100c09!important;
+}
+@media(max-width:800px){
+ .collection article>.availability-box{
+  right:24px!important;top:0!important;transform:translateY(18px)!important;
+  padding:0!important;
+ }
+ .collection article>.availability-box .availability-toggle{
+  min-width:200px!important;height:50px!important;padding:0 22px!important;font-size:9.5px!important;
+ }
+ .collection article>.availability-box.open{
+  left:16px!important;right:16px!important;top:0!important;
+  transform:translateY(18px)!important;padding:0!important;
+ }
+}
