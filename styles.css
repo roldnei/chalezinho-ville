@@ -1217,3 +1217,26 @@ footer{justify-content:space-between!important}
  .detail-practical{grid-template-columns:1fr;gap:35px;padding:80px 26px}.practical-grid{grid-template-columns:1fr}
  .detail-closing{min-height:70svh;padding:70px 26px}
 }
+
+/* Richer individual chalet photo story */
+.chalet-page .detail-photo-story{padding:110px 7vw 125px;background:#100d0a;border-top:1px solid rgba(198,166,136,.1)}
+.chalet-page .photo-story-head{max-width:760px;margin:0 auto 55px;text-align:center}
+.chalet-page .photo-story-head small{display:block;margin-bottom:18px;color:#b18a63;font-size:9px;letter-spacing:.24em}
+.chalet-page .photo-story-head h2{margin:0;color:#eee5dc;font:500 clamp(34px,4.5vw,62px)/1.04 "Playfair Display",serif}
+.chalet-page .photo-story-head h2 em{font-weight:500;color:#c9a27e}
+.chalet-page .photo-story-head p{max-width:590px;margin:24px auto 0;color:#9f958c;font-size:13px;line-height:1.85}
+.chalet-page .photo-story-grid{display:grid;grid-template-columns:1.45fr .8fr;grid-template-rows:320px 320px;gap:12px;max-width:1240px;margin:0 auto}
+.chalet-page .photo-story-grid figure{margin:0;overflow:hidden;background:#17120e}
+.chalet-page .photo-story-grid figure.wide{grid-row:1/3}
+.chalet-page .photo-story-grid img{width:100%;height:100%;display:block;object-fit:cover;transition:transform .7s ease}
+.chalet-page .photo-story-grid figure:hover img{transform:scale(1.02)}
+@media(max-width:800px){
+ .chalet-page .detail-photo-story{padding:76px 18px 86px}
+ .chalet-page .photo-story-head{margin-bottom:34px;padding:0 12px}
+ .chalet-page .photo-story-head h2{font-size:38px}
+ .chalet-page .photo-story-grid{grid-template-columns:1fr;grid-template-rows:auto;gap:9px}
+ .chalet-page .photo-story-grid figure.wide{grid-row:auto}
+ .chalet-page .photo-story-grid figure{aspect-ratio:4/5}
+ .chalet-page .photo-story-grid figure.wide{aspect-ratio:4/5}
+ .chalet-page .photo-story-grid img{height:100%;object-fit:cover}
+}
