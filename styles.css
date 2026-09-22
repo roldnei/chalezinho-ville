@@ -554,3 +554,15 @@ img{max-width:100%;height:auto}
  .collection .amenity-cloud{gap:7px!important;margin-top:18px!important;padding-top:16px!important}
  .collection .amenity-cloud span{min-height:28px!important;padding:5px 9px!important;font-size:11.5px!important}
 }
+
+/* Availability inquiry */
+.availability-box{margin-top:22px}
+.availability-toggle,.whatsapp-check{width:100%;border:1px solid rgba(198,166,136,.35);background:transparent;color:#eee6dc;padding:14px 16px;font:600 11px Arial,sans-serif;letter-spacing:.13em;text-transform:uppercase;cursor:pointer}
+.availability-toggle{display:flex;justify-content:space-between;align-items:center}
+.availability-form{display:none;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;padding:14px;border:1px solid rgba(198,166,136,.16)}
+.availability-box.open .availability-form{display:grid}
+.availability-form label{font:10px Arial,sans-serif;letter-spacing:.1em;text-transform:uppercase;color:#9f958c}
+.availability-form input{box-sizing:border-box;width:100%;margin-top:7px;padding:11px 8px;border:1px solid rgba(198,166,136,.25);background:#120e0b;color:#eee6dc;color-scheme:dark;font-size:13px}
+.whatsapp-check{grid-column:1/-1;background:#30200b;margin-top:2px}
+.date-error{grid-column:1/-1;color:#c9a07d;font-size:11px;min-height:0}
+@media(max-width:800px){.availability-form{padding:12px}.availability-toggle,.whatsapp-check{padding:13px 14px}}
