@@ -1301,3 +1301,22 @@ footer{justify-content:space-between!important}
  .collection .cards>article>div:last-child>p{max-width:330px!important;margin-left:auto!important;margin-right:auto!important;text-align:center!important}
  .collection .cards>article .amenity-cloud{justify-content:center!important;text-align:center!important}
 }
+
+
+/* Landscape mobile/tablet final alignment — applies to taller browser viewports too */
+@media (orientation:landscape) and (max-width:1600px){
+ .collection .cards>article{text-align:center!important}
+ .collection .cards>article .chalet-photo{width:100%!important;margin:0 auto!important;text-align:center!important}
+ .collection .cards>article .chalet-photo img{width:100%!important;object-position:center center!important}
+ .collection .cards>article .chalet-heading{display:flex!important;flex-direction:column!important;align-items:center!important;text-align:center!important}
+ .collection .cards>article .chalet-heading>small,
+ .collection .cards>article .chalet-heading>h3{width:100%!important;text-align:center!important;justify-content:center!important}
+ .collection .cards>article .chalet-heading>.chalet-explore{align-self:center!important;margin-left:auto!important;margin-right:auto!important}
+ .collection .cards>article>.availability-box{display:flex!important;flex-direction:column!important;align-items:center!important;text-align:center!important}
+ .collection .cards>article>.availability-box>.availability-toggle{position:relative!important;left:auto!important;transform:none!important;margin-left:auto!important;margin-right:auto!important}
+ .collection .cards>article>.availability-box>.availability-hint,
+ .collection .cards>article>.availability-box>.airbnb-card-link{position:relative!important;left:auto!important;transform:none!important;margin-left:auto!important;margin-right:auto!important;text-align:center!important}
+ .collection .cards>article>div:last-child{text-align:center!important}
+ .collection .cards>article>div:last-child>p{max-width:330px!important;margin-left:auto!important;margin-right:auto!important;text-align:center!important}
+ .collection .cards>article .amenity-cloud{display:flex!important;flex-wrap:wrap!important;justify-content:center!important;text-align:center!important}
+}
