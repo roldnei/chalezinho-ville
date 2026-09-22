@@ -907,3 +907,40 @@ img{max-width:100%;height:auto}
   transform:translateY(18px)!important;padding:0!important;
  }
 }
+
+/* CONSULTAR v9 — right of chalet eyebrow, where indicated */
+.collection article>.availability-box{
+ position:absolute!important;
+ left:auto!important;right:40px!important;top:auto!important;
+ transform:translateY(46px)!important;
+ width:auto!important;height:auto!important;
+ margin:0!important;padding:0!important;
+ z-index:30!important;background:transparent!important;
+}
+.collection article>.availability-box .availability-toggle{
+ width:auto!important;min-width:150px!important;height:40px!important;
+ padding:0 18px!important;gap:14px!important;
+ border-radius:8px!important;
+ background:#a96d08!important;border:1px solid #c78b22!important;
+ font-size:9px!important;letter-spacing:.15em!important;
+ box-shadow:0 5px 14px rgba(0,0,0,.25)!important;
+}
+.collection article>.availability-box.open{
+ left:40px!important;right:40px!important;top:auto!important;
+ transform:translateY(46px)!important;padding:0!important;
+ display:flex!important;flex-direction:column!important;align-items:flex-end!important;
+}
+.collection article>.availability-box .availability-form{
+ width:100%!important;max-width:560px!important;margin:8px 0 0!important;
+}
+@media(max-width:800px){
+ .collection article>.availability-box{
+  right:40px!important;top:auto!important;transform:translateY(46px)!important;
+ }
+ .collection article>.availability-box .availability-toggle{
+  min-width:150px!important;height:40px!important;padding:0 17px!important;font-size:9px!important;
+ }
+ .collection article>.availability-box.open{
+  left:40px!important;right:40px!important;top:auto!important;transform:translateY(46px)!important;
+ }
+}
