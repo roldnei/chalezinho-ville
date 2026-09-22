@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://chalezinhoville.com.br/sitemap.xml
