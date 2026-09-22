@@ -1057,3 +1057,5 @@ img{max-width:100%;height:auto}
  .important-info{padding:0 24px 64px}
  .important-grid{grid-template-columns:1fr 1fr;gap:22px 18px}
 }
+
+.location-address{display:block;margin:24px 0 14px;color:#d8b88f;font-size:12px;letter-spacing:.12em;text-transform:uppercase}
