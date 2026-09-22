@@ -1240,3 +1240,25 @@ footer{justify-content:space-between!important}
  .chalet-page .photo-story-grid figure.wide{aspect-ratio:4/5}
  .chalet-page .photo-story-grid img{height:100%;object-fit:cover}
 }
+
+
+/* Harmonize chalet card actions across all three columns */
+@media(min-width:801px){
+ .collection .cards{align-items:stretch!important}
+ .collection .cards>article{display:grid!important;grid-template-rows:auto 240px 112px auto!important;align-content:start!important}
+ .collection .cards>article>.chalet-heading{box-sizing:border-box!important;height:240px!important;min-height:240px!important;padding:28px!important;display:grid!important;grid-template-rows:34px 62px 46px!important;row-gap:12px!important;align-content:start!important}
+ .collection .cards>article>.chalet-heading>small{display:flex!important;align-items:flex-start!important;min-height:34px!important;line-height:1.45!important}
+ .collection .cards>article>.chalet-heading>h3{display:flex!important;align-items:center!important;height:62px!important;min-height:62px!important;margin:0!important;line-height:1.05!important}
+ .collection .cards>article>.chalet-heading>.chalet-explore{align-self:start!important;width:220px!important;height:46px!important;margin:0!important;padding:0 14px!important}
+ .collection .cards>article>.availability-box{height:112px!important;min-height:112px!important}
+ .collection .cards>article>.availability-box>.availability-toggle{height:46px!important}
+}
+@media(orientation:landscape) and (max-height:650px){
+ .collection .cards>article{grid-template-rows:auto 198px 104px auto!important}
+ .collection .cards>article>.chalet-heading{height:198px!important;min-height:198px!important;padding:22px 18px 18px!important;grid-template-rows:30px 54px 42px!important;row-gap:10px!important}
+ .collection .cards>article>.chalet-heading>small{min-height:30px!important}
+ .collection .cards>article>.chalet-heading>h3{height:54px!important;min-height:54px!important;margin:0!important}
+ .collection .cards>article>.chalet-heading>.chalet-explore{width:190px!important;height:42px!important;margin:0!important;padding:0 12px!important}
+ .collection .cards>article>.availability-box{height:104px!important;min-height:104px!important;padding:0!important;margin:0!important}
+ .collection .cards>article>.availability-box>.availability-toggle{height:46px!important;margin:0 auto!important}
+}
