@@ -525,3 +525,32 @@ img{max-width:100%;height:auto}
  display:block!important;
  text-align:center!important;
 }
+
+/* Restore outlined amenity pills */
+.collection .amenity-cloud{
+ display:flex!important;
+ flex-wrap:wrap!important;
+ gap:8px 9px!important;
+ margin-top:20px!important;
+ padding-top:18px!important;
+ border-top:1px solid rgba(198,166,136,.16)!important;
+}
+.collection .amenity-cloud span{
+ display:inline-flex!important;
+ align-items:center!important;
+ min-height:30px!important;
+ padding:6px 11px!important;
+ border:1px solid rgba(198,166,136,.22)!important;
+ border-radius:999px!important;
+ background:transparent!important;
+ color:#aaa099!important;
+ font-size:12px!important;
+ line-height:1.15!important;
+ letter-spacing:.02em!important;
+ white-space:nowrap!important;
+}
+.collection .amenity-cloud span::after{content:none!important;margin:0!important}
+@media(max-width:800px){
+ .collection .amenity-cloud{gap:7px!important;margin-top:18px!important;padding-top:16px!important}
+ .collection .amenity-cloud span{min-height:28px!important;padding:5px 9px!important;font-size:11.5px!important}
+}
