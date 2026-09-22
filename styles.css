@@ -401,3 +401,36 @@ img{max-width:100%;height:auto}
  .collection .amenity-cloud{gap:7px;margin-top:20px;padding-top:17px}
  .collection .amenity-cloud span{min-height:28px;padding:5px 9px;font-size:11.5px}
 }
+
+/* Amenities — simple editorial separators */
+.collection .amenity-cloud{
+ display:flex!important;
+ flex-wrap:wrap!important;
+ gap:0!important;
+ margin-top:20px!important;
+ padding-top:16px!important;
+ border-top:1px solid rgba(198,166,136,.16)!important;
+}
+.collection .amenity-cloud span{
+ display:inline!important;
+ min-height:0!important;
+ padding:0!important;
+ border:0!important;
+ border-radius:0!important;
+ background:none!important;
+ color:#aaa099!important;
+ font-size:13px!important;
+ line-height:1.8!important;
+ letter-spacing:.01em!important;
+ white-space:normal!important;
+}
+.collection .amenity-cloud span:not(:last-child)::after{
+ content:" | "!important;
+ color:#c7a17d!important;
+ margin:0 7px!important;
+}
+@media(max-width:800px){
+ .collection .amenity-cloud{margin-top:18px!important;padding-top:15px!important}
+ .collection .amenity-cloud span{font-size:12.5px!important;line-height:1.9!important}
+ .collection .amenity-cloud span:not(:last-child)::after{margin:0 6px!important}
+}
