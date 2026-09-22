@@ -1166,3 +1166,9 @@ footer{justify-content:space-between!important}
  .collection .cards>article>.availability-box>.availability-toggle{width:calc(100% - 36px)!important;min-width:0!important;max-width:220px!important}
  .collection .cards>article>.availability-box>.availability-hint{width:calc(100% - 28px)!important;max-width:240px!important}
 }
+
+/* Chalet page CTA lives inside heading so it cannot be displaced by card layout */
+.collection .cards>article .chalet-heading>.chalet-explore{display:inline-flex!important;align-items:center!important;justify-content:space-between!important;align-self:flex-start!important;width:220px!important;max-width:100%!important;box-sizing:border-box!important;margin:22px 0 0!important;padding:11px 14px!important;border:1px solid rgba(198,166,136,.34)!important;border-radius:7px!important;color:#cdb69f!important;background:rgba(198,166,136,.035)!important;font-size:9px!important;font-weight:600!important;letter-spacing:.14em!important;line-height:1!important;text-transform:uppercase!important;text-decoration:none!important}
+.collection .cards>article .chalet-heading>.chalet-explore span{font-size:15px!important;color:#d5a86f!important}
+@media(max-width:800px){.collection .cards>article .chalet-heading>.chalet-explore{width:220px!important;margin:20px 0 0!important}}
+@media(orientation:landscape) and (max-height:650px){.collection .cards>article .chalet-heading>.chalet-explore{width:190px!important;margin:14px 0 0!important;padding:10px 12px!important}}
