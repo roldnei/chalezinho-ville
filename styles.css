@@ -297,3 +297,7 @@ img{max-width:100%;height:auto}
 .chalet-carousel .chalet-dots{z-index:10!important;pointer-events:auto!important}
 .chalet-carousel .chalet-dots button{pointer-events:auto!important;touch-action:manipulation!important}
 .chalet-carousel{touch-action:pan-y!important}
+
+/* Ensure portrait CH1 cover is visible in carousel */
+.chalet-carousel .chalet-slide.active{display:block!important;visibility:visible!important;opacity:1!important}
+.chalet-carousel .chalet-slide:not(.active){visibility:hidden!important;opacity:0!important}
