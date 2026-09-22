@@ -1283,3 +1283,21 @@ footer{justify-content:space-between!important}
  .collection .cards>article .chalet-heading>.chalet-explore,
  .collection .cards>article>.availability-box>.availability-toggle{width:190px!important;max-width:calc(100% - 36px)!important}
 }
+
+
+/* Landscape collection: center all card content as one visual axis */
+@media (orientation:landscape) and (max-height:650px){
+ .collection .cards>article{text-align:center!important}
+ .collection .cards>article .chalet-photo{margin-left:auto!important;margin-right:auto!important}
+ .collection .cards>article .chalet-heading{align-items:center!important;text-align:center!important}
+ .collection .cards>article .chalet-heading>small,
+ .collection .cards>article .chalet-heading>h3{width:100%!important;justify-content:center!important;text-align:center!important}
+ .collection .cards>article .chalet-heading>.chalet-explore{align-self:center!important;margin-left:auto!important;margin-right:auto!important}
+ .collection .cards>article>.availability-box{text-align:center!important;justify-items:center!important}
+ .collection .cards>article>.availability-box>.availability-toggle{margin-left:auto!important;margin-right:auto!important}
+ .collection .cards>article>.availability-box>.availability-hint,
+ .collection .cards>article>.availability-box>.airbnb-card-link{margin-left:auto!important;margin-right:auto!important;text-align:center!important}
+ .collection .cards>article>div:last-child{text-align:center!important}
+ .collection .cards>article>div:last-child>p{max-width:330px!important;margin-left:auto!important;margin-right:auto!important;text-align:center!important}
+ .collection .cards>article .amenity-cloud{justify-content:center!important;text-align:center!important}
+}
