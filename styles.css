@@ -566,3 +566,39 @@ img{max-width:100%;height:auto}
 .whatsapp-check{grid-column:1/-1;background:#30200b;margin-top:2px}
 .date-error{grid-column:1/-1;color:#c9a07d;font-size:11px;min-height:0}
 @media(max-width:800px){.availability-form{padding:12px}.availability-toggle,.whatsapp-check{padding:13px 14px}}
+
+/* Availability CTA attached to each chalet photo */
+.collection article{position:relative}
+.collection article>.availability-box{
+ position:absolute!important;
+ top:auto!important;
+ right:18px!important;
+ margin:0!important;
+ z-index:20!important;
+ transform:translateY(-64px)!important;
+ width:auto!important;
+}
+.collection article>.availability-box .availability-toggle{
+ width:auto!important;
+ min-width:210px!important;
+ padding:13px 16px!important;
+ background:#3a2509!important;
+ border:1px solid rgba(215,177,126,.55)!important;
+ box-shadow:0 8px 24px rgba(0,0,0,.28)!important;
+ color:#f5eee5!important;
+}
+.collection article>.availability-box.open{
+ left:18px!important;
+ right:18px!important;
+ transform:translateY(-64px)!important;
+}
+.collection article>.availability-box.open .availability-toggle{margin-left:auto!important}
+.collection article>.availability-box .availability-form{
+ background:#17110d!important;
+ box-shadow:0 14px 36px rgba(0,0,0,.4)!important;
+}
+@media(max-width:800px){
+ .collection article>.availability-box{right:14px!important;transform:translateY(-58px)!important}
+ .collection article>.availability-box .availability-toggle{min-width:190px!important;padding:12px 14px!important;font-size:10px!important}
+ .collection article>.availability-box.open{left:14px!important;right:14px!important;transform:translateY(-58px)!important}
+}
