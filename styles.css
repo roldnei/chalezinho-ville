@@ -318,3 +318,18 @@ img{max-width:100%;height:auto}
   bottom:auto!important;
  }
 }
+
+/* Expanded amenities: keep every item visible */
+.collection .amenities{
+ display:flex!important;
+ flex-wrap:wrap!important;
+ gap:8px!important;
+ max-height:none!important;
+ height:auto!important;
+ overflow:visible!important;
+}
+.collection .amenities li{
+ display:list-item!important;
+ visibility:visible!important;
+ opacity:1!important;
+}
