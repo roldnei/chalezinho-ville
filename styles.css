@@ -697,3 +697,37 @@ img{max-width:100%;height:auto}
  .collection article>.availability-box .availability-toggle{width:100%!important;max-width:none!important;height:52px!important;margin:0!important;font-size:10.5px!important}
  .collection article>.availability-box .availability-form{width:100%!important;margin:0!important;padding:14px 16px 18px!important}
 }
+
+/* Availability CTA v5 — small floating tab bridging image and content */
+.collection article>.availability-box{
+ position:relative!important;display:block!important;width:100%!important;height:0!important;
+ margin:0!important;padding:0!important;background:transparent!important;z-index:25!important;
+}
+.collection article>.availability-box .availability-toggle{
+ position:absolute!important;right:22px!important;top:0!important;
+ transform:translateY(-50%)!important;
+ width:auto!important;min-width:0!important;height:44px!important;
+ margin:0!important;padding:0 18px!important;
+ border:1px solid rgba(206,170,121,.42)!important;border-radius:999px!important;
+ background:#17110c!important;box-shadow:0 8px 22px rgba(0,0,0,.38)!important;
+ color:#eee4da!important;font-size:9.5px!important;letter-spacing:.13em!important;
+ white-space:nowrap!important;
+}
+.collection article>.availability-box .availability-toggle span{
+ font-size:14px!important;color:#c7a17d!important;transform:none!important;
+}
+.collection article>.availability-box.open{height:auto!important;padding-top:30px!important;background:#050403!important}
+.collection article>.availability-box.open .availability-toggle{top:0!important}
+.collection article>.availability-box .availability-form{
+ width:calc(100% - 36px)!important;margin:0 18px 12px!important;padding:14px!important;
+ border:1px solid rgba(198,166,136,.16)!important;border-radius:12px!important;
+ background:#100c09!important;box-shadow:0 12px 28px rgba(0,0,0,.28)!important;
+}
+@media(max-width:800px){
+ .collection article>.availability-box .availability-toggle{
+  right:16px!important;width:auto!important;max-width:calc(100% - 32px)!important;
+  height:42px!important;padding:0 15px!important;font-size:9px!important;
+ }
+ .collection article>.availability-box.open{padding-top:29px!important}
+ .collection article>.availability-box .availability-form{width:calc(100% - 28px)!important;margin:0 14px 12px!important}
+}
