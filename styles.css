@@ -483,3 +483,33 @@ img{max-width:100%;height:auto}
  .trust-rating small,.trust-host small{font-size:8px}
  .trust-host strong{font-size:14px}
 }
+
+/* Trust strip v3 — Airbnb-style three-column layout */
+.trust-strip{
+ display:grid!important;
+ grid-template-columns:auto 1px auto 1px auto!important;
+ align-items:center!important;
+ justify-content:center!important;
+ gap:24px!important;
+ padding:20px 22px!important;
+ background:#17120d!important;
+ color:#f0e8df!important;
+ text-align:center!important;
+}
+.trust-sep{width:1px!important;height:48px!important;background:rgba(238,230,223,.18)!important}
+.trust-rating{display:flex!important;flex-direction:column!important;align-items:center!important;padding:0!important;border:0!important}
+.trust-rating strong,.trust-reviews strong{font-family:Arial,sans-serif!important;font-size:27px!important;line-height:1!important;font-weight:600!important;color:#f7f2ec!important}
+.trust-rating .stars{margin-top:6px!important;font-size:10px!important;letter-spacing:2px!important;color:#f7f2ec!important}
+.guest-favorite{display:flex!important;align-items:center!important;gap:8px!important;font-family:Arial,sans-serif!important;font-size:15px!important;line-height:1.08!important}
+.guest-favorite strong{font-weight:600!important}.laurel{font-size:29px!important;color:#c7a17d!important}.laurel.mirror{transform:scaleX(-1)!important}
+.trust-reviews{display:flex!important;flex-direction:column!important;gap:4px!important;align-items:center!important}
+.trust-reviews span{font-size:12px!important;color:#b8ada4!important}
+@media(max-width:800px){
+ .trust-strip{grid-template-columns:auto 1px minmax(0,1fr) 1px auto!important;gap:10px!important;padding:17px 12px!important}
+ .trust-sep{height:42px!important}
+ .trust-rating strong,.trust-reviews strong{font-size:23px!important}
+ .trust-rating .stars{font-size:7px!important;letter-spacing:1px!important;margin-top:5px!important}
+ .guest-favorite{gap:4px!important;font-size:12px!important;white-space:nowrap!important}
+ .laurel{font-size:20px!important}
+ .trust-reviews span{font-size:10px!important}
+}
