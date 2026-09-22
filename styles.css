@@ -301,3 +301,20 @@ img{max-width:100%;height:auto}
 /* Ensure portrait CH1 cover is visible in carousel */
 .chalet-carousel .chalet-slide.active{display:block!important;visibility:visible!important;opacity:1!important}
 .chalet-carousel .chalet-slide:not(.active){visibility:hidden!important;opacity:0!important}
+
+/* Chalet feature labels: consistent top-right position */
+.chalet-carousel>.type-badge{
+ left:auto!important;
+ right:18px!important;
+ top:18px!important;
+ bottom:auto!important;
+ margin:0!important;
+}
+@media(max-width:800px){
+ .chalet-carousel>.type-badge{
+  left:auto!important;
+  right:14px!important;
+  top:14px!important;
+  bottom:auto!important;
+ }
+}
