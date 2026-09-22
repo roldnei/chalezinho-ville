@@ -1086,3 +1086,8 @@ footer{justify-content:space-between!important}
 .footer-contact{display:flex;align-items:center;gap:18px;font-size:10px;letter-spacing:.13em;text-transform:uppercase}
 .footer-contact>span:first-child{color:#766d65}.footer-contact a{color:#d8b88f;border-bottom:1px solid rgba(216,184,143,.45);padding-bottom:3px}.footer-instagram{color:#625b55}
 @media(max-width:800px){footer{align-items:flex-start!important}.footer-brand{display:flex;flex-direction:column;align-items:flex-start;gap:8px}.footer-contact{margin-top:18px;flex-wrap:wrap;gap:14px 18px}.footer-contact>span:first-child{width:100%}}
+
+/* Floating WhatsApp contact */
+.floating-whatsapp{position:fixed;right:22px;bottom:22px;z-index:80;display:flex;align-items:center;gap:10px;padding:13px 17px;border-radius:999px;background:#25D366;color:#fff!important;box-shadow:0 10px 28px rgba(0,0,0,.28);font-size:11px;font-weight:600;letter-spacing:.04em;transition:transform .2s ease,box-shadow .2s ease}
+.floating-whatsapp svg{width:23px;height:23px;flex:0 0 23px}.floating-whatsapp:hover{transform:translateY(-2px);box-shadow:0 13px 32px rgba(0,0,0,.34)}
+@media(max-width:800px){.floating-whatsapp{right:16px;bottom:16px;width:54px;height:54px;padding:0;justify-content:center}.floating-whatsapp svg{width:27px;height:27px}.floating-whatsapp span{display:none}}
