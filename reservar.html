@@ -83,10 +83,14 @@ document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('clic
   const card=b.closest('.booking-property');
   const shown=card.querySelector('.booking-price strong').textContent;
   const numeric=Number(shown.replace(/[^0-9,]/g,'').replace(',','.'))||null;
-  const r=await fetch('/api/create-hold',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
-   property_code:chaletCodes[b.dataset.chalet],check_in:bi.value,check_out:bo.value,
-   guests:Number(document.getElementById('book-guests').value),total_price:numeric
-  })});
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
+  let r;
+  try{
+   r=await fetch('/api/create-hold',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({
+    property_code:chaletCodes[b.dataset.chalet],check_in:bi.value,check_out:bo.value,
+    guests:Number(document.getElementById('book-guests').value),total_price:numeric
+   })});
+  }finally{clearTimeout(timeout)}
   const data=await r.json();
   if(r.status===409){err.textContent='Essas datas acabaram de ficar indisponíveis. Faça uma nova busca.';b.textContent='Indisponível';return}
   if(!r.ok||!data.ok)throw new Error('hold');
