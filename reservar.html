@@ -6,7 +6,7 @@
 <title>Reserva direta | Chalezinho Ville</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=49"></head>
+<link rel="stylesheet" href="styles.css?v=50"></head>
 <body class="booking-page">
 <header class="detail-header"><a class="brand" href="index.html">Chalezinho <i>Ville</i></a><a class="back-home" href="index.html">← Voltar ao site</a></header>
 <main class="booking-shell">
@@ -52,13 +52,13 @@ function renderCalendar(){
   b.onclick=()=>pickDate(s);grid.appendChild(b);
  }}
 function pickDate(s){if(selecting==='in'||!bi.value||bo.value){bi.value=s;bo.value='';selecting='out';document.getElementById('cal-help').textContent='Agora selecione o check-out';}
- else if(s<=bi.value){bi.value=s;bo.value='';}else{bo.value=s;selecting='in';pop.classList.remove('open');}
+ else if(s<=bi.value){bi.value=s;bo.value='';}else{bo.value=s;selecting='in';pop.classList.remove('open');document.body.classList.remove('calendar-open');}
  document.getElementById('in-display').textContent=fmt(bi.value);document.getElementById('out-display').textContent=fmt(bo.value);renderCalendar();}
-document.getElementById('date-trigger').onclick=()=>{pop.classList.toggle('open');renderCalendar()};
+document.getElementById('date-trigger').onclick=()=>{pop.classList.toggle('open');document.body.classList.toggle('calendar-open',pop.classList.contains('open'));renderCalendar()};
 document.getElementById('cal-prev').onclick=()=>{const p=new Date(viewMonth.getFullYear(),viewMonth.getMonth()-1,1);if(p>=new Date(today.getFullYear(),today.getMonth(),1)){viewMonth=p;renderCalendar()}};
 document.getElementById('cal-next').onclick=()=>{viewMonth=new Date(viewMonth.getFullYear(),viewMonth.getMonth()+1,1);renderCalendar()};
 document.getElementById('cal-clear').onclick=()=>{bi.value='';bo.value='';selecting='in';document.getElementById('in-display').textContent='Adicionar data';document.getElementById('out-display').textContent='Adicionar data';document.getElementById('cal-help').textContent='Selecione o check-in';renderCalendar()};
-document.addEventListener('click',e=>{if(!e.target.closest('.date-range-picker'))pop.classList.remove('open')});
+document.addEventListener('click',e=>{if(!e.target.closest('.date-range-picker')){pop.classList.remove('open');document.body.classList.remove('calendar-open')}});
 const listingMap={
   '1526341230074666349':'Ville Signature','15084665___1508466501':'Ville Signature',
   '1547126637360310141':'Ville Essenza','17178441___1717844101':'Ville Essenza',
