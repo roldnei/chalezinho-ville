@@ -13,8 +13,13 @@
 <section class="booking-intro"><small>RESERVA DIRETA · DISPONIBILIDADE REAL</small><h1>Escolha seus dias.<br><em>O resto é com a gente.</em></h1><p>Consulte uma estadia no Chalezinho Ville. A disponibilidade agora é verificada com as reservas sincronizadas no PriceLabs; os valores entram na próxima etapa.</p></section>
 <section class="booking-search">
 <div class="booking-fields">
-<label>Check-in<input id="book-in" type="date"></label>
-<label>Check-out<input id="book-out" type="date"></label>
+<div class="date-range-picker">
+<button class="date-field" id="date-trigger" type="button"><span><small>CHECK-IN</small><strong id="in-display">Adicionar data</strong></span><span><small>CHECK-OUT</small><strong id="out-display">Adicionar data</strong></span></button>
+<div class="calendar-popover" id="calendar-popover">
+<div class="calendar-head"><button id="cal-prev" type="button" aria-label="Mês anterior">‹</button><strong id="cal-title"></strong><button id="cal-next" type="button" aria-label="Próximo mês">›</button></div>
+<div class="calendar-week"><span>DOM</span><span>SEG</span><span>TER</span><span>QUA</span><span>QUI</span><span>SEX</span><span>SÁB</span></div>
+<div class="calendar-grid" id="calendar-grid"></div><div class="calendar-foot"><span id="cal-help">Selecione o check-in</span><button id="cal-clear" type="button">Limpar</button></div>
+</div><input id="book-in" type="hidden"><input id="book-out" type="hidden"></div>
 <label>Hóspedes<select id="book-guests"><option value="2">2 hóspedes</option><option value="1">1 hóspede</option></select></label>
 <button id="book-search" type="button">Ver acomodações</button>
 </div><p id="booking-error" class="booking-error"></p>
@@ -31,8 +36,29 @@
 <footer><div class="footer-brand"><a class="brand" href="index.html">Chalezinho <i>Ville</i></a><span>Setiba Ville · Guarapari, ES</span></div></footer>
 <script>
 const bi=document.getElementById('book-in'),bo=document.getElementById('book-out'),err=document.getElementById('booking-error');
-const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset()); const min=today.toISOString().split('T')[0]; bi.min=min;bo.min=min;
-bi.addEventListener('change',()=>{bo.min=bi.value||min;if(bo.value&&bo.value<=bi.value)bo.value='';});
+const today=new Date(); today.setHours(0,0,0,0); let viewMonth=new Date(today.getFullYear(),today.getMonth(),1), selecting='in';
+const pop=document.getElementById('calendar-popover'), grid=document.getElementById('calendar-grid');
+const isoDate=d=>{const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return y+'-'+m+'-'+day};
+const parseDate=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+const fmt=s=>s?parseDate(s).toLocaleDateString('pt-BR',{day:'2-digit',month:'short'}).replace('.',''):'Adicionar data';
+function renderCalendar(){
+ document.getElementById('cal-title').textContent=viewMonth.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+ grid.innerHTML=''; const first=viewMonth.getDay(),days=new Date(viewMonth.getFullYear(),viewMonth.getMonth()+1,0).getDate();
+ for(let i=0;i<first;i++)grid.appendChild(document.createElement('span'));
+ for(let n=1;n<=days;n++){const d=new Date(viewMonth.getFullYear(),viewMonth.getMonth(),n),s=isoDate(d),b=document.createElement('button');b.type='button';b.textContent=n;b.dataset.date=s;
+  if(d<today)b.disabled=true;
+  if(s===bi.value||s===bo.value)b.classList.add('selected');
+  if(bi.value&&bo.value&&s>bi.value&&s<bo.value)b.classList.add('in-range');
+  b.onclick=()=>pickDate(s);grid.appendChild(b);
+ }}
+function pickDate(s){if(selecting==='in'||!bi.value||bo.value){bi.value=s;bo.value='';selecting='out';document.getElementById('cal-help').textContent='Agora selecione o check-out';}
+ else if(s<=bi.value){bi.value=s;bo.value='';}else{bo.value=s;selecting='in';pop.classList.remove('open');}
+ document.getElementById('in-display').textContent=fmt(bi.value);document.getElementById('out-display').textContent=fmt(bo.value);renderCalendar();}
+document.getElementById('date-trigger').onclick=()=>{pop.classList.toggle('open');renderCalendar()};
+document.getElementById('cal-prev').onclick=()=>{const p=new Date(viewMonth.getFullYear(),viewMonth.getMonth()-1,1);if(p>=new Date(today.getFullYear(),today.getMonth(),1)){viewMonth=p;renderCalendar()}};
+document.getElementById('cal-next').onclick=()=>{viewMonth=new Date(viewMonth.getFullYear(),viewMonth.getMonth()+1,1);renderCalendar()};
+document.getElementById('cal-clear').onclick=()=>{bi.value='';bo.value='';selecting='in';document.getElementById('in-display').textContent='Adicionar data';document.getElementById('out-display').textContent='Adicionar data';document.getElementById('cal-help').textContent='Selecione o check-in';renderCalendar()};
+document.addEventListener('click',e=>{if(!e.target.closest('.date-range-picker'))pop.classList.remove('open')});
 const listingMap={
   '1526341230074666349':'Ville Signature','15084665___1508466501':'Ville Signature',
   '1547126637360310141':'Ville Essenza','17178441___1717844101':'Ville Essenza',
