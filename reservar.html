@@ -78,30 +78,15 @@ document.getElementById('book-search').addEventListener('click',async()=>{
  }catch(e){err.textContent='Não foi possível consultar disponibilidade e tarifas agora. Tente novamente.'}
  finally{btnSearch.disabled=false}
 });
-document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('click',async()=>{
+document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('click',()=>{
  if(!bi.value||!bo.value||b.disabled)return;
- const original=b.textContent;b.disabled=true;b.textContent='Protegendo suas datas...';err.textContent='';
- try{
-  const card=b.closest('.booking-property');
-  const shown=card.querySelector('.booking-price strong').textContent;
-  const numeric=Number(shown.replace(/[^0-9,]/g,'').replace(',','.'))||null;
-  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),12000);
-  let r;
-  try{
-   r=await fetch('/api/create-hold',{method:'POST',headers:{'Content-Type':'application/json'},signal:controller.signal,body:JSON.stringify({
-    property_code:chaletCodes[b.dataset.chalet],check_in:bi.value,check_out:bo.value,
-    guests:Number(document.getElementById('book-guests').value),total_price:numeric
-   })});
-  }finally{clearTimeout(timeout)}
-  const data=await r.json();
-  if(r.status===409){err.textContent='Essas datas acabaram de ficar indisponíveis. Faça uma nova busca.';b.textContent='Indisponível';return}
-  if(!r.ok||!data.ok)throw new Error('hold');
-  b.textContent='Datas protegidas por 15 min';
-  const baseAmount=Math.max(0,(numeric||0)-290);
-  checkout={hold_id:data.hold_id,chalet:b.dataset.chalet,total:numeric,accommodation:baseAmount,cleaning:290};
-  document.getElementById('checkout-summary').textContent=b.dataset.chalet+' · '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/')+' · '+brl(numeric);
-  document.getElementById('checkout-modal').hidden=false;
- }catch(e){err.textContent='Não foi possível proteger as datas agora. Tente novamente.';b.disabled=false;b.textContent=original}
+ const card=b.closest('.booking-property'),shown=card.querySelector('.booking-price strong').textContent;
+ const numeric=Number(shown.replace(/[^0-9,]/g,'').replace(',','.'))||null;
+ checkout={hold_id:null,chalet:b.dataset.chalet,property_code:chaletCodes[b.dataset.chalet],total:numeric,accommodation:Math.max(0,(numeric||0)-290),cleaning:290};
+ document.getElementById('checkout-title').textContent='Seus dados';
+ document.getElementById('checkout-summary').textContent=b.dataset.chalet+' · '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/')+' · '+brl(numeric);
+ document.getElementById('checkout-continue').disabled=false;document.getElementById('checkout-continue').textContent='Ir para pagamento';
+ document.getElementById('checkout-modal').hidden=false;
 }));
 document.getElementById('checkout-close').addEventListener('click',()=>document.getElementById('checkout-modal').hidden=true);
 document.getElementById('checkout-continue').addEventListener('click',async()=>{
@@ -110,11 +95,14 @@ document.getElementById('checkout-continue').addEventListener('click',async()=>{
  if(!email.includes('@')){ce.textContent='Digite um e-mail válido.';return}
  btn.disabled=true;btn.textContent='Salvando seus dados...';ce.textContent='';
  try{
+  const hr=await fetch('/api/create-hold',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({property_code:checkout.property_code,check_in:bi.value,check_out:bo.value,guests:Number(document.getElementById('book-guests').value)})});
+  const hd=await hr.json();if(hr.status===409)throw new Error('unavailable');if(!hr.ok||!hd.ok)throw new Error('hold');
+  checkout.hold_id=hd.hold_id;
   const r=await fetch('/api/update-hold-guest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({hold_id:checkout.hold_id,guest_name:name,guest_email:email,guest_phone:phone,accommodation_amount:checkout.accommodation,cleaning_fee:checkout.cleaning,total_amount:checkout.total})});
   const data=await r.json();if(!r.ok||!data.ok)throw new Error(data.error||'update');
-  document.getElementById('checkout-title').textContent='Dados recebidos';
+  document.getElementById('checkout-title').textContent='Pronto para pagamento';
   document.getElementById('checkout-summary').textContent='Pré-reserva '+data.reservation_id+' · '+brl(checkout.total);
   btn.textContent='Pagamento será conectado na próxima etapa';btn.disabled=true;
- }catch(e){ce.textContent=e.message==='hold_expired'?'O tempo da pré-reserva expirou. Faça uma nova busca.':'Não foi possível salvar seus dados. Tente novamente.';btn.disabled=false;btn.textContent='Continuar para pagamento'}
+ }catch(e){ce.textContent=e.message==='unavailable'?'Essas datas acabaram de ficar indisponíveis. Faça uma nova busca.':e.message==='hold_expired'?'A pré-reserva expirou. Faça uma nova busca.':'Não foi possível iniciar o pagamento. Tente novamente.';btn.disabled=false;btn.textContent='Ir para pagamento'}
 });
 document.querySelectorAll('[data-carousel]').forEach(box=>{const slides=[...box.querySelectorAll('.chalet-slide')],dots=[...box.querySelectorAll('.chalet-dots button')];let i=0,sx=null,sy=null;const show=n=>{i=(n+slides.length)%slides.length;slides.forEach((s,k)=>s.classList.toggle('active',k===i));dots.forEach((d,k)=>d.classList.toggle('active',k===i))};box.querySelector('.prev')?.addEventListener('click',e=>{e.preventDefault();show(i-1)});box.querySelector('.next')?.addEventListener('click',e=>{e.preventDefault();show(i+1)});dots.forEach((d,k)=>d.addEventListener('click',()=>show(k)));box.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});box.addEventListener('pointerup',e=>{if(sx===null)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy))show(i+(dx<0?1:-1));sx=sy=null});show(0)});</script></body></html>
