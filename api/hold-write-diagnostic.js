@@ -16,8 +16,7 @@ export default async function handler(req,res){
    check_out:'2099-12-29',
    guests:2,
    status:'hold',
-   hold_expires_at:new Date(Date.now()+60000).toISOString(),
-   total_price:1
+   hold_expires_at:new Date(Date.now()+60000).toISOString()
   };
   const ir=await fetch(base+'/rest/v1/reservations',{
    method:'POST',
