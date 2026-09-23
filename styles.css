@@ -1499,3 +1499,33 @@ footer{justify-content:space-between!important}
  .booking-price .sales-signal{grid-column:1/4!important}
  .booking-price .booking-select{grid-column:4/5!important;grid-row:1/3!important;margin:0!important;min-width:150px!important}
 }
+
+/* Booking responsive hard reset v56 */
+.booking-gallery .chalet-dots{
+ left:50%!important;right:auto!important;top:auto!important;bottom:14px!important;
+ transform:translateX(-50%)!important;width:max-content!important;max-width:calc(100% - 40px)!important;
+ min-width:0!important;height:20px!important;min-height:20px!important;box-sizing:border-box!important;
+ display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:center!important;
+ gap:7px!important;padding:6px 9px!important;margin:0!important;border-radius:20px!important;
+ background:rgba(18,14,11,.38)!important;overflow:visible!important
+}
+.booking-gallery .chalet-dots button{
+ position:static!important;display:block!important;flex:0 0 6px!important;
+ width:6px!important;height:6px!important;min-width:6px!important;min-height:6px!important;
+ max-width:6px!important;max-height:6px!important;padding:0!important;margin:0!important;
+ border:0!important;border-radius:50%!important
+}
+@media (max-width:900px) and (orientation:landscape){
+ .booking-results{padding:42px 24px 70px!important;display:block!important}
+ .booking-list{display:block!important;width:100%!important;max-width:760px!important;margin:0 auto!important}
+ .booking-property{display:block!important;width:100%!important;max-width:760px!important;margin:0 auto 24px!important;overflow:hidden!important}
+ .booking-gallery{display:block!important;width:100%!important;height:auto!important;min-height:0!important;aspect-ratio:16/7!important}
+ .booking-property>div:nth-child(2){display:block!important;width:auto!important;min-width:0!important;padding:24px!important}
+ .booking-property>div:nth-child(2) small,.booking-property>div:nth-child(2) h3,.booking-property>div:nth-child(2) p{white-space:normal!important;overflow:visible!important;word-break:normal!important}
+ .booking-property h3{font-size:1.9rem!important}
+ .booking-price{display:block!important;width:auto!important;padding:22px 24px!important;border-left:0!important;border-top:1px solid #e3dbd2!important}
+ .booking-price .availability-status,.booking-price>small,.booking-price .price-was,.booking-price>strong,.booking-price .price-note,.booking-price .sales-signal{display:block!important;margin-left:0!important}
+ .booking-price>strong{margin:8px 0!important}
+ .booking-price .price-note{margin-top:0!important}
+ .booking-price .booking-select{display:block!important;width:100%!important;margin:18px 0 0!important}
+}
