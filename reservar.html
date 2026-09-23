@@ -6,7 +6,7 @@
 <title>Reserva direta | Chalezinho Ville</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,500;0,600;1,500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=51"></head>
+<link rel="stylesheet" href="styles.css?v=52"></head>
 <body class="booking-page">
 <header class="detail-header"><a class="brand" href="index.html">Chalezinho <i>Ville</i></a><a class="back-home" href="index.html">← Voltar ao site</a></header>
 <main class="booking-shell">
@@ -50,7 +50,7 @@ document.getElementById('book-search').addEventListener('click',async()=>{
     const occupied=new Set();
     (data.results||[]).forEach(group=>(group.reservations||[]).forEach(x=>{
       const name=listingMap[String(x.listing_id)];
-      if(name&&x.booking_status==='booked'&&overlaps(x.check_in,x.check_out,bi.value,bo.value)) occupied.add(name);
+      if(name&&['booked','blocked'].includes(String(x.booking_status).toLowerCase())&&overlaps(x.check_in,x.check_out,bi.value,bo.value)) occupied.add(name);
     }));
     err.textContent='';
     const results=document.getElementById('booking-results'); results.classList.remove('booking-results-hidden');
