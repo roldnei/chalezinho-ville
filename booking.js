@@ -1,7 +1,7 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,ENGINE=C.bookingEngine,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const state={config:null,search:null,property:null,selectedVariants:[],quote:null,rate:null,session:null};
+const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,session:null};
 async function api(action,body=null){
  const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development"};if(state.session?.access_token)headers.Authorization="Bearer "+state.session.access_token;
  const url=ENGINE+"?action="+encodeURIComponent(action);
@@ -14,6 +14,7 @@ async function init(){
  const today=new Date();today.setMinutes(today.getMinutes()-today.getTimezoneOffset());const min=today.toISOString().slice(0,10);$("#book-in").min=min;$("#book-out").min=min;
  $("#book-in").addEventListener("change",()=>{$("#book-out").min=$("#book-in").value||min;if($("#book-out").value&&$("#book-out").value<=$("#book-in").value)$("#book-out").value=""});
  $("#book-search").addEventListener("click",search);
+ await restoreResume();
  $("#checkout-close").addEventListener("click",()=>$("#checkout-modal").hidden=true);
  $("#step-back").addEventListener("click",()=>showStep(Math.max(1,Number($("#checkout-panel").dataset.step||1)-1)));
  $("#step-next").addEventListener("click",next);
@@ -44,28 +45,33 @@ function renderResults(list){
  box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>openFlow(Number(b.dataset.id))));
  $("#booking-results").scrollIntoView({behavior:"smooth"});
 }
-function openFlow(id){state.property=state.search.find(x=>Number(x.id)===id);state.selectedVariants=[];state.quote=null;state.rate=null;$("#checkout-modal").hidden=false;showStep(1);renderPropertyStep()}
-function showStep(n){$("#checkout-panel").dataset.step=String(n);$$(".checkout-step").forEach(x=>x.hidden=Number(x.dataset.step)!==n);$$(".progress-dot").forEach(x=>x.classList.toggle("active",Number(x.dataset.dot)<=n));$("#step-back").hidden=n===1;$("#step-next").textContent=n===5?"Iniciar pagamento de teste":"Continuar"}
+function openFlow(id){state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;$("#checkout-modal").hidden=false;showStep(1);renderPropertyStep()}
+function showStep(n){$("#checkout-panel").dataset.step=String(n);$(".checkout-step").forEach(x=>x.hidden=Number(x.dataset.step)!==n);$(".progress-dot").forEach(x=>x.classList.toggle("active",Number(x.dataset.dot)<=Math.min(n,5)));$("#step-back").hidden=n===1||n===6;$("#step-next").hidden=n===6;$("#step-next").textContent=n===5?"Iniciar pagamento de teste":"Continuar"}
 function renderPropertyStep(){
  $("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
+ const purpose=$("#trip-purpose-initial");purpose.innerHTML='<option value="">Prefiro escolher depois</option>'+(state.config.purposes||[]).map(x=>'<option value="'+x.code+'">'+x.label+'</option>').join("");
+ purpose.onchange=()=>renderExperienceList(purpose.value);renderExperienceList(purpose.value);
+}
+function renderExperienceList(purpose){
  const box=$("#experience-options");box.innerHTML="";
- const products=(state.config.experience_products||[]).filter(p=>(p.experience_property_eligibility||[]).some(e=>Number(e.property_id)===Number(state.property.id)));
- if(!products.length){box.innerHTML='<p class="empty-state">Nenhum adicional disponível para estas datas.</p>';return}
+ let products=(state.config.experience_products||[]).filter(p=>(p.experience_property_eligibility||[]).some(e=>Number(e.property_id)===Number(state.property.id)));
+ if(purpose)products=products.filter(p=>!(p.travel_purposes||[]).length||(p.travel_purposes||[]).includes(purpose));
+ if(!products.length){box.innerHTML='<p class="empty-state">Nenhum adicional recomendado para este momento. Você pode continuar sem adicionar nada.</p>';return}
  products.forEach(p=>{const item=document.createElement("div");item.className="experience-option";let variants=(p.experience_variants||[]).filter(v=>v.active).sort((a,b)=>a.display_order-b.display_order);
-  item.innerHTML='<div><small>'+p.status.toUpperCase()+'</small><strong>'+p.name+'</strong><p>'+p.description+'</p></div><div>'+variants.map(v=>'<button type="button" class="variant-btn" data-variant="'+v.id+'" data-price="'+v.price_cents+'">'+v.name+' · '+brlC(v.price_cents)+'</button>').join("")+'</div>';box.appendChild(item);
+  item.innerHTML='<div><small>'+p.status.toUpperCase()+'</small><strong>'+p.name+'</strong><p>'+p.description+'</p></div><div>'+variants.map(v=>'<button type="button" class="variant-btn '+(state.selectedByProduct[p.id]===v.id?"selected":"")+'" data-product="'+p.id+'" data-variant="'+v.id+'">'+v.name+' · '+brlC(v.price_cents)+'</button>').join("")+'</div>';box.appendChild(item);
  });
- box.querySelectorAll("[data-variant]").forEach(b=>b.addEventListener("click",()=>{const id=b.dataset.variant;state.selectedVariants=[id];box.querySelectorAll("[data-variant]").forEach(x=>x.classList.toggle("selected",x===b))}));
+ box.querySelectorAll("[data-variant]").forEach(b=>b.addEventListener("click",()=>{const p=b.dataset.product,v=b.dataset.variant;if(state.selectedByProduct[p]===v)delete state.selectedByProduct[p];else state.selectedByProduct[p]=v;renderExperienceList($("#trip-purpose-initial").value)}));
 }
 async function next(){
  const step=Number($("#checkout-panel").dataset.step||1);
  if(step===1){await makeQuote();return}
  if(step===2){if(!state.rate)return setFlowError("Escolha uma tarifa.");showStep(3);await renderLoginStep();return}
- if(step===3){if(!state.session){location.href="auth.html?mode=login&return="+encodeURIComponent("reservar.html?resume=1");return}showStep(4);renderGuestStep();return}
+ if(step===3){if(!state.session){saveResume();location.href="auth.html?mode=login&return="+encodeURIComponent("reservar.html?resume=1");return}showStep(4);renderGuestStep();return}
  if(step===4){if(!validateGuest())return;showStep(5);renderSummary();return}
  if(step===5){await startPayment()}
 }
 async function makeQuote(){setFlowError("Gerando cotação válida por 15 minutos...");
- try{state.quote=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:state.selectedVariants});
+ try{state.quote=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:Object.values(state.selectedByProduct)});
   renderRates();showStep(2);startCountdown(state.quote.expires_at);setFlowError("");
  }catch(e){setFlowError(e.message==="minimum_stay"?"A estadia mínima mudou. Faça uma nova busca.":"Não foi possível gerar a cotação. Faça uma nova busca.")}
 }
@@ -78,9 +84,7 @@ async function renderLoginStep(){const {data:{session}}=await sb.auth.getSession
  if(session){const {data:u}=await sb.auth.getUser();box.innerHTML='<div class="success-state">✓ Você está conectado como <strong>'+u.user.email+'</strong>.</div>'}
  else box.innerHTML='<p>Para proteger sua reserva e permitir acesso posterior, entre ou crie sua conta agora.</p><a class="primary-action inline" href="auth.html?mode=login&return='+encodeURIComponent("reservar.html?resume=1")+'">Entrar ou criar conta</a>';
 }
-function renderGuestStep(){const meta=state.session?.user?.user_metadata||{};$("#guest-name").value=$("#guest-name").value||meta.full_name||"";$("#guest-email").value=state.session?.user?.email||"";$("#guest-phone").value=$("#guest-phone").value||meta.phone||"";
- const s=$("#travel-purpose");s.innerHTML='<option value="">Selecione</option>'+(state.config.purposes||[]).map(x=>'<option value="'+x.code+'">'+x.label+'</option>').join("");
-}
+function renderGuestStep(){const meta=state.session?.user?.user_metadata||{};$("#guest-name").value=$("#guest-name").value||meta.full_name||"";$("#guest-email").value=state.session?.user?.email||"";$("#guest-phone").value=$("#guest-phone").value||meta.phone||"";}
 function validateGuest(){if(!$("#guest-name").value.trim()||!$("#guest-email").value.trim()||!$("#guest-phone").value.trim())return setFlowError("Preencha seus dados."),false;return true}
 function renderSummary(){
  $("#summary-content").innerHTML='<div class="summary-line"><span>'+state.property.name+'</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div><div class="summary-line"><span>'+state.rate.name+'</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
@@ -89,7 +93,7 @@ function renderSummary(){
 }
 async function startPayment(){if(!$("#accept-cancel")?.checked)return setFlowError("Aceite a política de cancelamento para continuar.");
  const method=document.querySelector('input[name="pay-method"]:checked')?.value||"mock";setFlowError("Criando proteção temporária das datas...");
- try{const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#travel-purpose").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments:Number($("#installments")?.value||1)});
+ try{const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments:Number($("#installments")?.value||1)});
   renderMockPayment(d);showStep(6);setFlowError("");
  }catch(e){setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
 }
@@ -97,6 +101,8 @@ function renderMockPayment(d){const box=$("#mock-payment");box.innerHTML='<div c
  box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':"Estado atualizado: "+b.dataset.outcome;}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
 }
 function startCountdown(exp){const el=$("#quote-countdown");clearInterval(window.__quoteTimer);const tick=()=>{const s=Math.max(0,Math.floor((Date.parse(exp)-Date.now())/1000));el.textContent="Cotação válida por "+Math.floor(s/60)+":"+String(s%60).padStart(2,"0");if(!s)clearInterval(window.__quoteTimer)};tick();window.__quoteTimer=setInterval(tick,1000)}
+function saveResume(){sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rate:state.rate,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||""}))}
+async function restoreResume(){if(!new URLSearchParams(location.search).has("resume"))return;let saved=null;try{saved=JSON.parse(sessionStorage.getItem("chalezinho_booking_resume")||"null")}catch{}if(!saved)return;sessionStorage.removeItem("chalezinho_booking_resume");$("#book-in").value=saved.check_in||"";$("#book-out").value=saved.check_out||"";$("#book-guests").value=saved.guests||"2";state.property=saved.property;state.selectedByProduct=saved.selectedByProduct||{};state.quote=saved.quote;state.rate=saved.rate;const {data:{session}}=await sb.auth.getSession();state.session=session;if(!session)return;$("#checkout-modal").hidden=false;renderPropertyStep();if($("#trip-purpose-initial"))$("#trip-purpose-initial").value=saved.purpose||"";if(state.quote?.expires_at)startCountdown(state.quote.expires_at);showStep(4);renderGuestStep();}
 function setFlowError(t){$("#checkout-error").textContent=t}
 init();
 })();
