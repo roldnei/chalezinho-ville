@@ -16,7 +16,7 @@ export default async function handler(req,res){
   const base=url.replace(/\/$/,'');
   const headers={apikey:key,Authorization:'Bearer '+key,Accept:'application/json','Content-Type':'application/json'};
   try{
-    const p=await fetch(base+'/rest/v1/properties?code=eq.'+encodeURIComponent(property_code)+'&select=id,code,name&limit=1',{headers});
+    const p=await fetch(base+'/rest/v1/properties?code=eq.'+encodeURIComponent(property_code)+'&select=id,code,name&limit=1',{headers,signal:AbortSignal.timeout(5000)});
     const props=await p.json().catch(()=>[]);
     if(!p.ok||!props?.[0]) return res.status(404).json({ok:false,error:'property_not_found'});
     const property=props[0];
@@ -28,7 +28,7 @@ export default async function handler(req,res){
       check_out:'gt.'+check_in,
       status:'in.(hold,pending_payment,confirmed)'
     });
-    const cr=await fetch(base+'/rest/v1/reservations?'+q.toString(),{headers});
+    const cr=await fetch(base+'/rest/v1/reservations?'+q.toString(),{headers,signal:AbortSignal.timeout(5000)});
     const conflicts=await cr.json().catch(()=>[]);
     if(!cr.ok) return res.status(cr.status).json({ok:false,error:'availability_check_failed'});
     const now=new Date();
@@ -49,7 +49,8 @@ export default async function handler(req,res){
     const ir=await fetch(base+'/rest/v1/reservations',{
       method:'POST',
       headers:{...headers,Prefer:'return=representation'},
-      body:JSON.stringify(payload)
+      body:JSON.stringify(payload),
+      signal:AbortSignal.timeout(5000)
     });
     const inserted=await ir.json().catch(()=>null);
     if(ir.status===409) return res.status(409).json({ok:false,error:'dates_unavailable'});
@@ -57,6 +58,6 @@ export default async function handler(req,res){
     const row=Array.isArray(inserted)?inserted[0]:inserted;
     return res.status(201).json({ok:true,hold_id:row?.id??null,property:property.name,expires_at:expires,minutes:HOLD_MINUTES});
   }catch(e){
-    return res.status(502).json({ok:false,error:'supabase_unreachable'});
+    return res.status(502).json({ok:false,error:e?.name==='TimeoutError'?'supabase_timeout':'supabase_unreachable'});
   }
 }
