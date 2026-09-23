@@ -1430,3 +1430,19 @@ footer{justify-content:space-between!important}
 
 /* Booking galleries and conversion cues */
 .booking-gallery{position:relative;min-height:250px;overflow:hidden;padding:0!important;background:#1b1815}.booking-gallery .chalet-slide{position:absolute;inset:0;width:100%!important;height:100%!important;object-fit:cover;opacity:0;transition:opacity .35s ease}.booking-gallery .chalet-slide.active{opacity:1}.booking-gallery .chalet-arrow{position:absolute;z-index:3;top:50%;transform:translateY(-50%);width:38px;height:38px;border:0;border-radius:50%;background:rgba(20,16,13,.62);color:#fff;font-size:25px;cursor:pointer}.booking-gallery .prev{left:12px}.booking-gallery .next{right:12px}.booking-gallery .chalet-dots{position:absolute;z-index:3;left:0;right:0;bottom:12px;display:flex;justify-content:center;gap:6px;padding:0!important}.booking-gallery .chalet-dots button{width:6px;height:6px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.5)}.booking-gallery .chalet-dots button.active{background:#fff}.booking-confidence{max-width:1180px;margin:0 auto;padding:32px max(24px,2vw) 12px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.booking-confidence>div{border:1px solid rgba(196,154,114,.32);padding:20px}.booking-confidence strong,.booking-confidence span{display:block}.booking-confidence strong{color:#eee5dc;margin-bottom:5px}.booking-confidence span{font-size:.82rem;color:#b8ada3}@media(max-width:800px){.booking-gallery{height:360px;min-height:360px}.booking-confidence{grid-template-columns:1fr;padding:28px 22px 0}}
+
+/* Booking card carousel layout fix */
+.booking-property{grid-template-columns:260px minmax(0,1fr) 250px!important;overflow:hidden}
+.booking-gallery{width:260px!important;height:250px!important;min-height:250px!important;align-self:stretch}
+.booking-gallery .chalet-slide{position:absolute!important;inset:0!important;width:100%!important;height:100%!important;object-fit:cover!important}
+@media(max-width:800px){
+ .booking-property{display:block!important}
+ .booking-gallery{width:100%!important;height:230px!important;min-height:230px!important}
+ .booking-property>div:not(.booking-gallery){padding:24px!important}
+}
+@media(orientation:landscape) and (max-height:650px){
+ .booking-property{grid-template-columns:220px minmax(260px,1fr) 250px!important}
+ .booking-gallery{width:220px!important;height:230px!important;min-height:230px!important}
+ .booking-property>div:not(.booking-gallery){padding:22px!important}
+ .booking-property h3{font-size:1.65rem!important}
+}
