@@ -1379,3 +1379,27 @@ footer{justify-content:space-between!important}
 
 /* Availability search summary */
 .availability-summary{margin-top:22px;padding:17px 20px;border:1px solid rgba(196,154,114,.5);display:flex;align-items:center;justify-content:space-between;gap:18px;background:rgba(196,154,114,.08)}.availability-summary strong{font-size:1.05rem;color:#eee5dc}.availability-summary span{font-size:.82rem;color:#c49a72;letter-spacing:.04em}@media(max-width:650px){.availability-summary{align-items:flex-start;flex-direction:column;gap:5px}}
+
+/* Booking date-range calendar */
+.date-range-picker{position:relative;grid-column:span 2}
+.date-field{width:100%;display:grid;grid-template-columns:1fr 1fr;text-align:left;background:#555;border:0;color:#fff;min-height:86px;padding:0;cursor:pointer}
+.date-field>span{padding:17px 22px;display:flex;flex-direction:column;gap:7px}
+.date-field>span+span{border-left:1px solid rgba(255,255,255,.18)}
+.date-field small{font-size:12px;letter-spacing:.13em;color:#ddd}
+.date-field strong{font-size:16px;font-weight:400}
+.calendar-popover{display:none;position:absolute;z-index:50;top:calc(100% + 10px);left:0;width:min(430px,92vw);background:#fffaf2;color:#29251f;border-radius:18px;padding:18px;box-shadow:0 22px 60px rgba(0,0,0,.38)}
+.calendar-popover.open{display:block}
+.calendar-head{display:grid;grid-template-columns:42px 1fr 42px;align-items:center;text-align:center;margin-bottom:14px}
+.calendar-head strong{text-transform:capitalize;font-family:'Playfair Display',serif;font-size:21px}
+.calendar-head button{border:0;background:transparent;font-size:30px;cursor:pointer;color:#29251f}
+.calendar-week,.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}
+.calendar-week span{font-size:10px;letter-spacing:.08em;color:#8a7d6e;padding:8px 0}
+.calendar-grid button,.calendar-grid>span{aspect-ratio:1;display:grid;place-items:center}
+.calendar-grid button{border:0;background:transparent;border-radius:50%;font:500 14px 'DM Sans',sans-serif;cursor:pointer;color:#29251f;position:relative}
+.calendar-grid button:hover{outline:1px solid #806344}
+.calendar-grid button:disabled{color:#c9c1b8;text-decoration:line-through;cursor:not-allowed}
+.calendar-grid button.in-range{background:#eee3d4;border-radius:0}
+.calendar-grid button.selected{background:#29251f;color:#fff;border-radius:50%;z-index:1}
+.calendar-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2d7c8;margin-top:12px;padding-top:14px;font-size:12px;color:#6c6054}
+.calendar-foot button{border:0;background:transparent;text-decoration:underline;font-weight:600;color:#29251f;cursor:pointer}
+@media(max-width:700px){.date-range-picker{grid-column:1/-1}.date-field{min-height:84px}.date-field>span{padding:15px 14px}.calendar-popover{position:fixed;left:4vw;right:4vw;top:50%;transform:translateY(-50%);width:92vw;max-width:430px;margin:auto;padding:16px}.calendar-grid button{font-size:15px}}
