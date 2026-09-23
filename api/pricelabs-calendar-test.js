@@ -16,12 +16,18 @@ export default async function handler(req,res){
     });
     const data=await r.json().catch(()=>null);
     if(!r.ok) return res.status(r.status).json({ok:false,error:data});
-    const date=req.query.date||'2026-09-28';
-    const compact=(Array.isArray(data)?data:[]).map((x,i)=>{
-      const arr=Array.isArray(x.pricing_array)?x.pricing_array:Array.isArray(x.prices)?x.prices:[];
-      const day=arr.find(d=>d.date===date);
-      return {name:listings[i]?.name,id:String(x.id??listings[i]?.id??''),pms:x.pms??listings[i]?.pms,date,last_refreshed_at:x.last_refreshed_at??null,day:day||null,array_key:Array.isArray(x.pricing_array)?'pricing_array':Array.isArray(x.prices)?'prices':null};
+    const rows=Array.isArray(data)?data:Array.isArray(data?.data)?data.data:[];
+    const safe=rows.map((x,i)=>{
+      const keys=x&&typeof x==='object'?Object.keys(x):[];
+      const shapes={};
+      for(const k of keys){
+        const v=x[k];
+        if(Array.isArray(v)) shapes[k]={type:'array',length:v.length,item_keys:v[0]&&typeof v[0]==='object'?Object.keys(v[0]):[]};
+        else if(v&&typeof v==='object') shapes[k]={type:'object',keys:Object.keys(v)};
+        else shapes[k]={type:typeof v};
+      }
+      return {name:listings[i]?.name??null,id:String(x?.id??listings[i]?.id??''),top_level_keys:keys,shapes};
     });
-    return res.status(200).json({ok:true,date,listings:compact});
+    return res.status(200).json({ok:true,diagnostic:'field_names_only',rows:safe});
   }catch(e){return res.status(502).json({ok:false,error:'pricelabs_unreachable'});}
 }
