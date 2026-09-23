@@ -10,59 +10,66 @@
 <body class="booking-page">
 <header class="detail-header"><a class="brand" href="index.html">Chalezinho <i>Ville</i></a><a class="back-home" href="index.html">← Voltar ao site</a></header>
 <main class="booking-shell">
-<section class="booking-intro"><small>RESERVA DIRETA · DISPONIBILIDADE REAL</small><h1>Escolha seus dias.<br><em>O resto é com a gente.</em></h1><p>Consulte uma estadia no Chalezinho Ville. A disponibilidade agora é verificada com as reservas sincronizadas no PriceLabs; os valores entram na próxima etapa.</p></section>
+<section class="booking-intro"><small>RESERVA DIRETA · DISPONIBILIDADE REAL</small><h1>Escolha seus dias.<br><em>O resto é com a gente.</em></h1><p>Consulte uma estadia no Chalezinho Ville. A disponibilidade é verificada pelos calendários das plataformas e os valores e regras da estadia são calculados pelo PriceLabs.</p></section>
 <section class="booking-search">
 <div class="booking-fields">
 <label>Check-in<input id="book-in" type="date"></label>
 <label>Check-out<input id="book-out" type="date"></label>
 <label>Hóspedes<select id="book-guests"><option value="2">2 hóspedes</option><option value="1">1 hóspede</option></select></label>
 <button id="book-search" type="button">Ver acomodações</button>
-</div><p id="booking-error" class="booking-error"></p>
+</div><p id="booking-error" class="booking-error"></p><p id="booking-rule" class="booking-error"></p>
 </section>
 <section class="booking-results booking-results-hidden" id="booking-results">
 <div class="booking-results-head"><small>RESULTADO DA BUSCA</small><h2>Disponibilidade para suas datas</h2><p id="booking-period"></p><div class="availability-summary"><strong id="availability-count"></strong><span>Veja todas as opções antes de escolher ↓</span></div></div>
 <div class="booking-list">
-<article class="booking-property"><img src="assets/ch1-capa-casal-spa.webp?v=2" alt="Ville Signature"><div><small>SIGNATURE · EXPERIÊNCIA COMPLETA</small><h3>Ville Signature</h3><p>Piscina aquecida entre <strong>28 e 30 °C</strong>, spa e terreno exclusivo.</p><div class="booking-tags"><span>Piscina aquecida</span><span>Spa</span><span>2 hóspedes</span></div></div><div class="booking-price"><span class="availability-status"></span><small>VALOR DA ESTADIA</small><strong>A consultar</strong><span class="price-note">Preço será integrado ao PriceLabs</span><button class="booking-select" data-chalet="Ville Signature">Reservar</button></div></article>
-<article class="booking-property"><img src="assets/04-banheira-petalas.webp" alt="Ville Essenza" loading="lazy"><div><small>ESSENZA · HIDROMASSAGEM</small><h3>Ville Essenza</h3><p>Um refúgio romântico com hidromassagem privativa e ambiente preparado para dois.</p><div class="booking-tags"><span>Hidromassagem</span><span>Privacidade</span><span>2 hóspedes</span></div></div><div class="booking-price"><span class="availability-status"></span><small>VALOR DA ESTADIA</small><strong>A consultar</strong><span class="price-note">Preço será integrado ao PriceLabs</span><button class="booking-select" data-chalet="Ville Essenza">Reservar</button></div></article>
-<article class="booking-property"><img src="assets/ch3-01-capa-hidro.webp" alt="Ville Amore" loading="lazy" onerror="this.src='assets/manifesto-hidro-romance-1.webp'"><div><small>AMORE · HIDROMASSAGEM</small><h3>Ville Amore</h3><p>Experiência intimista para dois, com hidromassagem privativa e clima romântico.</p><div class="booking-tags"><span>Hidromassagem</span><span>Romântico</span><span>2 hóspedes</span></div></div><div class="booking-price"><span class="availability-status"></span><small>VALOR DA ESTADIA</small><strong>A consultar</strong><span class="price-note">Preço será integrado ao PriceLabs</span><button class="booking-select" data-chalet="Ville Amore">Reservar</button></div></article>
+<article class="booking-property"><img src="assets/ch1-capa-casal-spa.webp?v=2" alt="Ville Signature"><div><small>SIGNATURE · EXPERIÊNCIA COMPLETA</small><h3>Ville Signature</h3><p>Piscina aquecida entre <strong>28 e 30 °C</strong>, spa e terreno exclusivo.</p><div class="booking-tags"><span>Piscina aquecida</span><span>Spa</span><span>2 hóspedes</span></div></div><div class="booking-price"><span class="availability-status"></span><small>VALOR DA ESTADIA</small><strong>—</strong><span class="price-note">Escolha as datas para calcular</span><button class="booking-select" data-chalet="Ville Signature">Reservar</button></div></article>
+<article class="booking-property"><img src="assets/04-banheira-petalas.webp" alt="Ville Essenza" loading="lazy"><div><small>ESSENZA · HIDROMASSAGEM</small><h3>Ville Essenza</h3><p>Um refúgio romântico com hidromassagem privativa e ambiente preparado para dois.</p><div class="booking-tags"><span>Hidromassagem</span><span>Privacidade</span><span>2 hóspedes</span></div></div><div class="booking-price"><span class="availability-status"></span><small>VALOR DA ESTADIA</small><strong>—</strong><span class="price-note">Escolha as datas para calcular</span><button class="booking-select" data-chalet="Ville Essenza">Reservar</button></div></article>
+<article class="booking-property"><img src="assets/ch3-01-capa-hidro.webp" alt="Ville Amore" loading="lazy" onerror="this.src='assets/manifesto-hidro-romance-1.webp'"><div><small>AMORE · HIDROMASSAGEM</small><h3>Ville Amore</h3><p>Experiência intimista para dois, com hidromassagem privativa e clima romântico.</p><div class="booking-tags"><span>Hidromassagem</span><span>Romântico</span><span>2 hóspedes</span></div></div><div class="booking-price"><span class="availability-status"></span><small>VALOR DA ESTADIA</small><strong>—</strong><span class="price-note">Escolha as datas para calcular</span><button class="booking-select" data-chalet="Ville Amore">Reservar</button></div></article>
 </div></section>
 <section class="booking-next"><small>PRÓXIMA ETAPA</small><h2>Primeiro acertamos a experiência.<br><em>Depois ligamos os dados reais.</em></h2><p>Quando esta página estiver aprovada, conectaremos tarifas, regras e disponibilidade. Pagamento e confirmação entram em uma etapa posterior.</p></section>
 </main>
 <footer><div class="footer-brand"><a class="brand" href="index.html">Chalezinho <i>Ville</i></a><span>Setiba Ville · Guarapari, ES</span></div></footer>
 <script>
-const bi=document.getElementById('book-in'),bo=document.getElementById('book-out'),err=document.getElementById('booking-error');
-const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset()); const min=today.toISOString().split('T')[0]; bi.min=min;bo.min=min;
-bi.addEventListener('change',()=>{bo.min=bi.value||min;if(bo.value&&bo.value<=bi.value)bo.value='';});
-const listingMap={
-  '1526341230074666349':'Ville Signature','15084665___1508466501':'Ville Signature',
-  '1547126637360310141':'Ville Essenza','17178441___1717844101':'Ville Essenza',
-  '1745999870058886727':'Ville Amore','17178441___1717844102':'Ville Amore'
-};
-const overlaps=(a,b,start,end)=>a<end&&b>start;
+const bi=document.getElementById('book-in'),bo=document.getElementById('book-out'),err=document.getElementById('booking-error'),rule=document.getElementById('booking-rule');
+const today=new Date();today.setMinutes(today.getMinutes()-today.getTimezoneOffset());const min=today.toISOString().split('T')[0];bi.min=min;bo.min=min;
+bi.addEventListener('change',()=>{bo.min=bi.value||min;if(bo.value&&bo.value<=bi.value)bo.value='';rule.textContent='';});
+const nights=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/86400000);
+const brl=n=>Number(n).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const overlaps=(a,b,s,e)=>a<e&&b>s;
 document.getElementById('book-search').addEventListener('click',async()=>{
-  if(!bi.value||!bo.value){err.textContent='Escolha as datas de check-in e check-out.';return}
-  if(bo.value<=bi.value){err.textContent='O check-out precisa ser depois do check-in.';return}
-  err.textContent='Consultando disponibilidade real...';
-  const searchBtn=document.getElementById('book-search'); searchBtn.disabled=true;
-  try{
-    const r=await fetch('/api/pricelabs-availability?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value));
-    const data=await r.json(); if(!r.ok||!data.ok) throw new Error('api');
-    const occupied=new Set((data.listings||[]).filter(x=>!x.available).map(x=>x.name));
-    err.textContent='';
-    const results=document.getElementById('booking-results'); results.classList.remove('booking-results-hidden');
-    document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');
-    let availableCount=0;
-    document.querySelectorAll('.booking-property').forEach(card=>{
-      const chalet=card.querySelector('.booking-select').dataset.chalet, available=!occupied.has(chalet); if(available)availableCount++;
-      card.classList.toggle('is-unavailable',!available);
-      const status=card.querySelector('.availability-status'),btn=card.querySelector('.booking-select'),price=card.querySelector('.booking-price strong'),note=card.querySelector('.price-note');
-      status.textContent=available?'● Disponível':'● Indisponível'; status.className='availability-status '+(available?'available':'unavailable');
-      btn.disabled=!available; btn.textContent=available?'Reservar':'Indisponível'; price.textContent=available?'A consultar':'—';
-      note.textContent=available?'Disponibilidade verificada · preço será integrado ao PriceLabs':'Não disponível para o período selecionado';
-    });
-    document.getElementById('availability-count').textContent=availableCount+' de 3 chalés disponíveis'; results.scrollIntoView({behavior:'smooth'});
-  }catch(e){err.textContent='Não foi possível consultar a disponibilidade agora. Tente novamente.'}
-  finally{searchBtn.disabled=false}
+ if(!bi.value||!bo.value){err.textContent='Escolha as datas de check-in e check-out.';return}
+ if(bo.value<=bi.value){err.textContent='O check-out precisa ser depois do check-in.';return}
+ err.textContent='Consultando disponibilidade e tarifas...';rule.textContent='';
+ const btnSearch=document.getElementById('book-search');btnSearch.disabled=true;
+ try{
+  const [ir,pr]=await Promise.all([
+   fetch('/api/ical-airbnb-all'),
+   fetch('/api/pricelabs-availability?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value))
+  ]);
+  const ic=await ir.json(),pl=await pr.json();if(!ir.ok||!ic.ok||!pr.ok||!pl.ok)throw new Error('api');
+  const ical=Object.fromEntries(ic.listings.map(x=>[x.name,x]));
+  const prices=Object.fromEntries(pl.listings.map(x=>[x.name,x]));
+  const n=nights(bi.value,bo.value),fee=290;let availableCount=0,minWarnings=[];
+  const results=document.getElementById('booking-results');results.classList.remove('booking-results-hidden');
+  document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');
+  document.querySelectorAll('.booking-property').forEach(card=>{
+   const name=card.querySelector('.booking-select').dataset.chalet,cal=ical[name],p=prices[name];
+   const occupied=!cal||!cal.ok||(cal.periods||[]).some(x=>overlaps(x.start,x.end,bi.value,bo.value));
+   const minStay=Math.max(1,Number(p?.min_stay||1)),violates=n<minStay;
+   const hasPrices=p&&p.days&&p.days.length===n&&Number.isFinite(Number(p.total_price));
+   const available=!occupied&&!violates&&hasPrices;if(available)availableCount++;
+   if(!occupied&&violates)minWarnings.push(name+': mínimo de '+minStay+' '+(minStay===1?'diária':'diárias')+' para entrada em '+bi.value.split('-').reverse().join('/'));
+   card.classList.toggle('is-unavailable',!available);
+   const status=card.querySelector('.availability-status'),b=card.querySelector('.booking-select'),price=card.querySelector('.booking-price strong'),note=card.querySelector('.price-note');
+   status.textContent=occupied?'● Indisponível':violates?'● Estadia mínima não atendida':hasPrices?'● Disponível':'● Tarifa indisponível';
+   status.className='availability-status '+(available?'available':'unavailable');b.disabled=!available;b.textContent=available?'Reservar':'Indisponível';
+   if(hasPrices&&!occupied){const total=Number(p.total_price)+fee;price.textContent=brl(total)+' por período';note.textContent=brl(total/n)+' por noite · inclui '+brl(fee)+' de taxa de limpeza';}
+   else{price.textContent='—';note.textContent=occupied?'Não disponível para o período selecionado':violates?'Selecione pelo menos '+minStay+' noites':'Não foi possível calcular a tarifa deste período';}
+  });
+  rule.textContent=minWarnings.length?minWarnings.join(' · '):'';
+  err.textContent='';document.getElementById('availability-count').textContent=availableCount+' de 3 chalés disponíveis';results.scrollIntoView({behavior:'smooth'});
+ }catch(e){err.textContent='Não foi possível consultar disponibilidade e tarifas agora. Tente novamente.'}
+ finally{btnSearch.disabled=false}
 });
-document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('click',()=>{const dates=bi.value&&bo.value?' para '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/') : ''; window.open('https://wa.me/5593991592266?text='+encodeURIComponent('Olá! Quero consultar '+b.dataset.chalet+dates+'. Vim pelo novo sistema de reserva direta.'),'_blank')}));
+document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('click',()=>{const dates=bi.value&&bo.value?' para '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/') : '';window.open('https://wa.me/5593991592266?text='+encodeURIComponent('Olá! Quero consultar '+b.dataset.chalet+dates+'. Vim pelo novo sistema de reserva direta.'),'_blank')}));
 </script></body></html>
