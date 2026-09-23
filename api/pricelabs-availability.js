@@ -13,8 +13,7 @@ export default async function handler(req,res){
   ];
   try{
     const r=await fetch('https://api.pricelabs.co/v1/listing_prices',{
-      method:'POST',
-      headers:{'X-API-Key':key,'Accept':'application/json','Content-Type':'application/json'},
+      method:'POST',headers:{'X-API-Key':key,'Accept':'application/json','Content-Type':'application/json'},
       body:JSON.stringify({listings:listings.map(x=>({id:x.id,pms:x.pms}))})
     });
     const raw=await r.json().catch(()=>null);
@@ -23,14 +22,12 @@ export default async function handler(req,res){
     const result=listings.map((listing,i)=>{
       const row=rows.find(x=>String(x?.id)===listing.id)||rows[i]||{};
       const days=(Array.isArray(row?.data)?row.data:[]).filter(d=>d?.date>=start&&d?.date<end);
-      const blockedDays=days.filter(d=>{
-        const status=String(d?.booking_status??'').toLowerCase();
-        const u=String(d?.unbookable??'').toLowerCase();
-        const occupancy=Number(d?.occupancy??0);
-        const userPrice=Number(d?.user_price);
-        return ['booked','blocked','unavailable'].includes(status)||['1','true','yes'].includes(u)||occupancy>=1||userPrice===-1;
-      }).map(d=>({date:d.date,booking_status:d.booking_status??null,unbookable:d.unbookable??null}));
-      return {name:listing.name,id:listing.id,available:days.length>0&&blockedDays.length===0,blocked_days:blockedDays};
+      const priced=days.map(d=>({date:d.date,price:Number(d?.price??d?.user_price),min_stay:Number(d?.min_stay??1)}))
+        .filter(d=>Number.isFinite(d.price)&&d.price>=0);
+      const total=priced.reduce((s,d)=>s+d.price,0);
+      const checkin=days.find(d=>d?.date===start);
+      const minStay=Math.max(1,Number(checkin?.min_stay??1));
+      return {name:listing.name,id:listing.id,days:priced,total_price:total,min_stay:minStay};
     });
     return res.status(200).json({ok:true,start,end,listings:result});
   }catch(e){return res.status(502).json({ok:false,error:'pricelabs_unreachable'});}
