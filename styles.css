@@ -1529,3 +1529,16 @@ footer{justify-content:space-between!important}
  .booking-price .price-note{margin-top:0!important}
  .booking-price .booking-select{display:block!important;width:100%!important;margin:18px 0 0!important}
 }
+
+/* v57 - mobile landscape: same single-column card as portrait */
+@media screen and (max-width:950px){
+ .booking-results,.booking-list{width:100%!important;max-width:none!important;box-sizing:border-box!important}
+ .booking-results{padding-left:22px!important;padding-right:22px!important;overflow:visible!important}
+ .booking-list{display:block!important;margin:0!important}
+ .booking-property{display:flex!important;flex-direction:column!important;grid-template-columns:none!important;grid-template-areas:none!important;width:100%!important;max-width:none!important;min-width:0!important;height:auto!important;margin:0 0 24px!important;overflow:hidden!important}
+ .booking-property>.booking-gallery{order:1!important;position:relative!important;width:100%!important;max-width:none!important;height:auto!important;min-height:0!important;aspect-ratio:16/8!important;flex:none!important}
+ .booking-property>div:nth-child(2){order:2!important;position:static!important;width:100%!important;max-width:none!important;min-width:0!important;height:auto!important;box-sizing:border-box!important;padding:24px!important;overflow:visible!important}
+ .booking-property>.booking-price{order:3!important;position:static!important;display:block!important;width:100%!important;max-width:none!important;min-width:0!important;height:auto!important;box-sizing:border-box!important;padding:22px 24px!important;border-left:0!important;border-top:1px solid #e3dbd2!important;overflow:visible!important}
+ .booking-property>div:nth-child(2)>*,.booking-price>*{max-width:100%!important;white-space:normal!important;word-break:normal!important}
+ .booking-price .booking-select{display:block!important;width:100%!important;max-width:none!important;margin:18px 0 0!important}
+}
