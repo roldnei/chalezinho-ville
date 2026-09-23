@@ -45,13 +45,9 @@ document.getElementById('book-search').addEventListener('click',async()=>{
   err.textContent='Consultando disponibilidade real...';
   const searchBtn=document.getElementById('book-search'); searchBtn.disabled=true;
   try{
-    const r=await fetch('/api/pricelabs-reservations?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value));
+    const r=await fetch('/api/pricelabs-availability?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value));
     const data=await r.json(); if(!r.ok||!data.ok) throw new Error('api');
-    const occupied=new Set();
-    (data.results||[]).forEach(group=>(group.reservations||[]).forEach(x=>{
-      const name=listingMap[String(x.listing_id)];
-      if(name&&['booked','blocked'].includes(String(x.booking_status).toLowerCase())&&overlaps(x.check_in,x.check_out,bi.value,bo.value)) occupied.add(name);
-    }));
+    const occupied=new Set((data.listings||[]).filter(x=>!x.available).map(x=>x.name));
     err.textContent='';
     const results=document.getElementById('booking-results'); results.classList.remove('booking-results-hidden');
     document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');
