@@ -44,7 +44,6 @@ export default async function handler(req,res){
       status:'hold',
       hold_expires_at:expires
     };
-    if(Number.isFinite(Number(total_price))&&Number(total_price)>0) payload.total_price=Number(total_price);
 
     const ir=await fetch(base+'/rest/v1/reservations',{
       method:'POST',
