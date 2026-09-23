@@ -1376,3 +1376,6 @@ footer{justify-content:space-between!important}
 
 /* Booking availability states */
 .booking-results-hidden{display:none!important}.availability-status{display:block!important;margin:0 0 15px!important;font-size:.82rem!important;font-weight:700!important;letter-spacing:.06em!important}.availability-status.available{color:#3d7651!important}.availability-status.unavailable{color:#9b443d!important}.booking-property.is-unavailable{opacity:.58}.booking-property.is-unavailable img{filter:grayscale(.75)}.booking-property.is-unavailable .booking-select{cursor:not-allowed!important;background:#d6d0c8!important;color:#756d65!important;border-color:#d6d0c8!important}.booking-results-head{grid-column:1/-1;margin-bottom:20px}.booking-results-head h2{font-family:"Playfair Display",serif;font-size:clamp(2rem,4vw,3.8rem);margin:.25em 0}.booking-results-head p{color:#b8ada3}
+
+/* Availability search summary */
+.availability-summary{margin-top:22px;padding:17px 20px;border:1px solid rgba(196,154,114,.5);display:flex;align-items:center;justify-content:space-between;gap:18px;background:rgba(196,154,114,.08)}.availability-summary strong{font-size:1.05rem;color:#eee5dc}.availability-summary span{font-size:.82rem;color:#c49a72;letter-spacing:.04em}@media(max-width:650px){.availability-summary{align-items:flex-start;flex-direction:column;gap:5px}}
