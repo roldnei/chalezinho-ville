@@ -10,7 +10,7 @@
 <body class="booking-page">
 <header class="detail-header"><a class="brand" href="index.html">Chalezinho <i>Ville</i></a><a class="back-home" href="index.html">← Voltar ao site</a></header>
 <main class="booking-shell">
-<section class="booking-intro"><small>RESERVA DIRETA · PROTÓTIPO</small><h1>Escolha seus dias.<br><em>O resto é com a gente.</em></h1><p>Consulte uma estadia no Chalezinho Ville. Nesta primeira versão, o calendário e os valores são demonstrativos; depois conectaremos disponibilidade e tarifas ao PriceLabs.</p></section>
+<section class="booking-intro"><small>RESERVA DIRETA · DISPONIBILIDADE REAL</small><h1>Escolha seus dias.<br><em>O resto é com a gente.</em></h1><p>Consulte uma estadia no Chalezinho Ville. A disponibilidade agora é verificada com as reservas sincronizadas no PriceLabs; os valores entram na próxima etapa.</p></section>
 <section class="booking-search">
 <div class="booking-fields">
 <label>Check-in<input id="book-in" type="date"></label>
@@ -33,6 +33,40 @@
 const bi=document.getElementById('book-in'),bo=document.getElementById('book-out'),err=document.getElementById('booking-error');
 const today=new Date(); today.setMinutes(today.getMinutes()-today.getTimezoneOffset()); const min=today.toISOString().split('T')[0]; bi.min=min;bo.min=min;
 bi.addEventListener('change',()=>{bo.min=bi.value||min;if(bo.value&&bo.value<=bi.value)bo.value='';});
-document.getElementById('book-search').addEventListener('click',()=>{if(!bi.value||!bo.value){err.textContent='Escolha as datas de check-in e check-out.';return} if(bo.value<=bi.value){err.textContent='O check-out precisa ser depois do check-in.';return}err.textContent='';const results=document.getElementById('booking-results');results.classList.remove('booking-results-hidden');document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');let availableCount=0;document.querySelectorAll('.booking-property').forEach((card,i)=>{const available=i!==1;if(available)availableCount++;card.classList.toggle('is-unavailable',!available);const status=card.querySelector('.availability-status'),btn=card.querySelector('.booking-select'),price=card.querySelector('.booking-price strong'),note=card.querySelector('.price-note');status.textContent=available?'● Disponível':'● Indisponível';status.className='availability-status '+(available?'available':'unavailable');btn.disabled=!available;btn.textContent=available?'Reservar':'Indisponível';price.textContent=available?'A consultar':'—';note.textContent=available?'Preço será integrado ao PriceLabs':'Não disponível para o período selecionado';});document.getElementById('availability-count').textContent=availableCount+' de 3 chalés disponíveis';results.scrollIntoView({behavior:'smooth'});});
+const listingMap={
+  '1526341230074666349':'Ville Signature','15084665___1508466501':'Ville Signature',
+  '1547126637360310141':'Ville Essenza','17178441___1717844101':'Ville Essenza',
+  '1745999870058886727':'Ville Amore','17178441___1717844102':'Ville Amore'
+};
+const overlaps=(a,b,start,end)=>a<end&&b>start;
+document.getElementById('book-search').addEventListener('click',async()=>{
+  if(!bi.value||!bo.value){err.textContent='Escolha as datas de check-in e check-out.';return}
+  if(bo.value<=bi.value){err.textContent='O check-out precisa ser depois do check-in.';return}
+  err.textContent='Consultando disponibilidade real...';
+  const searchBtn=document.getElementById('book-search'); searchBtn.disabled=true;
+  try{
+    const r=await fetch('/api/pricelabs-reservations?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value));
+    const data=await r.json(); if(!r.ok||!data.ok) throw new Error('api');
+    const occupied=new Set();
+    (data.results||[]).forEach(group=>(group.reservations||[]).forEach(x=>{
+      const name=listingMap[String(x.listing_id)];
+      if(name&&x.booking_status==='booked'&&overlaps(x.check_in,x.check_out,bi.value,bo.value)) occupied.add(name);
+    }));
+    err.textContent='';
+    const results=document.getElementById('booking-results'); results.classList.remove('booking-results-hidden');
+    document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');
+    let availableCount=0;
+    document.querySelectorAll('.booking-property').forEach(card=>{
+      const chalet=card.querySelector('.booking-select').dataset.chalet, available=!occupied.has(chalet); if(available)availableCount++;
+      card.classList.toggle('is-unavailable',!available);
+      const status=card.querySelector('.availability-status'),btn=card.querySelector('.booking-select'),price=card.querySelector('.booking-price strong'),note=card.querySelector('.price-note');
+      status.textContent=available?'● Disponível':'● Indisponível'; status.className='availability-status '+(available?'available':'unavailable');
+      btn.disabled=!available; btn.textContent=available?'Reservar':'Indisponível'; price.textContent=available?'A consultar':'—';
+      note.textContent=available?'Disponibilidade verificada · preço será integrado ao PriceLabs':'Não disponível para o período selecionado';
+    });
+    document.getElementById('availability-count').textContent=availableCount+' de 3 chalés disponíveis'; results.scrollIntoView({behavior:'smooth'});
+  }catch(e){err.textContent='Não foi possível consultar a disponibilidade agora. Tente novamente.'}
+  finally{searchBtn.disabled=false}
+});
 document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('click',()=>{const dates=bi.value&&bo.value?' para '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/') : ''; window.open('https://wa.me/5593991592266?text='+encodeURIComponent('Olá! Quero consultar '+b.dataset.chalet+dates+'. Vim pelo novo sistema de reserva direta.'),'_blank')}));
 </script></body></html>
