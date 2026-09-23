@@ -1424,3 +1424,6 @@ footer{justify-content:space-between!important}
  .calendar-foot{position:sticky;bottom:-22px;background:#fff;padding:16px 0 18px;margin-top:14px;color:#555}
  .calendar-foot button{color:#222}
 }
+
+/* Direct booking price merchandising */
+.price-was{display:block;font-size:.88rem;color:#93877d;text-decoration:line-through;margin:4px 0 2px}.sales-signal{display:block;margin-top:10px;font-size:.78rem;font-weight:600;letter-spacing:.02em;color:#c49a72}.booking-price>strong{font-size:clamp(1.45rem,2.4vw,2rem)}
