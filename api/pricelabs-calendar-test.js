@@ -31,3 +31,4 @@ export default async function handler(req,res){
     return res.status(200).json({ok:true,diagnostic:'field_names_only',rows:safe});
   }catch(e){return res.status(502).json({ok:false,error:'pricelabs_unreachable'});}
 }
+// teste vercel
