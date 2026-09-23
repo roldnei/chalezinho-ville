@@ -42,19 +42,23 @@ document.getElementById('book-search').addEventListener('click',async()=>{
  err.textContent='Consultando disponibilidade e tarifas...';rule.textContent='';
  const btnSearch=document.getElementById('book-search');btnSearch.disabled=true;
  try{
-  const [ir,pr]=await Promise.all([
+  const [ir,pr,dr]=await Promise.all([
    fetch('/api/ical-airbnb-all'),
-   fetch('/api/pricelabs-availability?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value))
+   fetch('/api/pricelabs-availability?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value)),
+   fetch('/api/database-availability?start='+encodeURIComponent(bi.value)+'&end='+encodeURIComponent(bo.value))
   ]);
-  const ic=await ir.json(),pl=await pr.json();if(!ir.ok||!ic.ok||!pr.ok||!pl.ok)throw new Error('api');
+  const ic=await ir.json(),pl=await pr.json(),db=await dr.json();
+  if(!ir.ok||!ic.ok||!pr.ok||!pl.ok||!dr.ok||!db.ok)throw new Error('api');
   const ical=Object.fromEntries(ic.listings.map(x=>[x.name,x]));
   const prices=Object.fromEntries(pl.listings.map(x=>[x.name,x]));
+  const database=Object.fromEntries(db.listings.map(x=>[x.name,x]));
   const n=nights(bi.value,bo.value),fee=290;let availableCount=0,minWarnings=[],availableCards=[];
   const results=document.getElementById('booking-results');results.classList.remove('booking-results-hidden');
   document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');
   document.querySelectorAll('.booking-property').forEach(card=>{
    const name=card.querySelector('.booking-select').dataset.chalet,cal=ical[name],p=prices[name];
-   const occupied=!cal||!cal.ok||(cal.periods||[]).some(x=>overlaps(x.start,x.end,bi.value,bo.value));
+   const dbAvailable=database[name]?.available!==false;
+   const occupied=!dbAvailable||!cal||!cal.ok||(cal.periods||[]).some(x=>overlaps(x.start,x.end,bi.value,bo.value));
    const minStay=Math.max(1,Number(p?.min_stay||1)),violates=n<minStay;
    const hasPrices=p&&p.days&&p.days.length===n&&Number.isFinite(Number(p.total_price));
    const available=!occupied&&!violates&&hasPrices;if(available)availableCount++;
