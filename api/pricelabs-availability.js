@@ -26,7 +26,9 @@ export default async function handler(req,res){
       const blockedDays=days.filter(d=>{
         const status=String(d?.booking_status??'').toLowerCase();
         const u=String(d?.unbookable??'').toLowerCase();
-        const occupancy=Number(d?.occupancy??0);\n        const userPrice=Number(d?.user_price);\n        return ['booked','blocked','unavailable'].includes(status)||['1','true','yes'].includes(u)||occupancy>=1||userPrice===-1;
+        const occupancy=Number(d?.occupancy??0);
+        const userPrice=Number(d?.user_price);
+        return ['booked','blocked','unavailable'].includes(status)||['1','true','yes'].includes(u)||occupancy>=1||userPrice===-1;
       }).map(d=>({date:d.date,booking_status:d.booking_status??null,unbookable:d.unbookable??null}));
       return {name:listing.name,id:listing.id,available:days.length>0&&blockedDays.length===0,blocked_days:blockedDays};
     });
