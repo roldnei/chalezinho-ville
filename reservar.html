@@ -16,7 +16,7 @@
 <label>Check-in<input id="book-in" type="date"></label>
 <label>Check-out<input id="book-out" type="date"></label>
 <label>Hóspedes<select id="book-guests"><option value="2">2 hóspedes</option><option value="1">1 hóspede</option></select></label>
-<button id="book-search" type="button">Ver acomodações</button>
+<button id="book-search" type="button">Consultar disponibilidade</button>
 </div><p id="booking-error" class="booking-error"></p><p id="booking-rule" class="booking-error"></p>
 </section>
 <section class="booking-results booking-results-hidden" id="booking-results">
@@ -55,12 +55,13 @@ document.getElementById('book-search').addEventListener('click',async()=>{
   const ical=Object.fromEntries(ic.listings.map(x=>[x.name,x]));
   const prices=Object.fromEntries(pl.listings.map(x=>[x.name,x]));
   const database=Object.fromEntries(db.listings.map(x=>[x.name,x]));
-  const n=nights(bi.value,bo.value),fee=290;let availableCount=0,minWarnings=[],availableCards=[];
+  const n=nights(bi.value,bo.value);let availableCount=0,minWarnings=[],availableCards=[];
   const results=document.getElementById('booking-results');results.classList.remove('booking-results-hidden');
   document.getElementById('booking-period').textContent=bi.value.split('-').reverse().join('/')+' → '+bo.value.split('-').reverse().join('/');
   document.querySelectorAll('.booking-property').forEach(card=>{
    const name=card.querySelector('.booking-select').dataset.chalet,cal=ical[name],p=prices[name];
    const dbAvailable=database[name]?.available!==false;
+   const fee=Math.max(0,Number(database[name]?.cleaning_fee??0));
    const occupied=!dbAvailable||!cal||!cal.ok||(cal.periods||[]).some(x=>overlaps(x.start,x.end,bi.value,bo.value));
    const minStay=Math.max(1,Number(p?.min_stay||1)),violates=n<minStay;
    const hasPrices=p&&p.days&&p.days.length===n&&Number.isFinite(Number(p.total_price));
@@ -70,7 +71,7 @@ document.getElementById('book-search').addEventListener('click',async()=>{
    const status=card.querySelector('.availability-status'),b=card.querySelector('.booking-select'),price=card.querySelector('.booking-price strong'),note=card.querySelector('.price-note'),was=card.querySelector('.price-was'),signal=card.querySelector('.sales-signal');
    status.textContent=occupied?'● Indisponível':violates?'● Estadia mínima não atendida':hasPrices?'● Disponível':'● Tarifa indisponível';
    status.className='availability-status '+(available?'available':'unavailable');b.disabled=!available;b.textContent=available?'Reservar':'Indisponível';
-   if(hasPrices&&!occupied){const base=Number(p.total_price),total=base*1.10+fee,anchor=base*1.18+fee;was.textContent=brl(anchor);price.textContent=brl(total)+' por período';note.textContent=brl(total/n)+' por noite';signal.textContent='';if(available)availableCards.push(card);}
+   if(hasPrices&&!occupied){const base=Number(p.total_price),accommodation=base*1.10,total=accommodation+fee,anchor=base*1.18+fee;was.textContent=brl(anchor);price.textContent=brl(total)+' por período';note.textContent=brl(total/n)+' por noite · limpeza '+brl(fee);signal.textContent='';b.dataset.total=String(total);b.dataset.accommodation=String(accommodation);b.dataset.cleaningFee=String(fee);if(available)availableCards.push(card);}
    else{was.textContent='';signal.textContent='';price.textContent='—';note.textContent=occupied?'Não disponível para o período selecionado':violates?'Selecione pelo menos '+minStay+' noites':'Não foi possível calcular a tarifa deste período';}
   });
   if(availableCount===1&&availableCards[0])availableCards[0].querySelector('.sales-signal').textContent='Última opção disponível para estas datas';else if(availableCount===2)availableCards.forEach(x=>x.querySelector('.sales-signal').textContent='Poucas opções disponíveis para estas datas');rule.textContent=minWarnings.length?minWarnings.join(' · '):'';
@@ -80,11 +81,10 @@ document.getElementById('book-search').addEventListener('click',async()=>{
 });
 document.querySelectorAll('.booking-select').forEach(b=>b.addEventListener('click',()=>{
  if(!bi.value||!bo.value||b.disabled)return;
- const card=b.closest('.booking-property'),shown=card.querySelector('.booking-price strong').textContent;
- const numeric=Number(shown.replace(/[^0-9,]/g,'').replace(',','.'))||null;
- checkout={hold_id:null,chalet:b.dataset.chalet,property_code:chaletCodes[b.dataset.chalet],total:numeric,accommodation:Math.max(0,(numeric||0)-290),cleaning:290};
+ const total=Number(b.dataset.total)||null,cleaning=Math.max(0,Number(b.dataset.cleaningFee)||0),accommodation=Math.max(0,Number(b.dataset.accommodation)||0);
+ checkout={hold_id:null,chalet:b.dataset.chalet,property_code:chaletCodes[b.dataset.chalet],total,accommodation,cleaning};
  document.getElementById('checkout-title').textContent='Seus dados';
- document.getElementById('checkout-summary').textContent=b.dataset.chalet+' · '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/')+' · '+brl(numeric);
+ document.getElementById('checkout-summary').textContent=b.dataset.chalet+' · '+bi.value.split('-').reverse().join('/')+' a '+bo.value.split('-').reverse().join('/')+' · '+brl(total);
  document.getElementById('checkout-continue').disabled=false;document.getElementById('checkout-continue').textContent='Ir para pagamento';
  document.getElementById('checkout-modal').hidden=false;
 }));

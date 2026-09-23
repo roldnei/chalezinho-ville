@@ -1,11 +1,25 @@
+async function previewFallback(start,end){
+  const u='https://chalezinhoville.com.br/api/pricelabs-availability?start='+encodeURIComponent(start)+'&end='+encodeURIComponent(end);
+  const r=await fetch(u,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(8000)});
+  const data=await r.json().catch(()=>null);
+  if(!r.ok||!data?.ok) throw new Error('production_pricelabs_fallback_failed');
+  return {...data,source:'production-read-fallback'};
+}
+
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET') return res.status(405).json({ok:false,error:'method_not_allowed'});
-  const key=process.env.PRICELABS_API_KEY;
-  if(!key) return res.status(500).json({ok:false,error:'missing_pricelabs_key'});
   const start=String(req.query.start||''),end=String(req.query.end||'');
   const valid=/^\d{4}-\d{2}-\d{2}$/;
   if(!valid.test(start)||!valid.test(end)||end<=start) return res.status(400).json({ok:false,error:'invalid_dates'});
+  const key=process.env.PRICELABS_API_KEY;
+  if(!key){
+    if(process.env.VERCEL_ENV==='preview'){
+      try{return res.status(200).json(await previewFallback(start,end))}
+      catch(e){return res.status(502).json({ok:false,error:'preview_pricelabs_fallback_failed'})}
+    }
+    return res.status(500).json({ok:false,error:'missing_pricelabs_key'});
+  }
   const listings=[
     {id:'1526341230074666349',pms:'airbnb',name:'Ville Signature'},
     {id:'1547126637360310141',pms:'airbnb',name:'Ville Essenza'},
@@ -14,7 +28,8 @@ export default async function handler(req,res){
   try{
     const r=await fetch('https://api.pricelabs.co/v1/listing_prices',{
       method:'POST',headers:{'X-API-Key':key,'Accept':'application/json','Content-Type':'application/json'},
-      body:JSON.stringify({listings:listings.map(x=>({id:x.id,pms:x.pms}))})
+      body:JSON.stringify({listings:listings.map(x=>({id:x.id,pms:x.pms}))}),
+      signal:AbortSignal.timeout(8000)
     });
     const raw=await r.json().catch(()=>null);
     if(!r.ok) return res.status(r.status).json({ok:false,error:'pricelabs_error'});
@@ -30,5 +45,5 @@ export default async function handler(req,res){
       return {name:listing.name,id:listing.id,days:priced,total_price:total,min_stay:minStay};
     });
     return res.status(200).json({ok:true,start,end,listings:result});
-  }catch(e){return res.status(502).json({ok:false,error:'pricelabs_unreachable'});}
+  }catch(e){return res.status(502).json({ok:false,error:e?.name==='TimeoutError'?'pricelabs_timeout':'pricelabs_unreachable'});}
 }

@@ -1,30 +1,43 @@
-const propertyMap = {
-  'Ville Signature': 'CH1',
-  'Ville Essenza': 'CH2',
-  'Ville Amore': 'CH3'
-};
+async function previewFallback(start,end){
+  const base='https://chalezinhoville.com.br/api/';
+  const [ar,pr]=await Promise.all([
+    fetch(base+'database-availability?start='+encodeURIComponent(start)+'&end='+encodeURIComponent(end),{headers:{Accept:'application/json'},signal:AbortSignal.timeout(8000)}),
+    fetch(base+'supabase-test',{headers:{Accept:'application/json'},signal:AbortSignal.timeout(8000)})
+  ]);
+  const av=await ar.json().catch(()=>null);
+  const props=await pr.json().catch(()=>null);
+  if(!ar.ok||!av?.ok) throw new Error('production_database_fallback_failed');
+  const byCode=Object.fromEntries((props?.properties||[]).map(x=>[x.code,x]));
+  const listings=(av.listings||[]).map(x=>({
+    ...x,
+    cleaning_fee:Math.max(0,Number(byCode[x.code]?.cleaning_fee??0)),
+    max_guests:Math.max(1,Number(byCode[x.code]?.max_guests??2))
+  }));
+  return {...av,listings,source:'production-read-fallback'};
+}
 
 export default async function handler(req,res){
   res.setHeader('Cache-Control','no-store');
   if(req.method!=='GET') return res.status(405).json({ok:false,error:'method_not_allowed'});
-
   const url=process.env.SUPABASE_URL;
   const key=process.env.SUPABASE_SECRET_KEY;
   const start=String(req.query.start||'');
   const end=String(req.query.end||'');
   const valid=/^\d{4}-\d{2}-\d{2}$/;
-
-  if(!url||!key) return res.status(500).json({ok:false,error:'missing_supabase_environment_variables'});
   if(!valid.test(start)||!valid.test(end)||end<=start) return res.status(400).json({ok:false,error:'invalid_dates'});
-
+  if(!url||!key){
+    if(process.env.VERCEL_ENV==='preview'){
+      try{return res.status(200).json(await previewFallback(start,end))}
+      catch(e){return res.status(502).json({ok:false,error:'preview_database_fallback_failed'})}
+    }
+    return res.status(500).json({ok:false,error:'missing_supabase_environment_variables'});
+  }
   const headers={apikey:key,Authorization:'Bearer '+key,Accept:'application/json'};
   const base=url.replace(/\/$/,'');
-
   try{
-    const p=await fetch(base+'/rest/v1/properties?select=id,code,name&order=id.asc',{headers});
+    const p=await fetch(base+'/rest/v1/properties?select=id,code,name,cleaning_fee,max_guests&order=id.asc',{headers,signal:AbortSignal.timeout(8000)});
     const properties=await p.json().catch(()=>[]);
     if(!p.ok) return res.status(p.status).json({ok:false,error:'supabase_properties_error'});
-
     const now=new Date().toISOString();
     const q=new URLSearchParams({
       select:'property_id,check_in,check_out,status,hold_expires_at',
@@ -32,23 +45,21 @@ export default async function handler(req,res){
       check_out:'gt.'+start,
       status:'in.(hold,pending_payment,confirmed)'
     });
-    const rr=await fetch(base+'/rest/v1/reservations?'+q.toString(),{headers});
+    const rr=await fetch(base+'/rest/v1/reservations?'+q.toString(),{headers,signal:AbortSignal.timeout(8000)});
     const reservations=await rr.json().catch(()=>[]);
     if(!rr.ok) return res.status(rr.status).json({ok:false,error:'supabase_reservations_error'});
-
     const active=(Array.isArray(reservations)?reservations:[]).filter(x=>{
       if(x.status!=='hold') return true;
       return !x.hold_expires_at || x.hold_expires_at>now;
     });
-
     const listings=(Array.isArray(properties)?properties:[]).map(x=>({
-      name:x.name,
-      code:x.code,
+      name:x.name,code:x.code,
+      cleaning_fee:Math.max(0,Number(x.cleaning_fee??0)),
+      max_guests:Math.max(1,Number(x.max_guests??2)),
       available:!active.some(r=>Number(r.property_id)===Number(x.id))
     }));
-
     return res.status(200).json({ok:true,start,end,listings});
   }catch(e){
-    return res.status(502).json({ok:false,error:'supabase_unreachable'});
+    return res.status(502).json({ok:false,error:e?.name==='TimeoutError'?'supabase_timeout':'supabase_unreachable'});
   }
 }

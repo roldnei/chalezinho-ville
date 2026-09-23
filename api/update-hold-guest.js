@@ -1,10 +1,14 @@
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
  if(req.method!=='POST')return res.status(405).json({ok:false,error:'method_not_allowed'});
- const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SECRET_KEY;
- if(!url||!key)return res.status(500).json({ok:false,error:'missing_supabase_environment_variables'});
  const {hold_id,guest_name,guest_email,guest_phone,accommodation_amount,cleaning_fee,total_amount}=req.body||{};
  if(!hold_id||!guest_name||!guest_email||!guest_phone)return res.status(400).json({ok:false,error:'missing_guest_data'});
+ const url=process.env.SUPABASE_URL,key=process.env.SUPABASE_SECRET_KEY;
+ if(!url||!key){
+  if(process.env.VERCEL_ENV==='preview'&&String(hold_id).startsWith('preview-'))
+   return res.status(200).json({ok:true,reservation_id:hold_id,status:'pending_payment',preview:true});
+  return res.status(500).json({ok:false,error:'missing_supabase_environment_variables'});
+ }
  const base=url.replace(/\/$/,'');
  const headers={apikey:key,Authorization:'Bearer '+key,Accept:'application/json','Content-Type':'application/json'};
  try{
