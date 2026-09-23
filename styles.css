@@ -1403,3 +1403,24 @@ footer{justify-content:space-between!important}
 .calendar-foot{display:flex;justify-content:space-between;align-items:center;border-top:1px solid #e2d7c8;margin-top:12px;padding-top:14px;font-size:12px;color:#6c6054}
 .calendar-foot button{border:0;background:transparent;text-decoration:underline;font-weight:600;color:#29251f;cursor:pointer}
 @media(max-width:700px){.date-range-picker{grid-column:1/-1}.date-field{min-height:84px}.date-field>span{padding:15px 14px}.calendar-popover{position:fixed;left:4vw;right:4vw;top:50%;transform:translateY(-50%);width:92vw;max-width:430px;margin:auto;padding:16px}.calendar-grid button{font-size:15px}}
+
+/* Mobile calendar: Airbnb-like bottom sheet, overrides previous fixed modal */
+@media(max-width:700px){
+ body.calendar-open{overflow:hidden}
+ .calendar-popover{display:none;position:fixed!important;z-index:9999!important;left:0!important;right:0!important;top:auto!important;bottom:0!important;transform:none!important;width:100%!important;max-width:none!important;height:auto!important;max-height:82dvh!important;overflow:auto!important;margin:0!important;padding:22px 22px calc(22px + env(safe-area-inset-bottom))!important;border-radius:24px 24px 0 0!important;background:#fff!important;color:#222!important}
+ .calendar-popover.open{display:block!important}
+ .calendar-popover.open:before{content:'';position:fixed;z-index:-1;inset:0;background:rgba(0,0,0,.55)}
+ .calendar-head{position:sticky;top:-22px;background:#fff;z-index:3;padding:18px 0 12px;margin:0 0 8px}
+ .calendar-head strong{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:600;color:#222}
+ .calendar-head button{color:#222}
+ .calendar-week{position:sticky;top:52px;background:#fff;z-index:2;border-bottom:1px solid #eee}
+ .calendar-week span{color:#777;padding:10px 0}
+ .calendar-grid{gap:4px 0}
+ .calendar-grid button,.calendar-grid>span{aspect-ratio:1}
+ .calendar-grid button{font-size:16px;color:#222}
+ .calendar-grid button:disabled{color:#d2d2d2}
+ .calendar-grid button.in-range{background:#f3f3f3}
+ .calendar-grid button.selected{background:#111;color:#fff}
+ .calendar-foot{position:sticky;bottom:-22px;background:#fff;padding:16px 0 18px;margin-top:14px;color:#555}
+ .calendar-foot button{color:#222}
+}
