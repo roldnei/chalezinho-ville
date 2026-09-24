@@ -70,12 +70,12 @@ async function acceptModification(id,btn){
  if(!confirm(message))return;
  btn.disabled=true;
  try{await api("modification_action",{operation:"guest_accept",request_id:id});location.reload()}
- catch(e){btn.disabled=false;alert("Não foi possível aceitar: "+e.message)}
+ catch(e){btn.disabled=false;alert("Não foi possível confirmar a alteração agora. Tente novamente.")}
 }
-async function cancelModification(id,btn){btn.disabled=true;try{await api("modification_action",{operation:"guest_cancel",request_id:id});location.reload()}catch(e){btn.disabled=false;alert("Não foi possível cancelar: "+e.message)}}
-$("#profile-form").addEventListener("submit",async e=>{e.preventDefault();const {error}=await sb.from("profiles").update({full_name:$("#profile-name").value.trim(),phone:$("#profile-phone").value.trim()}).eq("id",session.user.id);$("#account-message").textContent=error?error.message:"Dados atualizados."});
+async function cancelModification(id,btn){btn.disabled=true;try{await api("modification_action",{operation:"guest_cancel",request_id:id});location.reload()}catch(e){btn.disabled=false;alert("Não foi possível cancelar a solicitação agora. Tente novamente.")}}
+$("#profile-form").addEventListener("submit",async e=>{e.preventDefault();const {error}=await sb.from("profiles").update({full_name:$("#profile-name").value.trim(),phone:$("#profile-phone").value.trim()}).eq("id",session.user.id);$("#account-message").textContent=error?"Não foi possível atualizar seus dados agora. Tente novamente.":"Dados atualizados."});
 $("#logout").addEventListener("click",async()=>{await sb.auth.signOut();location.href="auth.html"});
-$("#delete-account").addEventListener("click",async()=>{const {error}=await sb.from("account_deletion_requests").insert({user_id:session.user.id});$("#account-message").textContent=error?error.message:"Solicitação de exclusão registrada para análise."});
+$("#delete-account").addEventListener("click",async()=>{const {error}=await sb.from("account_deletion_requests").insert({user_id:session.user.id});$("#account-message").textContent=error?"Não foi possível registrar a solicitação agora. Tente novamente.":"Solicitação de exclusão registrada para análise."});
 function openModification(reservationId,currentProperty,currentIn,currentOut){
  $("#modify-reservation-id").value=reservationId;$("#modify-current").innerHTML='<strong>Reserva atual</strong><span>'+properties.find(p=>Number(p.id)===Number(currentProperty))?.name+' · '+currentIn.split("-").reverse().join("/")+' → '+currentOut.split("-").reverse().join("/")+'</span>';
  const s=$("#modify-property");s.innerHTML=properties.map(p=>'<option value="'+p.id+'" '+(String(p.id)===String(currentProperty)?"selected":"")+'>'+p.name+'</option>').join("");
