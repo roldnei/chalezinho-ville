@@ -47,3 +47,21 @@
 4. QA visual final e aprovação do produto.
 5. Limpeza dos registros/dados marcados como desenvolvimento.
 6. Checklist de GO-LIVE e rollback.
+
+
+## QA técnico mais recente
+
+- booking-engine ativa no Supabase: v24.
+- alteração de reserva e captura de garantia endurecidas com operações atômicas no banco.
+- nenhum pagamento real ativado.
+- produção pública continua fora deste fluxo de GO-LIVE.
+
+### Lacunas técnicas ainda abertas da Fase 1
+
+1. Cobertura explícita de Booking.com na disponibilidade.
+2. Instrumentação dos eventos de analytics no frontend.
+3. Compra de experiências pós-reserva na Área do Hóspede.
+4. Documentos jurídicos finais aprovados.
+5. Gateway real + webhooks/refunds/pré-autorização.
+6. Leaked Password Protection no Supabase Auth.
+7. QA visual final nos viewports obrigatórios.

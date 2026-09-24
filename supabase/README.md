@@ -40,3 +40,5 @@ O arquivo `phase1_schema_snapshot.sql` é um snapshot idempotente e documentado 
 - 20260924022801 — guest_stay_price_and_modification_estimate
 
 - guarantee_capture_not_above_authorization — impede captura acima do valor autorizado da garantia.
+
+- 20260924052734 — atomic_modification_and_guarantee_capture

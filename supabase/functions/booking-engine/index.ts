@@ -457,6 +457,14 @@ async function mockPayment(req:Request,body:any){
   const allowed=["paid","refused","under_review","expired"];
   if(!allowed.includes(outcome)) return json({ok:false,error:"invalid_outcome"},400);
 
+  const current=String((p as any).status||"");
+  if(["paid","refused","expired","cancelled","refunded"].includes(current)){
+    if(current===outcome) return json({ok:true,outcome,idempotent:true});
+    return json({ok:false,error:"payment_state_final"},409);
+  }
+  if(current==="under_review" && !["paid","refused","expired","under_review"].includes(outcome))
+    return json({ok:false,error:"invalid_payment_transition"},409);
+
   if(outcome==="paid"){
     await admin.from("payments").update({status:"paid"}).eq("id",payment_id);
     await admin.from("reservations").update({status:"confirmed",confirmed_at:new Date().toISOString(),hold_expires_at:null}).eq("id",reservationId);
@@ -571,37 +579,18 @@ async function modificationAction(req:Request,body:any){
 
   if(action==="apply"){
     if(m.status!=="accepted") return json({ok:false,error:"guest_acceptance_required"},409);
-    const before=m.reservations;
-    const amount=Math.max(0,Number(m.admin_additional_amount_cents||0));
-    let paymentId=null;
-    if(amount>0){
-      const idem="mod-"+m.id;
-      const {data:existing}=await admin.from("payments").select("id,status").eq("idempotency_key",idem).maybeSingle();
-      if(existing && existing.status!=="paid") return json({ok:false,error:"additional_payment_not_paid"},409);
-      if(!existing){
-        const {data:p}=await admin.from("payments").insert({
-          reservation_id:m.reservation_id,user_id:m.user_id,provider:"mock",method:"mock",amount_cents:amount,status:"paid",
-          idempotency_key:idem,metadata:{development:true,kind:"modification",modification_request_id:m.id}
-        }).select().single();
-        paymentId=p?.id||null;
-        await admin.from("financial_entries").insert({reservation_id:m.reservation_id,payment_id:paymentId,entry_type:"additional_charge",amount_cents:amount,description:"Revisão de tarifa da alteração"});
-      }
-    }
-    const newTotal=Number(before.total_amount||0)+amount/100;
-    const {error}=await admin.from("reservations").update({
-      property_id:m.requested_property_id||before.property_id,check_in:m.requested_check_in||before.check_in,check_out:m.requested_check_out||before.check_out,total_amount:newTotal
-    }).eq("id",m.reservation_id);
-    if(error){
-      if(String(error.code)==="23P01") return json({ok:false,error:"dates_unavailable"},409);
+    const {data:rpc,error:rpcErr}=await admin.rpc("apply_modification_mock_atomic",{
+      p_request_id:m.id,p_actor_user_id:user.id
+    });
+    if(rpcErr){
+      const msg=String(rpcErr.message||"");
+      if(msg.includes("dates_unavailable")) return json({ok:false,error:"dates_unavailable"},409);
+      if(msg.includes("additional_payment_not_paid")) return json({ok:false,error:"additional_payment_not_paid"},409);
+      if(msg.includes("guest_acceptance_required")) return json({ok:false,error:"guest_acceptance_required"},409);
       return json({ok:false,error:"modification_apply_failed"},500);
     }
-    await admin.from("modification_requests").update({status:"applied",applied_at:new Date().toISOString()}).eq("id",m.id);
-    await admin.from("reservation_change_events").insert({
-      reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"applied",
-      before_snapshot:before,after_snapshot:{property_id:m.requested_property_id||before.property_id,check_in:m.requested_check_in||before.check_in,check_out:m.requested_check_out||before.check_out,total_amount:newTotal},
-      amount_cents:amount,actor_user_id:user.id
-    });
-    return json({ok:true,status:"applied"});
+    const row=Array.isArray(rpc)?rpc[0]:rpc;
+    return json({ok:true,status:"applied",payment_id:row?.result_payment_id||null,total_amount:row?.result_total_amount||null});
   }
   return json({ok:false,error:"invalid_operation"},400);
 }
@@ -622,23 +611,45 @@ async function guaranteeAction(req:Request,body:any){
   const {guarantee_id,operation,amount_cents=0,description=""}=body||{};
   const {data:g}=await admin.from("guarantees").select("*,reservations(id)").eq("id",guarantee_id).single();
   if(!g) return json({ok:false,error:"not_found"},404);
+
   if(operation==="release"){
-    await admin.from("guarantees").update({status:"released"}).eq("id",g.id);
+    if(g.status==="released") return json({ok:true,status:"released"});
+    if(["captured","incident_reported","capture_requested","disputed"].includes(g.status))
+      return json({ok:false,error:g.status==="captured"?"guarantee_already_captured":"active_incident"},409);
+    await admin.from("guarantees").update({status:"released",updated_at:new Date().toISOString()}).eq("id",g.id);
     return json({ok:true,status:"released"});
   }
+
   if(operation==="report_incident"){
-    const {data:i}=await admin.from("incidents").insert({guarantee_id:g.id,description:description||"Ocorrência registrada",requested_capture_cents:Math.max(0,Number(amount_cents||0)),status:"open"}).select().single();
-    await admin.from("guarantees").update({status:"incident_reported"}).eq("id",g.id);
+    if(["released","captured","resolved"].includes(g.status)) return json({ok:false,error:"guarantee_not_available"},409);
+    if(["incident_reported","capture_requested"].includes(g.status)){
+      const {data:existing}=await admin.from("incidents").select("*").eq("guarantee_id",g.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
+      if(existing) return json({ok:true,status:"incident_reported",incident:existing});
+    }
+    const {data:i,error}=await admin.from("incidents").insert({
+      guarantee_id:g.id,description:description||"Ocorrência registrada",
+      requested_capture_cents:Math.max(0,Number(amount_cents||0)),status:"open"
+    }).select().single();
+    if(error||!i) return json({ok:false,error:"incident_create_failed"},500);
+    await admin.from("guarantees").update({status:"incident_reported",updated_at:new Date().toISOString()}).eq("id",g.id);
     return json({ok:true,status:"incident_reported",incident:i});
   }
+
   if(operation==="capture"){
     const amount=Math.max(0,Number(amount_cents||0));
-    if(amount>Number(g.amount_cents)) return json({ok:false,error:"capture_exceeds_guarantee"},400);
-    await admin.from("guarantees").update({status:"captured",captured_amount_cents:amount}).eq("id",g.id);
-    if(amount>0) await admin.from("financial_entries").insert({reservation_id:g.reservation_id,entry_type:"guarantee_capture",amount_cents:amount,description:"Captura parcial de garantia"});
-    await admin.from("incidents").update({status:"resolved",resolved_at:new Date().toISOString()}).eq("guarantee_id",g.id).eq("status","open");
-    return json({ok:true,status:"captured",captured_amount_cents:amount,released_amount_cents:Number(g.amount_cents)-amount});
+    const {data:rpc,error:rpcErr}=await admin.rpc("capture_guarantee_mock_atomic",{
+      p_guarantee_id:g.id,p_actor_user_id:user.id,p_amount_cents:amount
+    });
+    if(rpcErr){
+      const msg=String(rpcErr.message||"");
+      if(msg.includes("capture_exceeds_guarantee")) return json({ok:false,error:"capture_exceeds_guarantee"},400);
+      if(msg.includes("incident_required")) return json({ok:false,error:"incident_required"},409);
+      return json({ok:false,error:"guarantee_capture_failed"},500);
+    }
+    const row=Array.isArray(rpc)?rpc[0]:rpc;
+    return json({ok:true,status:"captured",captured_amount_cents:Number(row?.captured_amount_cents||0),released_amount_cents:Number(row?.released_amount_cents||0)});
   }
+
   return json({ok:false,error:"invalid_operation"},400);
 }
 

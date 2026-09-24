@@ -28,3 +28,33 @@ Pendências pré-GO-LIVE:
 - ativar Leaked Password Protection no Supabase Auth;
 - aprovar/publicar Termos de Hospedagem, Regras da Propriedade e Política de Privacidade;
 - configurar definitivamente gateway real e testar seus webhooks/refunds/pré-autorização.
+
+
+## Continuação — hardening final
+
+Validações adicionais concluídas após o marco acima:
+
+- RLS real ampliado: perfil, garantia, alteração, pedidos/itens de experiência e aceite de políticas ficam visíveis somente ao dono — PASS.
+- Endpoints de hóspede sem autenticação retornam 401 e endpoints administrativos retornam 403 — PASS.
+- Sintaxe dos JavaScripts de Home, Auth, Callback, Reserva e Conta — PASS.
+- Varredura das telas do hóspede: nenhuma exposição de "taxa de limpeza"/"limpeza" — PASS.
+- Reservas confirmadas de QA: ledger = pagamento aprovado = total da reserva — PASS.
+- Aceite da política de cancelamento versionada persistido por reserva — PASS.
+- Aplicação de alteração agora é atômica: conflito de datas não gera pagamento nem lançamento financeiro órfão — PASS.
+- Reaplicação da mesma alteração não duplica cobrança — PASS.
+- Captura de garantia mock agora é atômica e idempotente — PASS.
+- Captura parcial de R$ 30 sobre R$ 500: saldo R$ 470; retry sem duplicar ledger — PASS.
+- Tentativa de captura acima de R$ 500: bloqueada sem alterar estado/ledger — PASS.
+- RPCs críticas não podem ser executadas por anon/authenticated; somente service_role — PASS.
+- booking-engine atual: v24; smoke config 200 e search 200 — PASS.
+- pg_net temporário removido novamente após o QA — PASS.
+
+### Lacunas encontradas que ainda fazem parte da Fase 1
+
+- Booking.com não está explicitamente integrado à disponibilidade atual. O motor usa reservas diretas + iCal Airbnb + PriceLabs. É necessário configurar/confirmar a fonte do Booking antes do GO-LIVE.
+- O backend de analytics existe, mas o frontend ainda não dispara os eventos definidos.
+- A Área do Hóspede mostra experiências compradas, porém ainda não oferece compra de novas experiências pós-reserva.
+- Termos de Hospedagem, Regras da Propriedade e Política de Privacidade continuam em rascunho e dependem de aprovação antes do GO-LIVE.
+- Gateway real continua não escolhido; pagamentos seguem em modo mock.
+- Leaked Password Protection do Supabase Auth continua desativado.
+- QA visual automatizado não pôde ser executado neste ambiente porque o navegador headless disponível não completa a navegação do Preview protegido; inspeção visual final permanece pendente.
