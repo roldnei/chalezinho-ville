@@ -142,41 +142,77 @@ function bindExperienceControls(){
  }));
  $$("[data-remove]").forEach(b=>b.addEventListener("click",()=>{delete state.selectedByProduct[b.dataset.remove];state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value)}));
 }
-function findUpsellCandidate(){
- const all=eligibleExperienceProducts("");
- for(const current of selectedProducts()){
-   const same=all.filter(p=>p.package_type===current.package_type).sort((a,b)=>Number(a.price_cents)-Number(b.price_cents));
-   const idx=same.findIndex(p=>String(p.id)===String(current.id));if(idx<0||idx>=same.length-1)continue;
-   const next=same[idx+1];
-   if(next?.upsell_enabled===true && primaryVariant(next)){
-     return {from:current,to:next,diff:Number(next.price_cents)-Number(current.price_cents),variant:primaryVariant(next)};
-   }
+async function serverUpsellPreview(){
+ try{
+  const d=await api("upsell_preview",{quote_id:state.quote.quote_id});
+  return d.upsell||null;
+ }catch(e){
+  if(e.message==="quote_expired")throw e;
+  return null;
  }
- return null;
 }
 function paymentChoice(){
  return {method:document.querySelector('input[name="pay-method"]:checked')?.value||"pix",installments:Number($("#installments")?.value||1)};
 }
 async function maybeOfferUpsell(){
  if(!$("#accept-cancel")?.checked){setFlowError("Aceite a política de cancelamento para continuar.");return}
- const choice=paymentChoice(),candidate=state.upsellHandled?null:findUpsellCandidate();
- if(!candidate){await performStartPayment(choice);return}
- const media=(candidate.to.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order)[0];
- const newTotal=Number(state.rate.total_amount_cents||0)+candidate.diff;
+ const choice=paymentChoice();
+ if(state.upsellHandled){await performStartPayment(choice);return}
+ setFlowError("Verificando a melhor opção antes do pagamento…");
+ let candidate=null;
+ try{candidate=await serverUpsellPreview()}catch(e){setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":"Não foi possível verificar o upsell.");return}
+ setFlowError("");
+ if(!candidate){state.upsellHandled=true;await performStartPayment(choice);return}
+
+ const target=(state.config.experience_products||[]).find(p=>String(p.id)===String(candidate.to_product_id));
+ const media=(target?.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order)[0];
+ const newTotal=Number(state.rate.total_amount_cents||0)+Number(candidate.difference_cents||0);
  $("#upsell-image").src=media?.media_url||"";
- $("#upsell-image").alt=media?.alt_text||candidate.to.name;
- $("#upsell-title").textContent=candidate.to.name;
- $("#upsell-copy").innerHTML='Você escolheu <strong>'+candidate.from.name+'</strong>. Por mais <strong>'+brlC(candidate.diff)+'</strong>, você pode trocar para <strong>'+candidate.to.name+'</strong>.';
+ $("#upsell-image").alt=media?.alt_text||candidate.to_name;
+ $("#upsell-title").textContent=candidate.to_name;
+ $("#upsell-copy").innerHTML='Você escolheu <strong>'+candidate.from_name+'</strong> por '+brlC(candidate.from_price_cents)+'. O próximo pacote é <strong>'+candidate.to_name+'</strong> por '+brlC(candidate.to_price_cents)+'. Você pode fazer o upgrade por <strong>+'+brlC(candidate.difference_cents)+'</strong>.';
  $("#upsell-total").textContent="Novo total da reserva: "+brlC(newTotal);
- $("#upsell-no").textContent="Não, manter "+candidate.from.name;
- $("#upsell-yes").textContent="Sim, quero por +"+brlC(candidate.diff);
+ $("#upsell-no").textContent="Não, manter "+candidate.from_name;
+ $("#upsell-yes").textContent="Sim, quero o upgrade por +"+brlC(candidate.difference_cents);
  $("#upsell-modal").hidden=false;
- $("#upsell-no").onclick=async()=>{state.upsellHandled=true;$("#upsell-modal").hidden=true;await performStartPayment(choice)};
+
+ $("#upsell-no").onclick=async()=>{
+   state.upsellHandled=true;$("#upsell-modal").hidden=true;
+   await performStartPayment(choice);
+ };
+
  $("#upsell-yes").onclick=async()=>{
-   state.upsellHandled=true;$("#upsell-modal").hidden=true;delete state.selectedByProduct[candidate.from.id];state.selectedByProduct[candidate.to.id]=candidate.variant.id;
-   const code=state.rateCode;setFlowError("Atualizando sua experiência…");
-   try{await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;renderSummary();setFlowError("");await performStartPayment(choice)}
-   catch(e){setFlowError("Não foi possível atualizar o pacote. Tente novamente.")}
+   $("#upsell-yes").disabled=true;$("#upsell-no").disabled=true;
+   $("#upsell-total").textContent="Atualizando o valor da reserva…";
+   try{
+     const d=await api("apply_upsell",{
+       quote_id:state.quote.quote_id,
+       quote_option_id:state.rate.quote_option_id,
+       target_product_id:candidate.to_product_id
+     });
+     state.quote=d.quote;
+     state.rate=d.selected_rate;
+     state.rateCode=d.selected_rate.code;
+     state.upsellHandled=true;
+     startCountdown(state.quote.expires_at);
+
+     delete state.selectedByProduct[candidate.from_product_id];
+     const targetProduct=(state.config.experience_products||[]).find(p=>String(p.id)===String(candidate.to_product_id));
+     const targetVariant=targetProduct?primaryVariant(targetProduct):null;
+     if(targetVariant)state.selectedByProduct[candidate.to_product_id]=targetVariant.id;
+
+     renderSummary();
+     $("#upsell-total").textContent="Pacote atualizado · novo total: "+brlC(state.rate.total_amount_cents);
+     $("#upsell-copy").innerHTML='<strong>'+candidate.to_name+'</strong> foi aplicado à reserva.';
+     $("#upsell-yes").textContent="Continuar para pagamento";
+     $("#upsell-no").hidden=true;
+     $("#upsell-yes").disabled=false;
+     $("#upsell-yes").onclick=async()=>{$("#upsell-modal").hidden=true;await performStartPayment(choice)};
+   }catch(e){
+     $("#upsell-total").textContent="Não foi possível atualizar o pacote.";
+     $("#upsell-yes").disabled=false;$("#upsell-no").disabled=false;
+     if(e.message==="upsell_not_available")$("#upsell-copy").textContent="A condição do pacote mudou. Feche esta oferta e tente novamente.";
+   }
  };
 }
 async function refreshQuoteAfterExperiences(){
@@ -220,7 +256,9 @@ async function performStartPayment(choice){
  }catch(e){setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderMockPayment(d){
- const box=$("#mock-payment");box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div><div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button></div><p id="mock-result"></p>';
+ const exp=(state.quote?.experiences||[]).map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
+ const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(state.rate.accommodation_amount_cents)+'</strong></div><div class="summary-line"><span>Taxa de limpeza</span><strong>'+brlC(state.rate.cleaning_fee_cents)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
+ const box=$("#mock-payment");box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button></div><p id="mock-result"></p>';
  box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':"Estado atualizado: "+b.dataset.outcome}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
 }
 function startCountdown(exp){
