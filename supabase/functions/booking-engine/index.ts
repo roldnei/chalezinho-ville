@@ -38,16 +38,52 @@ async function prodJson(path:string){
   return d;
 }
 
-async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null){
+const bookingFeeds=[
+  {name:"Ville Signature",env:"ICAL_BOOKING_CH1"},
+  {name:"Ville Essenza",env:"ICAL_BOOKING_CH2"},
+  {name:"Ville Amore",env:"ICAL_BOOKING_CH3"}
+];
+function bookingIcalConfigured(){
+  return bookingFeeds.every(x=>Boolean(Deno.env.get(x.env)));
+}
+function unfoldIcal(s:string){return s.replace(/\r?\n[ \t]/g,"");}
+function icalDate(v:string){
+  const m=String(v||"").match(/^(\d{4})(\d{2})(\d{2})/);
+  return m?m[1]+"-"+m[2]+"-"+m[3]:null;
+}
+async function readIcalFeed(url:string){
+  const r=await fetch(url,{headers:{"User-Agent":"ChalezinhoVille/1.0"},signal:AbortSignal.timeout(8000)});
+  if(!r.ok) throw new Error("feed_unreachable");
+  const raw=unfoldIcal(await r.text());
+  return raw.split("BEGIN:VEVENT").slice(1).map(x=>x.split("END:VEVENT")[0]).map(e=>{
+    const s=e.match(/DTSTART(?:;[^:]*)?:(\d{8})/);
+    const d=e.match(/DTEND(?:;[^:]*)?:(\d{8})/);
+    const start=s?icalDate(s[1]):null,end=d?icalDate(d[1]):null;
+    return start&&end?{start,end}:null;
+  }).filter(Boolean);
+}
+async function bookingCalendarData(){
+  const configured=bookingIcalConfigured();
+  if(!configured) return {configured:false,ok:true,listings:bookingFeeds.map(x=>({name:x.name,ok:true,periods:[]}))};
+  const listings=await Promise.all(bookingFeeds.map(async x=>{
+    const url=Deno.env.get(x.env)||"";
+    try{return {name:x.name,ok:true,periods:await readIcalFeed(url)}}
+    catch{return {name:x.name,ok:false,periods:[]}}
+  }));
+  return {configured:true,ok:listings.every(x=>x.ok),listings};
+}
+
+async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false){
   if(!validDate(start)||!validDate(end)||end<=start) throw new Error("invalid_dates");
   const stay=nights(start,end);
   if(stay<1) throw new Error("invalid_dates");
 
-  const [propertiesQ,reservationsQ,ical,prices] = await Promise.all([
+  const [propertiesQ,reservationsQ,ical,bookingIcal,prices] = await Promise.all([
     retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id")),
     retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
       .lt("check_in",end).gt("check_out",start).in("status",["hold","pending_payment","confirmed"])),
     prodJson("/api/ical-airbnb-all"),
+    bookingCalendarData(),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
   const {data:properties,error:pe}=propertiesQ;
@@ -56,15 +92,20 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null}));
     throw new Error("database_unavailable");
   }
+  if(!development && !bookingIcal.configured) throw new Error("booking_not_configured");
   const now=Date.now();
   const dbActive=(dbRows||[]).filter((r:any)=>String(r.id)!==String(excludeReservationId||"")).filter((r:any)=>r.status!=="hold" && r.status!=="pending_payment" ? true : !r.hold_expires_at || Date.parse(r.hold_expires_at)>now);
   const icalMap=Object.fromEntries((ical.listings||[]).map((x:any)=>[x.name,x]));
+  const bookingMap=Object.fromEntries((bookingIcal.listings||[]).map((x:any)=>[x.name,x]));
   const priceMap=Object.fromEntries((prices.listings||[]).map((x:any)=>[x.name,x]));
 
   return (properties||[]).map((p:any)=>{
     const cal=icalMap[p.name];
+    const bookingCal=bookingMap[p.name];
     const pr=priceMap[p.name];
-    const channelOccupied=!cal?.ok || (cal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end));
+    const airbnbOccupied=!cal?.ok || (cal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end));
+    const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end)));
+    const channelOccupied=airbnbOccupied||bookingOccupied;
     const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id));
     const minStay=Math.max(1,Number(pr?.min_stay||1));
     const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
@@ -82,7 +123,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
 
 async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null){
   const {property_id,check_in,check_out,guests,experience_variant_ids=[]}=body||{};
-  const list=await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId);
+  const list=await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development);
   const property=list.find((x:any)=>Number(x.id)===Number(property_id));
   if(!property) throw new Error("property_not_found");
   if(!property.available){
@@ -861,6 +902,98 @@ async function experienceAdminAction(req:Request,body:any){
   return json({ok:false,error:"invalid_operation"},400);
 }
 
+
+async function guestExperienceCatalog(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const reservationId=String(body?.reservation_id||"");
+  if(!reservationId) return json({ok:false,error:"missing_data"},400);
+
+  const {data:r,error:re}=await admin.from("reservations")
+    .select("id,user_id,property_id,check_in,status")
+    .eq("id",reservationId).single();
+  if(re||!r||r.user_id!==user.id) return json({ok:false,error:"not_found"},404);
+  if(r.status!=="confirmed") return json({ok:false,error:"reservation_not_available"},409);
+
+  const {data:products,error:pe}=await admin.from("experience_products")
+    .select("id,name,description,sales_headline,package_type,price_cents,minimum_lead_hours,daily_capacity,inventory,status,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility!inner(property_id),experience_media(id,media_url,alt_text,display_order)")
+    .eq("status","active")
+    .eq("experience_property_eligibility.property_id",r.property_id)
+    .order("display_order");
+  if(pe) return json({ok:false,error:"experience_catalog_unavailable"},500);
+
+  const {data:existing}=await admin.from("experience_orders")
+    .select("experience_order_items(product_id,status)")
+    .eq("reservation_id",r.id)
+    .in("status",["pending","active"]);
+  const owned=new Set((existing||[]).flatMap((o:any)=>o.experience_order_items||[]).filter((i:any)=>i.status==="active").map((i:any)=>String(i.product_id)));
+
+  const arrival=Date.parse(String(r.check_in)+"T15:00:00-03:00");
+  const now=Date.now();
+  const items=[];
+  for(const p of products||[]){
+    const variant=(p.experience_variants||[]).filter((v:any)=>v.active).sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))[0];
+    if(!variant) continue;
+    const leadOk=(arrival-now)>=Number(p.minimum_lead_hours||0)*3600000;
+    const stockOk=p.inventory==null||Number(p.inventory)>0;
+    if(!leadOk||!stockOk||owned.has(String(p.id))) continue;
+
+    let capacityOk=true;
+    if(p.daily_capacity!=null){
+      const {count}=await admin.from("experience_order_items")
+        .select("id,experience_orders!inner(reservation_id,status,reservations!inner(check_in,status))",{count:"exact",head:true})
+        .eq("product_id",p.id)
+        .eq("status","active")
+        .in("experience_orders.status",["pending","active"])
+        .eq("experience_orders.reservations.check_in",r.check_in)
+        .in("experience_orders.reservations.status",["confirmed","pending_payment"]);
+      capacityOk=Number(count||0)<Number(p.daily_capacity);
+    }
+    if(!capacityOk) continue;
+
+    items.push({
+      product_id:p.id,variant_id:variant.id,name:p.name,description:p.description,
+      sales_headline:p.sales_headline,package_type:p.package_type,
+      price_cents:Number(variant.price_cents),
+      media:(p.experience_media||[]).slice().sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))
+    });
+  }
+  return json({ok:true,reservation_id:r.id,items});
+}
+
+async function purchasePostBookingExperience(req:Request,body:any,development:boolean){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  if(!development) return json({ok:false,error:"payment_provider_not_ready"},409);
+
+  const reservationId=String(body?.reservation_id||"");
+  const variantId=String(body?.variant_id||"");
+  if(!reservationId||!variantId) return json({ok:false,error:"missing_data"},400);
+
+  const {data:settings}=await admin.from("payment_settings").select("active_provider").eq("id",1).single();
+  if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},409);
+
+  const {data,error}=await admin.rpc("purchase_post_booking_experience_mock_atomic",{
+    p_reservation_id:reservationId,p_user_id:user.id,p_variant_id:variantId
+  });
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock","experience_already_added","experience_capacity_reached"]){
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    }
+    return json({ok:false,error:"experience_purchase_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({
+    ok:true,
+    order_id:row?.result_order_id||null,
+    item_id:row?.result_item_id||null,
+    payment_id:row?.result_payment_id||null,
+    amount_cents:Number(row?.result_amount_cents||0),
+    total_amount:Number(row?.result_total_amount||0)
+  });
+}
+
 async function trackEvent(req:Request,body:any){
   const allowed=new Set(["search_started","search_completed","property_viewed","rate_viewed","rate_selected","experience_viewed","experience_added","experience_upgraded","checkout_started","login_started","account_created","payment_started","payment_failed","booking_confirmed","modification_requested","precheckin_started","guarantee_completed","checkin_completed","checkout_completed","review_requested","repeat_booking_started"]);
   if(!allowed.has(String(body?.event_name||""))) return json({ok:false,error:"invalid_event"},400);
@@ -914,13 +1047,20 @@ Deno.serve(async(req)=>{
       const productsQ=await retryDb("experience_products",()=>admin.from("experience_products").select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,daily_capacity,inventory,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)").in("status",development?["active","draft"]:["active"]).order("display_order"));
       if(productsQ.error) return json({ok:false,error:"config_unavailable"},500);
 
-      return json({ok:true,purposes:purposesQ.data||[],payment_settings:settingsQ.data||{},policy_documents:docsQ.data||[],experience_products:productsQ.data||[]});
+      return json({
+        ok:true,
+        purposes:purposesQ.data||[],
+        payment_settings:settingsQ.data||{},
+        policy_documents:docsQ.data||[],
+        experience_products:productsQ.data||[],
+        availability_coverage:{direct:true,airbnb:true,booking:bookingIcalConfigured()}
+      });
     }
     if(action==="search"){
       const start=url.searchParams.get("start")||body.start;
       const end=url.searchParams.get("end")||body.end;
       const guests=Number(url.searchParams.get("guests")||body.guests||2);
-      const listings=await searchData(start,end,guests);
+      const listings=await searchData(start,end,guests,null,development);
       return json({ok:true,listings:listings.map((x:any)=>{
         const {cleaning_fee,...rest}=x;
         return {...rest,from_stay_price:x.base_price!=null?Number(x.base_price)*1.10+Number(x.cleaning_fee||0):null};
@@ -937,6 +1077,8 @@ Deno.serve(async(req)=>{
     if(action==="guarantee_action") return await guaranteeAction(req,body);
     if(action==="experience_admin") return await experienceAdminData(req);
     if(action==="experience_admin_action") return await experienceAdminAction(req,body);
+    if(action==="guest_experience_catalog") return await guestExperienceCatalog(req,body);
+    if(action==="purchase_post_booking_experience") return await purchasePostBookingExperience(req,body,development);
     if(action==="track") return await trackEvent(req,body);
 
     return json({ok:false,error:"unknown_action"},404);
@@ -944,6 +1086,7 @@ Deno.serve(async(req)=>{
     const msg=String((e as Error)?.message||"unexpected_error");
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
+    if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
     const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","modification_already_open","upsell_not_available"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
