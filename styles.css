@@ -1639,3 +1639,9 @@ footer{justify-content:space-between!important}
 .post-payment-methods label{border:1px solid #55443a;padding:14px;display:flex;align-items:center;gap:9px;cursor:pointer}
 .post-mock{margin-top:22px}
 @media(max-width:620px){.pending-charge-actions{display:grid;grid-template-columns:1fr}.pending-charge-actions>*{width:100%}.post-payment-methods{grid-template-columns:1fr}.post-charge-summary{align-items:flex-start;flex-direction:column}}
+
+#post-installments-wrap{display:grid;gap:8px;width:100%;margin:0 0 12px}
+#post-installments-wrap[hidden]{display:none!important}
+#post-installments{display:block;width:100%;min-height:52px;padding:12px 14px;background:#332e29;border:1px solid #62564a;color:#fff;font:inherit}
+#post-pay-start{display:block;width:100%;min-height:54px;margin-top:10px}
+@media(max-width:620px){#post-installments-wrap{margin-bottom:10px}#post-pay-start{margin-top:0}}

@@ -247,16 +247,16 @@ async function upsellPreview(body:any){
 
   const productIds=[...new Set(qitems.map((x:any)=>x.product_id))];
   const {data:products,error:pe}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,status")
+    .select("id,name,package_type,price_cents,upsell_enabled,status")
     .in("id",productIds);
   if(pe) return json({ok:false,error:"experience_lookup_failed"},500);
 
   for(const item of qitems){
     const source=(products||[]).find((p:any)=>String(p.id)===String(item.product_id));
-    if(!source||source.status!=="active") continue;
+    if(!source||source.status!=="active"||source.upsell_enabled!==true) continue;
 
     const {data:above,error:ae}=await admin.from("experience_products")
-      .select("id,name,package_type,price_cents,upsell_enabled,status,inventory,experience_property_eligibility!inner(property_id)")
+      .select("id,name,package_type,price_cents,status,inventory,experience_property_eligibility!inner(property_id)")
       .eq("package_type",source.package_type)
       .eq("status","active")
       .eq("experience_property_eligibility.property_id",q.property_id)
@@ -266,7 +266,7 @@ async function upsellPreview(body:any){
     if(ae) return json({ok:false,error:"upsell_lookup_failed"},500);
 
     const next=(above||[])[0];
-    if(!next || next.upsell_enabled!==true || (next.inventory!=null&&Number(next.inventory)<=0)) continue;
+    if(!next || (next.inventory!=null&&Number(next.inventory)<=0)) continue;
     const diff=Number(next.price_cents)-Number(source.price_cents);
     if(diff<=0) continue;
 
@@ -302,19 +302,19 @@ async function applyUpsell(body:any,development:boolean){
 
   const productIds=[...new Set(qitems.map((x:any)=>x.product_id))];
   const {data:currentProducts,error:cpe}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,status").in("id",productIds);
+    .select("id,name,package_type,price_cents,upsell_enabled,status").in("id",productIds);
   if(cpe) return json({ok:false,error:"experience_lookup_failed"},500);
 
   const {data:target,error:te}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,upsell_enabled,status,inventory")
+    .select("id,name,package_type,price_cents,status,inventory")
     .eq("id",target_product_id).single();
-  if(te||!target||target.status!=="active"||target.upsell_enabled!==true||(target.inventory!=null&&Number(target.inventory)<=0)) return json({ok:false,error:"upsell_not_available"},409);
+  if(te||!target||target.status!=="active"||(target.inventory!=null&&Number(target.inventory)<=0)) return json({ok:false,error:"upsell_not_available"},409);
 
   const source=(currentProducts||[]).find((p:any)=>p.package_type===target.package_type);
-  if(!source) return json({ok:false,error:"upsell_not_available"},409);
+  if(!source||source.upsell_enabled!==true) return json({ok:false,error:"upsell_not_available"},409);
 
   const {data:eligible,error:ee}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,upsell_enabled,status,inventory,experience_property_eligibility!inner(property_id)")
+    .select("id,name,package_type,price_cents,status,inventory,experience_property_eligibility!inner(property_id)")
     .eq("package_type",source.package_type)
     .eq("status","active")
     .eq("experience_property_eligibility.property_id",q.property_id)
@@ -324,7 +324,7 @@ async function applyUpsell(body:any,development:boolean){
   if(ee) return json({ok:false,error:"upsell_lookup_failed"},500);
 
   const nextAbove=(eligible||[])[0];
-  if(!nextAbove || String(nextAbove.id)!==String(target.id) || nextAbove.upsell_enabled!==true || (nextAbove.inventory!=null&&Number(nextAbove.inventory)<=0))
+  if(!nextAbove || String(nextAbove.id)!==String(target.id) || (nextAbove.inventory!=null&&Number(nextAbove.inventory)<=0))
     return json({ok:false,error:"upsell_not_available"},409);
 
   const diff=Number(target.price_cents)-Number(source.price_cents);
