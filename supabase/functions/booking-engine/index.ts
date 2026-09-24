@@ -147,8 +147,9 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     };
     if(p.selectable) inserted.push(row);
     display.push({
-      code:p.code,name:p.name,selectable:p.selectable,accommodation_amount_cents:accommodation,
-      cleaning_fee_cents:cleaningCents,experience_amount_cents:experienceTotal,total_amount_cents:total,
+      code:p.code,name:p.name,selectable:p.selectable,
+      stay_amount_cents:accommodation+cleaningCents,
+      experience_amount_cents:experienceTotal,total_amount_cents:total,
       cancellation_policy:p.policy_documents||null
     });
   }
@@ -163,7 +164,8 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     const plan=(plans||[]).find((x:any)=>x.code===d.code);
     d.quote_option_id=plan?byPlan[String(plan.id)]||null:null;
   }
-  return {ok:true,quote_id:q.id,expires_at:expiresAt,property,rate_options:display,experiences:expSnapshots.map(x=>({
+  const {cleaning_fee:_hiddenCleaning,...guestProperty}=property;
+  return {ok:true,quote_id:q.id,expires_at:expiresAt,property:guestProperty,rate_options:display,experiences:expSnapshots.map(x=>({
     product_id:x.product.id,product:x.product.name,package_type:x.product.package_type,
     variant:x.variant.code==="package"?null:x.variant.name,price_cents:Number(x.variant.price_cents)
   }))};
@@ -327,8 +329,7 @@ async function applyUpsell(body:any,development:boolean){
     const p=byPlan[String(o.rate_plan_id)]||{};
     return {
       quote_option_id:o.id,code:p.code,name:p.name,selectable:p.selectable!==false,
-      accommodation_amount_cents:o.accommodation_amount_cents,
-      cleaning_fee_cents:o.cleaning_fee_cents,
+      stay_amount_cents:Number(o.accommodation_amount_cents)+Number(o.cleaning_fee_cents),
       experience_amount_cents:newExperienceTotal,total_amount_cents:o.total_amount_cents,
       cancellation_policy:p.policy_documents||null
     };
@@ -481,11 +482,11 @@ async function requestModification(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
   const {reservation_id,requested_check_in,requested_check_out,requested_property_id}=body||{};
-  const {data:r}=await admin.from("reservations").select("id,user_id,property_id,guests,total_amount,rate_plan_code,check_in,check_out,status").eq("id",reservation_id).single();
+  const {data:r}=await admin.from("reservations").select("id,user_id,property_id,guests,stay_amount,total_amount,rate_plan_code,check_in,check_out,status").eq("id",reservation_id).single();
   if(!r || r.user_id!==user.id) return json({ok:false,error:"not_found"},404);
   if(!["confirmed","pending_payment"].includes(r.status)) return json({ok:false,error:"reservation_not_changeable"},409);
   const {data:openRequest}=await admin.from("modification_requests")
-    .select("id,status,requested_check_in,requested_check_out,requested_property_id,reference_amount_cents,admin_additional_amount_cents,created_at")
+    .select("id,status,requested_check_in,requested_check_out,requested_property_id,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,created_at")
     .eq("reservation_id",r.id)
     .in("status",["requested","quoted","awaiting_guest_acceptance","accepted"])
     .order("created_at",{ascending:false})
@@ -498,12 +499,14 @@ async function requestModification(req:Request,body:any,development:boolean){
     quote=await createQuote({property_id:targetProperty,check_in:requested_check_in,check_out:requested_check_out,guests:r.guests,experience_variant_ids:[]},development,r.id);
   }catch(e){return json({ok:false,error:String((e as Error).message||"modification_quote_failed")},409)}
   const option=quote.rate_options.find((x:any)=>x.code===r.rate_plan_code && x.selectable) || quote.rate_options.find((x:any)=>x.code==="non_refundable");
-  const originalCents=Math.round(Number(r.total_amount||0)*100);
-  const referenceCents=Number(option?.total_amount_cents||0);
+  const originalCents=Math.round(Number(r.stay_amount||0)*100);
+  const referenceCents=Number(option?.stay_amount_cents||0);
+  const estimatedAdditional=Math.max(0,referenceCents-originalCents);
   const {data:m,error}=await admin.from("modification_requests").insert({
     reservation_id:r.id,user_id:user.id,request_type:targetProperty===Number(r.property_id)?"dates":"property",
     requested_check_in,requested_check_out,requested_property_id:targetProperty,reference_quote_id:quote.quote_id,
-    original_amount_cents:originalCents,reference_amount_cents:referenceCents,status:"quoted"
+    original_amount_cents:originalCents,reference_amount_cents:referenceCents,
+    estimated_additional_amount_cents:estimatedAdditional,status:"quoted"
   }).select().single();
   if(error){
     if(String(error.code)==="23505") return json({ok:false,error:"modification_already_open"},409);
@@ -512,7 +515,7 @@ async function requestModification(req:Request,body:any,development:boolean){
   await admin.from("reservation_change_events").insert({
     reservation_id:r.id,modification_request_id:m.id,event_type:"quoted",
     before_snapshot:{property_id:r.property_id,check_in:r.check_in,check_out:r.check_out,total_amount:r.total_amount,rate_plan_code:r.rate_plan_code},
-    after_snapshot:{requested_property_id:targetProperty,requested_check_in,requested_check_out,reference_amount_cents:referenceCents},
+    after_snapshot:{requested_property_id:targetProperty,requested_check_in,requested_check_out,reference_amount_cents:referenceCents,estimated_additional_amount_cents:estimatedAdditional},
     actor_user_id:user.id
   });
   return json({ok:true,request:m,reference_quote:quote});
@@ -570,7 +573,7 @@ async function modificationAction(req:Request,body:any){
           idempotency_key:idem,metadata:{development:true,kind:"modification",modification_request_id:m.id}
         }).select().single();
         paymentId=p?.id||null;
-        await admin.from("financial_entries").insert({reservation_id:m.reservation_id,payment_id:paymentId,entry_type:"additional_charge",amount_cents:amount,description:"Alteração de reserva"});
+        await admin.from("financial_entries").insert({reservation_id:m.reservation_id,payment_id:paymentId,entry_type:"additional_charge",amount_cents:amount,description:"Revisão de tarifa da alteração"});
       }
     }
     const newTotal=Number(before.total_amount||0)+amount/100;
@@ -875,7 +878,11 @@ Deno.serve(async(req)=>{
       const start=url.searchParams.get("start")||body.start;
       const end=url.searchParams.get("end")||body.end;
       const guests=Number(url.searchParams.get("guests")||body.guests||2);
-      return json({ok:true,listings:await searchData(start,end,guests)});
+      const listings=await searchData(start,end,guests);
+      return json({ok:true,listings:listings.map((x:any)=>{
+        const {cleaning_fee,...rest}=x;
+        return {...rest,from_stay_price:x.base_price!=null?Number(x.base_price)*1.10+Number(x.cleaning_fee||0):null};
+      })});
     }
     if(action==="quote") return json(await createQuote(body,development));
     if(action==="upsell_preview") return await upsellPreview(body);

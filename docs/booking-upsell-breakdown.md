@@ -48,3 +48,22 @@ Garantia:
 - Somente a experiência é substituída e o total aumenta exatamente pela diferença.
 - O pagamento só começa usando a nova quote.
 - O frontend mostra o novo total antes de prosseguir ao pagamento.
+
+
+## Exibição de hospedagem ao hóspede
+
+- A taxa de limpeza continua armazenada separadamente no banco para uso interno do proprietário.
+- O hóspede vê apenas o valor consolidado da hospedagem.
+- Valor da hospedagem = diárias + limpeza interna.
+- Valor por noite = valor consolidado da hospedagem / número de noites.
+- Nenhuma linha ou texto de taxa de limpeza aparece nas telas do hóspede.
+- Experiências aparecem separadamente.
+- Alterações aplicadas aparecem como "Revisão de tarifa da alteração" e entram no total pago.
+
+## Alteração de reserva
+
+- Antes da decisão administrativa, mostrar somente o possível valor da alteração.
+- Estimativa = max(0, nova hospedagem consolidada - hospedagem consolidada atual).
+- Experiências não entram nessa comparação.
+- Depois da aprovação administrativa, mostrar o valor final para aceite do hóspede.
+- Depois da aplicação, registrar lançamento financeiro e somar ao total da reserva.
