@@ -25,6 +25,7 @@ async function boot(){
  profile=p;properties=props||[];mods=m||[];charges=ch||[];paymentSettings=cfg?.payment_settings||{};
  $("#profile-name").value=profile?.full_name||"";$("#profile-phone").value=profile?.phone||"";
  if(profile?.role==="admin"){$("#ops-link").hidden=false;$("#experience-admin-link").hidden=false}
+ renderPendingPayments(reservations||[]);
  renderReservations(reservations||[]);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
  if(requestedCharge){
@@ -32,21 +33,73 @@ async function boot(){
   if(charge)setTimeout(()=>openChargePayment(charge),100);
  }
 }
+
 function activeModification(reservationId){return mods.find(m=>m.reservation_id===reservationId&&["requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status))}
 function chargeForModification(m){return m?.payment_charge_id?charges.find(c=>String(c.id)===String(m.payment_charge_id)):null}
+function liveCharges(reservationId=null){
+ const now=Date.now();
+ return charges.filter(c=>(!reservationId||c.reservation_id===reservationId)
+   &&["awaiting_payment","processing"].includes(c.status)
+   &&(!c.expires_at||Date.parse(c.expires_at)>now));
+}
+function fmtDate(v){return v?new Date(v).toLocaleDateString("pt-BR"):"—"}
+function reservationStatus(r){
+ const pending=liveCharges(r.id),active=activeModification(r.id);
+ const now=Date.now(),checkIn=Date.parse(r.check_in+"T15:00:00-03:00"),checkOut=Date.parse(r.check_out+"T11:00:00-03:00");
+ if(pending.length) return {label:"Pagamento pendente",tone:"action",priority:0,needsAction:true};
+ if(active?.status==="awaiting_payment") return {label:"Alteração aguardando pagamento",tone:"action",priority:0,needsAction:true};
+ if(active&&["requested","quoted","awaiting_guest_acceptance","accepted"].includes(active.status)) return {label:"Alteração em análise",tone:"info",priority:1,needsAction:true};
+ if(r.status==="pending_payment") return {label:"Aguardando pagamento",tone:"action",priority:0,needsAction:true};
+ if(r.status==="expired") return {label:"Expirada",tone:"muted",priority:4,needsAction:false};
+ if(r.status==="cancelled") return {label:"Cancelada",tone:"muted",priority:4,needsAction:false};
+ if(r.status==="confirmed"&&now>=checkOut) return {label:"Concluída",tone:"done",priority:3,needsAction:false};
+ if(r.status==="confirmed"&&now>=checkIn&&now<checkOut) return {label:"Hospedagem em andamento",tone:"success",priority:1,needsAction:false};
+ if(r.status==="confirmed") return {label:"Confirmada",tone:"success",priority:2,needsAction:false};
+ return {label:statusLabel(r.status),tone:"muted",priority:3,needsAction:false};
+}
+function renderPendingPayments(reservations){
+ const section=$("#pending-payment-section"),list=$("#pending-payment-list"),count=$("#pending-payment-count");
+ if(!section||!list)return;
+ const map=new Map(reservations.map(r=>[String(r.id),r]));
+ const pending=liveCharges().sort((a,b)=>Date.parse(a.expires_at||"2999-01-01")-Date.parse(b.expires_at||"2999-01-01"));
+ if(!pending.length){section.hidden=true;list.innerHTML="";return}
+ section.hidden=false;
+ count.textContent=pending.length===1?"1 pendência exige sua atenção":pending.length+" pendências exigem sua atenção";
+ list.innerHTML=pending.map(charge=>{
+   const r=map.get(String(charge.reservation_id));
+   const property=r?.properties?.name||"Reserva";
+   const period=r?(r.check_in.split("-").reverse().join("/")+" → "+r.check_out.split("-").reverse().join("/")):"";
+   const title=charge.kind==="modification"?"Alteração de reserva":charge.kind==="experience_upgrade"?"Upgrade de experiência":"Experiência";
+   const processing=charge.status==="processing";
+   return '<article class="payment-pending-card"><div><small>'+title.toUpperCase()+'</small><h3>'+esc(charge.description||title)+'</h3><p>'+esc(property)+(period?" · "+period:"")+'</p><p class="payment-pending-deadline">Prazo: '+fmtDateTime(charge.expires_at)+'</p></div><div class="payment-pending-value"><span>'+brlC(charge.amount_cents)+'</span><button class="primary-action compact" data-pay-charge="'+charge.id+'">'+(processing?"Continuar pagamento":"Ir para pagamento")+'</button><button class="text-action danger" data-cancel-charge="'+charge.id+'">Cancelar</button></div></article>';
+ }).join("");
+ list.querySelectorAll("[data-pay-charge]").forEach(b=>b.addEventListener("click",()=>openChargePayment(b.dataset.payCharge)));
+ list.querySelectorAll("[data-cancel-charge]").forEach(b=>b.addEventListener("click",()=>cancelPendingCharge(b.dataset.cancelCharge,b)));
+}
 function renderPendingExperienceCharge(c){
- return '<div class="pending-charge"><small>PAGAMENTO PENDENTE</small><strong>'+esc(c.description||"Experiência")+'</strong><div class="pending-charge-value">'+brlC(c.amount_cents)+'</div><p>Esta experiência só será adicionada à reserva depois da confirmação do pagamento. Prazo: <strong>'+fmtDateTime(c.expires_at)+'</strong>.</p><div class="pending-charge-actions"><button class="primary-action compact" data-pay-charge="'+c.id+'">Ir para pagamento</button><button class="text-action danger" data-cancel-charge="'+c.id+'">Cancelar</button></div></div>';
+ return '<div class="reservation-inline-pending"><span><strong>Pagamento pendente</strong> · '+esc(c.description||"Experiência")+' · '+brlC(c.amount_cents)+'</span><button class="text-action" data-pay-charge="'+c.id+'">Ir para pagamento</button></div>';
 }
 function renderReservations(reservations){
- const box=$("#reservation-list");box.innerHTML="";if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
- reservations.forEach(r=>{
-  const active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&!["requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status)).slice(0,2);
+ const box=$("#reservation-list");box.innerHTML="";
+ if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
+ const now=Date.now();
+ const sorted=[...reservations].sort((a,b)=>{
+   const sa=reservationStatus(a),sb=reservationStatus(b);
+   if(sa.priority!==sb.priority)return sa.priority-sb.priority;
+   const af=Date.parse(a.check_out+"T11:00:00-03:00")>=now,bf=Date.parse(b.check_out+"T11:00:00-03:00")>=now;
+   if(af!==bf)return af?-1:1;
+   return af?Date.parse(a.check_in)-Date.parse(b.check_in):Date.parse(b.check_in)-Date.parse(a.check_in);
+ });
+ const defaultOpen=(sorted.find(r=>reservationStatus(r).needsAction)||sorted.find(r=>r.status==="confirmed"&&Date.parse(r.check_out+"T11:00:00-03:00")>=now))?.id;
+ sorted.forEach(r=>{
+  const ux=reservationStatus(r),active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&![ "requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status)).slice(0,2);
   const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
-  const pendingExperienceCharges=charges.filter(c=>c.reservation_id===r.id&&["experience_add","experience_upgrade"].includes(c.kind)&&["awaiting_payment","processing"].includes(c.status));
+  const pendingExperienceCharges=liveCharges(r.id).filter(c=>["experience_add","experience_upgrade"].includes(c.kind));
   const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),per=Number(r.stay_amount||0)/n;
   const paid=(r.payments||[]).some(p=>p.status==="paid");
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);
-  const art=document.createElement("article");art.className="account-reservation";
+  const art=document.createElement("details");art.className="account-reservation reservation-accordion";art.dataset.status=ux.tone;
+  if(String(r.id)===String(defaultOpen))art.open=true;
   const expRows=expItems.map(i=>'<div class="reservation-breakdown-row"><span>'+esc(i.product_name_snapshot)+'</span><strong>'+brlC(Number(i.unit_price_cents))+'</strong></div>').join("");
   const revisionRow=appliedRevision>0?'<div class="reservation-breakdown-row tariff-revision"><span>Revisão de tarifa da alteração</span><strong>+'+brlC(appliedRevision)+'</strong></div>':"";
   const pendingCharges=pendingExperienceCharges.map(renderPendingExperienceCharge).join("");
@@ -54,7 +107,8 @@ function renderReservations(reservations){
   const experienceAction=canShop?'<button class="reservation-action experience-action" data-experience-shop="'+r.id+'">Adicionar experiência</button>':"";
   const modificationAction=!active&&r.status==="confirmed"?'<button class="reservation-action modification-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>':"";
   const reservationActions=(experienceAction||modificationAction)?'<div class="reservation-actions">'+experienceAction+modificationAction+'</div>':"";
-  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.stay_amount)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
+  const period=r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/");
+  art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>'+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.stay_amount)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';
   box.appendChild(art);
  });
  box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
