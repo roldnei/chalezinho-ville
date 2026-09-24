@@ -104,10 +104,14 @@ function renderExperienceStep(){
  renderExperienceList(purpose.value);
 }
 function eligibleExperienceProducts(purpose=""){
+ const checkIn=$("#book-in")?.value||"";
+ const checkInAt=checkIn?Date.parse(checkIn+"T15:00:00-03:00"):Infinity;
  return (state.config.experience_products||[])
   .filter(p=>p.status==="active")
   .filter(p=>Number(p.price_cents||0)>0)
   .filter(p=>(p.experience_media||[]).length>=5)
+  .filter(p=>p.inventory==null||Number(p.inventory)>0)
+  .filter(p=>!checkIn||checkInAt-Date.now()>=Number(p.minimum_lead_hours||0)*3600000)
   .filter(p=>(p.experience_property_eligibility||[]).some(e=>Number(e.property_id)===Number(state.property.id)))
   .filter(p=>!purpose||!(p.travel_purposes||[]).length||(p.travel_purposes||[]).includes(purpose));
 }
