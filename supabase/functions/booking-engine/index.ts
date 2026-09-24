@@ -509,9 +509,11 @@ async function experienceAdminAction(req:Request,body:any){
     }
 
     // Keep the existing booking engine compatible: the first active variant mirrors package price.
-    const {data:variants}=await admin.from("experience_variants").select("*").eq("product_id",product.id).eq("active",true).order("display_order").limit(1);
+    const {data:variants}=await admin.from("experience_variants").select("*").eq("product_id",product.id).eq("active",true).order("display_order");
     if(variants?.length){
-      await admin.from("experience_variants").update({price_cents:priceCents}).eq("id",variants[0].id);
+      const primary=variants[0];
+      await admin.from("experience_variants").update({code:"package",name:"Pacote",price_cents:priceCents,active:true,display_order:10}).eq("id",primary.id);
+      if(variants.length>1) await admin.from("experience_variants").update({active:false}).in("id",variants.slice(1).map((v:any)=>v.id));
     }else{
       await admin.from("experience_variants").insert({product_id:product.id,code:"package",name:"Pacote",price_cents:priceCents,active:true,display_order:10});
     }
