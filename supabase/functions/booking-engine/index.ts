@@ -78,23 +78,28 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   const stay=nights(start,end);
   if(stay<1) throw new Error("invalid_dates");
 
-  const [propertiesQ,reservationsQ,ical,bookingIcal,prices] = await Promise.all([
+  const [propertiesQ,reservationsQ,changeHoldsQ,ical,bookingIcal,prices] = await Promise.all([
     retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id")),
     retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
       .lt("check_in",end).gt("check_out",start).in("status",["hold","pending_payment","confirmed"])),
+    retryDb("search_change_holds",()=>admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
+      .eq("kind","modification").in("status",["awaiting_payment","processing","paid"])
+      .lt("target_check_in",end).gt("target_check_out",start).gt("expires_at",new Date().toISOString())),
     prodJson("/api/ical-airbnb-all"),
     bookingCalendarData(),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
   const {data:properties,error:pe}=propertiesQ;
   const {data:dbRows,error:re}=reservationsQ;
-  if(pe||re){
-    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null}));
+  const {data:changeHolds,error:he}=changeHoldsQ;
+  if(pe||re||he){
+    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null,change_holds:he?.code||null}));
     throw new Error("database_unavailable");
   }
   if(!development && !bookingIcal.configured) throw new Error("booking_not_configured");
   const now=Date.now();
   const dbActive=(dbRows||[]).filter((r:any)=>String(r.id)!==String(excludeReservationId||"")).filter((r:any)=>r.status!=="hold" && r.status!=="pending_payment" ? true : !r.hold_expires_at || Date.parse(r.hold_expires_at)>now);
+  const changeHoldActive=(changeHolds||[]).filter((c:any)=>String(c.reservation_id)!==String(excludeReservationId||"") && Date.parse(c.expires_at)>now);
   const icalMap=Object.fromEntries((ical.listings||[]).map((x:any)=>[x.name,x]));
   const bookingMap=Object.fromEntries((bookingIcal.listings||[]).map((x:any)=>[x.name,x]));
   const priceMap=Object.fromEntries((prices.listings||[]).map((x:any)=>[x.name,x]));
@@ -106,7 +111,8 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     const airbnbOccupied=!cal?.ok || (cal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end));
     const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end)));
     const channelOccupied=airbnbOccupied||bookingOccupied;
-    const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id));
+    const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id))
+      || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id));
     const minStay=Math.max(1,Number(pr?.min_stay||1));
     const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
     const available=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&stay>=minStay&&hasPrice;
@@ -526,17 +532,40 @@ async function mockPayment(req:Request,body:any){
   const {payment_id,outcome}=body||{};
   const {data:p}=await admin.from("payments").select("*,reservations(id,user_id,property_id)").eq("id",payment_id).single();
   if(!p || (p as any).user_id!==user.id) return json({ok:false,error:"not_found"},404);
-  const reservationId=(p as any).reservation_id;
   const allowed=["paid","refused","under_review","expired"];
   if(!allowed.includes(outcome)) return json({ok:false,error:"invalid_outcome"},400);
 
+  const isPostCharge=(p as any).metadata?.kind==="post_booking_charge";
+  if(isPostCharge){
+    if(outcome==="paid"){
+      const {data,error}=await admin.rpc("finalize_post_booking_charge_atomic",{p_payment_id:payment_id,p_user_id:user.id});
+      if(error){
+        const msg=String(error.message||"");
+        for(const code of ["payment_not_found","charge_not_found","charge_expired","payment_state_final","reservation_not_available","modification_not_payable","dates_unavailable","experience_upgrade_not_available","experience_category_conflict"])
+          if(msg.includes(code)) return json({ok:false,error:code},409);
+        return json({ok:false,error:"post_booking_finalize_failed"},500);
+      }
+      const row=Array.isArray(data)?data[0]:data;
+      return json({ok:true,outcome:"paid",charge_id:row?.result_charge_id||null,charge_status:row?.result_status||"applied",amount_cents:Number(row?.result_amount_cents||0),total_amount:Number(row?.result_total_amount||0)});
+    }
+
+    const {data,error}=await admin.rpc("update_post_booking_payment_state_atomic",{p_payment_id:payment_id,p_user_id:user.id,p_outcome:outcome});
+    if(error){
+      const msg=String(error.message||"");
+      for(const code of ["payment_not_found","charge_not_found","payment_state_final","invalid_outcome"])
+        if(msg.includes(code)) return json({ok:false,error:code},409);
+      return json({ok:false,error:"post_booking_payment_state_failed"},500);
+    }
+    const row=Array.isArray(data)?data[0]:data;
+    return json({ok:true,outcome,charge_id:row?.result_charge_id||null,charge_status:row?.result_charge_status||null});
+  }
+
+  const reservationId=(p as any).reservation_id;
   const current=String((p as any).status||"");
   if(["paid","refused","expired","cancelled","refunded"].includes(current)){
     if(current===outcome) return json({ok:true,outcome,idempotent:true});
     return json({ok:false,error:"payment_state_final"},409);
   }
-  if(current==="under_review" && !["paid","refused","expired","under_review"].includes(outcome))
-    return json({ok:false,error:"invalid_payment_transition"},409);
 
   if(outcome==="paid"){
     await admin.from("payments").update({status:"paid"}).eq("id",payment_id);
@@ -548,16 +577,15 @@ async function mockPayment(req:Request,body:any){
       const {data:existing}=await admin.from("guarantees").select("id").eq("reservation_id",reservationId).maybeSingle();
       if(!existing) await admin.from("guarantees").insert({reservation_id:reservationId,provider:"mock",amount_cents:amount,status:"pending"});
     }
-  } else if(outcome==="under_review"){
+  }else if(outcome==="under_review"){
     await admin.from("payments").update({status:"under_review"}).eq("id",payment_id);
     await admin.from("reservations").update({status:"pending_payment",hold_expires_at:new Date(Date.now()+60*60000).toISOString()}).eq("id",reservationId);
-  } else {
+  }else{
     await admin.from("payments").update({status:outcome==="refused"?"refused":"expired"}).eq("id",payment_id);
     await admin.from("reservations").update({status:"expired",hold_expires_at:new Date().toISOString()}).eq("id",reservationId);
   }
   return json({ok:true,outcome});
 }
-
 
 async function userIsAdmin(user:any){
   if(!user) return false;
@@ -575,7 +603,7 @@ async function requestModification(req:Request,body:any,development:boolean){
   const {data:openRequest}=await admin.from("modification_requests")
     .select("id,status,requested_check_in,requested_check_out,requested_property_id,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,created_at")
     .eq("reservation_id",r.id)
-    .in("status",["requested","quoted","awaiting_guest_acceptance","accepted"])
+    .in("status",["requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"])
     .order("created_at",{ascending:false})
     .limit(1)
     .maybeSingle();
@@ -613,7 +641,7 @@ async function requestModification(req:Request,body:any,development:boolean){
   return json({ok:true,request:m,reference_quote:quote});
 }
 
-async function modificationAction(req:Request,body:any){
+async function modificationAction(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
   const action=body?.operation;
@@ -622,7 +650,23 @@ async function modificationAction(req:Request,body:any){
   if(!m) return json({ok:false,error:"not_found"},404);
 
   if(action==="guest_cancel"){
-    if(m.user_id!==user.id || !["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status)) return json({ok:false,error:"not_allowed"},403);
+    if(m.user_id!==user.id) return json({ok:false,error:"not_allowed"},403);
+
+    if(m.status==="awaiting_payment"&&m.payment_charge_id){
+      const {data,error}=await admin.rpc("cancel_post_booking_charge_atomic",{p_charge_id:m.payment_charge_id,p_user_id:user.id});
+      if(error){
+        const msg=String(error.message||"");
+        if(msg.includes("payment_processing")) return json({ok:false,error:"payment_processing"},409);
+        if(msg.includes("charge_already_applied")||msg.includes("charge_already_paid")) return json({ok:false,error:"not_allowed"},403);
+        return json({ok:false,error:"modification_cancel_failed"},500);
+      }
+      const row=Array.isArray(data)?data[0]:data;
+      return json({ok:true,status:row?.result_modification_status||"cancelled"});
+    }
+
+    if(!["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status))
+      return json({ok:false,error:"not_allowed"},403);
+
     await admin.from("modification_requests").update({status:"cancelled",updated_at:new Date().toISOString()}).eq("id",m.id);
     await admin.from("reservation_change_events").insert({reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"cancelled",actor_user_id:user.id});
     return json({ok:true,status:"cancelled"});
@@ -640,31 +684,57 @@ async function modificationAction(req:Request,body:any){
   if(action==="decide"){
     const decision=body?.decision;
     if(decision==="reject"){
-      await admin.from("modification_requests").update({status:"rejected",admin_note:body?.admin_note||null,decided_at:new Date().toISOString()}).eq("id",m.id);
+      if(!["requested","quoted"].includes(m.status)) return json({ok:false,error:"modification_not_approvable"},409);
+      await admin.from("modification_requests").update({status:"rejected",admin_note:body?.admin_note||null,decided_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",m.id);
       await admin.from("reservation_change_events").insert({reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"rejected",actor_user_id:user.id});
       return json({ok:true,status:"rejected"});
     }
+
+    if(!["requested","quoted"].includes(m.status)) return json({ok:false,error:"modification_not_approvable"},409);
+
+    const targetProperty=Number(m.requested_property_id||m.reservations?.property_id);
+    const targetIn=String(m.requested_check_in||m.reservations?.check_in||"");
+    const targetOut=String(m.requested_check_out||m.reservations?.check_out||"");
+    const listings=await searchData(targetIn,targetOut,Number(m.reservations?.guests||2),m.reservation_id,development);
+    const target=listings.find((x:any)=>Number(x.id)===targetProperty);
+    if(!target?.available){
+      if(target?.unavailable_reason==="minimum_stay") return json({ok:false,error:"minimum_stay",min_stay:Number(target.min_stay||1)},409);
+      return json({ok:false,error:target?.unavailable_reason||"dates_unavailable"},409);
+    }
+
     const amount=Math.max(0,Number(body?.additional_amount_cents||0));
-    await admin.from("modification_requests").update({status:"awaiting_guest_acceptance",admin_additional_amount_cents:amount,admin_note:body?.admin_note||null,decided_at:new Date().toISOString()}).eq("id",m.id);
-    await admin.from("reservation_change_events").insert({reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"admin_decision",amount_cents:amount,actor_user_id:user.id});
-    return json({ok:true,status:"awaiting_guest_acceptance",additional_amount_cents:amount});
+    const {data:settings}=await admin.from("payment_settings").select("modification_payment_deadline_hours").eq("id",1).single();
+    const {data,error}=await admin.rpc("create_modification_charge_atomic",{
+      p_request_id:m.id,
+      p_admin_id:user.id,
+      p_amount_cents:amount,
+      p_deadline_hours:Number(settings?.modification_payment_deadline_hours||24),
+      p_admin_note:body?.admin_note||null
+    });
+    if(error){
+      const msg=String(error.message||"");
+      for(const code of ["dates_unavailable","modification_not_approvable","reservation_not_changeable","modification_payment_deadline_passed","invalid_dates"])
+        if(msg.includes(code)) return json({ok:false,error:code},409);
+      return json({ok:false,error:"modification_approval_failed"},500);
+    }
+    const row=Array.isArray(data)?data[0]:data;
+    return json({ok:true,status:"awaiting_payment",charge:{
+      id:row?.charge_id||null,
+      amount_cents:Number(row?.amount_cents||0),
+      expires_at:row?.expires_at||null,
+      reminder_at:row?.reminder_at||null
+    }});
   }
 
+  // Legacy path only for requests accepted before the payment-required workflow.
   if(action==="apply"){
     if(m.status!=="accepted") return json({ok:false,error:"guest_acceptance_required"},409);
-    const {data:rpc,error:rpcErr}=await admin.rpc("apply_modification_mock_atomic",{
-      p_request_id:m.id,p_actor_user_id:user.id
-    });
-    if(rpcErr){
-      const msg=String(rpcErr.message||"");
-      if(msg.includes("dates_unavailable")) return json({ok:false,error:"dates_unavailable"},409);
-      if(msg.includes("additional_payment_not_paid")) return json({ok:false,error:"additional_payment_not_paid"},409);
-      if(msg.includes("guest_acceptance_required")) return json({ok:false,error:"guest_acceptance_required"},409);
-      return json({ok:false,error:"modification_apply_failed"},500);
-    }
+    const {data:rpc,error:rpcErr}=await admin.rpc("apply_modification_mock_atomic",{p_request_id:m.id,p_actor_user_id:user.id});
+    if(rpcErr) return json({ok:false,error:"modification_apply_failed"},500);
     const row=Array.isArray(rpc)?rpc[0]:rpc;
     return json({ok:true,status:"applied",payment_id:row?.result_payment_id||null,total_amount:row?.result_total_amount||null});
   }
+
   return json({ok:false,error:"invalid_operation"},400);
 }
 
@@ -1022,35 +1092,102 @@ async function guestExperienceCatalog(req:Request,body:any){
 async function purchasePostBookingExperience(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
-  if(!development) return json({ok:false,error:"payment_provider_not_ready"},409);
-
   const reservationId=String(body?.reservation_id||"");
   const variantId=String(body?.variant_id||"");
   if(!reservationId||!variantId) return json({ok:false,error:"missing_data"},400);
 
-  const {data:settings}=await admin.from("payment_settings").select("active_provider").eq("id",1).single();
-  if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},409);
+  const {data:settings}=await admin.from("payment_settings")
+    .select("post_booking_payment_minutes").eq("id",1).single();
 
-  const {data,error}=await admin.rpc("purchase_or_upgrade_post_booking_experience_mock_atomic",{
-    p_reservation_id:reservationId,p_user_id:user.id,p_variant_id:variantId
+  const {data,error}=await admin.rpc("create_experience_charge_atomic",{
+    p_reservation_id:reservationId,
+    p_user_id:user.id,
+    p_variant_id:variantId,
+    p_expires_minutes:Number(settings?.post_booking_payment_minutes||15)
   });
   if(error){
     const msg=String(error.message||"");
-    for(const code of ["reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock","experience_already_added","experience_upgrade_not_available","experience_capacity_reached"]){
-      if(msg.includes(code)) return json({ok:false,error:code},409);
-    }
-    return json({ok:false,error:"experience_purchase_failed"},500);
+    for(const code of [
+      "reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock",
+      "experience_already_added","experience_upgrade_not_available","experience_capacity_reached",
+      "experience_payment_already_pending"
+    ]) if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"experience_charge_failed"},500);
   }
   const row=Array.isArray(data)?data[0]:data;
   return json({
     ok:true,
-    mode:row?.result_mode||"added",
-    order_id:row?.result_order_id||null,
-    item_id:row?.result_item_id||null,
-    payment_id:row?.result_payment_id||null,
-    amount_cents:Number(row?.result_amount_cents||0),
-    total_amount:Number(row?.result_total_amount||0)
+    charge:{
+      id:row?.charge_id||null,
+      kind:row?.purchase_mode==="upgrade"?"experience_upgrade":"experience_add",
+      purchase_mode:row?.purchase_mode||"add",
+      amount_cents:Number(row?.amount_cents||0),
+      description:row?.description||"Experiência",
+      expires_at:row?.expires_at||null
+    }
   });
+}
+
+async function startPostBookingPayment(req:Request,body:any,development:boolean){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  if(!development) return json({ok:false,error:"payment_provider_not_ready"},409);
+
+  const chargeId=String(body?.charge_id||"");
+  const method=String(body?.method||"pix");
+  const installments=Math.max(1,Number(body?.installments||1));
+  if(!chargeId||!["pix","card"].includes(method)) return json({ok:false,error:"missing_data"},400);
+
+  const {data:settings}=await admin.from("payment_settings")
+    .select("active_provider,max_card_installments").eq("id",1).single();
+  if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},409);
+  if(method==="card"&&installments>Number(settings?.max_card_installments||1))
+    return json({ok:false,error:"invalid_installments"},400);
+
+  const {data,error}=await admin.rpc("start_post_booking_payment_atomic",{
+    p_charge_id:chargeId,p_user_id:user.id,p_provider:"mock",p_method:method,p_installments:installments
+  });
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["charge_not_found","charge_already_applied","charge_expired","payment_not_required"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"post_booking_payment_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,payment:{
+    id:row?.payment_id||null,status:row?.payment_status||"awaiting_payment",
+    amount_cents:Number(row?.amount_cents||0),method,installments:method==="card"?installments:null
+  },charge_status:row?.charge_status||"processing",charge_expires_at:row?.charge_expires_at||null});
+}
+
+async function confirmFreePostBookingCharge(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const chargeId=String(body?.charge_id||"");
+  const {data,error}=await admin.rpc("confirm_free_post_booking_charge_atomic",{p_charge_id:chargeId,p_user_id:user.id});
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["charge_not_found","payment_required","charge_expired","dates_unavailable","modification_not_payable"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"charge_confirm_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,status:row?.result_status||"applied",total_amount:Number(row?.result_total_amount||0)});
+}
+
+async function cancelPostBookingCharge(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const chargeId=String(body?.charge_id||"");
+  const {data,error}=await admin.rpc("cancel_post_booking_charge_atomic",{p_charge_id:chargeId,p_user_id:user.id});
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["charge_not_found","charge_already_applied","charge_already_paid","payment_processing"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"charge_cancel_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,status:row?.result_charge_status||"cancelled",modification_status:row?.result_modification_status||null});
 }
 
 async function trackEvent(req:Request,body:any){
@@ -1101,7 +1238,7 @@ Deno.serve(async(req)=>{
       const purposesQ=await retryDb("travel_purposes",()=>admin.from("travel_purposes").select("*").eq("active",true).order("display_order"));
       if(purposesQ.error) return json({ok:false,error:"config_unavailable"},500);
 
-      const settingsQ=await retryDb("payment_settings",()=>admin.from("payment_settings").select("active_provider,charge_percent,pix_expiration_minutes,max_card_installments").eq("id",1).single());
+      const settingsQ=await retryDb("payment_settings",()=>admin.from("payment_settings").select("active_provider,charge_percent,pix_expiration_minutes,max_card_installments,modification_payment_deadline_hours,post_booking_payment_minutes").eq("id",1).single());
       if(settingsQ.error) return json({ok:false,error:"config_unavailable"},500);
 
       const docsQ=await retryDb("policy_documents",()=>admin.from("policy_documents").select("id,document_type,code,version,title,body,status").in("status",development?["active","draft"]:["active"]).order("document_type"));
@@ -1135,8 +1272,11 @@ Deno.serve(async(req)=>{
     if(action==="start_payment") return await startPayment(req,body);
     if(action==="cancel_pending_payment") return await cancelPendingPayment(req,body,development);
     if(action==="mock_payment") return await mockPayment(req,body);
+    if(action==="start_post_booking_payment") return await startPostBookingPayment(req,body,development);
+    if(action==="confirm_free_post_booking_charge") return await confirmFreePostBookingCharge(req,body);
+    if(action==="cancel_post_booking_charge") return await cancelPostBookingCharge(req,body);
     if(action==="request_modification") return await requestModification(req,body,development);
-    if(action==="modification_action") return await modificationAction(req,body);
+    if(action==="modification_action") return await modificationAction(req,body,development);
     if(action==="ops") return await opsData(req);
     if(action==="guarantee_action") return await guaranteeAction(req,body);
     if(action==="experience_admin") return await experienceAdminData(req);

@@ -1624,3 +1624,18 @@ footer{justify-content:space-between!important}
 .mock-controls .mock-help{display:block;width:100%;margin-top:10px;color:#9f9389;font-size:12px;line-height:1.45}
 .mock-controls button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:620px){.reservation-actions{grid-template-columns:1fr}.reservation-action{width:100%}}
+
+.pending-charge{margin-top:18px;padding:18px;border:1px solid #76523e;background:rgba(94,59,38,.12);display:grid;gap:10px}
+.pending-charge>small{font-size:10px;letter-spacing:2.2px;color:#d09b72}
+.pending-charge>strong{font:500 22px "Playfair Display",serif;color:#f1e7de}
+.pending-charge-value{font:500 32px "Playfair Display",serif;color:#f4e8dc}
+.pending-charge p{margin:0;color:#b9ada3;line-height:1.5}
+.pending-charge-actions{display:flex;gap:12px;flex-wrap:wrap}
+.post-payment-panel{width:min(620px,calc(100vw - 28px));max-height:calc(100vh - 28px);overflow:auto}
+.post-charge-summary{margin:22px 0;padding:18px 0;border-top:1px solid #4a3b32;border-bottom:1px solid #4a3b32;display:flex;justify-content:space-between;align-items:center;gap:18px}
+.post-charge-summary span{color:#cdbfb3}
+.post-charge-summary strong{font:500 28px "Playfair Display",serif;color:#f5ece4}
+.post-payment-methods{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:20px 0}
+.post-payment-methods label{border:1px solid #55443a;padding:14px;display:flex;align-items:center;gap:9px;cursor:pointer}
+.post-mock{margin-top:22px}
+@media(max-width:620px){.pending-charge-actions{display:grid;grid-template-columns:1fr}.pending-charge-actions>*{width:100%}.post-payment-methods{grid-template-columns:1fr}.post-charge-summary{align-items:flex-start;flex-direction:column}}
