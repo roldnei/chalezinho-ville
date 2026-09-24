@@ -3,7 +3,7 @@ const C=window.CHALEZINHO_CONFIG,ENGINE=C.bookingEngine,sb=window.supabase.creat
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null};
+const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false};
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
 const stayNights=()=>nights($("#book-in").value,$("#book-out").value);
 const nightly=c=>Math.round(Number(c||0)/stayNights());
@@ -24,7 +24,7 @@ async function init(){
  $("#book-in").min=min;$("#book-out").min=min;
  $("#book-in").addEventListener("change",()=>{$("#book-out").min=$("#book-in").value||min;if($("#book-out").value&&$("#book-out").value<=$("#book-in").value)$("#book-out").value=""});
  $("#book-search").addEventListener("click",search);
- $("#checkout-close").addEventListener("click",()=>$("#checkout-modal").hidden=true);
+ $("#checkout-close").addEventListener("click",()=>$("#checkout-modal").hidden=true);$("#upsell-close")?.addEventListener("click",()=>$("#upsell-modal").hidden=true);
  $("#step-back").addEventListener("click",()=>showStep(Math.max(1,Number($("#checkout-panel").dataset.step||1)-1)));
  $("#step-next").addEventListener("click",next);
  renderDevBanner();
@@ -63,7 +63,7 @@ function renderResults(list){
 }
 
 async function openFlow(id){
- state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;
+ state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  $("#checkout-modal").hidden=false;$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
  showStep(1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
@@ -97,27 +97,34 @@ function renderExperienceStep(){
  purpose.onchange=()=>renderExperienceList(purpose.value);
  renderExperienceList(purpose.value);
 }
+function eligibleExperienceProducts(purpose=""){
+ return (state.config.experience_products||[])
+  .filter(p=>p.status==="active")
+  .filter(p=>Number(p.price_cents||0)>0)
+  .filter(p=>(p.experience_media||[]).length>=5)
+  .filter(p=>(p.experience_property_eligibility||[]).some(e=>Number(e.property_id)===Number(state.property.id)))
+  .filter(p=>!purpose||!(p.travel_purposes||[]).length||(p.travel_purposes||[]).includes(purpose));
+}
+function primaryVariant(p){
+ return (p.experience_variants||[]).filter(v=>v.active).sort((a,b)=>a.display_order-b.display_order)[0]||null;
+}
+function selectedProducts(){
+ const ids=new Set(Object.keys(state.selectedByProduct));
+ return (state.config.experience_products||[]).filter(p=>ids.has(String(p.id)));
+}
 function renderExperienceList(purpose){
  const box=$("#experience-options");box.innerHTML="";
- let products=(state.config.experience_products||[]).filter(p=>(p.experience_property_eligibility||[]).some(e=>Number(e.property_id)===Number(state.property.id)));
- if(purpose)products=products.filter(p=>!(p.travel_purposes||[]).length||(p.travel_purposes||[]).includes(purpose));
- if(!products.length){box.innerHTML='<p class="empty-state">Nenhuma experiência recomendada para este momento. Você pode continuar sem adicionar nada.</p>';return}
+ const products=eligibleExperienceProducts(purpose);
+ if(!products.length){box.innerHTML='<p class="empty-state">Nenhuma experiência disponível para este momento. Você pode continuar sem adicionar nada.</p>';return}
+ products.sort((a,b)=>String(a.package_type).localeCompare(String(b.package_type))||Number(a.price_cents)-Number(b.price_cents));
  products.forEach(p=>{
-  const variants=(p.experience_variants||[]).filter(v=>v.active).sort((a,b)=>a.display_order-b.display_order);
+  const variant=primaryVariant(p);if(!variant)return;
   const media=(p.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order);
-  const selected=state.selectedByProduct[p.id],base=variants[0];
-  const slides=media.length?media.map((m,i)=>'<img class="experience-slide '+(i===0?"active":"")+'" src="'+m.media_url+'" alt="'+(m.alt_text||p.name)+'" loading="lazy">').join(""):'<div class="experience-placeholder">Fotos em preparação</div>';
+  const selected=state.selectedByProduct[p.id]===variant.id;
+  const slides=media.map((m,i)=>'<img class="experience-slide '+(i===0?"active":"")+'" src="'+m.media_url+'" alt="'+(m.alt_text||p.name)+'" loading="lazy">').join("");
   const controls=media.length>1?'<button class="exp-arrow prev" type="button" aria-label="Foto anterior">‹</button><button class="exp-arrow next" type="button" aria-label="Próxima foto">›</button><div class="exp-dots">'+media.map((_,i)=>'<span class="'+(i===0?"active":"")+'"></span>').join("")+'</div>':"";
-  let actions="";
-  variants.forEach((v,i)=>{
-    if(i===0) actions+='<button type="button" class="experience-buy '+(selected===v.id?"selected":"")+'" data-product="'+p.id+'" data-variant="'+v.id+'">'+(selected===v.id?"✓ Adicionado":"Adicionar "+v.name)+' · '+brlC(v.price_cents)+'</button>';
-    else{
-      const diff=Math.max(0,Number(v.price_cents)-Number(base?.price_cents||0));
-      actions+='<button type="button" class="experience-upgrade '+(selected===v.id?"selected":"")+'" data-product="'+p.id+'" data-variant="'+v.id+'">'+(selected===v.id?"✓ "+v.name:"Upgrade para "+v.name+" por +"+brlC(diff))+'</button>';
-    }
-  });
-  const item=document.createElement("article");item.className="experience-card";
-  item.innerHTML='<div class="experience-carousel">'+slides+controls+'</div><div class="experience-copy"><small>'+p.status.toUpperCase()+'</small><h4>'+p.name+'</h4><strong class="experience-headline">'+(p.sales_headline||"Um detalhe a mais para a estadia.")+'</strong><p>'+p.description+'</p><div class="experience-actions">'+actions+(selected?'<button class="text-action remove-experience" type="button" data-remove="'+p.id+'">Continuar sem este adicional</button>':"")+'</div></div>';
+  const item=document.createElement("article");item.className="experience-card"+(selected?" selected":"");
+  item.innerHTML='<div class="experience-carousel">'+slides+controls+'</div><div class="experience-copy"><small>'+String(p.package_type||"experiência").toUpperCase()+'</small><h4>'+p.name+'</h4><strong class="experience-headline">'+(p.sales_headline||"Um detalhe a mais para a estadia.")+'</strong><p>'+p.description+'</p><div class="experience-actions"><button type="button" class="experience-buy '+(selected?"selected":"")+'" data-package="'+p.id+'" data-variant="'+variant.id+'">'+(selected?"✓ Adicionado":"Adicionar por "+brlC(p.price_cents))+'</button>'+(selected?'<button class="text-action remove-experience" type="button" data-remove="'+p.id+'">Remover experiência</button>':"")+'</div></div>';
   box.appendChild(item);
  });
  bindExperienceControls();
@@ -128,12 +135,53 @@ function bindExperienceControls(){
   const go=n=>{if(!slides.length)return;index=(n+slides.length)%slides.length;slides.forEach((s,i)=>s.classList.toggle("active",i===index));dots.forEach((d,i)=>d.classList.toggle("active",i===index))};
   car.querySelector(".prev")?.addEventListener("click",()=>go(index-1));car.querySelector(".next")?.addEventListener("click",()=>go(index+1));
  });
- $$("[data-variant]").forEach(b=>b.addEventListener("click",()=>{state.selectedByProduct[b.dataset.product]=b.dataset.variant;renderExperienceList($("#trip-purpose-initial").value)}));
- $$("[data-remove]").forEach(b=>b.addEventListener("click",()=>{delete state.selectedByProduct[b.dataset.remove];renderExperienceList($("#trip-purpose-initial").value)}));
+ $$("[data-package]").forEach(b=>b.addEventListener("click",()=>{
+   const product=(state.config.experience_products||[]).find(p=>String(p.id)===String(b.dataset.package));if(!product)return;
+   for(const p of selectedProducts()) if(p.package_type===product.package_type) delete state.selectedByProduct[p.id];
+   state.selectedByProduct[product.id]=b.dataset.variant;state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value);
+ }));
+ $$("[data-remove]").forEach(b=>b.addEventListener("click",()=>{delete state.selectedByProduct[b.dataset.remove];state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value)}));
+}
+function findUpsellCandidate(){
+ const all=eligibleExperienceProducts("");
+ for(const current of selectedProducts()){
+   const same=all.filter(p=>p.package_type===current.package_type).sort((a,b)=>Number(a.price_cents)-Number(b.price_cents));
+   const idx=same.findIndex(p=>String(p.id)===String(current.id));if(idx<0||idx>=same.length-1)continue;
+   const next=same[idx+1];
+   if(next?.upsell_enabled===true && primaryVariant(next)){
+     return {from:current,to:next,diff:Number(next.price_cents)-Number(current.price_cents),variant:primaryVariant(next)};
+   }
+ }
+ return null;
+}
+function paymentChoice(){
+ return {method:document.querySelector('input[name="pay-method"]:checked')?.value||"pix",installments:Number($("#installments")?.value||1)};
+}
+async function maybeOfferUpsell(){
+ if(!$("#accept-cancel")?.checked){setFlowError("Aceite a política de cancelamento para continuar.");return}
+ const choice=paymentChoice(),candidate=state.upsellHandled?null:findUpsellCandidate();
+ if(!candidate){await performStartPayment(choice);return}
+ const media=(candidate.to.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order)[0];
+ const newTotal=Number(state.rate.total_amount_cents||0)+candidate.diff;
+ $("#upsell-image").src=media?.media_url||"";
+ $("#upsell-image").alt=media?.alt_text||candidate.to.name;
+ $("#upsell-title").textContent=candidate.to.name;
+ $("#upsell-copy").innerHTML='Você escolheu <strong>'+candidate.from.name+'</strong>. Por mais <strong>'+brlC(candidate.diff)+'</strong>, você pode trocar para <strong>'+candidate.to.name+'</strong>.';
+ $("#upsell-total").textContent="Novo total da reserva: "+brlC(newTotal);
+ $("#upsell-no").textContent="Não, manter "+candidate.from.name;
+ $("#upsell-yes").textContent="Sim, quero por +"+brlC(candidate.diff);
+ $("#upsell-modal").hidden=false;
+ $("#upsell-no").onclick=async()=>{state.upsellHandled=true;$("#upsell-modal").hidden=true;await performStartPayment(choice)};
+ $("#upsell-yes").onclick=async()=>{
+   state.upsellHandled=true;$("#upsell-modal").hidden=true;delete state.selectedByProduct[candidate.from.id];state.selectedByProduct[candidate.to.id]=candidate.variant.id;
+   const code=state.rateCode;setFlowError("Atualizando sua experiência…");
+   try{await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;renderSummary();setFlowError("");await performStartPayment(choice)}
+   catch(e){setFlowError("Não foi possível atualizar o pacote. Tente novamente.")}
+ };
 }
 async function refreshQuoteAfterExperiences(){
  const code=state.rateCode;setFlowError("Atualizando o pacote com suas escolhas…");
- await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;setFlowError("");
+ await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;state.upsellHandled=false;setFlowError("");
 }
 
 async function next(){
@@ -142,7 +190,7 @@ async function next(){
  if(step===2){try{await refreshQuoteAfterExperiences();showStep(3);await renderLoginStep()}catch(e){setFlowError("Não foi possível atualizar o pacote. Tente novamente.");}return}
  if(step===3){if(!state.session){saveResume();location.href="auth.html?mode=login&return="+encodeURIComponent("reservar.html?resume=1");return}showStep(4);renderGuestStep();return}
  if(step===4){if(!validateGuest())return;showStep(5);renderSummary();return}
- if(step===5){await startPayment()}
+ if(step===5){await maybeOfferUpsell()}
 }
 async function renderLoginStep(){
  const {data:{session}}=await sb.auth.getSession();state.session=session;const box=$("#login-state");
@@ -154,18 +202,20 @@ function renderGuestStep(){
 }
 function validateGuest(){if(!$("#guest-name").value.trim()||!$("#guest-email").value.trim()||!$("#guest-phone").value.trim()){setFlowError("Preencha seus dados.");return false}return true}
 function renderSummary(){
- const total=Number(state.rate.total_amount_cents||0),per=nightly(total),selectedProducts=Object.keys(state.selectedByProduct).length;
- $("#summary-content").innerHTML='<div class="summary-price"><small>SEU PACOTE</small><strong>'+brlC(total)+'</strong><span>'+stayNights()+' noites · '+brlC(per)+' por noite</span>'+(selectedProducts?'<em>Experiências selecionadas incluídas no valor</em>':'')+'</div><div class="summary-line"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
+ const total=Number(state.rate.total_amount_cents||0),accommodation=Number(state.rate.accommodation_amount_cents||0),cleaning=Number(state.rate.cleaning_fee_cents||0);
+ const perNight=Math.round(accommodation/stayNights());
+ const experiences=state.quote?.experiences||[];
+ const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
+ $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(accommodation)+'</strong></div><div class="summary-line"><span>Taxa de limpeza</span><strong>'+brlC(cleaning)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
  const guarantee=Number(state.property.guarantee_amount_cents||0);
- $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM</small><h4>'+brlC(guarantee)+'</h4><p>Antes do check-in, poderemos solicitar uma <strong>pré-autorização no cartão</strong>. Não é uma compra nem uma cobrança. O emissor do cartão pode reservar temporariamente esse valor do limite disponível até a liberação. Sem ocorrência, nenhum valor é capturado.</p></div>':"";
+ $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM</small><h4>'+brlC(guarantee)+'</h4><p>Antes do check-in, fazemos uma <strong>pré-autorização no cartão</strong> como garantia da hospedagem. <strong>Não é uma cobrança e nenhum valor é capturado nesse momento.</strong> O valor só poderá ser utilizado, total ou parcialmente, em caso de dano ou ocorrência comprovada. Sem ocorrência, a garantia é liberada. Dependendo do banco emissor, a pré-autorização pode ficar temporariamente reservada no limite do cartão.</p></div>':"";
  const pol=$("#policy-box");pol.innerHTML='<label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política <strong>'+state.rate.cancellation_policy.title+'</strong>: '+state.rate.cancellation_policy.body+'</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
  const pay=$("#payment-options"),max=Number(state.config.payment_settings.max_card_installments||1);pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão</label><select id="installments">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'x</option>').join("")+'</select><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
 }
-async function startPayment(){
- if(!$("#accept-cancel")?.checked)return setFlowError("Aceite a política de cancelamento para continuar.");
- const method=document.querySelector('input[name="pay-method"]:checked')?.value||"mock";setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
+async function performStartPayment(choice){
+ const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  try{
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments:Number($("#installments")?.value||1)});
+  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments});
   renderMockPayment(d);showStep(6);setFlowError("");
  }catch(e){setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
 }

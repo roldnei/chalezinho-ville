@@ -10,7 +10,7 @@ async function boot(){
  $("#account-email").textContent=session.user.email||"";
  const [{data:p},{data:reservations},{data:props},{data:m}]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
-  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,guests,rate_plan_code,total_amount,created_at,properties(name,cover_image),payments(status,amount_cents),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("check_in",{ascending:false}),
+  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,guests,rate_plan_code,accommodation_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image),payments(status,amount_cents),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("check_in",{ascending:false}),
   sb.from("properties").select("id,name,active").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,admin_additional_amount_cents,status,admin_note,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false})
  ]);
@@ -23,10 +23,12 @@ function renderReservations(reservations){
  const box=$("#reservation-list");box.innerHTML="";if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
  reservations.forEach(r=>{
   const active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&!["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status)).slice(0,2);
-  const exp=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).map(i=>i.product_name_snapshot+(i.variant_name_snapshot?" · "+i.variant_name_snapshot:"")).join(", ");
-  const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),per=Number(r.total_amount||0)/n;
+  const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]);
+  const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),per=Number(r.accommodation_amount||0)/n;
+  const paid=(r.payments||[]).some(p=>p.status==="paid");
   const art=document.createElement("article");art.className="account-reservation";
-  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-price"><strong>'+brl(r.total_amount)+'</strong><span>pacote · '+brl(per)+' por noite</span></div><span>Código '+(r.confirmation_code||"—")+'</span>'+(exp?'<p>Experiências: '+exp+'</p>':'')+renderGuarantee(guarantee)+(active?renderModification(active):'<button class="text-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>')+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
+  const expRows=expItems.map(i=>'<div class="reservation-breakdown-row"><span>'+i.product_name_snapshot+'</span><strong>'+brlC(Number(i.unit_price_cents)*1)+'</strong></div>').join("");
+  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.accommodation_amount)+'</strong></div><div class="reservation-breakdown-row"><span>Taxa de limpeza</span><strong>'+brl(r.cleaning_fee)+'</strong></div>'+expRows+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+(active?renderModification(active):'<button class="text-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>')+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
   box.appendChild(art);
  });
  box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
@@ -36,8 +38,8 @@ function renderReservations(reservations){
 function renderGuarantee(g){
  if(!g)return "";
  const amount=brlC(g.amount_cents),captured=Number(g.captured_amount_cents||0);
- let text=g.status==="pending"?"Pré-autorização será solicitada antes do check-in.":g.status==="released"?"Garantia liberada.":g.status==="captured"?"Valor capturado: "+brlC(captured)+".":"Garantia em acompanhamento.";
- return '<div class="guest-guarantee"><small>GARANTIA DA HOSPEDAGEM</small><strong>'+amount+'</strong><p>'+text+' Não é uma compra; o emissor pode reservar temporariamente esse valor do limite disponível até a liberação.</p></div>';
+ let text=g.status==="released"?"Garantia liberada.":g.status==="captured"?"Foi utilizado "+brlC(captured)+" em uma ocorrência registrada.":"A pré-autorização será solicitada antes do check-in.";
+ return '<div class="guest-guarantee"><small>GARANTIA DA HOSPEDAGEM</small><strong>'+amount+'</strong><p>'+text+' Não é uma cobrança e nenhum valor é capturado ao criar a garantia. O valor só poderá ser utilizado, total ou parcialmente, em caso de dano ou ocorrência comprovada. Sem ocorrência, a garantia é liberada. Dependendo do banco emissor, pode haver reserva temporária desse valor no limite do cartão.</p></div>';
 }
 function renderModification(m){
  const target=properties.find(p=>Number(p.id)===Number(m.requested_property_id))?.name||"propriedade solicitada";
