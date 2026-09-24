@@ -4,6 +4,9 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false};
+let anonymousId="";
+try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
+catch{anonymousId=crypto.randomUUID()}
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
 const stayNights=()=>nights($("#book-in").value,$("#book-out").value);
 const nightly=c=>Math.round(Number(c||0)/stayNights());
@@ -16,6 +19,7 @@ async function api(action,body=null){
  if(!r.ok||!d.ok) throw Object.assign(new Error(d.error||"request_failed"),{status:r.status,data:d});
  return d;
 }
+function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 
 async function init(){
  const {data:{session}}=await sb.auth.getSession();state.session=session;
@@ -38,11 +42,13 @@ async function search(){
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
  if(!bi||!bo||bo<=bi)return error("Escolha datas válidas.");
  error("Consultando disponibilidade e valores...");
+ track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
   const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
   state.search=d.listings;renderResults(d.listings);error("");
+  track("search_completed",{metadata:{nights:nights(bi,bo),guests,available_count:d.listings.filter(x=>x.available).length}});
  }catch(e){error("Não foi possível consultar agora. Tente novamente.");}
 }
 function renderResults(list){
@@ -65,6 +71,7 @@ function renderResults(list){
 
 async function openFlow(id){
  state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
+ track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  $("#checkout-modal").hidden=false;$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
  showStep(1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
@@ -88,12 +95,13 @@ async function generateQuote(withExperiences){
 }
 function renderRates(){
  const box=$("#rate-options");box.innerHTML="";const ref=state.quote.rate_options.find(x=>x.code==="reference");
+ track("rate_viewed",{property_id:state.property.id,metadata:{rate_count:state.quote.rate_options.filter(x=>x.selectable).length}});
  state.quote.rate_options.filter(x=>x.selectable).forEach(r=>{
   const d=document.createElement("button");d.type="button";d.className="rate-card";d.dataset.option=r.quote_option_id;
   if(state.rateCode===r.code){d.classList.add("selected");state.rate=r}
   const extra=r.experience_amount_cents?'<span class="rate-extra">Experiências selecionadas já incluídas</span>':"";
   d.innerHTML='<small>'+r.name.toUpperCase()+'</small><span class="strike">'+(ref?brlC(ref.total_amount_cents):"")+'</span><strong>'+brlC(r.total_amount_cents)+'</strong><span class="package-line">Pacote de '+stayNights()+' noites · '+brlC(nightly(r.total_amount_cents))+' por noite</span>'+extra+'<p>'+((r.cancellation_policy?.body)||"Política informada antes do pagamento.")+'</p>';
-  d.addEventListener("click",()=>{state.rate=r;state.rateCode=r.code;box.querySelectorAll(".rate-card").forEach(x=>x.classList.toggle("selected",x===d))});
+  d.addEventListener("click",()=>{state.rate=r;state.rateCode=r.code;box.querySelectorAll(".rate-card").forEach(x=>x.classList.toggle("selected",x===d));track("rate_selected",{property_id:state.property.id,metadata:{rate_code:r.code,total_cents:Number(r.total_amount_cents||0)}})});
   box.appendChild(d);
  });
 }
@@ -125,6 +133,7 @@ function selectedProducts(){
 function renderExperienceList(purpose){
  const box=$("#experience-options");box.innerHTML="";
  const products=eligibleExperienceProducts(purpose);
+ track("experience_viewed",{property_id:state.property?.id||null,metadata:{source:"booking",purpose:purpose||null,available_count:products.length}});
  if(!products.length){box.innerHTML='<p class="empty-state">Nenhuma experiência disponível para este momento. Você pode continuar sem adicionar nada.</p>';return}
  products.sort((a,b)=>String(a.package_type).localeCompare(String(b.package_type))||Number(a.price_cents)-Number(b.price_cents));
  products.forEach(p=>{
@@ -148,7 +157,9 @@ function bindExperienceControls(){
  $$("[data-package]").forEach(b=>b.addEventListener("click",()=>{
    const product=(state.config.experience_products||[]).find(p=>String(p.id)===String(b.dataset.package));if(!product)return;
    for(const p of selectedProducts()) if(p.package_type===product.package_type) delete state.selectedByProduct[p.id];
-   state.selectedByProduct[product.id]=b.dataset.variant;state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value);
+   state.selectedByProduct[product.id]=b.dataset.variant;state.upsellHandled=false;
+   track("experience_added",{property_id:state.property?.id||null,metadata:{source:"booking",product_id:product.id,amount_cents:Number(product.price_cents||0)}});
+   renderExperienceList($("#trip-purpose-initial").value);
  }));
  $$("[data-remove]").forEach(b=>b.addEventListener("click",()=>{delete state.selectedByProduct[b.dataset.remove];state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value)}));
 }
@@ -212,6 +223,7 @@ async function maybeOfferUpsell(){
      if(targetVariant)state.selectedByProduct[candidate.to_product_id]=targetVariant.id;
 
      renderSummary();
+     track("experience_upgraded",{property_id:state.property?.id||null,metadata:{from_product_id:candidate.from_product_id,to_product_id:candidate.to_product_id,difference_cents:Number(candidate.difference_cents||0)}});
      $("#upsell-total").textContent="Pacote atualizado · novo total: "+brlC(state.rate.total_amount_cents);
      $("#upsell-copy").innerHTML='<strong>'+candidate.to_name+'</strong> foi aplicado à reserva.';
      $("#upsell-yes").textContent="Continuar para pagamento";
@@ -233,7 +245,7 @@ async function refreshQuoteAfterExperiences(){
 async function next(){
  const step=Number($("#checkout-panel").dataset.step||1);
  if(step===1){if(!state.rate)return setFlowError("Escolha uma tarifa para continuar.");showStep(2);renderExperienceStep();return}
- if(step===2){try{await refreshQuoteAfterExperiences();showStep(3);await renderLoginStep()}catch(e){setFlowError("Não foi possível atualizar o pacote. Tente novamente.");}return}
+ if(step===2){try{await refreshQuoteAfterExperiences();track("checkout_started",{property_id:state.property?.id||null,metadata:{rate_code:state.rateCode,total_cents:Number(state.rate?.total_amount_cents||0)}});showStep(3);await renderLoginStep()}catch(e){setFlowError("Não foi possível atualizar o pacote. Tente novamente.");}return}
  if(step===3){if(!state.session){saveResume();location.href="auth.html?mode=login&return="+encodeURIComponent("reservar.html?resume=1");return}showStep(4);renderGuestStep();return}
  if(step===4){if(!validateGuest())return;showStep(5);renderSummary();return}
  if(step===5){await maybeOfferUpsell()}
@@ -260,16 +272,17 @@ function renderSummary(){
 }
 async function performStartPayment(choice){
  const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
+ track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
   const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments});
   renderMockPayment(d);showStep(6);setFlowError("");
- }catch(e){setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
+ }catch(e){track("payment_failed",{property_id:state.property?.id||null,metadata:{stage:"start_payment",reason:e.message||"unknown"}});setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderMockPayment(d){
  const exp=(state.quote?.experiences||[]).map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
  const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(state.rate.stay_amount_cents)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
  const box=$("#mock-payment");box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button></div><p id="mock-result"></p>';
- box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});const labels={under_review:"Pagamento em análise",refused:"Pagamento recusado",expired:"Pagamento expirado"};$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':(labels[b.dataset.outcome]||"Estado atualizado")}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
+ box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});const labels={under_review:"Pagamento em análise",refused:"Pagamento recusado",expired:"Pagamento expirado"};if(b.dataset.outcome==="paid")track("booking_confirmed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{total_cents:Number(state.rate?.total_amount_cents||0)}});else if(["refused","expired"].includes(b.dataset.outcome))track("payment_failed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{stage:"mock_outcome",reason:b.dataset.outcome}});$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':(labels[b.dataset.outcome]||"Estado atualizado")}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
 }
 function startCountdown(exp){
  const el=$("#quote-countdown");clearInterval(window.__quoteTimer);
