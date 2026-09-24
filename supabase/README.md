@@ -32,3 +32,5 @@ O arquivo `phase1_schema_snapshot.sql` é um snapshot idempotente e documentado 
 - Dados de QA devem ser identificados e removidos após testes.
 - Nenhum pagamento real está ativo; provider atual é `mock`.
 - Nenhum GO-LIVE sem aprovação explícita.
+
+- booking_price_breakdown_and_upsell_snapshot — snapshots financeiros separados e regra de upsell por pacote.

@@ -89,7 +89,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   const expSnapshots:any[]=[];
   if(Array.isArray(experience_variant_ids)&&experience_variant_ids.length){
     const {data:variants,error}=await admin.from("experience_variants")
-      .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours)")
+      .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,package_type,price_cents,upsell_enabled)")
       .in("id",experience_variant_ids);
     if(error) throw new Error("experience_lookup_failed");
     const productIds=[...new Set((variants||[]).map((v:any)=>v.product_id))];
@@ -123,7 +123,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   if(expSnapshots.length){
     const rows=expSnapshots.map(x=>({
       quote_id:q.id,product_id:x.product.id,variant_id:x.variant.id,
-      product_name_snapshot:x.product.name,variant_name_snapshot:x.variant.name,
+      product_name_snapshot:x.product.name,variant_name_snapshot:x.variant.code==="package"?null:x.variant.name,
       unit_price_cents:Number(x.variant.price_cents),quantity:1
     }));
     const {error}=await admin.from("quote_experience_items").insert(rows);
@@ -164,7 +164,8 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     d.quote_option_id=plan?byPlan[String(plan.id)]||null:null;
   }
   return {ok:true,quote_id:q.id,expires_at:expiresAt,property,rate_options:display,experiences:expSnapshots.map(x=>({
-    product:x.product.name,variant:x.variant.name,price_cents:Number(x.variant.price_cents)
+    product_id:x.product.id,product:x.product.name,package_type:x.product.package_type,
+    variant:x.variant.code==="package"?null:x.variant.name,price_cents:Number(x.variant.price_cents)
   }))};
 }
 
