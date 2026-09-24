@@ -916,17 +916,17 @@ async function guestExperienceCatalog(req:Request,body:any){
   if(r.status!=="confirmed") return json({ok:false,error:"reservation_not_available"},409);
 
   const {data:products,error:pe}=await admin.from("experience_products")
-    .select("id,name,description,sales_headline,package_type,price_cents,minimum_lead_hours,daily_capacity,inventory,status,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility!inner(property_id),experience_media(id,media_url,alt_text,display_order)")
+    .select("id,name,description,sales_headline,package_type,price_cents,upsell_enabled,minimum_lead_hours,daily_capacity,inventory,status,created_at,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility!inner(property_id),experience_media(id,media_url,alt_text,display_order)")
     .eq("status","active")
     .eq("experience_property_eligibility.property_id",r.property_id)
     .order("display_order");
   if(pe) return json({ok:false,error:"experience_catalog_unavailable"},500);
 
   const {data:existing}=await admin.from("experience_orders")
-    .select("experience_order_items(product_id,status)")
+    .select("experience_order_items(id,product_id,product_name_snapshot,unit_price_cents,status,experience_products(package_type,price_cents,name))")
     .eq("reservation_id",r.id)
     .in("status",["pending","active"]);
-  const owned=new Set((existing||[]).flatMap((o:any)=>o.experience_order_items||[]).filter((i:any)=>i.status==="active").map((i:any)=>String(i.product_id)));
+  const activeItems=(existing||[]).flatMap((o:any)=>o.experience_order_items||[]).filter((i:any)=>i.status==="active");
 
   const arrival=Date.parse(String(r.check_in)+"T15:00:00-03:00");
   const now=Date.now();
@@ -936,7 +936,22 @@ async function guestExperienceCatalog(req:Request,body:any){
     if(!variant) continue;
     const leadOk=(arrival-now)>=Number(p.minimum_lead_hours||0)*3600000;
     const stockOk=p.inventory==null||Number(p.inventory)>0;
-    if(!leadOk||!stockOk||owned.has(String(p.id))) continue;
+    if(!leadOk||!stockOk) continue;
+
+    const current=activeItems.find((i:any)=>i.experience_products?.package_type===p.package_type);
+    let purchaseMode="add",payableCents=Number(variant.price_cents),upgradeFrom=null;
+    if(current){
+      if(String(current.product_id)===String(p.id)) continue;
+      const sourceCatalogPrice=Number(current.experience_products?.price_cents??current.unit_price_cents??0);
+      const next=(products||[])
+        .filter((x:any)=>x.package_type===p.package_type&&x.status==="active"&&Number(x.price_cents)>sourceCatalogPrice&&(x.inventory==null||Number(x.inventory)>0))
+        .sort((a:any,b:any)=>Number(a.price_cents)-Number(b.price_cents)||String(a.created_at||"").localeCompare(String(b.created_at||"")))[0];
+      if(!next||String(next.id)!==String(p.id)||p.upsell_enabled!==true) continue;
+      payableCents=Math.max(0,Number(variant.price_cents)-Number(current.unit_price_cents||0));
+      if(payableCents<=0) continue;
+      purchaseMode="upgrade";
+      upgradeFrom={product_id:current.product_id,name:current.product_name_snapshot,price_cents:Number(current.unit_price_cents||0)};
+    }
 
     let capacityOk=true;
     if(p.daily_capacity!=null){
@@ -954,7 +969,8 @@ async function guestExperienceCatalog(req:Request,body:any){
     items.push({
       product_id:p.id,variant_id:variant.id,name:p.name,description:p.description,
       sales_headline:p.sales_headline,package_type:p.package_type,
-      price_cents:Number(variant.price_cents),
+      price_cents:Number(variant.price_cents),payable_cents:payableCents,purchase_mode:purchaseMode,
+      upgrade_from:upgradeFrom,
       media:(p.experience_media||[]).slice().sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))
     });
   }
@@ -973,12 +989,12 @@ async function purchasePostBookingExperience(req:Request,body:any,development:bo
   const {data:settings}=await admin.from("payment_settings").select("active_provider").eq("id",1).single();
   if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},409);
 
-  const {data,error}=await admin.rpc("purchase_post_booking_experience_mock_atomic",{
+  const {data,error}=await admin.rpc("purchase_or_upgrade_post_booking_experience_mock_atomic",{
     p_reservation_id:reservationId,p_user_id:user.id,p_variant_id:variantId
   });
   if(error){
     const msg=String(error.message||"");
-    for(const code of ["reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock","experience_already_added","experience_capacity_reached"]){
+    for(const code of ["reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock","experience_already_added","experience_upgrade_not_available","experience_capacity_reached"]){
       if(msg.includes(code)) return json({ok:false,error:code},409);
     }
     return json({ok:false,error:"experience_purchase_failed"},500);
@@ -986,6 +1002,7 @@ async function purchasePostBookingExperience(req:Request,body:any,development:bo
   const row=Array.isArray(data)?data[0]:data;
   return json({
     ok:true,
+    mode:row?.result_mode||"added",
     order_id:row?.result_order_id||null,
     item_id:row?.result_item_id||null,
     payment_id:row?.result_payment_id||null,
@@ -998,11 +1015,15 @@ async function trackEvent(req:Request,body:any){
   const allowed=new Set(["search_started","search_completed","property_viewed","rate_viewed","rate_selected","experience_viewed","experience_added","experience_upgraded","checkout_started","login_started","account_created","payment_started","payment_failed","booking_confirmed","modification_requested","precheckin_started","guarantee_completed","checkin_completed","checkout_completed","review_requested","repeat_booking_started"]);
   if(!allowed.has(String(body?.event_name||""))) return json({ok:false,error:"invalid_event"},400);
   const user=await currentUser(req);
-  await admin.from("analytics_events").insert({
+  const {error}=await admin.from("analytics_events").insert({
     event_name:body.event_name,anonymous_id:String(body.anonymous_id||"").slice(0,120)||null,user_id:user?.id||null,
     reservation_id:body.reservation_id||null,property_id:body.property_id||null,
     metadata:typeof body.metadata==="object"&&body.metadata?body.metadata:{}
   });
+  if(error){
+    console.error(JSON.stringify({event:"analytics_insert_failed",code:error.code||null,message:error.message||"unknown"}));
+    return json({ok:false,error:"analytics_unavailable"},500);
+  }
   return json({ok:true});
 }
 
