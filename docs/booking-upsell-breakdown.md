@@ -34,3 +34,17 @@ Garantia:
 - tratada como pré-autorização, não cobrança;
 - captura somente em caso de dano/ocorrência comprovada;
 - o texto informa corretamente que, conforme emissor, pode haver reserva temporária de limite.
+
+
+## Regra final do upsell
+
+- O valor do upsell nunca é fixo.
+- O servidor procura o primeiro pacote com preço estritamente maior dentro do mesmo tipo.
+- Esse pacote só é ofertado quando `upsell_enabled=true`.
+- Diferença = preço atual do pacote superior - preço do pacote escolhido.
+- Exemplo atual: R$ 599 - R$ 549 = +R$ 50.
+- Se o pacote superior mudar para R$ 650, a diferença passa a ser calculada com R$ 650 automaticamente.
+- Ao aceitar, o servidor clona a cotação atual e preserva hospedagem, taxa de limpeza, tarifa e expiração originais.
+- Somente a experiência é substituída e o total aumenta exatamente pela diferença.
+- O pagamento só começa usando a nova quote.
+- O frontend mostra o novo total antes de prosseguir ao pagamento.

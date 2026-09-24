@@ -169,6 +169,198 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   }))};
 }
 
+
+
+async function upsellPreview(body:any){
+  const {quote_id}=body||{};
+  if(!quote_id) return json({ok:false,error:"missing_data"},400);
+
+  const {data:q,error:qe}=await admin.from("quotes")
+    .select("id,property_id,status,expires_at")
+    .eq("id",quote_id).eq("status","active").gt("expires_at",new Date().toISOString()).single();
+  if(qe||!q) return json({ok:false,error:"quote_expired"},409);
+
+  const {data:qitems,error:qie}=await admin.from("quote_experience_items")
+    .select("product_id,unit_price_cents,created_at")
+    .eq("quote_id",quote_id).order("created_at");
+  if(qie) return json({ok:false,error:"experience_lookup_failed"},500);
+  if(!qitems?.length) return json({ok:true,upsell:null});
+
+  const productIds=[...new Set(qitems.map((x:any)=>x.product_id))];
+  const {data:products,error:pe}=await admin.from("experience_products")
+    .select("id,name,package_type,price_cents,status")
+    .in("id",productIds);
+  if(pe) return json({ok:false,error:"experience_lookup_failed"},500);
+
+  for(const item of qitems){
+    const source=(products||[]).find((p:any)=>String(p.id)===String(item.product_id));
+    if(!source||source.status!=="active") continue;
+
+    const {data:above,error:ae}=await admin.from("experience_products")
+      .select("id,name,package_type,price_cents,upsell_enabled,status,experience_property_eligibility!inner(property_id)")
+      .eq("package_type",source.package_type)
+      .eq("status","active")
+      .eq("experience_property_eligibility.property_id",q.property_id)
+      .gt("price_cents",Number(source.price_cents))
+      .order("price_cents",{ascending:true})
+      .limit(1);
+    if(ae) return json({ok:false,error:"upsell_lookup_failed"},500);
+
+    const next=(above||[])[0];
+    if(!next || next.upsell_enabled!==true) continue;
+    const diff=Number(next.price_cents)-Number(source.price_cents);
+    if(diff<=0) continue;
+
+    return json({ok:true,upsell:{
+      from_product_id:source.id,from_name:source.name,from_price_cents:Number(source.price_cents),
+      to_product_id:next.id,to_name:next.name,to_price_cents:Number(next.price_cents),
+      difference_cents:diff
+    }});
+  }
+  return json({ok:true,upsell:null});
+}
+
+async function applyUpsell(body:any,development:boolean){
+  const {quote_id,quote_option_id,target_product_id}=body||{};
+  if(!quote_id||!quote_option_id||!target_product_id) return json({ok:false,error:"missing_data"},400);
+
+  const {data:q,error:qe}=await admin.from("quotes")
+    .select("*").eq("id",quote_id).eq("status","active").gt("expires_at",new Date().toISOString()).single();
+  if(qe||!q) return json({ok:false,error:"quote_expired"},409);
+
+  const {data:oldOptions,error:ooe}=await admin.from("quote_options")
+    .select("id,rate_plan_id,accommodation_amount_cents,cleaning_fee_cents,total_amount_cents,cancellation_policy_id")
+    .eq("quote_id",quote_id);
+  if(ooe||!oldOptions?.length) return json({ok:false,error:"invalid_quote_option"},400);
+  const oldSelected=oldOptions.find((x:any)=>String(x.id)===String(quote_option_id));
+  if(!oldSelected) return json({ok:false,error:"invalid_quote_option"},400);
+
+  const {data:qitems,error:qie}=await admin.from("quote_experience_items")
+    .select("product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,created_at")
+    .eq("quote_id",quote_id).order("created_at");
+  if(qie) return json({ok:false,error:"experience_lookup_failed"},500);
+  if(!qitems?.length) return json({ok:false,error:"upsell_not_available"},409);
+
+  const productIds=[...new Set(qitems.map((x:any)=>x.product_id))];
+  const {data:currentProducts,error:cpe}=await admin.from("experience_products")
+    .select("id,name,package_type,price_cents,status").in("id",productIds);
+  if(cpe) return json({ok:false,error:"experience_lookup_failed"},500);
+
+  const {data:target,error:te}=await admin.from("experience_products")
+    .select("id,name,package_type,price_cents,upsell_enabled,status")
+    .eq("id",target_product_id).single();
+  if(te||!target||target.status!=="active"||target.upsell_enabled!==true) return json({ok:false,error:"upsell_not_available"},409);
+
+  const source=(currentProducts||[]).find((p:any)=>p.package_type===target.package_type);
+  if(!source) return json({ok:false,error:"upsell_not_available"},409);
+
+  const {data:eligible,error:ee}=await admin.from("experience_products")
+    .select("id,name,package_type,price_cents,upsell_enabled,status,experience_property_eligibility!inner(property_id)")
+    .eq("package_type",source.package_type)
+    .eq("status","active")
+    .eq("experience_property_eligibility.property_id",q.property_id)
+    .gt("price_cents",Number(source.price_cents))
+    .order("price_cents",{ascending:true})
+    .limit(1);
+  if(ee) return json({ok:false,error:"upsell_lookup_failed"},500);
+
+  const nextAbove=(eligible||[])[0];
+  if(!nextAbove || String(nextAbove.id)!==String(target.id) || nextAbove.upsell_enabled!==true)
+    return json({ok:false,error:"upsell_not_available"},409);
+
+  const diff=Number(target.price_cents)-Number(source.price_cents);
+  if(diff<=0) return json({ok:false,error:"upsell_not_available"},409);
+
+  const {data:targetVariant,error:tve}=await admin.from("experience_variants")
+    .select("id,code,name,price_cents").eq("product_id",target.id).eq("active",true).order("display_order").limit(1).maybeSingle();
+  if(tve||!targetVariant) return json({ok:false,error:"upsell_not_available"},409);
+
+  const sourceItem=qitems.find((x:any)=>String(x.product_id)===String(source.id));
+  if(!sourceItem) return json({ok:false,error:"upsell_not_available"},409);
+
+  const currentExperienceTotal=qitems.reduce((sum:number,x:any)=>sum+Number(x.unit_price_cents||0)*Number(x.quantity||1),0);
+  const newExperienceTotal=currentExperienceTotal+diff;
+  const snapshot={...(q.pricing_snapshot||{}),experience_total_cents:newExperienceTotal,upsell_from_quote_id:q.id,upsell_from_product_id:source.id,upsell_to_product_id:target.id,upsell_difference_cents:diff};
+
+  const {data:newQ,error:nqe}=await admin.from("quotes").insert({
+    property_id:q.property_id,user_id:q.user_id,client_token_hash:crypto.randomUUID(),
+    check_in:q.check_in,check_out:q.check_out,guests:q.guests,
+    base_amount_cents:q.base_amount_cents,cleaning_fee_cents:q.cleaning_fee_cents,
+    pricing_snapshot:snapshot,rules_version:q.rules_version,status:"active",expires_at:q.expires_at
+  }).select().single();
+  if(nqe||!newQ) return json({ok:false,error:"quote_create_failed"},500);
+
+  const newItems=qitems
+    .filter((x:any)=>String(x.product_id)!==String(source.id))
+    .map((x:any)=>({
+      quote_id:newQ.id,product_id:x.product_id,variant_id:x.variant_id,
+      product_name_snapshot:x.product_name_snapshot,variant_name_snapshot:x.variant_name_snapshot,
+      unit_price_cents:x.unit_price_cents,quantity:x.quantity
+    }));
+  newItems.push({
+    quote_id:newQ.id,product_id:target.id,variant_id:targetVariant.id,
+    product_name_snapshot:target.name,variant_name_snapshot:targetVariant.code==="package"?null:targetVariant.name,
+    unit_price_cents:Number(target.price_cents),quantity:1
+  });
+  const {error:nie}=await admin.from("quote_experience_items").insert(newItems);
+  if(nie){await admin.from("quotes").delete().eq("id",newQ.id);return json({ok:false,error:"quote_experience_failed"},500);}
+
+  const newOptionRows=oldOptions.map((o:any)=>({
+    quote_id:newQ.id,rate_plan_id:o.rate_plan_id,
+    accommodation_amount_cents:o.accommodation_amount_cents,
+    cleaning_fee_cents:o.cleaning_fee_cents,
+    total_amount_cents:Number(o.total_amount_cents)+diff,
+    cancellation_policy_id:o.cancellation_policy_id
+  }));
+  const {data:newOptions,error:noe}=await admin.from("quote_options").insert(newOptionRows).select("*");
+  if(noe||!newOptions?.length){
+    await admin.from("quotes").delete().eq("id",newQ.id);
+    return json({ok:false,error:"quote_options_failed"},500);
+  }
+
+  const planIds=[...new Set(newOptions.map((x:any)=>x.rate_plan_id))];
+  const {data:plans}=await admin.from("rate_plans")
+    .select("id,code,name,selectable,cancellation_policy_id,policy_documents(title,body,version,code)")
+    .in("id",planIds);
+  const byPlan=Object.fromEntries((plans||[]).map((p:any)=>[String(p.id),p]));
+  const display=newOptions.map((o:any)=>{
+    const p=byPlan[String(o.rate_plan_id)]||{};
+    return {
+      quote_option_id:o.id,code:p.code,name:p.name,selectable:p.selectable!==false,
+      accommodation_amount_cents:o.accommodation_amount_cents,
+      cleaning_fee_cents:o.cleaning_fee_cents,
+      experience_amount_cents:newExperienceTotal,total_amount_cents:o.total_amount_cents,
+      cancellation_policy:p.policy_documents||null
+    };
+  });
+  const selected=display.find((x:any)=>String(newOptions.find((o:any)=>String(o.id)===String(x.quote_option_id))?.rate_plan_id)===String(oldSelected.rate_plan_id));
+  if(!selected){
+    await admin.from("quotes").delete().eq("id",newQ.id);
+    return json({ok:false,error:"rate_unavailable"},409);
+  }
+
+  const experiences=[
+    ...qitems.filter((x:any)=>String(x.product_id)!==String(source.id)).map((x:any)=>({
+      product_id:x.product_id,product:x.product_name_snapshot,package_type:(currentProducts||[]).find((p:any)=>String(p.id)===String(x.product_id))?.package_type||null,
+      variant:x.variant_name_snapshot,price_cents:Number(x.unit_price_cents)
+    })),
+    {product_id:target.id,product:target.name,package_type:target.package_type,variant:targetVariant.code==="package"?null:targetVariant.name,price_cents:Number(target.price_cents)}
+  ];
+
+  await admin.from("quotes").update({status:"cancelled"}).eq("id",quote_id).eq("status","active");
+
+  return json({
+    ok:true,
+    quote:{ok:true,quote_id:newQ.id,expires_at:newQ.expires_at,rate_options:display,experiences},
+    selected_rate:selected,
+    upsell:{
+      from_product_id:source.id,from_name:source.name,from_price_cents:Number(source.price_cents),
+      to_product_id:target.id,to_name:target.name,to_price_cents:Number(target.price_cents),
+      difference_cents:diff
+    }
+  });
+}
+
 async function startPayment(req:Request,body:any){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
@@ -686,6 +878,8 @@ Deno.serve(async(req)=>{
       return json({ok:true,listings:await searchData(start,end,guests)});
     }
     if(action==="quote") return json(await createQuote(body,development));
+    if(action==="upsell_preview") return await upsellPreview(body);
+    if(action==="apply_upsell") return await applyUpsell(body,development);
     if(action==="start_payment") return await startPayment(req,body);
     if(action==="mock_payment") return await mockPayment(req,body);
     if(action==="request_modification") return await requestModification(req,body,development);
@@ -699,7 +893,7 @@ Deno.serve(async(req)=>{
     return json({ok:false,error:"unknown_action"},404);
   }catch(e){
     const msg=String((e as Error)?.message||"unexpected_error");
-    const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","modification_already_open"];
+    const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","modification_already_open","upsell_not_available"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
 });
