@@ -1595,3 +1595,8 @@ footer{justify-content:space-between!important}
 .mod-price small{font-size:12px;line-height:1.5;color:#9f9389}
 .mod-price.approved strong{color:#d7b18a}
 .mod-price.applied strong,.tariff-revision strong{color:#a8d0b1}
+
+.minimum-stay-alert{margin-top:18px;padding:14px 16px;border:1px solid #9b6845;background:rgba(139,74,35,.13);display:grid;gap:4px}
+.minimum-stay-alert small{font-size:10px;letter-spacing:2.2px;color:#c99167}
+.minimum-stay-alert strong{font:500 24px "Playfair Display",serif;color:#f4e8dc}
+.minimum-stay-alert span{font-size:13px;line-height:1.45;color:#c8b8aa}

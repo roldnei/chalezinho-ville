@@ -48,19 +48,30 @@ function renderModification(m){
  const estimate=Number(m.estimated_additional_amount_cents||0);
  let valueLine="";
  if(m.status==="quoted"||m.status==="requested"){
-   valueLine='<div class="mod-price"><span>Possível valor da alteração</span><strong>'+brlC(estimate)+'</strong><small>Estimativa da diferença de tarifa da hospedagem. O valor final ainda depende da análise.</small></div>';
+   valueLine='<div class="mod-price"><span>Reajuste estimado da diária</span><strong>'+brlC(estimate)+'</strong><small>Esta alteração solicitada poderá gerar uma cobrança adicional de reajuste da diária neste valor. O valor final será confirmado após a análise.</small></div>';
  }else if(m.status==="awaiting_guest_acceptance"){
    const approved=Number(m.admin_additional_amount_cents||0);
-   valueLine='<div class="mod-price approved"><span>Valor da alteração aprovado</span><strong>'+brlC(approved)+'</strong><small>Se você aceitar, esse valor será acrescentado à sua reserva.</small></div>';
+   valueLine='<div class="mod-price approved"><span>Cobrança adicional da alteração</span><strong>'+brlC(approved)+'</strong><small>Esta alteração gerará uma cobrança adicional de reajuste da diária no valor acima. Ao aceitar, você concorda com esse acréscimo na reserva.</small></div>';
  }else if(m.status==="accepted"){
    valueLine='<div class="mod-price approved"><span>Valor da alteração aceito</span><strong>'+brlC(Number(m.admin_additional_amount_cents||0))+'</strong><small>Aguardando aplicação da alteração.</small></div>';
  }else if(m.status==="applied"){
    valueLine='<div class="mod-price applied"><span>Revisão de tarifa aplicada</span><strong>'+brlC(Number(m.admin_additional_amount_cents||0))+'</strong></div>';
  }
- const actions=["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status)?'<div class="mod-actions">'+(m.status==="awaiting_guest_acceptance"?'<button class="primary-action compact" data-accept-mod="'+m.id+'">Aceitar alteração</button>':'')+'<button class="text-action danger" data-cancel-mod="'+m.id+'">Cancelar solicitação</button></div>':"";
+ const acceptedAmount=Number(m.admin_additional_amount_cents||0);
+ const acceptLabel=acceptedAmount>0?"Aceitar alteração + "+brlC(acceptedAmount):"Aceitar alteração sem cobrança adicional";
+ const actions=["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status)?'<div class="mod-actions">'+(m.status==="awaiting_guest_acceptance"?'<button class="primary-action compact" data-accept-mod="'+m.id+'" data-accept-amount="'+acceptedAmount+'">'+acceptLabel+'</button>':'')+'<button class="text-action danger" data-cancel-mod="'+m.id+'">Cancelar solicitação</button></div>':"";
  return '<div class="mod-status"><small>ALTERAÇÃO · '+statusLabel(m.status).toUpperCase()+'</small><p><strong>'+target+'</strong><br>'+(m.requested_check_in?m.requested_check_in.split("-").reverse().join("/"):"")+' → '+(m.requested_check_out?m.requested_check_out.split("-").reverse().join("/"):"")+'</p>'+valueLine+(m.admin_note?'<p>'+m.admin_note+'</p>':'')+actions+'</div>';
 }
-async function acceptModification(id,btn){btn.disabled=true;try{await api("modification_action",{operation:"guest_accept",request_id:id});location.reload()}catch(e){btn.disabled=false;alert("Não foi possível aceitar: "+e.message)}}
+async function acceptModification(id,btn){
+ const amount=Number(btn.dataset.acceptAmount||0);
+ const message=amount>0
+   ?"Esta alteração gerará uma cobrança adicional de reajuste da diária no valor de "+brlC(amount)+".\n\nDeseja confirmar a alteração e esse valor adicional?"
+   :"Esta alteração foi aprovada sem cobrança adicional. Deseja confirmar?";
+ if(!confirm(message))return;
+ btn.disabled=true;
+ try{await api("modification_action",{operation:"guest_accept",request_id:id});location.reload()}
+ catch(e){btn.disabled=false;alert("Não foi possível aceitar: "+e.message)}
+}
 async function cancelModification(id,btn){btn.disabled=true;try{await api("modification_action",{operation:"guest_cancel",request_id:id});location.reload()}catch(e){btn.disabled=false;alert("Não foi possível cancelar: "+e.message)}}
 $("#profile-form").addEventListener("submit",async e=>{e.preventDefault();const {error}=await sb.from("profiles").update({full_name:$("#profile-name").value.trim(),phone:$("#profile-phone").value.trim()}).eq("id",session.user.id);$("#account-message").textContent=error?error.message:"Dados atualizados."});
 $("#logout").addEventListener("click",async()=>{await sb.auth.signOut();location.href="auth.html"});
@@ -73,8 +84,16 @@ function openModification(reservationId,currentProperty,currentIn,currentOut){
 }
 $("#modify-close").addEventListener("click",()=>$("#modify-modal").hidden=true);
 $("#modify-form").addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter;if(!$("#modify-in").value||!$("#modify-out").value||$("#modify-out").value<=$("#modify-in").value){$("#modify-result").textContent="Escolha novas datas válidas.";return}btn.disabled=true;$("#modify-result").textContent="Consultando disponibilidade e nova condição…";
- try{const d=await api("request_modification",{reservation_id:$("#modify-reservation-id").value,requested_check_in:$("#modify-in").value,requested_check_out:$("#modify-out").value,requested_property_id:Number($("#modify-property").value)});$("#modify-result").innerHTML='Solicitação registrada. <strong>Sua reserva atual continua exatamente como está.</strong><br>Possível valor da alteração: <strong>'+brlC(d.request.estimated_additional_amount_cents||0)+'</strong>. O valor final depende da análise e nenhuma cobrança é feita agora.';setTimeout(()=>location.reload(),2200)}
- catch(err){$("#modify-result").textContent=err.message==="modification_already_open"?"Já existe uma solicitação de alteração em andamento. Cancele ou conclua a anterior antes de fazer outra.":err.message==="occupied"?"A nova opção não está disponível para essas datas.":"Não foi possível solicitar a alteração: "+err.message;btn.disabled=false}
+ try{const d=await api("request_modification",{reservation_id:$("#modify-reservation-id").value,requested_check_in:$("#modify-in").value,requested_check_out:$("#modify-out").value,requested_property_id:Number($("#modify-property").value)});$("#modify-result").innerHTML='Solicitação registrada. <strong>Sua reserva atual continua exatamente como está.</strong><br>Reajuste estimado da diária: <strong>'+brlC(d.request.estimated_additional_amount_cents||0)+'</strong>. Se a alteração for aprovada, o valor final será apresentado para sua confirmação antes de qualquer cobrança.';setTimeout(()=>location.reload(),2200)}
+ catch(err){
+  if(err.message==="modification_already_open") $("#modify-result").textContent="Já existe uma solicitação de alteração em andamento. Cancele ou conclua a anterior antes de fazer outra.";
+  else if(err.message==="occupied") $("#modify-result").textContent="A nova opção não está disponível para essas datas.";
+  else if(err.message==="minimum_stay"){
+    const min=Number(err.data?.min_stay||1);
+    $("#modify-result").textContent="Para estas datas, o mínimo de estadia deste chalé é de "+min+" "+(min===1?"noite":"noites")+". Escolha um período maior.";
+  } else $("#modify-result").textContent="Não foi possível solicitar a alteração. Tente novamente.";
+  btn.disabled=false
+}
 });
 boot();
 })();

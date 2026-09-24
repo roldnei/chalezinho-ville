@@ -52,10 +52,11 @@ function renderResults(list){
  list.forEach(p=>{
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
   const feats=(p.features||[]).map(x=>"<span>"+x+"</span>").join("");
-  const status=p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Mínimo de "+p.min_stay+" noites":p.unavailable_reason==="occupied"?"Indisponível":"Tarifa indisponível";
+  const status=p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Indisponível":"Tarifa indisponível";
+  const minNotice=p.unavailable_reason==="minimum_stay"?'<div class="minimum-stay-alert"><small>MÍNIMO DE ESTADIA</small><strong>'+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'</strong><span>Para estas datas, este chalé exige no mínimo '+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'.</span></div>':"";
   const total=p.from_stay_price!=null?Number(p.from_stay_price):null;
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
-  a.innerHTML='<div class="booking-gallery"><img src="'+p.cover_image+'" alt="'+p.name+'" loading="lazy"></div><div><small>'+String(p.property_type).toUpperCase()+'</small><h3>'+p.name+'</h3><p>'+p.summary+'</p><div class="booking-tags">'+feats+'</div></div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span><small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">pacote · '+perNight+' por noite</span><button class="booking-select" '+(p.available?"":"disabled")+' data-id="'+p.id+'">'+(p.available?"Ver tarifas":"Indisponível")+'</button></div>';
+  a.innerHTML='<div class="booking-gallery"><img src="'+p.cover_image+'" alt="'+p.name+'" loading="lazy"></div><div><small>'+String(p.property_type).toUpperCase()+'</small><h3>'+p.name+'</h3><p>'+p.summary+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span><small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">pacote · '+perNight+' por noite</span><button class="booking-select" '+(p.available?"":"disabled")+' data-id="'+p.id+'">'+(p.available?"Ver tarifas":"Indisponível")+'</button></div>';
   box.appendChild(a);
  });
  box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>openFlow(Number(b.dataset.id))));
@@ -68,7 +69,12 @@ async function openFlow(id){
  showStep(1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
   await generateQuote(false);renderRates();
- }catch(e){setFlowError(e.message==="minimum_stay"?"A estadia mínima mudou. Faça uma nova busca.":"Não foi possível preparar as tarifas. Faça uma nova busca.");}
+ }catch(e){
+  if(e.message==="minimum_stay"){
+    const min=Number(e.data?.min_stay||state.property?.min_stay||1);
+    setFlowError("Para estas datas, o mínimo de estadia deste chalé é de "+min+" "+(min===1?"noite":"noites")+". Faça uma nova busca com o período mínimo.");
+  }else setFlowError("Não foi possível preparar as tarifas. Faça uma nova busca.");
+}
 }
 function showStep(n){
  $("#checkout-panel").dataset.step=String(n);$$(".checkout-step").forEach(x=>x.hidden=Number(x.dataset.step)!==n);$$(".progress-dot").forEach(x=>x.classList.toggle("active",Number(x.dataset.dot)<=Math.min(n,5)));

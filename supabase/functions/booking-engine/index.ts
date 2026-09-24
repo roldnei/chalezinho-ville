@@ -83,7 +83,10 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   const list=await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId);
   const property=list.find((x:any)=>Number(x.id)===Number(property_id));
   if(!property) throw new Error("property_not_found");
-  if(!property.available) throw new Error(property.unavailable_reason||"unavailable");
+  if(!property.available){
+    if(property.unavailable_reason==="minimum_stay") throw new Error("minimum_stay:"+Number(property.min_stay||1));
+    throw new Error(property.unavailable_reason||"unavailable");
+  }
 
   let experienceTotal=0;
   const expSnapshots:any[]=[];
@@ -497,7 +500,12 @@ async function requestModification(req:Request,body:any,development:boolean){
   let quote;
   try{
     quote=await createQuote({property_id:targetProperty,check_in:requested_check_in,check_out:requested_check_out,guests:r.guests,experience_variant_ids:[]},development,r.id);
-  }catch(e){return json({ok:false,error:String((e as Error).message||"modification_quote_failed")},409)}
+  }catch(e){
+    const msg=String((e as Error).message||"modification_quote_failed");
+    const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
+    if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},409);
+    return json({ok:false,error:msg},409);
+  }
   const option=quote.rate_options.find((x:any)=>x.code===r.rate_plan_code && x.selectable) || quote.rate_options.find((x:any)=>x.code==="non_refundable");
   const originalCents=Math.round(Number(r.stay_amount||0)*100);
   const referenceCents=Number(option?.stay_amount_cents||0);
@@ -900,6 +908,8 @@ Deno.serve(async(req)=>{
     return json({ok:false,error:"unknown_action"},404);
   }catch(e){
     const msg=String((e as Error)?.message||"unexpected_error");
+    const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
+    if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
     const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","modification_already_open","upsell_not_available"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
