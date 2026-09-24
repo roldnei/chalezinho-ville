@@ -2,8 +2,13 @@
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
-let session=null,profile=null,properties=[],mods=[];
+let session=null,profile=null,properties=[],mods=[],shopReservationId=null;
+const esc=v=>String(v??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+let anonymousId="";
+try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
+catch{anonymousId=crypto.randomUUID()}
 async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const r=await fetch(ENGINE+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
+function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando pagamento",expired:"Expirada",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
 async function boot(){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
@@ -30,12 +35,53 @@ function renderReservations(reservations){
   const art=document.createElement("article");art.className="account-reservation";
   const expRows=expItems.map(i=>'<div class="reservation-breakdown-row"><span>'+i.product_name_snapshot+'</span><strong>'+brlC(Number(i.unit_price_cents)*1)+'</strong></div>').join("");
   const revisionRow=appliedRevision>0?'<div class="reservation-breakdown-row tariff-revision"><span>Revisão de tarifa da alteração</span><strong>+'+brlC(appliedRevision)+'</strong></div>':"";
-  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.stay_amount)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+(active?renderModification(active):'<button class="text-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>')+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
+  const canShop=r.status==="confirmed"&&Date.parse(r.check_in+"T15:00:00-03:00")>Date.now();
+  const experienceAction=canShop?'<button class="text-action guest-experience-open" data-experience-shop="'+r.id+'">Adicionar experiência</button>':"";
+  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.stay_amount)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+experienceAction+(active?renderModification(active):'<button class="text-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>')+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
   box.appendChild(art);
  });
  box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
  box.querySelectorAll("[data-accept-mod]").forEach(b=>b.addEventListener("click",()=>acceptModification(b.dataset.acceptMod,b)));
  box.querySelectorAll("[data-cancel-mod]").forEach(b=>b.addEventListener("click",()=>cancelModification(b.dataset.cancelMod,b)));
+ box.querySelectorAll("[data-experience-shop]").forEach(b=>b.addEventListener("click",()=>openExperienceShop(b.dataset.experienceShop)));
+}
+
+async function openExperienceShop(reservationId){
+ shopReservationId=reservationId;
+ $("#experience-shop-modal").hidden=false;
+ $("#guest-experience-list").innerHTML='<div class="loading-state">Buscando experiências disponíveis…</div>';
+ $("#guest-experience-message").textContent="";
+ try{
+  const d=await api("guest_experience_catalog",{reservation_id:reservationId});
+  renderGuestExperiences(d.items||[]);
+  track("experience_viewed",{reservation_id:reservationId,metadata:{source:"post_booking",available_count:(d.items||[]).length}});
+ }catch(e){
+  $("#guest-experience-list").innerHTML='<div class="empty-state">Não foi possível carregar as experiências agora.</div>';
+ }
+}
+function renderGuestExperiences(items){
+ const box=$("#guest-experience-list");
+ if(!items.length){box.innerHTML='<div class="empty-state">Não há novas experiências disponíveis para esta reserva neste momento.</div>';return}
+ box.innerHTML=items.map(item=>{
+  const photos=(item.media||[]).slice(0,5).map(m=>'<img src="'+esc(m.media_url)+'" alt="'+esc(m.alt_text||item.name)+'" loading="lazy">').join("");
+  return '<article class="guest-experience-card"><div class="guest-experience-gallery">'+photos+'</div><div class="guest-experience-copy"><small>'+esc(String(item.package_type||"experiência").toUpperCase())+'</small><h3>'+esc(item.name)+'</h3>'+(item.sales_headline?'<strong>'+esc(item.sales_headline)+'</strong>':'')+'<p>'+esc(item.description||"")+'</p><div class="guest-experience-buy"><span>'+brlC(item.price_cents)+'</span><button class="primary-action compact" data-buy-experience="'+esc(item.variant_id)+'" data-product="'+esc(item.product_id)+'" data-name="'+esc(item.name)+'" data-price="'+Number(item.price_cents||0)+'">Adicionar</button></div></div></article>';
+ }).join("");
+ box.querySelectorAll("[data-buy-experience]").forEach(b=>b.addEventListener("click",()=>purchaseGuestExperience(b)));
+}
+async function purchaseGuestExperience(btn){
+ const amount=Number(btn.dataset.price||0),name=btn.dataset.name||"experiência";
+ if(!confirm("Adicionar "+name+" por "+brlC(amount)+" à sua reserva?"))return;
+ btn.disabled=true;$("#guest-experience-message").textContent="Adicionando experiência…";
+ try{
+  const d=await api("purchase_post_booking_experience",{reservation_id:shopReservationId,variant_id:btn.dataset.buyExperience});
+  $("#guest-experience-message").textContent="Experiência adicionada à reserva por "+brlC(d.amount_cents)+".";
+  track("experience_added",{reservation_id:shopReservationId,metadata:{source:"post_booking",product_id:btn.dataset.product,amount_cents:Number(d.amount_cents||0)}});
+  setTimeout(()=>location.reload(),900);
+ }catch(e){
+  const messages={experience_already_added:"Esta experiência já está na sua reserva.",experience_lead_time:"O prazo mínimo para adicionar esta experiência já passou.",experience_out_of_stock:"Esta experiência não está disponível no momento.",experience_capacity_reached:"A capacidade desta experiência para sua data foi atingida.",payment_provider_not_ready:"A compra desta experiência ainda não está disponível."};
+  $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível adicionar a experiência agora.";
+  btn.disabled=false;
+ }
 }
 function renderGuarantee(g){
  if(!g)return "";
@@ -83,8 +129,9 @@ function openModification(reservationId,currentProperty,currentIn,currentOut){
  $("#modify-result").textContent="";$("#modify-modal").hidden=false;
 }
 $("#modify-close").addEventListener("click",()=>$("#modify-modal").hidden=true);
+$("#experience-shop-close")?.addEventListener("click",()=>$("#experience-shop-modal").hidden=true);
 $("#modify-form").addEventListener("submit",async e=>{e.preventDefault();const btn=e.submitter;if(!$("#modify-in").value||!$("#modify-out").value||$("#modify-out").value<=$("#modify-in").value){$("#modify-result").textContent="Escolha novas datas válidas.";return}btn.disabled=true;$("#modify-result").textContent="Consultando disponibilidade e nova condição…";
- try{const d=await api("request_modification",{reservation_id:$("#modify-reservation-id").value,requested_check_in:$("#modify-in").value,requested_check_out:$("#modify-out").value,requested_property_id:Number($("#modify-property").value)});$("#modify-result").innerHTML='Solicitação registrada. <strong>Sua reserva atual continua exatamente como está.</strong><br>Reajuste estimado da diária: <strong>'+brlC(d.request.estimated_additional_amount_cents||0)+'</strong>. Se a alteração for aprovada, o valor final será apresentado para sua confirmação antes de qualquer cobrança.';setTimeout(()=>location.reload(),2200)}
+ try{const d=await api("request_modification",{reservation_id:$("#modify-reservation-id").value,requested_check_in:$("#modify-in").value,requested_check_out:$("#modify-out").value,requested_property_id:Number($("#modify-property").value)});track("modification_requested",{reservation_id:$("#modify-reservation-id").value,metadata:{request_type:d.request?.request_type||null}});$("#modify-result").innerHTML='Solicitação registrada. <strong>Sua reserva atual continua exatamente como está.</strong><br>Reajuste estimado da diária: <strong>'+brlC(d.request.estimated_additional_amount_cents||0)+'</strong>. Se a alteração for aprovada, o valor final será apresentado para sua confirmação antes de qualquer cobrança.';setTimeout(()=>location.reload(),2200)}
  catch(err){
   if(err.message==="modification_already_open") $("#modify-result").textContent="Já existe uma solicitação de alteração em andamento. Cancele ou conclua a anterior antes de fazer outra.";
   else if(err.message==="occupied") $("#modify-result").textContent="A nova opção não está disponível para essas datas.";
