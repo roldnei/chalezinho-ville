@@ -19,7 +19,7 @@ async function api(action,body=null){
 
 async function init(){
  const {data:{session}}=await sb.auth.getSession();state.session=session;
- try{state.config=await api("config")}catch(e){error("Não foi possível carregar as configurações de reserva.");return}
+ try{let last=null;for(let attempt=1;attempt<=3;attempt++){try{state.config=await api("config");last=null;break}catch(e){last=e;if(attempt<3)await new Promise(resolve=>setTimeout(resolve,600*attempt))}}if(last)throw last}catch(e){error("Não foi possível carregar as configurações de reserva. Tente atualizar a página.");return}
  const today=new Date();today.setMinutes(today.getMinutes()-today.getTimezoneOffset());const min=today.toISOString().slice(0,10);
  $("#book-in").min=min;$("#book-out").min=min;
  $("#book-in").addEventListener("change",()=>{$("#book-out").min=$("#book-in").value||min;if($("#book-out").value&&$("#book-out").value<=$("#book-in").value)$("#book-out").value=""});
