@@ -488,6 +488,34 @@ async function startPayment(req:Request,body:any){
   return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,hold_expires_at:hold.hold_expires_at,payment});
 }
 
+async function cancelPendingPayment(req:Request,body:any,development:boolean){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  if(!development) return json({ok:false,error:"not_allowed"},403);
+  const paymentId=String(body?.payment_id||"");
+  if(!paymentId) return json({ok:false,error:"missing_data"},400);
+
+  const {data:settings}=await admin.from("payment_settings").select("active_provider").eq("id",1).single();
+  if(settings?.active_provider!=="mock") return json({ok:false,error:"not_allowed"},403);
+
+  const {data,error}=await admin.rpc("cancel_pending_payment_mock_atomic",{
+    p_payment_id:paymentId,p_user_id:user.id
+  });
+  if(error){
+    const msg=String(error.message||"");
+    if(msg.includes("not_found")) return json({ok:false,error:"not_found"},404);
+    if(msg.includes("payment_not_cancellable")) return json({ok:false,error:"payment_not_cancellable"},409);
+    return json({ok:false,error:"cancel_payment_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({
+    ok:true,
+    payment_status:row?.result_payment_status||"cancelled",
+    reservation_status:row?.result_reservation_status||"cancelled",
+    reservation_id:row?.result_reservation_id||null
+  });
+}
+
 async function mockPayment(req:Request,body:any){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
@@ -1091,6 +1119,7 @@ Deno.serve(async(req)=>{
     if(action==="upsell_preview") return await upsellPreview(body);
     if(action==="apply_upsell") return await applyUpsell(body,development);
     if(action==="start_payment") return await startPayment(req,body);
+    if(action==="cancel_pending_payment") return await cancelPendingPayment(req,body,development);
     if(action==="mock_payment") return await mockPayment(req,body);
     if(action==="request_modification") return await requestModification(req,body,development);
     if(action==="modification_action") return await modificationAction(req,body);

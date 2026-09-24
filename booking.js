@@ -3,7 +3,7 @@ const C=window.CHALEZINHO_CONFIG,ENGINE=C.bookingEngine,sb=window.supabase.creat
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false};
+const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null};
 let anonymousId="";
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
@@ -28,11 +28,31 @@ async function init(){
  $("#book-in").min=min;$("#book-out").min=min;
  $("#book-in").addEventListener("change",()=>{$("#book-out").min=$("#book-in").value||min;if($("#book-out").value&&$("#book-out").value<=$("#book-in").value)$("#book-out").value=""});
  $("#book-search").addEventListener("click",search);
- $("#checkout-close").addEventListener("click",()=>$("#checkout-modal").hidden=true);$("#upsell-close")?.addEventListener("click",()=>$("#upsell-modal").hidden=true);
+ $("#checkout-close").addEventListener("click",closeCheckout);$("#upsell-close")?.addEventListener("click",()=>$("#upsell-modal").hidden=true);
  $("#step-back").addEventListener("click",()=>showStep(Math.max(1,Number($("#checkout-panel").dataset.step||1)-1)));
  $("#step-next").addEventListener("click",next);
  renderDevBanner();
  await restoreResume();
+}
+async function closeCheckout(){
+ const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
+ if(step===6&&active?.payment_id&&active.status==="awaiting_payment"){
+  btn.disabled=true;setFlowError("Cancelando a pré-reserva e liberando as datas…");
+  try{
+   await api("cancel_pending_payment",{payment_id:active.payment_id});
+   state.activePayment=null;state.quote=null;state.rate=null;state.rateCode=null;state.selectedByProduct={};state.upsellHandled=false;
+   clearInterval(window.__quoteTimer);$("#checkout-modal").hidden=true;$("#upsell-modal").hidden=true;setFlowError("");
+   await search();
+  }catch(e){
+   if(e.message==="payment_not_cancellable"){
+    $("#checkout-modal").hidden=true;setFlowError("");
+   }else{
+    setFlowError("Não foi possível liberar a pré-reserva agora. Tente novamente antes de fechar.");
+   }
+  }finally{btn.disabled=false}
+  return;
+ }
+ $("#checkout-modal").hidden=true;
 }
 function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · nenhum pagamento real será realizado";document.body.prepend(b)}
 function error(t){$("#booking-error").textContent=t}
@@ -275,6 +295,7 @@ async function performStartPayment(choice){
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
   const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments});
+  state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment"};
   renderMockPayment(d);showStep(6);setFlowError("");
  }catch(e){track("payment_failed",{property_id:state.property?.id||null,metadata:{stage:"start_payment",reason:e.message||"unknown"}});setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
 }
@@ -282,7 +303,7 @@ function renderMockPayment(d){
  const exp=(state.quote?.experiences||[]).map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
  const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(state.rate.stay_amount_cents)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
  const box=$("#mock-payment");box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button></div><p id="mock-result"></p>';
- box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});const labels={under_review:"Pagamento em análise",refused:"Pagamento recusado",expired:"Pagamento expirado"};if(b.dataset.outcome==="paid")track("booking_confirmed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{total_cents:Number(state.rate?.total_amount_cents||0)}});else if(["refused","expired"].includes(b.dataset.outcome))track("payment_failed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{stage:"mock_outcome",reason:b.dataset.outcome}});$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':(labels[b.dataset.outcome]||"Estado atualizado")}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
+ box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});if(state.activePayment?.payment_id===d.payment.id)state.activePayment.status=b.dataset.outcome==="paid"?"paid":b.dataset.outcome==="under_review"?"under_review":b.dataset.outcome==="refused"?"refused":"expired";const labels={under_review:"Pagamento em análise",refused:"Pagamento recusado",expired:"Pagamento expirado"};if(b.dataset.outcome==="paid")track("booking_confirmed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{total_cents:Number(state.rate?.total_amount_cents||0)}});else if(["refused","expired"].includes(b.dataset.outcome))track("payment_failed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{stage:"mock_outcome",reason:b.dataset.outcome}});$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':(labels[b.dataset.outcome]||"Estado atualizado")}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
 }
 function startCountdown(exp){
  const el=$("#quote-countdown");clearInterval(window.__quoteTimer);
