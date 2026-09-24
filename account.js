@@ -65,7 +65,7 @@ function renderGuestExperiences(items,ownedPackages=[]){
  const box=$("#guest-experience-list");
  if(!items.length){
   const owned=ownedPackages.map(x=>x.name).filter(Boolean);
-  const current=owned.length?'<strong>Você já possui '+esc(owned.join(", "))+' .</strong> ':"";
+  const current=owned.length?'<strong>Você já possui '+esc(owned.join(", "))+'.</strong> ':"";
   box.innerHTML='<div class="empty-state">'+current+'No momento não há outro pacote ou upgrade disponível para esta reserva. Pacotes de outras categorias aparecerão aqui quando estiverem ativos e disponíveis para a sua data.</div>';
   return
  }
