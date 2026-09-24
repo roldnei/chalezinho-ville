@@ -44,3 +44,8 @@ Data: 2026-09-23
 - escolha do gateway real antes do GO-LIVE.
 
 Nenhum pagamento real foi executado.
+
+31. Final smoke da booking-engine v10: config 200 — PASS.
+32. Final smoke da booking-engine v10: search 200 — PASS.
+33. Extensão pg_net temporária de QA removida após os testes — PASS.
+34. Resposta pública da Edge Function não expõe diagnóstico interno detalhado — PASS.

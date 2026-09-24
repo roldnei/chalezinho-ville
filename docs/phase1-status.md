@@ -31,6 +31,14 @@
 - Termos/Regras/Privacidade são rascunhos de desenvolvimento;
 - nenhum botão/login novo deve ser promovido para produção sem autorização explícita.
 
+## Fechamento técnico
+
+- Edge Function booking-engine: versão 10 ativa no Supabase.
+- Último smoke técnico: config 200 e search 200.
+- pg_net temporário removido após QA.
+- Índices de FKs adicionados para crescimento.
+- Advisors de segurança sem alerta crítico; avisos restantes são tabelas server-only deliberadamente sem policy pública.
+
 ## Dependências antes do GO-LIVE
 
 1. Aprovação dos documentos jurídicos finais.

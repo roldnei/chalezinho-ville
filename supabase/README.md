@@ -18,8 +18,10 @@ Este diretório versiona a infraestrutura da Fase 1 que já foi aplicada ao Supa
 | 20260923232247 | move_btree_gist_extension |
 | 20260923232327 | move_admin_helper_private |
 | 20260923232417 | phase1_post_booking_history |
+| 20260923233705 | phase1_cover_foreign_keys |
+| 20260924001601 | remove_pg_net_after_internal_qa |
 
-O arquivo `phase1_schema_snapshot.sql` é um snapshot idempotente e documentado da estrutura alvo da Fase 1. As migrations originais permanecem registradas no histórico do Supabase.
+O arquivo `phase1_schema_snapshot.sql` é um snapshot idempotente e documentado da estrutura alvo da Fase 1. As migrations originais permanecem registradas no histórico do Supabase. O `pg_net` foi utilizado exclusivamente para QA interno e removido ao final dos testes.
 
 ## Regras importantes
 

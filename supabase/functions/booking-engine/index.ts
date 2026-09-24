@@ -50,7 +50,10 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     prodJson("/api/ical-airbnb-all"),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
-  if(pe||re) throw new Error("database_unavailable");
+  if(pe||re){
+    console.error("booking_search_db_error", pe?.code||null, re?.code||null);
+    throw new Error("database_unavailable");
+  }
   const now=Date.now();
   const dbActive=(dbRows||[]).filter((r:any)=>String(r.id)!==String(excludeReservationId||"")).filter((r:any)=>r.status!=="hold" && r.status!=="pending_payment" ? true : !r.hold_expires_at || Date.parse(r.hold_expires_at)>now);
   const icalMap=Object.fromEntries((ical.listings||[]).map((x:any)=>[x.name,x]));
@@ -445,8 +448,8 @@ Deno.serve(async(req)=>{
         admin.from("experience_products").select("id,code,name,description,status,minimum_lead_hours,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id)")
           .in("status",development?["active","draft"]:["active"]).order("display_order")
       ]);
-      const errs=[purposesQ.error,settingsQ.error,docsQ.error,productsQ.error].filter(Boolean).map((e:any)=>({message:e.message,code:e.code,details:e.details}));
-      if(errs.length) return json({ok:false,error:"config_query_failed",diagnostics:{hasServiceKey:!!serviceKey,hasAnonKey:!!anonKey,hasProjectUrl:!!projectUrl,errors:errs}},500);
+      const errs=[purposesQ.error,settingsQ.error,docsQ.error,productsQ.error].filter(Boolean);
+      if(errs.length) return json({ok:false,error:"config_unavailable"},500);
       return json({ok:true,purposes:purposesQ.data||[],payment_settings:settingsQ.data||{},policy_documents:docsQ.data||[],experience_products:productsQ.data||[]});
     }
     if(action==="search"){
