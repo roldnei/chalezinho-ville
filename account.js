@@ -64,22 +64,28 @@ function renderGuestExperiences(items){
  if(!items.length){box.innerHTML='<div class="empty-state">Não há novas experiências disponíveis para esta reserva neste momento.</div>';return}
  box.innerHTML=items.map(item=>{
   const photos=(item.media||[]).slice(0,5).map(m=>'<img src="'+esc(m.media_url)+'" alt="'+esc(m.alt_text||item.name)+'" loading="lazy">').join("");
-  return '<article class="guest-experience-card"><div class="guest-experience-gallery">'+photos+'</div><div class="guest-experience-copy"><small>'+esc(String(item.package_type||"experiência").toUpperCase())+'</small><h3>'+esc(item.name)+'</h3>'+(item.sales_headline?'<strong>'+esc(item.sales_headline)+'</strong>':'')+'<p>'+esc(item.description||"")+'</p><div class="guest-experience-buy"><span>'+brlC(item.price_cents)+'</span><button class="primary-action compact" data-buy-experience="'+esc(item.variant_id)+'" data-product="'+esc(item.product_id)+'" data-name="'+esc(item.name)+'" data-price="'+Number(item.price_cents||0)+'">Adicionar</button></div></div></article>';
+  const isUpgrade=item.purchase_mode==="upgrade";
+  const priceLine=isUpgrade?'<span><small>UPGRADE</small> +'+brlC(item.payable_cents)+'</span>':'<span>'+brlC(item.payable_cents)+'</span>';
+  const upgradeNote=isUpgrade&&item.upgrade_from?'<p class="upgrade-from">Você já tem <strong>'+esc(item.upgrade_from.name)+'</strong>. Troque por este pacote pagando apenas a diferença.</p>':"";
+  const buttonLabel=isUpgrade?'Fazer upgrade por +'+brlC(item.payable_cents):'Adicionar';
+  return '<article class="guest-experience-card"><div class="guest-experience-gallery">'+photos+'</div><div class="guest-experience-copy"><small>'+esc(String(item.package_type||"experiência").toUpperCase())+'</small><h3>'+esc(item.name)+'</h3>'+(item.sales_headline?'<strong>'+esc(item.sales_headline)+'</strong>':'')+'<p>'+esc(item.description||"")+'</p>'+upgradeNote+'<div class="guest-experience-buy">'+priceLine+'<button class="primary-action compact" data-buy-experience="'+esc(item.variant_id)+'" data-product="'+esc(item.product_id)+'" data-name="'+esc(item.name)+'" data-price="'+Number(item.payable_cents||0)+'" data-mode="'+esc(item.purchase_mode||"add")+'">'+buttonLabel+'</button></div></div></article>';
  }).join("");
  box.querySelectorAll("[data-buy-experience]").forEach(b=>b.addEventListener("click",()=>purchaseGuestExperience(b)));
 }
 async function purchaseGuestExperience(btn){
- const amount=Number(btn.dataset.price||0),name=btn.dataset.name||"experiência";
- if(!confirm("Adicionar "+name+" por "+brlC(amount)+" à sua reserva?"))return;
- btn.disabled=true;$("#guest-experience-message").textContent="Adicionando experiência…";
+ const amount=Number(btn.dataset.price||0),name=btn.dataset.name||"experiência",mode=btn.dataset.mode||"add";
+ const prompt=mode==="upgrade"?"Fazer upgrade para "+name+" por mais "+brlC(amount)+"?":"Adicionar "+name+" por "+brlC(amount)+" à sua reserva?";
+ if(!confirm(prompt))return;
+ btn.disabled=true;$("#guest-experience-message").textContent=mode==="upgrade"?"Atualizando sua experiência…":"Adicionando experiência…";
  try{
   const d=await api("purchase_post_booking_experience",{reservation_id:shopReservationId,variant_id:btn.dataset.buyExperience});
-  $("#guest-experience-message").textContent="Experiência adicionada à reserva por "+brlC(d.amount_cents)+".";
-  track("experience_added",{reservation_id:shopReservationId,metadata:{source:"post_booking",product_id:btn.dataset.product,amount_cents:Number(d.amount_cents||0)}});
+  const upgraded=d.mode==="upgraded";
+  $("#guest-experience-message").textContent=upgraded?"Upgrade realizado por +"+brlC(d.amount_cents)+".":"Experiência adicionada à reserva por "+brlC(d.amount_cents)+".";
+  track(upgraded?"experience_upgraded":"experience_added",{reservation_id:shopReservationId,metadata:{source:"post_booking",product_id:btn.dataset.product,amount_cents:Number(d.amount_cents||0)}});
   setTimeout(()=>location.reload(),900);
  }catch(e){
-  const messages={experience_already_added:"Esta experiência já está na sua reserva.",experience_lead_time:"O prazo mínimo para adicionar esta experiência já passou.",experience_out_of_stock:"Esta experiência não está disponível no momento.",experience_capacity_reached:"A capacidade desta experiência para sua data foi atingida.",payment_provider_not_ready:"A compra desta experiência ainda não está disponível."};
-  $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível adicionar a experiência agora.";
+  const messages={experience_already_added:"Esta experiência já está na sua reserva.",experience_upgrade_not_available:"Este upgrade não está mais disponível.",experience_lead_time:"O prazo mínimo para adicionar esta experiência já passou.",experience_out_of_stock:"Esta experiência não está disponível no momento.",experience_capacity_reached:"A capacidade desta experiência para sua data foi atingida.",payment_provider_not_ready:"A compra desta experiência ainda não está disponível."};
+  $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível atualizar a experiência agora.";
   btn.disabled=false;
  }
 }
