@@ -141,8 +141,12 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     const productIds=[...new Set((variants||[]).map((v:any)=>v.product_id))];
     const {data:eligibleRows}=await admin.from("experience_property_eligibility").select("product_id").eq("property_id",property.id).in("product_id",productIds);
     const eligible=new Set((eligibleRows||[]).map((x:any)=>String(x.product_id)));
+    const seenPackageTypes=new Set<string>();
     for(const v of variants||[]){
       const prod=(v as any).experience_products;
+      const packageType=String(prod.package_type||"other");
+      if(seenPackageTypes.has(packageType)) throw new Error("experience_category_conflict");
+      seenPackageTypes.add(packageType);
       const leadOk=(Date.parse(check_in+"T15:00:00-03:00")-Date.now()) >= Number(prod.minimum_lead_hours||0)*3600000;
       const stockOk=prod.inventory==null || Number(prod.inventory)>0;
       const allowed=v.active && eligible.has(String(prod.id)) && leadOk && stockOk && (prod.status==="active" || (development && prod.status==="draft"));
@@ -1002,7 +1006,17 @@ async function guestExperienceCatalog(req:Request,body:any){
       media:(p.experience_media||[]).slice().sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))
     });
   }
-  return json({ok:true,reservation_id:r.id,items});
+  return json({
+    ok:true,
+    reservation_id:r.id,
+    items,
+    owned_packages:activeItems.map((i:any)=>({
+      product_id:i.product_id,
+      name:i.product_name_snapshot,
+      package_type:i.experience_products?.package_type||"other",
+      price_cents:Number(i.unit_price_cents||0)
+    }))
+  });
 }
 
 async function purchasePostBookingExperience(req:Request,body:any,development:boolean){
@@ -1137,7 +1151,7 @@ Deno.serve(async(req)=>{
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
     if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
-    const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","modification_already_open","upsell_not_available"];
+    const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
 });

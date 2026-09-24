@@ -1615,3 +1615,12 @@ footer{justify-content:space-between!important}
 .guest-experience-buy>span{font:500 22px "Playfair Display",serif}
 .guest-experience-open{margin-top:12px}
 @media(max-width:620px){.guest-experience-gallery img{flex-basis:88%;width:88%}.guest-experience-buy{align-items:stretch;flex-direction:column}.guest-experience-buy .primary-action{width:100%}}
+
+.reservation-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:22px}
+.reservation-action{min-height:52px;padding:13px 16px;border:1px solid #6b4b38;background:#17110d;color:#f2e8df;font:600 15px/1.2 inherit;cursor:pointer;text-align:center}
+.reservation-action:hover{background:#211711}
+.experience-action{border-color:#9a6542;color:#e2b58f}
+.modification-action{border-color:#4b4038;color:#d7cbc0}
+.mock-controls .mock-help{display:block;width:100%;margin-top:10px;color:#9f9389;font-size:12px;line-height:1.45}
+.mock-controls button:disabled{opacity:.45;cursor:not-allowed}
+@media(max-width:620px){.reservation-actions{grid-template-columns:1fr}.reservation-action{width:100%}}

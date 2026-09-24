@@ -28,7 +28,7 @@ function renderReservations(reservations){
  const box=$("#reservation-list");box.innerHTML="";if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
  reservations.forEach(r=>{
   const active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&!["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status)).slice(0,2);
-  const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]);
+  const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
   const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),per=Number(r.stay_amount||0)/n;
   const paid=(r.payments||[]).some(p=>p.status==="paid");
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);
@@ -36,8 +36,10 @@ function renderReservations(reservations){
   const expRows=expItems.map(i=>'<div class="reservation-breakdown-row"><span>'+i.product_name_snapshot+'</span><strong>'+brlC(Number(i.unit_price_cents)*1)+'</strong></div>').join("");
   const revisionRow=appliedRevision>0?'<div class="reservation-breakdown-row tariff-revision"><span>Revisão de tarifa da alteração</span><strong>+'+brlC(appliedRevision)+'</strong></div>':"";
   const canShop=r.status==="confirmed"&&Date.parse(r.check_in+"T15:00:00-03:00")>Date.now();
-  const experienceAction=canShop?'<button class="text-action guest-experience-open" data-experience-shop="'+r.id+'">Adicionar experiência</button>':"";
-  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.stay_amount)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+experienceAction+(active?renderModification(active):'<button class="text-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>')+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
+  const experienceAction=canShop?'<button class="reservation-action experience-action" data-experience-shop="'+r.id+'">Adicionar experiência</button>':"";
+  const modificationAction=!active?'<button class="reservation-action modification-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>':"";
+  const reservationActions=(experienceAction||modificationAction)?'<div class="reservation-actions">'+experienceAction+modificationAction+'</div>':"";
+  art.innerHTML='<img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div><small>'+statusLabel(r.status).toUpperCase()+'</small><h3>'+r.properties?.name+'</h3><p>'+r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/")+' · '+r.guests+' hóspedes</p><div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(r.stay_amount)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"TOTAL DA RESERVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div>';
   box.appendChild(art);
  });
  box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
@@ -53,15 +55,20 @@ async function openExperienceShop(reservationId){
  $("#guest-experience-message").textContent="";
  try{
   const d=await api("guest_experience_catalog",{reservation_id:reservationId});
-  renderGuestExperiences(d.items||[]);
+  renderGuestExperiences(d.items||[],d.owned_packages||[]);
   track("experience_viewed",{reservation_id:reservationId,metadata:{source:"post_booking",available_count:(d.items||[]).length}});
  }catch(e){
   $("#guest-experience-list").innerHTML='<div class="empty-state">Não foi possível carregar as experiências agora.</div>';
  }
 }
-function renderGuestExperiences(items){
+function renderGuestExperiences(items,ownedPackages=[]){
  const box=$("#guest-experience-list");
- if(!items.length){box.innerHTML='<div class="empty-state">Não há novas experiências disponíveis para esta reserva neste momento.</div>';return}
+ if(!items.length){
+  const owned=ownedPackages.map(x=>x.name).filter(Boolean);
+  const current=owned.length?'<strong>Você já possui '+esc(owned.join(", "))+' .</strong> ':"";
+  box.innerHTML='<div class="empty-state">'+current+'No momento não há outro pacote ou upgrade disponível para esta reserva. Pacotes de outras categorias aparecerão aqui quando estiverem ativos e disponíveis para a sua data.</div>';
+  return
+ }
  box.innerHTML=items.map(item=>{
   const photos=(item.media||[]).slice(0,5).map(m=>'<img src="'+esc(m.media_url)+'" alt="'+esc(m.alt_text||item.name)+'" loading="lazy">').join("");
   const isUpgrade=item.purchase_mode==="upgrade";

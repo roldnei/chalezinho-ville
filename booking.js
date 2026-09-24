@@ -302,8 +302,37 @@ async function performStartPayment(choice){
 function renderMockPayment(d){
  const exp=(state.quote?.experiences||[]).map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
  const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(state.rate.stay_amount_cents)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
- const box=$("#mock-payment");box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button></div><p id="mock-result"></p>';
- box.querySelectorAll("[data-outcome]").forEach(b=>b.addEventListener("click",async()=>{try{await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});if(state.activePayment?.payment_id===d.payment.id)state.activePayment.status=b.dataset.outcome==="paid"?"paid":b.dataset.outcome==="under_review"?"under_review":b.dataset.outcome==="refused"?"refused":"expired";const labels={under_review:"Pagamento em análise",refused:"Pagamento recusado",expired:"Pagamento expirado"};if(b.dataset.outcome==="paid")track("booking_confirmed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{total_cents:Number(state.rate?.total_amount_cents||0)}});else if(["refused","expired"].includes(b.dataset.outcome))track("payment_failed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{stage:"mock_outcome",reason:b.dataset.outcome}});$("#mock-result").innerHTML=b.dataset.outcome==="paid"?'Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>':(labels[b.dataset.outcome]||"Estado atualizado")}catch(e){$("#mock-result").textContent="Falha ao simular estado."}}));
+ const box=$("#mock-payment");
+ box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button><small class="mock-help">Aprovado, Recusado e Expirado são resultados finais. Depois de escolher um deles, os outros deixam de ser válidos para esta pré-reserva.</small></div><p id="mock-result"></p>';
+ const buttons=[...box.querySelectorAll("[data-outcome]")];
+ const setState=outcome=>{
+  if(outcome==="under_review") buttons.forEach(x=>x.disabled=x.dataset.outcome==="under_review");
+  else buttons.forEach(x=>x.disabled=true);
+ };
+ buttons.forEach(b=>b.addEventListener("click",async()=>{
+  try{
+   await api("mock_payment",{payment_id:d.payment.id,outcome:b.dataset.outcome});
+   const outcome=b.dataset.outcome;
+   if(state.activePayment?.payment_id===d.payment.id)state.activePayment.status=outcome==="paid"?"paid":outcome==="under_review"?"under_review":outcome==="refused"?"refused":"expired";
+   if(outcome==="paid"){
+    track("booking_confirmed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{total_cents:Number(state.rate?.total_amount_cents||0)}});
+    $("#mock-result").innerHTML='Pagamento aprovado. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';
+   }else if(outcome==="under_review"){
+    $("#mock-result").textContent="Pagamento em análise. Você ainda pode simular aprovação, recusa ou expiração.";
+   }else{
+    track("payment_failed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{stage:"mock_outcome",reason:outcome}});
+    $("#mock-result").textContent=outcome==="refused"?"Pagamento recusado. Esta pré-reserva foi encerrada.":"Pagamento expirado. Esta pré-reserva foi encerrada.";
+   }
+   setState(outcome);
+  }catch(e){
+   if(e.message==="payment_state_final"){
+    buttons.forEach(x=>x.disabled=true);
+    $("#mock-result").textContent="Este pagamento já foi finalizado. Para testar outro resultado final, inicie uma nova pré-reserva.";
+   }else{
+    $("#mock-result").textContent="Não foi possível atualizar o status do pagamento.";
+   }
+  }
+ }));
 }
 function startCountdown(exp){
  const el=$("#quote-countdown");clearInterval(window.__quoteTimer);
