@@ -1,18 +1,136 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine,$=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-let session=null,data=null,current=null;
-async function api(action,body=null){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const r=await fetch(ENGINE+"?action="+action,{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw new Error(d.error||"request_failed");return d}
-async function boot(){const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session)return location.href="auth.html?mode=login&return=experiencias-admin.html";const {data:p}=await sb.from("profiles").select("role").eq("id",session.user.id).single();if(p?.role!=="admin"){$("#experience-admin-root").innerHTML='<div class="empty-state">Acesso restrito à administração.</div>';return}await load()}
-async function load(){data=await api("experience_admin");renderList();if(current){current=data.products.find(p=>p.id===current.id)||null;if(current)edit(current.id)}}
-function renderList(){const box=$("#experience-admin-list");box.innerHTML='<button class="primary-action compact" id="new-experience">+ Nova experiência</button>'+(data.products||[]).map(p=>'<button class="admin-experience-item" data-edit="'+p.id+'">'+((p.experience_media||[])[0]?'<img src="'+p.experience_media[0].media_url+'" alt="">':'')+'<span><small>'+p.status.toUpperCase()+'</small><strong>'+p.name+'</strong><em>'+((p.experience_variants||[]).length)+' variantes · '+((p.experience_media||[]).length)+' fotos</em></span></button>').join("");$("#new-experience").onclick=()=>edit(null);box.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>edit(b.dataset.edit))}
-function edit(id){current=id?(data.products||[]).find(p=>p.id===id):null;$("#exp-id").value=current?.id||"";$("#exp-code").value=current?.code||"";$("#exp-name").value=current?.name||"";$("#exp-headline").value=current?.sales_headline||"";$("#exp-description").value=current?.description||"";$("#exp-status").value=current?.status||"draft";$("#exp-lead").value=current?.minimum_lead_hours||0;$("#exp-order").value=current?.display_order||0;renderChecks();renderVariants();renderMedia();$("#experience-editor").scrollIntoView({behavior:"smooth",block:"start"})}
-function renderChecks(){const pp=new Set((current?.experience_property_eligibility||[]).map(x=>String(x.property_id))),tp=new Set(current?.travel_purposes||[]);$("#exp-properties").innerHTML=(data.properties||[]).map(p=>'<label><input type="checkbox" value="'+p.id+'" '+(pp.has(String(p.id))?"checked":"")+'> '+p.name+'</label>').join("");$("#exp-purposes").innerHTML=(data.purposes||[]).map(p=>'<label><input type="checkbox" value="'+p.code+'" '+(tp.has(p.code)?"checked":"")+'> '+p.label+'</label>').join("")}
-$("#experience-form").addEventListener("submit",async e=>{e.preventDefault();const body={operation:"save_product",id:$("#exp-id").value||null,code:$("#exp-code").value,name:$("#exp-name").value,sales_headline:$("#exp-headline").value,description:$("#exp-description").value,status:$("#exp-status").value,minimum_lead_hours:Number($("#exp-lead").value||0),display_order:Number($("#exp-order").value||0),property_ids:$$('#exp-properties input:checked').map(x=>Number(x.value)),travel_purposes:$$('#exp-purposes input:checked').map(x=>x.value)};try{const r=await api("experience_admin_action",body);current=r.product;$("#admin-message").textContent="Experiência salva.";await load()}catch(err){$("#admin-message").textContent="Falha ao salvar: "+err.message}});
-function renderVariants(){const box=$("#variant-list");if(!current){box.innerHTML='<p>Salve a experiência primeiro.</p>';return}const rows=(current.experience_variants||[]).slice().sort((a,b)=>a.display_order-b.display_order);box.innerHTML=rows.map(v=>variantRow(v)).join("")+variantRow(null);box.querySelectorAll("[data-save-variant]").forEach(b=>b.onclick=()=>saveVariant(b.closest(".variant-editor")))}
-function variantRow(v){return '<div class="variant-editor" data-id="'+(v?.id||"")+'"><input data-field="name" placeholder="Nome da variante" value="'+(v?.name||"")+'"><input data-field="code" placeholder="Código" value="'+(v?.code||"")+'"><label>Preço (R$)<input data-field="price" type="number" min="0" step="0.01" value="'+(v?Number(v.price_cents)/100:"")+'"></label><label>Ordem<input data-field="order" type="number" value="'+(v?.display_order||0)+'"></label><label><input data-field="active" type="checkbox" '+(v?.active!==false?"checked":"")+'> Ativa</label><button type="button" data-save-variant>Salvar variante</button></div>'}
-async function saveVariant(row){if(!current)return;const get=f=>row.querySelector('[data-field="'+f+'"]');try{await api("experience_admin_action",{operation:"save_variant",id:row.dataset.id||null,product_id:current.id,name:get("name").value,code:get("code").value,price_cents:Math.round(Number(get("price").value||0)*100),display_order:Number(get("order").value||0),active:get("active").checked});$("#admin-message").textContent="Variante salva.";await load()}catch(e){$("#admin-message").textContent="Falha ao salvar variante: "+e.message}}
-function renderMedia(){const box=$("#media-list");if(!current){box.innerHTML='<p>Salve a experiência primeiro.</p>';return}const media=(current.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order);box.innerHTML=media.map(m=>'<figure><img src="'+m.media_url+'" alt="'+(m.alt_text||"")+'"><figcaption>'+(m.alt_text||"Sem legenda")+'</figcaption><button type="button" data-delete-media="'+m.id+'">Remover</button></figure>').join("");box.querySelectorAll("[data-delete-media]").forEach(b=>b.onclick=async()=>{await api("experience_admin_action",{operation:"delete_media",id:b.dataset.deleteMedia});await load()})}
-$("#media-upload").addEventListener("change",async e=>{if(!current||!e.target.files?.[0])return;const file=e.target.files[0];if(file.size>10*1024*1024){$("#admin-message").textContent="A imagem deve ter no máximo 10 MB.";return}const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,"-"),path=current.id+"/"+Date.now()+"-"+safe;$("#admin-message").textContent="Enviando foto…";const {error}=await sb.storage.from("experience-media").upload(path,file,{upsert:false});if(error){$("#admin-message").textContent="Falha no upload: "+error.message;return}const {data:u}=sb.storage.from("experience-media").getPublicUrl(path);await api("experience_admin_action",{operation:"save_media",product_id:current.id,media_url:u.publicUrl,alt_text:$("#media-alt").value||current.name,display_order:Number($("#media-order").value||0)});$("#media-upload").value="";$("#admin-message").textContent="Foto adicionada.";await load()});
-$("#add-media-url").onclick=async()=>{if(!current)return;const url=$("#media-url").value.trim();if(!url)return;await api("experience_admin_action",{operation:"save_media",product_id:current.id,media_url:url,alt_text:$("#media-alt").value||current.name,display_order:Number($("#media-order").value||0)});$("#media-url").value="";await load()};
+const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
+const $=s=>document.querySelector(s),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+let session=null,data=null,current=null,mediaItems=[],draftKey=crypto.randomUUID();
+
+async function api(action,body=null){
+  const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};
+  const r=await fetch(ENGINE+"?action="+action,{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});
+  const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
+  if(!r.ok||!d.ok) throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});
+  return d;
+}
+const statusText=s=>s==="active"?"Ativa":s==="archived"?"Arquivada":"Pausada";
+const typeText=t=>({romantic:"Romântico",beach:"Praia",breakfast:"Café da manhã",celebration:"Comemoração",wellness:"Bem-estar",other:"Outros"}[t]||"Outros");
+const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+
+async function boot(){
+  const {data:{session:s}}=await sb.auth.getSession();session=s;
+  if(!session)return location.href="auth.html?mode=login&return=experiencias-admin.html";
+  const {data:p}=await sb.from("profiles").select("role").eq("id",session.user.id).single();
+  if(p?.role!=="admin"){$("#experience-admin-root").innerHTML='<div class="empty-state">Acesso restrito à administração.</div>';return}
+  bind();await load();
+}
+function bind(){
+  $("#experience-picker").addEventListener("change",()=>selectExperience($("#experience-picker").value||null));
+  $("#new-experience").addEventListener("click",()=>selectExperience(null));
+  $("#experience-form").addEventListener("submit",save);
+  $("#photo-upload").addEventListener("change",uploadPhotos);
+  $("#toggle-status").addEventListener("click",toggleStatus);
+  $("#delete-experience").addEventListener("click",deleteExperience);
+}
+async function load(selectId=current?.id||null){
+  data=await api("experience_admin");
+  renderPicker();
+  if(selectId && data.products.some(p=>p.id===selectId)) selectExperience(selectId);
+  else if(!current) selectExperience(null);
+}
+function renderPicker(){
+  const products=(data.products||[]).filter(p=>p.status!=="archived");
+  $("#experience-picker").innerHTML='<option value="">Nova experiência</option>'+products.map(p=>'<option value="'+p.id+'">'+esc(p.name)+' · '+statusText(p.status)+'</option>').join("");
+  if(current?.id) $("#experience-picker").value=current.id;
+}
+function selectExperience(id){
+  current=id?(data.products||[]).find(p=>p.id===id)||null:null;
+  draftKey=current?.id||crypto.randomUUID();
+  mediaItems=(current?.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order).map(m=>({id:m.id||null,media_url:m.media_url,alt_text:m.alt_text||current?.name||"",display_order:m.display_order||0}));
+  $("#experience-picker").value=current?.id||"";
+  $("#exp-type").value=current?.package_type||"romantic";
+  $("#exp-name").value=current?.name||"";
+  $("#exp-price").value=current?Number(current.price_cents||0)/100:"";
+  $("#exp-description").value=current?.description||"";
+  $("#exp-upsell-yes").checked=current?.upsell_enabled===true;
+  $("#exp-upsell-no").checked=current?.upsell_enabled!==true;
+  renderStatus();renderPhotos();renderActions();
+  $("#admin-message").textContent="";
+  $("#experience-form").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function renderStatus(){
+  const badge=$("#experience-status");
+  const status=current?.status||"new";
+  badge.textContent=status==="new"?"Nova experiência":statusText(status);
+  badge.className="simple-status "+(status==="active"?"is-active":"is-paused");
+}
+function renderActions(){
+  $("#save-experience").textContent=current?"Salvar alterações":"Salvar experiência";
+  $("#toggle-status").hidden=!current;
+  $("#delete-experience").hidden=!current;
+  if(current) $("#toggle-status").textContent=current.status==="active"?"Pausar experiência":"Ativar experiência";
+}
+function renderPhotos(){
+  const count=mediaItems.length;
+  $("#photo-count").textContent=count+"/5 fotos";
+  $("#photo-count").className="photo-count "+(count>=5?"ok":"warn");
+  $("#photo-help").textContent=count>=5?"Galeria pronta para o carrossel.":"Adicione pelo menos "+(5-count)+" foto"+(5-count===1?"":"s")+" para completar o carrossel.";
+  const box=$("#photo-grid");
+  box.innerHTML=mediaItems.map((m,i)=>'<figure class="simple-photo"><img src="'+esc(m.media_url)+'" alt="'+esc(m.alt_text||"Foto da experiência")+'"><button type="button" data-remove-photo="'+i+'" aria-label="Excluir foto">×</button><span>'+(i+1)+'</span></figure>').join("");
+  box.querySelectorAll("[data-remove-photo]").forEach(b=>b.onclick=()=>{mediaItems.splice(Number(b.dataset.removePhoto),1);normalizeMedia();renderPhotos()});
+}
+function normalizeMedia(){mediaItems=mediaItems.map((m,i)=>({...m,display_order:(i+1)*10}))}
+async function uploadPhotos(e){
+  const files=[...(e.target.files||[])];if(!files.length)return;
+  $("#admin-message").textContent="Enviando fotos…";
+  for(let i=0;i<files.length;i++){
+    const file=files[i];
+    if(file.size>10*1024*1024){$("#admin-message").textContent="Uma das imagens ultrapassa 10 MB.";continue}
+    const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,"-"),path=draftKey+"/"+Date.now()+"-"+i+"-"+safe;
+    const {error}=await sb.storage.from("experience-media").upload(path,file,{upsert:false});
+    if(error){$("#admin-message").textContent="Falha ao enviar "+file.name+": "+error.message;continue}
+    const {data:u}=sb.storage.from("experience-media").getPublicUrl(path);
+    mediaItems.push({id:null,media_url:u.publicUrl,alt_text:$("#exp-name").value.trim()||"Experiência Chalezinho Ville",display_order:(mediaItems.length+1)*10});
+  }
+  e.target.value="";normalizeMedia();renderPhotos();
+  if(!$("#admin-message").textContent.startsWith("Falha")) $("#admin-message").textContent="Fotos adicionadas. Clique em Salvar no final para confirmar as alterações.";
+}
+async function save(e){
+  e.preventDefault();
+  const name=$("#exp-name").value.trim(),price=Math.round(Number($("#exp-price").value||0)*100);
+  if(!name){$("#admin-message").textContent="Informe o nome da experiência.";return}
+  if(price<=0){$("#admin-message").textContent="Informe o preço.";return}
+  if(mediaItems.length<5){$("#admin-message").textContent="Adicione pelo menos 5 fotos antes de salvar.";return}
+  $("#save-experience").disabled=true;$("#admin-message").textContent=current?"Salvando alterações…":"Salvando experiência…";
+  try{
+    const r=await api("experience_admin_action",{
+      operation:"save_simple_product",id:current?.id||null,
+      package_type:$("#exp-type").value,name,
+      price_cents:price,description:$("#exp-description").value.trim(),
+      upsell_enabled:$("#exp-upsell-yes").checked,
+      media_items:mediaItems.map((m,i)=>({media_url:m.media_url,alt_text:m.alt_text||name,display_order:(i+1)*10}))
+    });
+    $("#admin-message").textContent=current?"Alterações salvas.":"Experiência criada.";
+    await load(r.product.id);
+  }catch(err){
+    $("#admin-message").textContent=err.message==="experience_requires_five_photos"?"São necessárias pelo menos 5 fotos.":"Não foi possível salvar: "+err.message;
+  }finally{$("#save-experience").disabled=false}
+}
+async function toggleStatus(){
+  if(!current)return;
+  const action=current.status==="active"?"pausar":"ativar";
+  if(!confirm("Deseja "+action+" esta experiência?"))return;
+  try{
+    const r=await api("experience_admin_action",{operation:"toggle_product_status",id:current.id});
+    $("#admin-message").textContent=r.product.status==="active"?"Experiência ativada.":"Experiência pausada.";
+    await load(current.id);
+  }catch(err){$("#admin-message").textContent=err.message==="experience_requires_five_photos"?"Adicione pelo menos 5 fotos antes de ativar.":"Não foi possível alterar o status: "+err.message}
+}
+async function deleteExperience(){
+  if(!current)return;
+  if(!confirm('Excluir "'+current.name+'"? Esta ação remove a experiência da operação.'))return;
+  try{
+    const r=await api("experience_admin_action",{operation:"delete_product",id:current.id});
+    $("#admin-message").textContent=r.archived?"A experiência tinha histórico e foi retirada da operação, preservando os registros antigos.":"Experiência excluída.";
+    current=null;await load();
+  }catch(err){$("#admin-message").textContent="Não foi possível excluir: "+err.message}
+}
 boot();
 })();
