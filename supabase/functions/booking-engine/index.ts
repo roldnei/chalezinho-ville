@@ -1025,7 +1025,7 @@ async function guestExperienceCatalog(req:Request,body:any){
   if(pe) return json({ok:false,error:"experience_catalog_unavailable"},500);
 
   const {data:existing}=await admin.from("experience_orders")
-    .select("experience_order_items(id,product_id,product_name_snapshot,unit_price_cents,status,experience_products(package_type,price_cents,name,upsell_enabled))")
+    .select("experience_order_items(id,product_id,product_name_snapshot,unit_price_cents,status,experience_products(package_type,price_cents,name))")
     .eq("reservation_id",r.id)
     .in("status",["pending","active"]);
   const activeItems=(existing||[]).flatMap((o:any)=>o.experience_order_items||[]).filter((i:any)=>i.status==="active");
@@ -1044,7 +1044,6 @@ async function guestExperienceCatalog(req:Request,body:any){
     let purchaseMode="add",payableCents=Number(variant.price_cents),upgradeFrom=null;
     if(current){
       if(String(current.product_id)===String(p.id)) continue;
-      if(current.experience_products?.upsell_enabled!==true) continue;
       const sourceCatalogPrice=Number(current.experience_products?.price_cents??current.unit_price_cents??0);
       const next=(products||[])
         .filter((x:any)=>x.package_type===p.package_type&&x.status==="active"&&Number(x.price_cents)>sourceCatalogPrice&&(x.inventory==null||Number(x.inventory)>0))
