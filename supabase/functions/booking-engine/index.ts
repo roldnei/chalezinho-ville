@@ -43,15 +43,17 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   const stay=nights(start,end);
   if(stay<1) throw new Error("invalid_dates");
 
-  const [{data:properties,error:pe},{data:dbRows,error:re},ical,prices] = await Promise.all([
-    admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id"),
-    admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
-      .lt("check_in",end).gt("check_out",start).in("status",["hold","pending_payment","confirmed"]),
+  const [propertiesQ,reservationsQ,ical,prices] = await Promise.all([
+    retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id")),
+    retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
+      .lt("check_in",end).gt("check_out",start).in("status",["hold","pending_payment","confirmed"])),
     prodJson("/api/ical-airbnb-all"),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
+  const {data:properties,error:pe}=propertiesQ;
+  const {data:dbRows,error:re}=reservationsQ;
   if(pe||re){
-    console.error("booking_search_db_error", pe?.code||null, re?.code||null);
+    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null}));
     throw new Error("database_unavailable");
   }
   const now=Date.now();
@@ -92,7 +94,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   const expSnapshots:any[]=[];
   if(Array.isArray(experience_variant_ids)&&experience_variant_ids.length){
     const {data:variants,error}=await admin.from("experience_variants")
-      .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,package_type,price_cents,upsell_enabled)")
+      .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,daily_capacity,inventory,package_type,price_cents,upsell_enabled)")
       .in("id",experience_variant_ids);
     if(error) throw new Error("experience_lookup_failed");
     const productIds=[...new Set((variants||[]).map((v:any)=>v.product_id))];
@@ -101,7 +103,8 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     for(const v of variants||[]){
       const prod=(v as any).experience_products;
       const leadOk=(Date.parse(check_in+"T15:00:00-03:00")-Date.now()) >= Number(prod.minimum_lead_hours||0)*3600000;
-      const allowed=v.active && eligible.has(String(prod.id)) && leadOk && (prod.status==="active" || (development && prod.status==="draft"));
+      const stockOk=prod.inventory==null || Number(prod.inventory)>0;
+      const allowed=v.active && eligible.has(String(prod.id)) && leadOk && stockOk && (prod.status==="active" || (development && prod.status==="draft"));
       if(!allowed) throw new Error("experience_unavailable");
       experienceTotal+=Number(v.price_cents||0);
       expSnapshots.push({variant:v,product:prod});
@@ -202,7 +205,7 @@ async function upsellPreview(body:any){
     if(!source||source.status!=="active") continue;
 
     const {data:above,error:ae}=await admin.from("experience_products")
-      .select("id,name,package_type,price_cents,upsell_enabled,status,experience_property_eligibility!inner(property_id)")
+      .select("id,name,package_type,price_cents,upsell_enabled,status,inventory,experience_property_eligibility!inner(property_id)")
       .eq("package_type",source.package_type)
       .eq("status","active")
       .eq("experience_property_eligibility.property_id",q.property_id)
@@ -212,7 +215,7 @@ async function upsellPreview(body:any){
     if(ae) return json({ok:false,error:"upsell_lookup_failed"},500);
 
     const next=(above||[])[0];
-    if(!next || next.upsell_enabled!==true) continue;
+    if(!next || next.upsell_enabled!==true || (next.inventory!=null&&Number(next.inventory)<=0)) continue;
     const diff=Number(next.price_cents)-Number(source.price_cents);
     if(diff<=0) continue;
 
@@ -252,15 +255,15 @@ async function applyUpsell(body:any,development:boolean){
   if(cpe) return json({ok:false,error:"experience_lookup_failed"},500);
 
   const {data:target,error:te}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,upsell_enabled,status")
+    .select("id,name,package_type,price_cents,upsell_enabled,status,inventory")
     .eq("id",target_product_id).single();
-  if(te||!target||target.status!=="active"||target.upsell_enabled!==true) return json({ok:false,error:"upsell_not_available"},409);
+  if(te||!target||target.status!=="active"||target.upsell_enabled!==true||(target.inventory!=null&&Number(target.inventory)<=0)) return json({ok:false,error:"upsell_not_available"},409);
 
   const source=(currentProducts||[]).find((p:any)=>p.package_type===target.package_type);
   if(!source) return json({ok:false,error:"upsell_not_available"},409);
 
   const {data:eligible,error:ee}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,upsell_enabled,status,experience_property_eligibility!inner(property_id)")
+    .select("id,name,package_type,price_cents,upsell_enabled,status,inventory,experience_property_eligibility!inner(property_id)")
     .eq("package_type",source.package_type)
     .eq("status","active")
     .eq("experience_property_eligibility.property_id",q.property_id)
@@ -270,7 +273,7 @@ async function applyUpsell(body:any,development:boolean){
   if(ee) return json({ok:false,error:"upsell_lookup_failed"},500);
 
   const nextAbove=(eligible||[])[0];
-  if(!nextAbove || String(nextAbove.id)!==String(target.id) || nextAbove.upsell_enabled!==true)
+  if(!nextAbove || String(nextAbove.id)!==String(target.id) || nextAbove.upsell_enabled!==true || (nextAbove.inventory!=null&&Number(nextAbove.inventory)<=0))
     return json({ok:false,error:"upsell_not_available"},409);
 
   const diff=Number(target.price_cents)-Number(source.price_cents);
@@ -645,7 +648,7 @@ async function experienceAdminData(req:Request){
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const [{data:products,error:pe},{data:properties,error:pre},{data:purposes,error:pu}] = await Promise.all([
     admin.from("experience_products")
-      .select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)")
+      .select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,daily_capacity,inventory,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)")
       .order("display_order"),
     admin.from("properties").select("id,code,name,active").eq("active",true).order("id"),
     admin.from("travel_purposes").select("code,label,active,display_order").eq("active",true).order("display_order")
@@ -861,6 +864,23 @@ async function trackEvent(req:Request,body:any){
 
 
 
+async function retryDb(label:string,run:()=>PromiseLike<any>,attempts=3){
+  let last:any=null;
+  for(let attempt=1;attempt<=attempts;attempt++){
+    try{
+      const result=await run();
+      last=result;
+      if(!result?.error) return result;
+      console.error(JSON.stringify({event:"db_query_failed",label,attempt,code:result.error?.code||null,message:result.error?.message||"unknown"}));
+    }catch(error){
+      last={data:null,error};
+      console.error(JSON.stringify({event:"db_query_exception",label,attempt,message:String((error as Error)?.message||error)}));
+    }
+    if(attempt<attempts) await new Promise(r=>setTimeout(r,250*attempt));
+  }
+  return last;
+}
+
 Deno.serve(async(req)=>{
   if(req.method==="OPTIONS") return new Response("ok",{headers:corsHeaders});
   try{
@@ -871,15 +891,18 @@ Deno.serve(async(req)=>{
     const development=req.headers.get("x-chalezinho-env")==="development";
 
     if(action==="config"){
-      const [purposesQ,settingsQ,docsQ,productsQ] = await Promise.all([
-        admin.from("travel_purposes").select("*").eq("active",true).order("display_order"),
-        admin.from("payment_settings").select("active_provider,charge_percent,pix_expiration_minutes,max_card_installments").eq("id",1).single(),
-        admin.from("policy_documents").select("id,document_type,code,version,title,body,status").in("status",development?["active","draft"]:["active"]).order("document_type"),
-        admin.from("experience_products").select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)")
-          .in("status",development?["active","draft"]:["active"]).order("display_order")
-      ]);
-      const errs=[purposesQ.error,settingsQ.error,docsQ.error,productsQ.error].filter(Boolean);
-      if(errs.length) return json({ok:false,error:"config_unavailable"},500);
+      const purposesQ=await retryDb("travel_purposes",()=>admin.from("travel_purposes").select("*").eq("active",true).order("display_order"));
+      if(purposesQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      const settingsQ=await retryDb("payment_settings",()=>admin.from("payment_settings").select("active_provider,charge_percent,pix_expiration_minutes,max_card_installments").eq("id",1).single());
+      if(settingsQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      const docsQ=await retryDb("policy_documents",()=>admin.from("policy_documents").select("id,document_type,code,version,title,body,status").in("status",development?["active","draft"]:["active"]).order("document_type"));
+      if(docsQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      const productsQ=await retryDb("experience_products",()=>admin.from("experience_products").select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,daily_capacity,inventory,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)").in("status",development?["active","draft"]:["active"]).order("display_order"));
+      if(productsQ.error) return json({ok:false,error:"config_unavailable"},500);
+
       return json({ok:true,purposes:purposesQ.data||[],payment_settings:settingsQ.data||{},policy_documents:docsQ.data||[],experience_products:productsQ.data||[]});
     }
     if(action==="search"){

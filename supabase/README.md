@@ -38,3 +38,5 @@ O arquivo `phase1_schema_snapshot.sql` é um snapshot idempotente e documentado 
 - allow_simple_package_snapshot — permite snapshot sem nome técnico de variante para pacotes simplificados.
 
 - 20260924022801 — guest_stay_price_and_modification_estimate
+
+- guarantee_capture_not_above_authorization — impede captura acima do valor autorizado da garantia.
