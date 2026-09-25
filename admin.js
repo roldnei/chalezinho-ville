@@ -30,9 +30,9 @@ async function boot(){
   bind();await load();
 }
 function bind(){
-  $("#admin-nav").addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(!b)return;showView(b.dataset.view);document.body.classList.remove("admin-menu-open")});
+  $("#admin-nav").addEventListener("click",e=>{const b=e.target.closest("[data-view]");if(!b||!state)return;showView(b.dataset.view);document.body.classList.remove("admin-menu-open")});
   $("#admin-refresh").onclick=()=>load(true);
-  $("#admin-notification-shortcut").onclick=()=>showView("notifications");
+  $("#admin-notification-shortcut").onclick=()=>{if(state)showView("notifications")};
   $("#admin-menu").onclick=()=>document.body.classList.toggle("admin-menu-open");
   $("#admin-logout").onclick=async()=>{await sb.auth.signOut();location.href="auth.html"};
   $$('[data-close-drawer]').forEach(x=>x.onclick=closeDrawer);
