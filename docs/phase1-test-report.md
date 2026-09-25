@@ -71,3 +71,13 @@ Nenhum pagamento real foi executado.
 55. Pagamento aprovado: pagamento `paid`, reserva `confirmed`, `confirmed_at` preenchido e garantia criada idempotentemente — PASS com rollback.
 56. RPCs da nova máquina de estados: execução revogada de `anon` e `authenticated`, concedida apenas a `service_role` — PASS.
 57. Invariante no banco impede marcar como `cancelled` ou `no_show` uma tentativa que nunca foi confirmada — PASS.
+58. Reserva inicial com R$ 300: recusa do upsell mantém o pacote; aceite troca somente para R$ 549 e acrescenta exatamente R$ 249 — PASS no navegador real (2026-09-25).
+59. Fechar checkout Pix gera tentativa `not_confirmed/payment_cancelled`; cartão recusado e cartão em análise exibem estados distintos — PASS no navegador real.
+60. Upgrade pós-reserva R$ 549 → R$ 599 cobra somente R$ 50, retry reutiliza a mesma cobrança e a aplicação mantém `total_amount = pagamentos pagos = ledger` — PASS.
+61. Alteração sem diferença exige confirmação explícita; alteração paga de R$ 707,30 aplica datas e total automaticamente após pagamento — PASS.
+62. Alteração não paga expira, libera o hold, mantém as datas originais e enfileira `modification_cancelled_unpaid` — PASS.
+63. Carrinho pós-reserva sobrevive ao reload sem criar cobrança; cobrança só nasce em `Ir para pagamento` e permanece recuperável após abandono — PASS.
+64. Pagamento pós-reserva em análise bloqueia retry e cancelamento; após recusa, cancelamento volta a ficar disponível — PASS.
+65. Painel operacional voltou a listar solicitações após remoção de relacionamento PostgREST inválido; datas solicitadas são exibidas corretamente na pendência — PASS.
+66. Quatro reservas `[DEV]` desta rodada, seus pagamentos, ledger, eventos, quotes e dependências foram removidos; nenhum carrinho ou órfão financeiro permaneceu — PASS.
+67. Edge Function v40: zero respostas 4xx/5xx nos logs do período; Preview `e4a2159` READY; produção e `main` não alteradas — PASS.

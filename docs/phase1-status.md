@@ -38,7 +38,7 @@
 
 ## Fechamento técnico
 
-- Edge Function booking-engine: versão 39 ativa no Supabase.
+- Edge Function booking-engine: versão 40 ativa no Supabase.
 - Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.
@@ -59,7 +59,7 @@
 
 ## QA técnico mais recente
 
-- booking-engine ativa no Supabase: v39.
+- booking-engine ativa no Supabase: v40.
 - alteração de reserva e captura de garantia endurecidas com operações atômicas no banco.
 - nenhum pagamento real ativado.
 - produção pública continua fora deste fluxo de GO-LIVE.
