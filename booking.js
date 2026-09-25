@@ -37,7 +37,7 @@ async function init(){
 async function closeCheckout(){
  const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
  if(step===6&&active?.payment_id&&active.status==="awaiting_payment"){
-  btn.disabled=true;setFlowError("Cancelando a pré-reserva e liberando as datas…");
+  btn.disabled=true;setFlowError("Encerrando a tentativa de pagamento e liberando as datas…");
   try{
    await api("cancel_pending_payment",{payment_id:active.payment_id});
    state.activePayment=null;state.quote=null;state.rate=null;state.rateCode=null;state.selectedByProduct={};state.upsellHandled=false;
@@ -47,7 +47,7 @@ async function closeCheckout(){
    if(e.message==="payment_not_cancellable"){
     $("#checkout-modal").hidden=true;setFlowError("");
    }else{
-    setFlowError("Não foi possível liberar a pré-reserva agora. Tente novamente antes de fechar.");
+    setFlowError("Não foi possível encerrar a tentativa agora. Tente novamente antes de fechar.");
    }
   }finally{btn.disabled=false}
   return;
@@ -321,7 +321,7 @@ function renderMockPayment(d){
     $("#mock-result").textContent="Pagamento em análise. Você ainda pode simular aprovação, recusa ou expiração.";
    }else{
     track("payment_failed",{reservation_id:d.reservation_id,property_id:state.property?.id||null,metadata:{stage:"mock_outcome",reason:outcome}});
-    $("#mock-result").textContent=outcome==="refused"?"Pagamento recusado. Esta pré-reserva foi encerrada.":"Pagamento expirado. Esta pré-reserva foi encerrada.";
+    $("#mock-result").textContent=outcome==="refused"?"Pagamento recusado. A reserva não foi confirmada.":"Pagamento expirado. A reserva não foi confirmada.";
    }
    setState(outcome);
   }catch(e){

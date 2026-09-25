@@ -14,6 +14,9 @@
 - PIX 15 min e parcelamento configuráveis.
 - Hold transacional somente no início de pagamento.
 - Expiração de holds.
+- Ciclos de vida independentes para reserva e pagamento: falha antes da confirmação gera `not_confirmed`, nunca `cancelled`.
+- Reserva `cancelled` é exclusiva para hospedagem que já havia sido confirmada; `no_show` está previsto para ausência do hóspede.
+- Pagamentos distinguem aguardando, ação necessária, processamento, análise, aprovação, recusa, expiração, cancelamento, reembolso, disputa e chargeback.
 - Ledger financeiro em centavos.
 - Minhas Reservas.
 - Alteração de data/propriedade com referência, decisão do admin, aceite e histórico.
@@ -35,7 +38,7 @@
 
 ## Fechamento técnico
 
-- Edge Function booking-engine: versão 38 ativa no Supabase.
+- Edge Function booking-engine: versão 39 ativa no Supabase.
 - Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.
@@ -56,7 +59,7 @@
 
 ## QA técnico mais recente
 
-- booking-engine ativa no Supabase: v38.
+- booking-engine ativa no Supabase: v39.
 - alteração de reserva e captura de garantia endurecidas com operações atômicas no banco.
 - nenhum pagamento real ativado.
 - produção pública continua fora deste fluxo de GO-LIVE.

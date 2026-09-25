@@ -521,7 +521,7 @@ async function cancelPendingPayment(req:Request,body:any,development:boolean){
   return json({
     ok:true,
     payment_status:row?.result_payment_status||"cancelled",
-    reservation_status:row?.result_reservation_status||"cancelled",
+    reservation_status:row?.result_reservation_status||"not_confirmed",
     reservation_id:row?.result_reservation_id||null
   });
 }
@@ -560,31 +560,23 @@ async function mockPayment(req:Request,body:any){
     return json({ok:true,outcome,charge_id:row?.result_charge_id||null,charge_status:row?.result_charge_status||null});
   }
 
-  const reservationId=(p as any).reservation_id;
-  const current=String((p as any).status||"");
-  if(["paid","refused","expired","cancelled","refunded"].includes(current)){
-    if(current===outcome) return json({ok:true,outcome,idempotent:true});
-    return json({ok:false,error:"payment_state_final"},409);
+  const {data,error}=await admin.rpc("update_initial_payment_state_mock_atomic",{
+    p_payment_id:payment_id,p_user_id:user.id,p_outcome:outcome
+  });
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["not_found","invalid_outcome","invalid_payment_kind","payment_state_final"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    if(msg.includes("no_overlapping_reservations")) return json({ok:false,error:"dates_unavailable"},409);
+    return json({ok:false,error:"payment_state_update_failed"},500);
   }
-
-  if(outcome==="paid"){
-    await admin.from("payments").update({status:"paid"}).eq("id",payment_id);
-    await admin.from("reservations").update({status:"confirmed",confirmed_at:new Date().toISOString(),hold_expires_at:null}).eq("id",reservationId);
-    await admin.from("experience_orders").update({status:"active"}).eq("reservation_id",reservationId);
-    const {data:prop}=await admin.from("reservations").select("property_id,properties(guarantee_amount_cents)").eq("id",reservationId).single();
-    const amount=Number((prop as any)?.properties?.guarantee_amount_cents||0);
-    if(amount>0){
-      const {data:existing}=await admin.from("guarantees").select("id").eq("reservation_id",reservationId).maybeSingle();
-      if(!existing) await admin.from("guarantees").insert({reservation_id:reservationId,provider:"mock",amount_cents:amount,status:"pending"});
-    }
-  }else if(outcome==="under_review"){
-    await admin.from("payments").update({status:"under_review"}).eq("id",payment_id);
-    await admin.from("reservations").update({status:"pending_payment",hold_expires_at:new Date(Date.now()+60*60000).toISOString()}).eq("id",reservationId);
-  }else{
-    await admin.from("payments").update({status:outcome==="refused"?"refused":"expired"}).eq("id",payment_id);
-    await admin.from("reservations").update({status:"expired",hold_expires_at:new Date().toISOString()}).eq("id",reservationId);
-  }
-  return json({ok:true,outcome});
+  const row=Array.isArray(data)?data[0]:data;
+  return json({
+    ok:true,outcome,
+    payment_status:row?.result_payment_status||outcome,
+    reservation_status:row?.result_reservation_status||null,
+    reservation_id:row?.result_reservation_id||(p as any).reservation_id
+  });
 }
 
 async function userIsAdmin(user:any){

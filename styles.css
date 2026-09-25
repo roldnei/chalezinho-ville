@@ -1678,6 +1678,9 @@ footer{justify-content:space-between!important}
 .reservation-status-badge.info{border-color:#74634f;color:#cfb792}
 .reservation-status-badge.success{border-color:#4f6b58;color:#a9ccb0}
 .reservation-status-badge.done,.reservation-status-badge.muted{border-color:#45403b;color:#8f8882}
+.reservation-badge-stack{display:grid;justify-items:end;gap:6px}
+.payment-status-badge{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px;border:1px solid #4c433c;font-size:10px;letter-spacing:.5px;white-space:nowrap}
+.payment-status-badge.action{border-color:#a86642;color:#e2a77f}.payment-status-badge.info{border-color:#74634f;color:#cfb792}.payment-status-badge.success{border-color:#4f6b58;color:#a9ccb0}.payment-status-badge.danger{border-color:#8a4a42;color:#e5a097}.payment-status-badge.muted{color:#8f8882}
 .reservation-summary-arrow{font-size:20px;color:#b69b84;transition:transform .2s}
 .reservation-accordion[open] .reservation-summary-arrow{transform:rotate(180deg)}
 .reservation-detail-grid{display:grid;grid-template-columns:260px 1fr;border-top:1px solid #3b342e}
@@ -1685,6 +1688,9 @@ footer{justify-content:space-between!important}
 .reservation-detail-grid>img{width:100%;height:100%;min-height:230px;object-fit:cover}
 .reservation-detail-copy{padding:24px}
 .reservation-detail-copy h3{font:500 30px "Playfair Display",serif;margin:8px 0}
+.reservation-payment-state{display:grid;gap:4px;margin:18px 0;padding:14px 16px;border:1px solid #4c433c;background:#120f0c}
+.reservation-payment-state small{letter-spacing:2px;color:#9f9389}.reservation-payment-state strong{font-size:17px}.reservation-payment-state p{margin:0;color:#b8aba1}.reservation-payment-state>span{font-size:12px;color:#91867e}
+.reservation-payment-state.success{border-color:#405949}.reservation-payment-state.info{border-color:#74634f}.reservation-payment-state.action{border-color:#8c573b}.reservation-payment-state.danger{border-color:#7b403a}
 .reservation-inline-pending{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-top:16px;padding:13px 0;border-top:1px solid #5a4030;border-bottom:1px solid #5a4030;color:#d8b08d}
 .reservation-inline-pending .text-action{white-space:nowrap}
 
@@ -1696,7 +1702,7 @@ footer{justify-content:space-between!important}
  .payment-pending-value>span{font-size:26px}
  .payment-pending-value .primary-action,.payment-pending-value .text-action{width:100%;text-align:center}
  .reservation-summary{grid-template-columns:minmax(0,1fr) 22px;padding:16px}
- .reservation-status-badge{grid-column:1/2;justify-self:start;margin-top:5px}
+ .reservation-badge-stack{grid-column:1/2;justify-self:start;justify-items:start;margin-top:5px}
  .reservation-summary-arrow{grid-column:2;grid-row:1/3;align-self:center}
  .reservation-detail-grid{grid-template-columns:1fr}
  .reservation-detail-grid>img{height:180px;min-height:0}

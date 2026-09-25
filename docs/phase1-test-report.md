@@ -64,3 +64,9 @@ Nenhum pagamento real foi executado.
 48. Leaked Password Protection — BLOQUEADO EXTERNAMENTE pelo plano Supabase Free; requer Pro ou superior.
 49. Área do Hóspede ordena reservas por `created_at` decrescente, com a reserva recém-criada no topo — PASS (2026-09-25).
 50. Reserva `A296A1F6C0`: Noite Romântica ativa por R$ 549 encontra Ultra Premium por R$ 599 como próximo upgrade e calcula somente R$ 50 de diferença — PASS (2026-09-25).
+51. Migração dos estados históricos: 13 reservas confirmadas preservadas; tentativas nunca confirmadas reclassificadas para `not_confirmed` conforme o pagamento — PASS (2026-09-25).
+52. Cartão recusado: reserva `not_confirmed/payment_refused` e pagamento `refused`, sem falso cancelamento — PASS com rollback.
+53. Fechamento antes da confirmação: reserva `not_confirmed/payment_cancelled` e pagamento `cancelled` — PASS com rollback.
+54. Pagamento em análise: reserva permanece `pending_payment`, datas protegidas sem expiração automática, pagamento `under_review` — PASS com rollback.
+55. Pagamento aprovado: pagamento `paid`, reserva `confirmed`, `confirmed_at` preenchido e garantia criada idempotentemente — PASS com rollback.
+56. RPCs da nova máquina de estados: execução revogada de `anon` e `authenticated`, concedida apenas a `service_role` — PASS.
