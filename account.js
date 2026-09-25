@@ -321,6 +321,7 @@ async function handlePostPaymentOutcome(paymentId,outcome,box){
    }
    $("#post-payment-message").textContent="Pagamento em análise. A alteração/experiência ainda não foi aplicada.";
    box.querySelectorAll("button").forEach(b=>b.disabled=b.dataset.postOutcome==="under_review");
+   location.reload();
   }else{
    $("#post-payment-message").textContent=(outcome==="refused"?"Pagamento recusado. ":"Pagamento expirado. ")+(d.charge_status==="awaiting_payment"?"Você ainda pode tentar novamente antes do prazo final.":"O prazo desta cobrança terminou.");
    setTimeout(()=>location.reload(),1200);
