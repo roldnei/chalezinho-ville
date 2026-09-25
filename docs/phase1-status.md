@@ -11,6 +11,7 @@
 - Funil sem carrinho e login tardio.
 - Catálogo configurável de experiências, variantes, elegibilidade e antecedência.
 - Payment provider desacoplado, provider atual mock.
+- Entrega de e-mail desacoplada por `EmailProvider`; Brevo é o primeiro adaptador e pode ser substituído por configuração.
 - PIX 15 min e parcelamento configuráveis.
 - Hold transacional somente no início de pagamento.
 - Expiração de holds.
