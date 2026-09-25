@@ -741,11 +741,46 @@ async function modificationAction(req:Request,body:any,development:boolean){
 async function opsData(req:Request){
   const user=await currentUser(req);
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
-  const [{data:mods},{data:guarantees}] = await Promise.all([
+  const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}] = await Promise.all([
     admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name)),profiles:user_id(full_name,phone)").order("created_at",{ascending:false}).limit(50),
-    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name),profiles:user_id(full_name)),incidents(*)").order("created_at",{ascending:false}).limit(50)
+    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name),profiles:user_id(full_name)),incidents(*)").order("created_at",{ascending:false}).limit(50),
+    admin.from("payments").select("id,reservation_id,provider,method,installments,amount_cents,status,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
+    admin.from("post_booking_charges").select("id,reservation_id,kind,description,amount_cents,status,expires_at,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
+    admin.from("payment_settings").select("*").eq("id",1).single(),
+    admin.from("properties").select("id,code,name,active,cleaning_fee,guarantee_amount_cents,max_guests").order("id"),
+    admin.from("property_integrations").select("property_id,provider,environment_key,external_listing_id,active").order("provider"),
+    admin.from("notification_outbox").select("id,template_code,status,send_after,attempt_count,max_attempts,last_error,created_at,reservations(confirmation_code)").order("created_at",{ascending:false}).limit(50)
   ]);
-  return json({ok:true,modifications:mods||[],guarantees:guarantees||[]});
+  const bookingConfigured=bookingFeeds.map(x=>({name:x.name,environment_key:x.env,configured:Boolean(Deno.env.get(x.env))}));
+  return json({ok:true,modifications:mods||[],guarantees:guarantees||[],payments:payments||[],charges:charges||[],settings:settings||null,properties:properties||[],integrations:integrations||[],booking_configured:bookingConfigured,notifications:notifications||[]});
+}
+
+async function opsSettingsAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+  if(operation==="payment_settings"){
+    const payload={
+      max_card_installments:Math.max(1,Math.min(24,Math.round(Number(body?.max_card_installments||1)))),
+      pix_expiration_minutes:Math.max(5,Math.min(1440,Math.round(Number(body?.pix_expiration_minutes||15)))),
+      post_booking_payment_minutes:Math.max(5,Math.min(1440,Math.round(Number(body?.post_booking_payment_minutes||15)))),
+      modification_payment_deadline_hours:Math.max(1,Math.min(168,Math.round(Number(body?.modification_payment_deadline_hours||24)))),
+      updated_at:new Date().toISOString()
+    };
+    const {data,error}=await admin.from("payment_settings").update(payload).eq("id",1).select().single();
+    if(error) return json({ok:false,error:"settings_update_failed"},500);
+    return json({ok:true,settings:data});
+  }
+  if(operation==="property_settings"){
+    const propertyId=Number(body?.property_id||0);
+    const cleaningFee=Math.max(0,Math.min(100000,Number(body?.cleaning_fee||0)));
+    const guaranteeCents=Math.max(0,Math.min(100000000,Math.round(Number(body?.guarantee_amount_cents||0))));
+    if(!propertyId||!Number.isFinite(cleaningFee)||!Number.isFinite(guaranteeCents)) return json({ok:false,error:"invalid_settings"},400);
+    const {data,error}=await admin.from("properties").update({cleaning_fee:cleaningFee,guarantee_amount_cents:guaranteeCents,updated_at:new Date().toISOString()}).eq("id",propertyId).select("id,code,name,cleaning_fee,guarantee_amount_cents").single();
+    if(error) return json({ok:false,error:"settings_update_failed"},500);
+    return json({ok:true,property:data});
+  }
+  return json({ok:false,error:"invalid_operation"},400);
 }
 
 async function guaranteeAction(req:Request,body:any){
@@ -1326,6 +1361,7 @@ Deno.serve(async(req)=>{
     if(action==="request_modification") return await requestModification(req,body,development);
     if(action==="modification_action") return await modificationAction(req,body,development);
     if(action==="ops") return await opsData(req);
+    if(action==="ops_settings_action") return await opsSettingsAction(req,body);
     if(action==="guarantee_action") return await guaranteeAction(req,body);
     if(action==="experience_admin") return await experienceAdminData(req);
     if(action==="experience_admin_action") return await experienceAdminAction(req,body);

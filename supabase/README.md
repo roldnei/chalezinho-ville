@@ -1,44 +1,24 @@
 # Supabase — Fase 1
 
-Projeto: `irxsaladqhbzhkoaclxy`
+Projeto de desenvolvimento: `irxsaladqhbzhkoaclxy`.
 
-Este diretório versiona a infraestrutura da Fase 1 que já foi aplicada ao Supabase compartilhado durante o desenvolvimento.
+A pasta versiona a estrutura aplicada durante a Fase 1. O snapshot inicial e as migrations incrementais devem ser preservados; não reaplicar manualmente migrations registradas.
 
-## Migrations aplicadas
+## Estado atual
 
-| Versão | Migration |
-|---|---|
-| 20260923230511 | phase1_foundation |
-| 20260923230605 | phase1_foundation_hardening |
-| 20260923230736 | phase1_quote_experiences |
-| 20260923230825 | phase1_payment_settings |
-| 20260923231619 | enable_pg_net_for_internal_qa |
-| 20260923231817 | grant_service_role_phase1 |
-| 20260923232040 | schedule_hold_expiration |
-| 20260923232247 | move_btree_gist_extension |
-| 20260923232327 | move_admin_helper_private |
-| 20260923232417 | phase1_post_booking_history |
-| 20260923233705 | phase1_cover_foreign_keys |
-| 20260924001601 | remove_pg_net_after_internal_qa |
-| 20260924005001 | phase1_experience_media_and_modification_guard |
-| 20260924011905 | simplify_experience_admin_model |
+- `booking-engine` v37 na reconciliação de 25/09/2026.
+- Provider de pagamento: `mock`.
+- Quotes, holds, pagamentos, ledger, garantia, experiências, carrinho, cobranças e alterações atômicas.
+- Cron a cada 5 minutos para holds e prazos pós-reserva.
+- Outbox transacional com templates, dedupe, claim/retry/complete.
+- PriceLabs e Airbnb configurados.
+- Slots de Booking.com registrados para `ICAL_BOOKING_CH1/2/3`, ainda sem URLs.
+- RLS ativa; RPCs financeiras somente service_role.
+- Guests só podem alterar `profiles.full_name`, `profiles.phone` e criar sua solicitação de exclusão.
 
-O arquivo `phase1_schema_snapshot.sql` é um snapshot idempotente e documentado da estrutura alvo da Fase 1. As migrations originais permanecem registradas no histórico do Supabase. O `pg_net` foi utilizado exclusivamente para QA interno e removido ao final dos testes.
+## Regras
 
-## Regras importantes
-
-- Frontend novo permanece apenas na branch `desenvolvimento`.
-- Banco é compartilhado com produção durante desenvolvimento.
-- Dados de QA devem ser identificados e removidos após testes.
-- Nenhum pagamento real está ativo; provider atual é `mock`.
-- Nenhum GO-LIVE sem aprovação explícita.
-
-- booking_price_breakdown_and_upsell_snapshot — snapshots financeiros separados e regra de upsell por pacote.
-
-- allow_simple_package_snapshot — permite snapshot sem nome técnico de variante para pacotes simplificados.
-
-- 20260924022801 — guest_stay_price_and_modification_estimate
-
-- guarantee_capture_not_above_authorization — impede captura acima do valor autorizado da garantia.
-
-- 20260924052734 — atomic_modification_and_guarantee_capture
+- Banco compartilhado: QA sempre marcado `[DEV]` e removido ao final.
+- Nenhum gateway ou e-mail real ativo.
+- Nenhuma mudança em `main`, produção ou GO-LIVE sem autorização.
+- Termos jurídicos permanecem draft.

@@ -1704,3 +1704,6 @@ footer{justify-content:space-between!important}
  .reservation-inline-pending{align-items:flex-start;flex-direction:column}
  .reservation-inline-pending .text-action{width:100%;text-align:left}
 }
+
+/* Phase 1 operations hardening */
+.ops-settings-form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.ops-settings-form label,.property-settings-form label{display:grid;gap:6px;margin:0}.ops-settings-form .primary-action,.ops-settings-form .form-result{grid-column:1/-1}.property-settings-form{display:grid;gap:12px}.integration-card code,.ops-card code{display:block;overflow-wrap:anywhere;color:#aa9a8c}.integration-card.is-ok{border-left:3px solid #63876b}.integration-card.is-missing{border-left:3px solid #b66a50}.integration-card.is-missing p{color:#e2a087}@media(max-width:620px){.ops-settings-form{grid-template-columns:1fr}.ops-settings-form .primary-action,.ops-settings-form .form-result{grid-column:auto}.ops-card input{width:100%;box-sizing:border-box}}

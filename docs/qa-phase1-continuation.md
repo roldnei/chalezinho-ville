@@ -1,60 +1,32 @@
-# QA técnico — Fase 1 (continuação)
+# QA técnico — continuação da Fase 1
 
-Validações automatizadas executadas em desenvolvimento:
+Este documento registra apenas o que continua relevante. Listas antigas foram reconciliadas com o banco, código e Preview reais.
 
-- busca válida, datas inválidas, capacidade e mínimo de noites;
-- mínimo de noites individual por propriedade conforme PriceLabs;
-- multiplicadores 1,28 / 1,20 / 1,10;
-- taxa de limpeza mantida somente internamente e hospedagem consolidada para o hóspede;
-- quote de 15 minutos e preço congelado;
-- quote não bloqueia inventário;
-- hold somente ao iniciar pagamento;
-- double booking bloqueado no banco;
-- checkout de uma reserva pode coincidir com check-in da próxima;
-- expiração de pending_payment libera inventário;
-- upsell usa o próximo preço maior do mesmo tipo e diferença real;
-- upsell preserva hospedagem e substitui apenas a experiência;
-- experiência sem estoque é recusada;
-- antecedência mínima de experiência é respeitada;
-- RLS: hóspede não lê reserva/pagamento de outro hóspede;
-- endpoints sensíveis exigem autenticação/admin;
-- uma única alteração ativa por reserva;
-- garantia parcial aceita; captura acima do autorizado bloqueada também no banco;
-- config e busca receberam retry server-side para falhas transitórias do Supabase;
-- config stress: 10/10 respostas 200 após retry;
-- busca stress: 10/10 respostas 200 após retry.
+## Cobertura concluída
 
-Pendências pré-GO-LIVE:
-- ativar Leaked Password Protection no Supabase Auth;
-- aprovar/publicar Termos de Hospedagem, Regras da Propriedade e Política de Privacidade;
-- configurar definitivamente gateway real e testar seus webhooks/refunds/pré-autorização.
+- Busca, datas inválidas, capacidade, mínimo de noites e indisponibilidade de tarifa.
+- PriceLabs, Airbnb, reservas diretas, holds e alterações aprovadas.
+- Falha de fonte de calendário ou preço fecha a disponibilidade com segurança.
+- Quote expirada, hold expirado, clique repetido, cobrança duplicada e webhook/mock repetido.
+- Pix/cartão mock: aprovado, recusado, em análise e expirado.
+- Carrinho pós-reserva separado de pagamentos pendentes.
+- Experiência, upgrade, alteração paga e alteração expirada.
+- Ledger, pagamentos, total da reserva, `experience_amount` e histórico conciliados.
+- RLS por proprietário dos dados e RPCs financeiras sem acesso guest.
+- Analytics do funil persistindo eventos sem cartão, senha ou token.
+- Sintaxe dos JavaScripts e smoke da Edge Function.
+- Dados temporários removidos ao fim de cada bloco.
 
+## Cobertura externa ainda impossível
 
-## Continuação — hardening final
+- Booking.com: código e fail-safe prontos, faltam as três URLs iCal.
+- Gateway real: contrato pronto, falta escolher e credenciar o provider.
+- E-mail real: templates, outbox, retry e status prontos; falta provider.
+- Auth: Leaked Password Protection ainda desligado no painel.
+- Jurídico: drafts não podem ser ativados sem aprovação.
 
-Validações adicionais concluídas após o marco acima:
+## Proteção de publicação
 
-- RLS real ampliado: perfil, garantia, alteração, pedidos/itens de experiência e aceite de políticas ficam visíveis somente ao dono — PASS.
-- Endpoints de hóspede sem autenticação retornam 401 e endpoints administrativos retornam 403 — PASS.
-- Sintaxe dos JavaScripts de Home, Auth, Callback, Reserva e Conta — PASS.
-- Varredura das telas do hóspede: nenhuma exposição de "taxa de limpeza"/"limpeza" — PASS.
-- Reservas confirmadas de QA: ledger = pagamento aprovado = total da reserva — PASS.
-- Aceite da política de cancelamento versionada persistido por reserva — PASS.
-- Aplicação de alteração agora é atômica: conflito de datas não gera pagamento nem lançamento financeiro órfão — PASS.
-- Reaplicação da mesma alteração não duplica cobrança — PASS.
-- Captura de garantia mock agora é atômica e idempotente — PASS.
-- Captura parcial de R$ 30 sobre R$ 500: saldo R$ 470; retry sem duplicar ledger — PASS.
-- Tentativa de captura acima de R$ 500: bloqueada sem alterar estado/ledger — PASS.
-- RPCs críticas não podem ser executadas por anon/authenticated; somente service_role — PASS.
-- booking-engine atual: v24; smoke config 200 e search 200 — PASS.
-- pg_net temporário removido novamente após o QA — PASS.
-
-### Lacunas encontradas que ainda fazem parte da Fase 1
-
-- Booking.com não está explicitamente integrado à disponibilidade atual. O motor usa reservas diretas + iCal Airbnb + PriceLabs. É necessário configurar/confirmar a fonte do Booking antes do GO-LIVE.
-- O backend de analytics existe, mas o frontend ainda não dispara os eventos definidos.
-- A Área do Hóspede mostra experiências compradas, porém ainda não oferece compra de novas experiências pós-reserva.
-- Termos de Hospedagem, Regras da Propriedade e Política de Privacidade continuam em rascunho e dependem de aprovação antes do GO-LIVE.
-- Gateway real continua não escolhido; pagamentos seguem em modo mock.
-- Leaked Password Protection do Supabase Auth continua desativado.
-- QA visual automatizado não pôde ser executado neste ambiente porque o navegador headless disponível não completa a navegação do Preview protegido; inspeção visual final permanece pendente.
+- `main` e produção não fazem parte deste QA.
+- Rotas novas permanecem `noindex,nofollow`.
+- Nenhum GO-LIVE sem autorização explícita.
