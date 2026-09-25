@@ -2,7 +2,7 @@
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
-let session=null,profile=null,properties=[],mods=[],charges=[],shopReservationId=null,paymentSettings={},activeCharge=null;
+let session=null,profile=null,properties=[],mods=[],charges=[],cartItems=[],reservationsCache=[],shopReservationId=null,paymentSettings={},activeCharge=null;
 const esc=v=>String(v??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 let anonymousId="";
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
@@ -14,24 +14,60 @@ const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"
 async function boot(){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
  $("#account-email").textContent=session.user.email||"";
- const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},cfg]=await Promise.all([
+ const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
   sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,guests,rate_plan_code,stay_amount,experience_amount,total_amount,created_at,properties(name,cover_image),payments(id,status,amount_cents,method,installments),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("check_in",{ascending:false}),
   sb.from("properties").select("id,name,active").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,status,admin_note,payment_charge_id,payment_due_at,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)").eq("user_id",session.user.id).order("created_at",{ascending:false}),
+  sb.from("post_booking_cart_items").select("id,reservation_id,target_variant_id,package_type,purchase_mode,amount_cents,description,snapshot,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   api("config")
  ]);
- profile=p;properties=props||[];mods=m||[];charges=ch||[];paymentSettings=cfg?.payment_settings||{};
+ profile=p;properties=props||[];mods=m||[];charges=ch||[];cartItems=cart||[];reservationsCache=reservations||[];paymentSettings=cfg?.payment_settings||{};
  $("#profile-name").value=profile?.full_name||"";$("#profile-phone").value=profile?.phone||"";
  if(profile?.role==="admin"){$("#ops-link").hidden=false;$("#experience-admin-link").hidden=false}
- renderPendingPayments(reservations||[]);
- renderReservations(reservations||[]);
+ renderExperienceCart(reservationsCache);
+ renderPendingPayments(reservationsCache);
+ renderReservations(reservationsCache);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
  if(requestedCharge){
   const charge=charges.find(x=>String(x.id)===String(requestedCharge)&&["awaiting_payment","processing"].includes(x.status));
   if(charge)setTimeout(()=>openChargePayment(charge),100);
  }
+}
+
+function renderExperienceCart(reservations){
+ const section=$("#experience-cart-section"),list=$("#experience-cart-list"),count=$("#experience-cart-count");
+ if(!section||!list)return;
+ if(!cartItems.length){section.hidden=true;list.innerHTML="";return}
+ const map=new Map(reservations.map(r=>[String(r.id),r]));
+ section.hidden=false;
+ count.textContent=(cartItems.length===1?"1 item separado":""+cartItems.length+" itens separados")+". Você pode remover ou seguir para o pagamento.";
+ list.innerHTML=cartItems.map(item=>{
+   const r=map.get(String(item.reservation_id)),property=r?.properties?.name||"Reserva";
+   const code=r?.confirmation_code?' · Código '+esc(r.confirmation_code):'';
+   const kind=item.purchase_mode==="upgrade"?"UPGRADE DE EXPERIÊNCIA":"EXPERIÊNCIA";
+   return '<article class="experience-cart-card"><div><small>'+kind+'</small><h3>'+esc(item.description)+'</h3><p>'+esc(property)+code+'</p><p class="cart-not-charge">Este item ainda não gerou cobrança.</p></div><div class="experience-cart-value"><span>'+brlC(item.amount_cents)+'</span><button class="primary-action compact" data-checkout-cart="'+item.id+'">Ir para pagamento</button><button class="text-action danger" data-remove-cart="'+item.id+'">Remover</button></div></article>';
+ }).join("");
+ list.querySelectorAll("[data-checkout-cart]").forEach(b=>b.addEventListener("click",()=>checkoutCartItem(b.dataset.checkoutCart,b)));
+ list.querySelectorAll("[data-remove-cart]").forEach(b=>b.addEventListener("click",()=>removeCartItem(b.dataset.removeCart,b)));
+}
+
+async function checkoutCartItem(id,btn){
+ btn.disabled=true;
+ try{
+  const item=cartItems.find(x=>String(x.id)===String(id));
+  const d=await api("checkout_experience_cart_item",{cart_item_id:id});
+  cartItems=cartItems.filter(x=>String(x.id)!==String(id));
+  const charge={...d.charge,reservation_id:item?.reservation_id};charges.unshift(charge);
+  renderExperienceCart(reservationsCache);renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+  openChargePayment(charge);
+ }catch(e){btn.disabled=false;alert(e.message==="experience_payment_already_pending"?"Já existe um pagamento pendente para esta categoria.":"Não foi possível iniciar o pagamento agora.")}
+}
+async function removeCartItem(id,btn){
+ btn.disabled=true;
+ try{await api("remove_experience_cart_item",{cart_item_id:id});cartItems=cartItems.filter(x=>String(x.id)!==String(id));renderExperienceCart(reservationsCache)}
+ catch{btn.disabled=false;alert("Não foi possível remover este item agora.")}
 }
 
 function activeModification(reservationId){return mods.find(m=>m.reservation_id===reservationId&&["requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status))}
@@ -160,18 +196,21 @@ function renderGuestExperiences(items,ownedPackages=[]){
   const isUpgrade=item.purchase_mode==="upgrade";
   const priceLine=isUpgrade?'<span><small>UPGRADE</small> +'+brlC(item.payable_cents)+'</span>':'<span>'+brlC(item.payable_cents)+'</span>';
   const upgradeNote=isUpgrade&&item.upgrade_from?'<p class="upgrade-from">Você já tem <strong>'+esc(item.upgrade_from.name)+'</strong>. Troque por este pacote pagando apenas a diferença.</p>':"";
-  const buttonLabel=isUpgrade?'Continuar com upgrade · +'+brlC(item.payable_cents):'Continuar · '+brlC(item.payable_cents);
+  const buttonLabel=isUpgrade?'Adicionar upgrade ao carrinho · +'+brlC(item.payable_cents):'Adicionar ao carrinho · '+brlC(item.payable_cents);
   return '<article class="guest-experience-card"><div class="guest-experience-gallery">'+photos+'</div><div class="guest-experience-copy"><small>'+esc(String(item.package_type||"experiência").toUpperCase())+'</small><h3>'+esc(item.name)+'</h3>'+(item.sales_headline?'<strong>'+esc(item.sales_headline)+'</strong>':'')+'<p>'+esc(item.description||"")+'</p>'+upgradeNote+'<div class="guest-experience-buy">'+priceLine+'<button class="primary-action compact" data-buy-experience="'+esc(item.variant_id)+'" data-product="'+esc(item.product_id)+'" data-mode="'+esc(item.purchase_mode||"add")+'">'+buttonLabel+'</button></div></div></article>';
  }).join("");
  box.querySelectorAll("[data-buy-experience]").forEach(b=>b.addEventListener("click",()=>purchaseGuestExperience(b)));
 }
 async function purchaseGuestExperience(btn){
- btn.disabled=true;$("#guest-experience-message").textContent="Preparando pagamento…";
+ btn.disabled=true;$("#guest-experience-message").textContent="Adicionando ao carrinho…";
  try{
   const d=await api("purchase_post_booking_experience",{reservation_id:shopReservationId,variant_id:btn.dataset.buyExperience});
   $("#experience-shop-modal").hidden=true;
-  track(btn.dataset.mode==="upgrade"?"experience_upgraded":"experience_added",{reservation_id:shopReservationId,metadata:{source:"post_booking_payment_started",product_id:btn.dataset.product,amount_cents:Number(d.charge?.amount_cents||0)}});
-  openChargePayment({...d.charge,reservation_id:shopReservationId});
+  const item={...d.cart_item,reservation_id:shopReservationId,target_variant_id:btn.dataset.buyExperience,package_type:"",snapshot:{target_product_id:btn.dataset.product}};
+  cartItems=cartItems.filter(x=>!(String(x.reservation_id)===String(shopReservationId)&&String(x.id)===String(item.id)));cartItems.unshift(item);
+  renderExperienceCart(reservationsCache);
+  track("experience_cart_added",{reservation_id:shopReservationId,metadata:{source:"post_booking_cart",product_id:btn.dataset.product,amount_cents:Number(item.amount_cents||0)}});
+  $("#experience-cart-section")?.scrollIntoView({behavior:"smooth",block:"start"});
  }catch(e){
   const messages={
    experience_already_added:"Esta experiência já está na sua reserva.",
@@ -186,7 +225,7 @@ async function purchaseGuestExperience(btn){
    if(!charges.some(c=>String(c.id)===String(existing.id)))charges.unshift(existing);
    $("#guest-experience-message").innerHTML='Já existe um pagamento pendente para esta experiência. <button class="primary-action compact" id="existing-charge-payment">Ir para pagamento</button>';
    $("#existing-charge-payment").onclick=()=>{$("#experience-shop-modal").hidden=true;openChargePayment(existing)};
-  }else $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível preparar a cobrança agora.";
+  }else $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível adicionar ao carrinho agora.";
   btn.disabled=false;
  }
 }

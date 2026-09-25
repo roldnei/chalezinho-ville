@@ -1097,14 +1097,10 @@ async function purchasePostBookingExperience(req:Request,body:any,development:bo
   const variantId=String(body?.variant_id||"");
   if(!reservationId||!variantId) return json({ok:false,error:"missing_data"},400);
 
-  const {data:settings}=await admin.from("payment_settings")
-    .select("post_booking_payment_minutes").eq("id",1).single();
-
-  const {data,error}=await admin.rpc("create_experience_charge_atomic",{
+  const {data,error}=await admin.rpc("add_experience_cart_item_atomic",{
     p_reservation_id:reservationId,
     p_user_id:user.id,
-    p_variant_id:variantId,
-    p_expires_minutes:Number(settings?.post_booking_payment_minutes||15)
+    p_variant_id:variantId
   });
   if(error){
     const msg=String(error.message||"");
@@ -1136,15 +1132,48 @@ async function purchasePostBookingExperience(req:Request,body:any,development:bo
   const row=Array.isArray(data)?data[0]:data;
   return json({
     ok:true,
-    charge:{
-      id:row?.charge_id||null,
-      kind:row?.purchase_mode==="upgrade"?"experience_upgrade":"experience_add",
+    cart_item:{
+      id:row?.cart_item_id||null,
       purchase_mode:row?.purchase_mode||"add",
       amount_cents:Number(row?.amount_cents||0),
-      description:row?.description||"Experiência",
-      expires_at:row?.expires_at||null
+      description:row?.description||"Experiência"
     }
   });
+}
+
+async function checkoutExperienceCartItem(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const cartItemId=String(body?.cart_item_id||"");
+  if(!cartItemId) return json({ok:false,error:"missing_data"},400);
+  const {data:settings}=await admin.from("payment_settings").select("post_booking_payment_minutes").eq("id",1).single();
+  const {data,error}=await admin.rpc("checkout_experience_cart_item_atomic",{
+    p_cart_item_id:cartItemId,p_user_id:user.id,
+    p_expires_minutes:Number(settings?.post_booking_payment_minutes||15)
+  });
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["cart_item_not_found","reservation_not_available","experience_unavailable","experience_lead_time",
+      "experience_out_of_stock","experience_already_added","experience_upgrade_not_available",
+      "experience_capacity_reached","experience_payment_already_pending"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"experience_checkout_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,charge:{id:row?.charge_id||null,
+    kind:row?.purchase_mode==="upgrade"?"experience_upgrade":"experience_add",
+    purchase_mode:row?.purchase_mode||"add",amount_cents:Number(row?.amount_cents||0),
+    description:row?.description||"Experiência",expires_at:row?.expires_at||null}});
+}
+
+async function removeExperienceCartItem(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const cartItemId=String(body?.cart_item_id||"");
+  if(!cartItemId) return json({ok:false,error:"missing_data"},400);
+  const {data,error}=await admin.rpc("remove_experience_cart_item_atomic",{p_cart_item_id:cartItemId,p_user_id:user.id});
+  if(error) return json({ok:false,error:"cart_remove_failed"},500);
+  return json({ok:true,removed:data===true});
 }
 
 async function startPostBookingPayment(req:Request,body:any,development:boolean){
@@ -1302,6 +1331,8 @@ Deno.serve(async(req)=>{
     if(action==="experience_admin_action") return await experienceAdminAction(req,body);
     if(action==="guest_experience_catalog") return await guestExperienceCatalog(req,body);
     if(action==="purchase_post_booking_experience") return await purchasePostBookingExperience(req,body,development);
+    if(action==="checkout_experience_cart_item") return await checkoutExperienceCartItem(req,body);
+    if(action==="remove_experience_cart_item") return await removeExperienceCartItem(req,body);
     if(action==="track") return await trackEvent(req,body);
 
     return json({ok:false,error:"unknown_action"},404);

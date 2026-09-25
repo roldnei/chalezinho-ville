@@ -1647,6 +1647,11 @@ footer{justify-content:space-between!important}
 @media(max-width:620px){#post-installments-wrap{margin-bottom:10px}#post-pay-start{margin-top:0}}
 
 .pending-payment-section{border:1px solid #7e5036;background:linear-gradient(180deg,rgba(104,56,31,.18),rgba(23,19,15,.35));padding:28px}
+.experience-cart-section{border:1px solid #6c5a45;background:linear-gradient(180deg,rgba(91,72,49,.18),rgba(23,19,15,.35));padding:28px}
+.experience-cart-section .section-heading{margin-bottom:18px}.experience-cart-section .section-heading p{margin:0;color:#c5b091}
+.experience-cart-list{display:grid;gap:12px}.experience-cart-card{display:grid;grid-template-columns:1fr auto;gap:24px;align-items:center;padding:18px;border:1px solid #675844;background:#17130f}
+.experience-cart-card small{letter-spacing:2px;font-size:10px;color:#c8aa7b}.experience-cart-card h3{font:500 22px "Playfair Display",serif;margin:5px 0}.experience-cart-card p{margin:3px 0;color:#a99b90}.experience-cart-card .cart-not-charge{color:#cfb990;font-size:12px}
+.experience-cart-value{display:grid;justify-items:end;gap:8px;min-width:190px}.experience-cart-value>span{font:500 28px "Playfair Display",serif;color:#f3e9df}
 .pending-payment-section .section-heading{margin-bottom:18px}
 .pending-payment-section .section-heading h2{margin-bottom:6px}
 .pending-payment-section .section-heading p{margin:0;color:#caa787}
@@ -1684,6 +1689,7 @@ footer{justify-content:space-between!important}
 .reservation-inline-pending .text-action{white-space:nowrap}
 
 @media(max-width:720px){
+ .experience-cart-section{padding:22px 18px}.experience-cart-card{grid-template-columns:1fr}.experience-cart-value{justify-items:stretch;min-width:0}.experience-cart-value>span{font-size:26px}.experience-cart-value .primary-action,.experience-cart-value .text-action{width:100%;text-align:center}
  .pending-payment-section{padding:22px 18px}
  .payment-pending-card{grid-template-columns:1fr}
  .payment-pending-value{justify-items:stretch;min-width:0}
