@@ -18,7 +18,9 @@
 - Minhas Reservas.
 - Alteração de data/propriedade com referência, decisão do admin, aceite e histórico.
 - Garantia/caução mock, ocorrência e captura parcial.
-- Analytics event model.
+- Analytics event model e instrumentação da jornada no frontend.
+- Carrinho pós-reserva separado de cobrança, pagamentos pendentes e retry de tentativa recusada.
+- Outbox transacional com catálogo de templates, dedupe, claim, retry/backoff e falha final.
 - RLS e papéis guest/admin.
 - Rota interna de operações da Fase 1 (não é o PMS da Fase 2).
 
@@ -38,6 +40,8 @@
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.
 - Advisors de segurança sem alerta crítico; avisos restantes são tabelas server-only deliberadamente sem policy pública.
+- Site URL e redirects do Supabase Auth configurados para produção e Preview.
+- Booking.com ativo nos três chalés por feeds iCal independentes.
 
 ## Dependências antes do GO-LIVE
 
@@ -46,6 +50,8 @@
 3. QA visual final e aprovação do produto.
 4. Limpeza dos registros/dados marcados como desenvolvimento.
 5. Checklist de GO-LIVE e rollback.
+6. Escolher/configurar o provedor transacional de e-mail.
+7. Avaliar upgrade do Supabase para habilitar Leaked Password Protection (recurso indisponível no plano Free atual).
 
 
 ## QA técnico mais recente
@@ -57,8 +63,8 @@
 
 ### Lacunas técnicas ainda abertas da Fase 1
 
-1. Instrumentação dos eventos de analytics no frontend.
-2. Documentos jurídicos finais aprovados.
-3. Gateway real + webhooks/refunds/pré-autorização.
-4. Leaked Password Protection no Supabase Auth.
-5. QA visual final nos viewports obrigatórios.
+1. Documentos jurídicos finais aprovados.
+2. Gateway real + webhooks/refunds/pré-autorização.
+3. Provedor transacional de e-mail e credenciais.
+4. Leaked Password Protection, dependente de plano Supabase Pro ou superior.
+5. Aprovação visual humana final nos viewports obrigatórios.

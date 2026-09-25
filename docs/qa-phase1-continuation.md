@@ -25,7 +25,7 @@ Validações automatizadas executadas em desenvolvimento:
 - busca stress: 10/10 respostas 200 após retry.
 
 Pendências pré-GO-LIVE:
-- ativar Leaked Password Protection no Supabase Auth;
+- decidir sobre plano Supabase Pro ou superior para habilitar Leaked Password Protection; o recurso não existe no plano Free atual;
 - aprovar/publicar Termos de Hospedagem, Regras da Propriedade e Política de Privacidade;
 - configurar definitivamente gateway real e testar seus webhooks/refunds/pré-autorização.
 
@@ -51,11 +51,23 @@ Validações adicionais concluídas após o marco acima:
 - Bloqueio real do feed do CH1 validado na busca, sem bloquear CH2/CH3 — PASS.
 - pg_net temporário removido novamente após o QA — PASS.
 
-### Lacunas encontradas que ainda fazem parte da Fase 1
+### Lacunas externas e de aprovação
 
-- O backend de analytics existe, mas o frontend ainda não dispara os eventos definidos.
-- A Área do Hóspede mostra experiências compradas, porém ainda não oferece compra de novas experiências pós-reserva.
+- Analytics da jornada já é disparado no frontend e persistido pelo backend — PASS.
+- Compra pós-reserva usa carrinho antes da cobrança e separa “Experiências no carrinho” de “Pagamentos pendentes” — PASS.
 - Termos de Hospedagem, Regras da Propriedade e Política de Privacidade continuam em rascunho e dependem de aprovação antes do GO-LIVE.
 - Gateway real continua não escolhido; pagamentos seguem em modo mock.
-- Leaked Password Protection do Supabase Auth continua desativado.
-- QA visual automatizado não pôde ser executado neste ambiente porque o navegador headless disponível não completa a navegação do Preview protegido; inspeção visual final permanece pendente.
+- Provedor transacional de e-mail continua não escolhido; o outbox está pronto, mas não envia externamente.
+- Leaked Password Protection continua desativado porque o projeto está no plano Supabase Free e o painel exige Pro ou superior.
+- O Preview protegido foi aberto em navegador real e a jornada pública de busca, tarifa e experiência foi exercitada em 1366×768 equivalente. A aprovação visual humana final e os demais dispositivos físicos permanecem pré-GO-LIVE.
+
+### Continuação — notificações e Auth (2026-09-25)
+
+- Site URL do Auth corrigido de localhost para `https://chalezinhoville.com.br` — PASS.
+- Redirects autorizados para produção e Preview `desenvolvimento` — PASS.
+- Eventos de pagamento reembolsado e decisões de alteração adicionados ao catálogo — PASS.
+- Correção dos tipos reais `experience_add` e `experience_upgrade` no trigger de notificação — PASS.
+- Eventos de experiência paga e upgrade pago exercitados em transação com rollback — PASS.
+- Outbox: `queued → processing → queued` no retry e `failed` ao atingir o limite — PASS com rollback.
+- RPCs financeiras e de entrega continuam bloqueadas para `anon`/`authenticated` e disponíveis somente para `service_role` — PASS.
+- Nenhum resíduo `[DEV]` dos testes de outbox — PASS.

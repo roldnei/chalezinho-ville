@@ -30,7 +30,9 @@
 
 ## Notificações
 
-`notification_outbox` separa evento, fila, envio e resultado. Há dedupe, `processing`, limite de tentativas, backoff, falha final e confirmação de envio. Templates cobrem conta/recuperação, reserva, pagamentos, alteração, experiência, upgrade e pré-estadia.
+`notification_outbox` separa evento, fila, envio e resultado. Há dedupe, `processing`, limite de tentativas, backoff, falha final e confirmação de envio. Templates cobrem conta/recuperação, reserva, pagamento aguardando/em análise/recusado/pago/expirado/reembolsado, alteração solicitada/aprovada/recusada/confirmada/cancelada, lembrete, experiência, upgrade e pré-estadia.
+
+Os triggers usam os tipos efetivos de cobrança (`experience_add` e `experience_upgrade`) e enfileiram decisões de alteração também nas transições de status, não apenas na criação da solicitação.
 
 O texto de aprovação informa: “A alteração solicitada ainda não está confirmada. Para concluir, realize o pagamento da diferença pelo site até [prazo]” e lembra que a solicitação anterior à aprovação não garantia datas.
 

@@ -51,3 +51,14 @@ Nenhum pagamento real foi executado.
 35. Booking.com configurado por secret para CH1/CH2/CH3; `availability_coverage.booking=true` — PASS (2026-09-25).
 36. Período ocupado no feed do CH1 bloqueia somente o Ville Signature; CH2/CH3 permanecem independentes — PASS (2026-09-25).
 37. Logs da booking-engine após os smokes de Booking.com: zero respostas 4xx/5xx — PASS (2026-09-25).
+38. Preview protegido aberto em navegador real; Home e reserva carregam sem bloqueio de autenticação da Vercel — PASS (2026-09-25).
+39. Busca real 10/12/2026 → 12/12/2026 retornou três propriedades e preços server-side — PASS (2026-09-25).
+40. Seleção de tarifa gera quote de 15 minutos sem bloquear datas — PASS (2026-09-25).
+41. Pacote romântico de R$ 300 permanece marcado como fonte de upsell; próximo ativo da categoria é R$ 549 e diferença server-side é R$ 249 — PASS.
+42. Carrinho pós-reserva não cria cobrança ao adicionar; cobrança nasce apenas no checkout do item — PASS.
+43. Trigger de notificação reconhece os tipos reais `experience_add` e `experience_upgrade` — PASS com rollback.
+44. Eventos `payment_refunded`, `modification_rejected`, `modification_approved_confirmation` e `modification_confirmed` — PASS com rollback.
+45. Contrato do outbox: claim incrementa tentativa, falha transitória volta para fila e o limite leva a `failed` — PASS com rollback.
+46. RPCs financeiras críticas: `anon=false`, `authenticated=false`, `service_role=true` — PASS.
+47. URL Configuration do Auth: Site URL de produção e redirects de produção/Preview — PASS por inspeção do painel.
+48. Leaked Password Protection — BLOQUEADO EXTERNAMENTE pelo plano Supabase Free; requer Pro ou superior.
