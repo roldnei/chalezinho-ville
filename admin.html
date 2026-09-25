@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#0e0b09">
+  <title>Central de Operações | Chalezinho Ville</title>
+  <link rel="stylesheet" href="styles.css?v=151">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+</head>
+<body class="admin-body">
+  <div id="admin-app" class="admin-app" aria-busy="true">
+    <aside class="admin-sidebar">
+      <a class="admin-brand" href="index.html">Chalezinho <i>Ville</i><small>Central de operações</small></a>
+      <nav id="admin-nav" class="admin-nav" aria-label="Navegação administrativa">
+        <button data-view="today" class="active"><span>Hoje</span><strong id="nav-today-count">0</strong></button>
+        <button data-view="calendar"><span>Calendário</span></button>
+        <button data-view="reservations"><span>Reservas</span></button>
+        <button data-view="notifications"><span>Notificações</span><strong id="nav-alert-count">0</strong></button>
+        <button data-view="changes"><span>Alterações</span></button>
+        <button data-view="finance"><span>Financeiro</span></button>
+        <button data-view="guarantees"><span>Garantias</span></button>
+        <button data-view="properties"><span>Imóveis</span></button>
+        <a href="experiencias-admin.html"><span>Experiências</span></a>
+        <button data-view="settings"><span>Configurações</span></button>
+      </nav>
+      <div class="admin-sidebar-foot">
+        <span id="admin-user"></span>
+        <button id="admin-logout" type="button">Sair</button>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <header class="admin-topbar">
+        <button id="admin-menu" class="admin-menu" type="button" aria-label="Abrir menu">☰</button>
+        <div><small id="admin-context">OPERAÇÃO DE HOJE</small><h1 id="admin-title">Visão geral</h1></div>
+        <div class="admin-top-actions">
+          <button id="admin-refresh" type="button">Atualizar</button>
+          <button id="admin-notification-shortcut" type="button">Avisos <strong id="top-alert-count">0</strong></button>
+        </div>
+      </header>
+      <section id="admin-loading" class="admin-loading">Carregando a operação…</section>
+      <section id="admin-content" class="admin-content" hidden></section>
+    </main>
+  </div>
+
+  <div id="reservation-drawer" class="admin-drawer-shell" hidden>
+    <button class="admin-drawer-backdrop" data-close-drawer aria-label="Fechar detalhes"></button>
+    <aside class="admin-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <button class="admin-drawer-close" data-close-drawer aria-label="Fechar">×</button>
+      <div id="reservation-detail"></div>
+    </aside>
+  </div>
+
+  <div id="admin-modal" class="admin-modal-shell" hidden>
+    <button class="admin-drawer-backdrop" data-close-modal aria-label="Fechar"></button>
+    <section class="admin-modal" role="dialog" aria-modal="true">
+      <button class="admin-drawer-close" data-close-modal aria-label="Fechar">×</button>
+      <div id="admin-modal-content"></div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-config.js?v=151"></script>
+  <script src="admin.js?v=151"></script>
+</body>
+</html>

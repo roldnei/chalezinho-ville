@@ -747,6 +747,206 @@ async function opsData(req:Request){
   return json({ok:true,modifications:mods||[],guarantees:guarantees||[],payments:payments||[],charges:charges||[],settings:settings||null,properties:properties||[],integrations:integrations||[],booking_configured:bookingConfigured,notifications:notifications||[]});
 }
 
+function localDate(offsetDays=0){
+  const now=new Date(Date.now()+offsetDays*86400000);
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
+}
+
+async function adminHubData(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const start=validDate(String(body?.start||""))?String(body.start):localDate(-31);
+  const end=validDate(String(body?.end||""))?String(body.end):localDate(185);
+  if(end<=start) return json({ok:false,error:"invalid_dates"},400);
+
+  const [propertiesQ,reservationsQ,notificationsQ,integrationsQ,settingsQ,airbnb,booking] = await Promise.all([
+    admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,active,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone,created_at,updated_at").order("id"),
+    admin.from("reservations").select("id,property_id,user_id,check_in,check_out,status,source,guests,guest_name,guest_email,guest_phone,stay_amount,experience_amount,total_amount,rate_plan_code,confirmation_code,hold_expires_at,created_at,updated_at,confirmed_at,cancelled_at,not_confirmed_at,not_confirmed_reason,cancellation_actor,cancellation_reason,no_show_at,operational_status,checked_in_at,checked_out_at").lte("check_in",end).gte("check_out",start).order("created_at",{ascending:false}).limit(750),
+    admin.from("admin_notifications").select("id,notification_type,severity,title,message,reservation_id,entity_type,entity_id,payload,read_at,created_at").order("created_at",{ascending:false}).limit(150),
+    admin.from("property_integrations").select("id,property_id,provider,external_listing_id,pms,environment_key,active,updated_at").order("provider"),
+    admin.from("payment_settings").select("*").eq("id",1).single(),
+    prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
+    bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
+  ]);
+  if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error)
+    return json({ok:false,error:"admin_hub_unavailable"},500);
+
+  const reservations=reservationsQ.data||[];
+  const reservationIds=reservations.map((r:any)=>r.id);
+  const empty:any[]=[];
+  const [paymentsQ,ordersQ,chargesQ,modsQ,guaranteesQ,notesQ,ledgerQ] = reservationIds.length ? await Promise.all([
+    admin.from("payments").select("id,reservation_id,provider,provider_payment_id,method,installments,amount_cents,status,metadata,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("experience_orders").select("id,reservation_id,status,created_at,experience_order_items(id,product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,created_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,description,snapshot,expires_at,applied_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,status,admin_additional_amount_cents,estimated_additional_amount_cents,admin_note,payment_due_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("guarantees").select("id,reservation_id,provider,amount_cents,captured_amount_cents,status,created_at,updated_at,incidents(id,description,requested_capture_cents,status,created_at,resolved_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("reservation_notes").select("id,reservation_id,author_user_id,note,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("financial_entries").select("id,reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents,currency,description,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false})
+  ]) : [{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty}];
+
+  const properties=propertiesQ.data||[];
+  const propertyByName=new Map(properties.map((p:any)=>[String(p.name),p]));
+  const channelPeriods:any[]=[];
+  for(const listing of airbnb?.listings||[]){
+    const p=propertyByName.get(String(listing.name));
+    if(!p) continue;
+    for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
+      channelPeriods.push({id:`airbnb:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"airbnb",start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+  }
+  for(const listing of booking?.listings||[]){
+    const p=propertyByName.get(String(listing.name));
+    if(!p) continue;
+    for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
+      channelPeriods.push({id:`booking:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"booking",start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+  }
+
+  return json({
+    ok:true,server_now:new Date().toISOString(),range:{start,end},properties,reservations,
+    payments:paymentsQ.data||[],experience_orders:ordersQ.data||[],charges:chargesQ.data||[],
+    modifications:modsQ.data||[],guarantees:guaranteesQ.data||[],notes:notesQ.data||[],ledger:ledgerQ.data||[],
+    notifications:notificationsQ.data||[],integrations:integrationsQ.data||[],settings:settingsQ.data||{},
+    channel_periods:channelPeriods,
+    channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
+  });
+}
+
+async function adminReservationAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+
+  if(operation==="create_manual"){
+    const propertyId=Number(body?.property_id||0);
+    const checkIn=String(body?.check_in||""),checkOut=String(body?.check_out||"");
+    const guests=Math.max(1,Math.round(Number(body?.guests||1)));
+    const guestName=String(body?.guest_name||"").trim().slice(0,200);
+    const guestEmail=String(body?.guest_email||"").trim().toLowerCase().slice(0,320)||null;
+    const guestPhone=String(body?.guest_phone||"").trim().slice(0,50)||null;
+    const total=Math.max(0,Number(body?.total_amount||0));
+    if(!propertyId||!validDate(checkIn)||!validDate(checkOut)||checkOut<=checkIn||!guestName) return json({ok:false,error:"invalid_reservation"},400);
+    const [{data:property},{data:occupied},{data:changeHolds},airbnb,booking]=await Promise.all([
+      admin.from("properties").select("id,name,max_guests,cleaning_fee,active").eq("id",propertyId).single(),
+      admin.from("reservations").select("id").eq("property_id",propertyId).in("status",["hold","pending_payment","confirmed"]).lt("check_in",checkOut).gt("check_out",checkIn).limit(1),
+      admin.from("post_booking_charges").select("id").eq("kind","modification").eq("target_property_id",propertyId).in("status",["awaiting_payment","processing","paid"]).gt("expires_at",new Date().toISOString()).lt("target_check_in",checkOut).gt("target_check_out",checkIn).limit(1),
+      prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
+      bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
+    ]);
+    if(!property||!property.active) return json({ok:false,error:"property_not_found"},404);
+    if(guests>Number(property.max_guests)) return json({ok:false,error:"capacity"},409);
+    const externalBlocked=(source:any)=>{
+      const listing=(source?.listings||[]).find((x:any)=>x.name===property.name);
+      return !listing?.ok || (listing.periods||[]).some((x:any)=>overlaps(x.start,x.end,checkIn,checkOut));
+    };
+    if(occupied?.length||changeHolds?.length||externalBlocked(airbnb)||(booking.configured&&externalBlocked(booking))) return json({ok:false,error:"occupied"},409);
+    const code=crypto.randomUUID().replaceAll("-","").slice(0,10).toUpperCase();
+    const cleaning=Number(property.cleaning_fee||0);
+    const {data,error}=await admin.from("reservations").insert({
+      property_id:propertyId,check_in:checkIn,check_out:checkOut,status:"confirmed",source:"manual",guests,
+      guest_name:guestName,guest_email:guestEmail,guest_phone:guestPhone,stay_amount:total,experience_amount:0,
+      total_amount:total,accommodation_amount:Math.max(0,total-cleaning),cleaning_fee:cleaning,
+      confirmation_code:code,confirmed_at:new Date().toISOString(),operational_status:"upcoming"
+    }).select().single();
+    if(error||!data){
+      if(String(error?.message||"").includes("no_overlapping_active_reservations")) return json({ok:false,error:"occupied"},409);
+      return json({ok:false,error:"reservation_create_failed"},500);
+    }
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"manual_reservation_created",entity_type:"reservation",entity_id:data.id,new_value:{confirmation_code:code,check_in:checkIn,check_out:checkOut}});
+    return json({ok:true,reservation:data});
+  }
+
+  const reservationId=String(body?.reservation_id||"");
+  const {data:reservation,error}=await admin.from("reservations").select("*").eq("id",reservationId).single();
+  if(error||!reservation) return json({ok:false,error:"reservation_not_found"},404);
+  const now=new Date().toISOString();
+
+  if(operation==="add_note"){
+    const note=String(body?.note||"").trim().slice(0,2000);
+    if(!note) return json({ok:false,error:"note_required"},400);
+    const {data,error:noteError}=await admin.from("reservation_notes").insert({reservation_id:reservation.id,author_user_id:user.id,note}).select().single();
+    if(noteError) return json({ok:false,error:"note_create_failed"},500);
+    return json({ok:true,note:data});
+  }
+  if(operation==="check_in"){
+    if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+    const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_in",checked_in_at:reservation.checked_in_at||now,updated_at:now}).eq("id",reservation.id).select().single();
+    if(updateError) return json({ok:false,error:"check_in_failed"},500);
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_in",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_in_at:data.checked_in_at}});
+    return json({ok:true,reservation:data});
+  }
+  if(operation==="check_out"){
+    if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+    const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_out",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservation.id).select().single();
+    if(updateError) return json({ok:false,error:"check_out_failed"},500);
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_out_at:data.checked_out_at}});
+    return json({ok:true,reservation:data});
+  }
+  if(operation==="set_operational_status"){
+    const next=String(body?.status||"");
+    if(!["upcoming","preparing","ready","attention"].includes(next)) return json({ok:false,error:"invalid_operational_status"},400);
+    const {data,error:updateError}=await admin.from("reservations").update({operational_status:next,updated_at:now}).eq("id",reservation.id).select().single();
+    if(updateError) return json({ok:false,error:"status_update_failed"},500);
+    return json({ok:true,reservation:data});
+  }
+  if(operation==="cancel"){
+    if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_cancellable"},409);
+    const reason=String(body?.reason||"").trim().slice(0,1000);
+    if(!reason) return json({ok:false,error:"cancellation_reason_required"},400);
+    const {data,error:updateError}=await admin.from("reservations").update({status:"cancelled",cancelled_at:now,cancellation_actor:"admin",cancellation_reason:reason,updated_at:now}).eq("id",reservation.id).eq("status","confirmed").select().single();
+    if(updateError||!data) return json({ok:false,error:"reservation_cancel_failed"},500);
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_cancelled",entity_type:"reservation",entity_id:reservation.id,old_value:{status:"confirmed"},new_value:{status:"cancelled",reason}});
+    return json({ok:true,reservation:data,refund_created:false});
+  }
+  return json({ok:false,error:"invalid_operation"},400);
+}
+
+async function adminNotificationAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+  if(operation==="mark_read"){
+    const id=String(body?.notification_id||"");
+    const {error}=await admin.from("admin_notifications").update({read_at:new Date().toISOString()}).eq("id",id);
+    if(error) return json({ok:false,error:"notification_update_failed"},500);
+    return json({ok:true});
+  }
+  if(operation==="mark_all_read"){
+    const {error}=await admin.from("admin_notifications").update({read_at:new Date().toISOString()}).is("read_at",null);
+    if(error) return json({ok:false,error:"notification_update_failed"},500);
+    return json({ok:true});
+  }
+  return json({ok:false,error:"invalid_operation"},400);
+}
+
+async function adminPropertyAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+  if(operation!=="save") return json({ok:false,error:"invalid_operation"},400);
+  const id=body?.id?Number(body.id):null;
+  const name=String(body?.name||"").trim().slice(0,160);
+  const code=String(body?.code||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,30);
+  const slug=String(body?.slug||"").trim().toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"").slice(0,100);
+  const propertyType=["chalet","apartment","house","cabin","other"].includes(String(body?.property_type))?String(body.property_type):"other";
+  const checkIn=String(body?.check_in_time||"15:00").slice(0,5);
+  const checkOut=String(body?.check_out_time||"11:00").slice(0,5);
+  if(!name||!code||!slug||!/^\d{2}:\d{2}$/.test(checkIn)||!/^\d{2}:\d{2}$/.test(checkOut)) return json({ok:false,error:"invalid_property"},400);
+  const payload={
+    name,code,slug,property_type:propertyType,
+    tagline:String(body?.tagline||"").trim().slice(0,240)||null,
+    summary:String(body?.summary||"").trim().slice(0,3000)||null,
+    max_guests:Math.max(1,Math.min(50,Math.round(Number(body?.max_guests||2)))),
+    cleaning_fee:Math.max(0,Math.min(100000,Number(body?.cleaning_fee||0))),
+    guarantee_amount_cents:Math.max(0,Math.min(100000000,Math.round(Number(body?.guarantee_amount_cents||0)))),
+    check_in_time:checkIn,check_out_time:checkOut,timezone:"America/Sao_Paulo",active:body?.active!==false,updated_at:new Date().toISOString()
+  };
+  const result=id
+    ? await admin.from("properties").update(payload).eq("id",id).select().single()
+    : await admin.from("properties").insert({...payload,gallery:[],features:{}}).select().single();
+  if(result.error||!result.data) return json({ok:false,error:"property_save_failed"},409);
+  await admin.from("audit_events").insert({actor_user_id:user.id,action:id?"property_updated":"property_created",entity_type:"property",entity_id:String(result.data.id),new_value:{name,code,active:payload.active}});
+  return json({ok:true,property:result.data});
+}
+
 async function opsSettingsAction(req:Request,body:any){
   const user=await currentUser(req);
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
@@ -1354,6 +1554,10 @@ Deno.serve(async(req)=>{
     if(action==="modification_action") return await modificationAction(req,body,development);
     if(action==="ops") return await opsData(req);
     if(action==="ops_settings_action") return await opsSettingsAction(req,body);
+    if(action==="admin_hub") return await adminHubData(req,body);
+    if(action==="admin_reservation_action") return await adminReservationAction(req,body);
+    if(action==="admin_notification_action") return await adminNotificationAction(req,body);
+    if(action==="admin_property_action") return await adminPropertyAction(req,body);
     if(action==="guarantee_action") return await guaranteeAction(req,body);
     if(action==="experience_admin") return await experienceAdminData(req);
     if(action==="experience_admin_action") return await experienceAdminAction(req,body);

@@ -27,6 +27,7 @@
 - Outbox transacional com catálogo de templates, dedupe, claim, retry/backoff e falha final.
 - RLS e papéis guest/admin.
 - Rota interna de operações da Fase 1 (não é o PMS da Fase 2).
+- Central administrativa unificada em desenvolvimento: agenda, entradas/saídas, reservas, alertas, financeiro, experiências e imóveis.
 
 ## Não é GO-LIVE
 
