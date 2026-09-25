@@ -265,6 +265,12 @@ async function startChargePayment(){
  const installments=method==="card"?Number($("#post-installments").value||1):1;
  try{
   const d=await api("start_post_booking_payment",{charge_id:activeCharge.id,method,installments});
+  if(activeCharge){
+   activeCharge.status="processing";
+   activeCharge.payment_id=d.payment?.id||activeCharge.payment_id||null;
+   activeCharge.payments={...(activeCharge.payments||{}),status:d.payment?.status||"pending",method:d.payment?.method||method,installments:d.payment?.installments||installments};
+   renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+  }
   $("#post-payment-message").textContent="";
   renderPostBookingMockPayment(d.payment);
  }catch(e){
@@ -286,6 +292,11 @@ async function handlePostPaymentOutcome(paymentId,outcome,box){
    $("#post-payment-message").textContent="Pagamento aprovado. A cobrança foi aplicada à sua reserva.";
    setTimeout(()=>location.reload(),900);
   }else if(outcome==="under_review"){
+   if(activeCharge){
+    activeCharge.status=d.charge_status||"processing";
+    activeCharge.payments={...(activeCharge.payments||{}),status:"under_review"};
+    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+   }
    $("#post-payment-message").textContent="Pagamento em análise. A alteração/experiência ainda não foi aplicada.";
    box.querySelectorAll("button").forEach(b=>b.disabled=b.dataset.postOutcome==="under_review");
   }else{
