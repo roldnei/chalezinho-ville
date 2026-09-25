@@ -62,3 +62,5 @@ Nenhum pagamento real foi executado.
 46. RPCs financeiras críticas: `anon=false`, `authenticated=false`, `service_role=true` — PASS.
 47. URL Configuration do Auth: Site URL de produção e redirects de produção/Preview — PASS por inspeção do painel.
 48. Leaked Password Protection — BLOQUEADO EXTERNAMENTE pelo plano Supabase Free; requer Pro ou superior.
+49. Área do Hóspede ordena reservas por `created_at` decrescente, com a reserva recém-criada no topo — PASS (2026-09-25).
+50. Reserva `A296A1F6C0`: Noite Romântica ativa por R$ 549 encontra Ultra Premium por R$ 599 como próximo upgrade e calcula somente R$ 50 de diferença — PASS (2026-09-25).

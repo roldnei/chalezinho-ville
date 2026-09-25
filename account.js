@@ -16,7 +16,7 @@ async function boot(){
  $("#account-email").textContent=session.user.email||"";
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
-  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,guests,rate_plan_code,stay_amount,experience_amount,total_amount,created_at,properties(name,cover_image),payments(id,status,amount_cents,method,installments),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("check_in",{ascending:false}),
+  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,guests,rate_plan_code,stay_amount,experience_amount,total_amount,created_at,properties(name,cover_image),payments(id,status,amount_cents,method,installments),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("properties").select("id,name,active").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,status,admin_note,payment_charge_id,payment_due_at,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)").eq("user_id",session.user.id).order("created_at",{ascending:false}),
@@ -135,15 +135,12 @@ function renderPendingExperienceCharge(c){
 function renderReservations(reservations){
  const box=$("#reservation-list");box.innerHTML="";
  if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
- const now=Date.now();
- const sorted=[...reservations].sort((a,b)=>{
-   const sa=reservationStatus(a),sb=reservationStatus(b);
-   if(sa.priority!==sb.priority)return sa.priority-sb.priority;
-   const af=Date.parse(a.check_out+"T11:00:00-03:00")>=now,bf=Date.parse(b.check_out+"T11:00:00-03:00")>=now;
-   if(af!==bf)return af?-1:1;
-   return af?Date.parse(a.check_in)-Date.parse(b.check_in):Date.parse(b.check_in)-Date.parse(a.check_in);
- });
- const defaultOpen=(sorted.find(r=>reservationStatus(r).needsAction)||sorted.find(r=>r.status==="confirmed"&&Date.parse(r.check_out+"T11:00:00-03:00")>=now))?.id;
+ const sorted=[...reservations].sort((a,b)=>
+   Date.parse(b.created_at||0)-Date.parse(a.created_at||0)
+   ||Date.parse(b.check_in)-Date.parse(a.check_in)
+   ||String(b.id).localeCompare(String(a.id))
+ );
+ const defaultOpen=sorted[0]?.id;
  sorted.forEach(r=>{
   const ux=reservationStatus(r),active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&![ "requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status)).slice(0,2);
   const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
