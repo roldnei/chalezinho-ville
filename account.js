@@ -19,7 +19,7 @@ async function boot(){
   sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,guests,rate_plan_code,stay_amount,experience_amount,total_amount,created_at,properties(name,cover_image),payments(id,status,amount_cents,method,installments),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("check_in",{ascending:false}),
   sb.from("properties").select("id,name,active").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,status,admin_note,payment_charge_id,payment_due_at,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
-  sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
+  sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   api("config")
  ]);
  profile=p;properties=props||[];mods=m||[];charges=ch||[];paymentSettings=cfg?.payment_settings||{};
@@ -36,6 +36,8 @@ async function boot(){
 
 function activeModification(reservationId){return mods.find(m=>m.reservation_id===reservationId&&["requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status))}
 function chargeForModification(m){return m?.payment_charge_id?charges.find(c=>String(c.id)===String(m.payment_charge_id)):null}
+function chargePaymentStatus(c){return c?.payments?.status||null}
+function chargeUnderReview(c){return chargePaymentStatus(c)==="under_review"}
 function liveCharges(reservationId=null){
  const now=Date.now();
  return charges.filter(c=>(!reservationId||c.reservation_id===reservationId)
@@ -68,12 +70,24 @@ function renderPendingPayments(reservations){
  list.innerHTML=pending.map(charge=>{
    const r=map.get(String(charge.reservation_id));
    const property=r?.properties?.name||"Reserva";
-   const period=r?(r.check_in.split("-").reverse().join("/")+" → "+r.check_out.split("-").reverse().join("/")):"";
+   const originalPeriod=r?(r.check_in.split("-").reverse().join("/")+" → "+r.check_out.split("-").reverse().join("/")):"";
+   const targetPeriod=charge.kind==="modification"&&charge.snapshot?.target_check_in&&charge.snapshot?.target_check_out
+     ?charge.snapshot.target_check_in.split("-").reverse().join("/")+" → "+charge.snapshot.target_check_out.split("-").reverse().join("/")
+     :originalPeriod;
    const title=charge.kind==="modification"?"Alteração de reserva":charge.kind==="experience_upgrade"?"Upgrade de experiência":"Experiência";
-   const processing=charge.status==="processing";
-   return '<article class="payment-pending-card"><div><small>'+title.toUpperCase()+'</small><h3>'+esc(charge.description||title)+'</h3><p>'+esc(property)+(period?" · "+period:"")+'</p><p class="payment-pending-deadline">Prazo: '+fmtDateTime(charge.expires_at)+'</p></div><div class="payment-pending-value"><span>'+brlC(charge.amount_cents)+'</span><button class="primary-action compact" data-pay-charge="'+charge.id+'">'+(processing?"Continuar pagamento":"Ir para pagamento")+'</button><button class="text-action danger" data-cancel-charge="'+charge.id+'">Cancelar</button></div></article>';
+   const underReview=chargeUnderReview(charge),isFree=Number(charge.amount_cents||0)===0;
+   const code=r?.confirmation_code?' · Código '+esc(r.confirmation_code):'';
+   const context=charge.kind==="modification"?'Novas datas protegidas: '+targetPeriod:targetPeriod;
+   const primary=underReview
+     ?'<span class="payment-review-state">Pagamento em análise</span>'
+     :isFree
+       ?'<button class="primary-action compact" data-confirm-free-charge="'+charge.id+'">Confirmar alteração</button>'
+       :'<button class="primary-action compact" data-pay-charge="'+charge.id+'">'+(charge.status==="processing"?"Continuar pagamento":"Ir para pagamento")+'</button>';
+   const cancel=underReview?'':'<button class="text-action danger" data-cancel-charge="'+charge.id+'">Cancelar</button>';
+   return '<article class="payment-pending-card"><div><small>'+title.toUpperCase()+'</small><h3>'+esc(charge.description||title)+'</h3><p>'+esc(property)+code+'</p><p>'+context+'</p><p class="payment-pending-deadline">Prazo: '+fmtDateTime(charge.expires_at)+'</p></div><div class="payment-pending-value"><span>'+(isFree?'Sem cobrança adicional':brlC(charge.amount_cents))+'</span>'+primary+cancel+'</div></article>';
  }).join("");
  list.querySelectorAll("[data-pay-charge]").forEach(b=>b.addEventListener("click",()=>openChargePayment(b.dataset.payCharge)));
+ list.querySelectorAll("[data-confirm-free-charge]").forEach(b=>b.addEventListener("click",()=>confirmFreeCharge(b.dataset.confirmFreeCharge,b)));
  list.querySelectorAll("[data-cancel-charge]").forEach(b=>b.addEventListener("click",()=>cancelPendingCharge(b.dataset.cancelCharge,b)));
 }
 function renderPendingExperienceCharge(c){
@@ -167,7 +181,12 @@ async function purchaseGuestExperience(btn){
    experience_out_of_stock:"Esta experiência não está disponível no momento.",
    experience_capacity_reached:"A capacidade desta experiência para sua data foi atingida."
   };
-  $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível preparar a cobrança agora.";
+  if(e.message==="experience_payment_already_pending"&&e.data?.existing_charge){
+   const existing=e.data.existing_charge;
+   if(!charges.some(c=>String(c.id)===String(existing.id)))charges.unshift(existing);
+   $("#guest-experience-message").innerHTML='Já existe um pagamento pendente para esta experiência. <button class="primary-action compact" id="existing-charge-payment">Ir para pagamento</button>';
+   $("#existing-charge-payment").onclick=()=>{$("#experience-shop-modal").hidden=true;openChargePayment(existing)};
+  }else $("#guest-experience-message").textContent=messages[e.message]||"Não foi possível preparar a cobrança agora.";
   btn.disabled=false;
  }
 }
@@ -178,6 +197,10 @@ function openChargePayment(chargeInput){
  activeCharge=charge;
  const modal=$("#post-payment-modal"),content=$("#post-payment-content");
  modal.hidden=false;
+ if(chargeUnderReview(charge)){
+  content.innerHTML='<small>COBRANÇA DA RESERVA</small><h2>Pagamento em análise</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(charge.amount_cents)+'</strong></div><p>O pagamento está em análise. A cobrança não pode ser cancelada nem enviada novamente enquanto a análise não terminar.</p>';
+  return;
+ }
  const amount=Number(charge.amount_cents||0),isModification=charge.kind==="modification";
  const deadline=fmtDateTime(charge.expires_at);
  if(amount===0){
@@ -265,10 +288,12 @@ function renderModification(m){
    ?'Esta alteração foi aprovada e gerará uma cobrança adicional de reajuste da diária. <strong>Ela só será confirmada depois do pagamento.</strong> As novas datas estão protegidas até '+due+'. Se não houver pagamento até esse prazo, a solicitação será cancelada automaticamente.'
    :'Esta alteração foi aprovada sem cobrança adicional. As novas datas estão protegidas até '+due+'. Confirme a alteração dentro do prazo.';
   valueLine='<div class="mod-price approved"><span>'+(approved>0?'Pagamento necessário':'Confirmação necessária')+'</span><strong>'+(approved>0?brlC(approved):'Sem cobrança adicional')+'</strong><small>'+payText+'</small></div>';
-  const primary=approved>0
+  const primary=chargeUnderReview(charge)
+   ?'<span class="payment-review-state">Pagamento em análise</span>'
+   :approved>0
    ?'<button class="primary-action compact" data-pay-charge="'+(charge?.id||m.payment_charge_id)+'">Ir para pagamento · '+brlC(approved)+'</button>'
    :'<button class="primary-action compact" data-confirm-free-charge="'+(charge?.id||m.payment_charge_id)+'">Confirmar alteração</button>';
-  actions='<div class="mod-actions">'+primary+'<button class="text-action danger" data-cancel-mod="'+m.id+'">Cancelar solicitação</button></div>';
+  actions='<div class="mod-actions">'+primary+(chargeUnderReview(charge)?'':'<button class="text-action danger" data-cancel-mod="'+m.id+'">Cancelar solicitação</button>')+'</div>';
  }else if(m.status==="payment_expired"){
   valueLine='<div class="mod-price"><span>Solicitação cancelada</span><strong>Prazo de pagamento encerrado</strong><small>A alteração não foi aplicada. Sua reserva original permaneceu válida.</small></div>';
  }else if(m.status==="awaiting_guest_acceptance"){

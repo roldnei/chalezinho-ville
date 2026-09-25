@@ -1658,6 +1658,7 @@ footer{justify-content:space-between!important}
 .payment-pending-deadline{font-size:12px}
 .payment-pending-value{display:grid;justify-items:end;gap:8px;min-width:190px}
 .payment-pending-value>span{font:500 28px "Playfair Display",serif;color:#f3e9df}
+.payment-review-state{display:block;padding:12px 14px;border:1px solid #80674f;color:#e4c49f;text-align:center;font-weight:600}
 
 .account-reservations{display:grid;gap:12px}
 .reservation-accordion{display:block!important;border:1px solid #413931;background:#17130f;overflow:hidden}
