@@ -734,8 +734,8 @@ async function opsData(req:Request){
   const user=await currentUser(req);
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}] = await Promise.all([
-    admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name)),profiles:user_id(full_name,phone)").order("created_at",{ascending:false}).limit(50),
-    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name),profiles:user_id(full_name)),incidents(*)").order("created_at",{ascending:false}).limit(50),
+    admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name))").order("created_at",{ascending:false}).limit(50),
+    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents(*)").order("created_at",{ascending:false}).limit(50),
     admin.from("payments").select("id,reservation_id,provider,method,installments,amount_cents,status,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("post_booking_charges").select("id,reservation_id,kind,description,amount_cents,status,expires_at,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("payment_settings").select("*").eq("id",1).single(),

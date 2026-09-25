@@ -127,8 +127,10 @@ function renderPendingPayments(reservations){
    const r=map.get(String(charge.reservation_id));
    const property=r?.properties?.name||"Reserva";
    const originalPeriod=r?(r.check_in.split("-").reverse().join("/")+" → "+r.check_out.split("-").reverse().join("/")):"";
-   const targetPeriod=charge.kind==="modification"&&charge.snapshot?.target_check_in&&charge.snapshot?.target_check_out
-     ?charge.snapshot.target_check_in.split("-").reverse().join("/")+" → "+charge.snapshot.target_check_out.split("-").reverse().join("/")
+   const targetCheckIn=charge.snapshot?.requested_check_in||charge.snapshot?.target_check_in;
+   const targetCheckOut=charge.snapshot?.requested_check_out||charge.snapshot?.target_check_out;
+   const targetPeriod=charge.kind==="modification"&&targetCheckIn&&targetCheckOut
+     ?targetCheckIn.split("-").reverse().join("/")+" → "+targetCheckOut.split("-").reverse().join("/")
      :originalPeriod;
    const title=charge.kind==="modification"?"Alteração de reserva":charge.kind==="experience_upgrade"?"Upgrade de experiência":"Experiência";
    const underReview=chargeUnderReview(charge),isFree=Number(charge.amount_cents||0)===0;
