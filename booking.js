@@ -104,6 +104,7 @@ async function openFlow(id){
 }
 }
 function showStep(n){
+ setFlowError("");
  $("#checkout-panel").dataset.step=String(n);$$(".checkout-step").forEach(x=>x.hidden=Number(x.dataset.step)!==n);$$(".progress-dot").forEach(x=>x.classList.toggle("active",Number(x.dataset.dot)<=Math.min(n,5)));
  $("#step-back").hidden=n===1||n===6;$("#step-next").hidden=n===6;
  $("#step-next").textContent=n===5?"Iniciar pagamento de teste":"Continuar";
@@ -121,7 +122,7 @@ function renderRates(){
   if(state.rateCode===r.code){d.classList.add("selected");state.rate=r}
   const extra=r.experience_amount_cents?'<span class="rate-extra">Experiências selecionadas já incluídas</span>':"";
   d.innerHTML='<small>'+r.name.toUpperCase()+'</small><span class="strike">'+(ref?brlC(ref.total_amount_cents):"")+'</span><strong>'+brlC(r.total_amount_cents)+'</strong><span class="package-line">Pacote de '+stayNights()+' noites · '+brlC(nightly(r.stay_amount_cents))+' por noite</span>'+extra+'<p>'+((r.cancellation_policy?.body)||"Política informada antes do pagamento.")+'</p>';
-  d.addEventListener("click",()=>{state.rate=r;state.rateCode=r.code;box.querySelectorAll(".rate-card").forEach(x=>x.classList.toggle("selected",x===d));track("rate_selected",{property_id:state.property.id,metadata:{rate_code:r.code,total_cents:Number(r.total_amount_cents||0)}})});
+  d.addEventListener("click",()=>{state.rate=r;state.rateCode=r.code;setFlowError("");box.querySelectorAll(".rate-card").forEach(x=>x.classList.toggle("selected",x===d));track("rate_selected",{property_id:state.property.id,metadata:{rate_code:r.code,total_cents:Number(r.total_amount_cents||0)}})});
   box.appendChild(d);
  });
 }
