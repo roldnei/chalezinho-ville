@@ -1,0 +1,1 @@
+-- Applied separately in development. Final idempotent template catalog is consolidated in 20260925021101_phase1_operations_notifications_hardening.sql.\n

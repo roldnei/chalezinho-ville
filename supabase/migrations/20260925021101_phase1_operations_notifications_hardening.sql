@@ -1,4 +1,4 @@
--- Consolidated Phase 1 hardening applied to development.
+-- Applied as phase1_operations_notifications_hardening; includes the reconciled final definition of the notification contract.
 create index if not exists post_booking_cart_items_target_variant_idx
   on public.post_booking_cart_items(target_variant_id);
 
