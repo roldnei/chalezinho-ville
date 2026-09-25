@@ -1,42 +1,64 @@
-# Fase 1 ampliada — estado real em desenvolvimento
+# Fase 1 — Estado atual
 
-Atualizado em 25/09/2026. Fonte: branch `desenvolvimento`, Supabase `irxsaladqhbzhkoaclxy` e Preview Vercel.
+## Implementado em desenvolvimento
 
-## Concluído
+- Fundação data-driven de propriedades.
+- Supabase Auth: cadastro, confirmação de e-mail, login, logout, recuperação e redefinição de senha.
+- Perfil do hóspede + solicitação de exclusão.
+- Busca de disponibilidade e preço.
+- Quote server-side por 15 minutos.
+- Tarifas 1,28 / 1,20 / 1,10 com limpeza separada.
+- Funil sem carrinho e login tardio.
+- Catálogo configurável de experiências, variantes, elegibilidade e antecedência.
+- Payment provider desacoplado, provider atual mock.
+- PIX 15 min e parcelamento configuráveis.
+- Hold transacional somente no início de pagamento.
+- Expiração de holds.
+- Ledger financeiro em centavos.
+- Minhas Reservas.
+- Alteração de data/propriedade com referência, decisão do admin, aceite e histórico.
+- Garantia/caução mock, ocorrência e captura parcial.
+- Analytics event model.
+- RLS e papéis guest/admin.
+- Rota interna de operações da Fase 1 (não é o PMS da Fase 2).
 
-- Motor data-driven para três propriedades, preço em centavos, limpeza configurável e oculta ao hóspede.
-- PriceLabs e Airbnb iCal; reservas diretas, holds e alterações aprovadas participam da disponibilidade.
-- Tarifas de referência 1,28, reembolsável 1,20 e não reembolsável 1,10.
-- Auth com cadastro tardio, confirmação, login, recuperação, callback, perfil e exclusão.
-- Quotes de 15 minutos, hold apenas ao iniciar pagamento e barreira final contra sobreposição no banco.
-- Pagamentos desacoplados por configuração; provider atual `mock`, Pix e cartão, parcelas configuráveis.
-- Ledger, garantia, ocorrência e captura parcial idempotente.
-- Experiências administráveis, fotos, ativar/pausar/arquivar, categoria única e upsell pelo pacote-fonte.
-- Upsell oferece somente o próximo pacote ativo mais caro da mesma categoria e cobra a diferença real.
-- Área do hóspede com reservas, experiências, carrinho, pagamentos pendentes, alterações e garantia.
-- Adicionar pós-reserva grava carrinho, não cobrança. A cobrança nasce apenas em “Ir para pagamento”.
-- Retry de pagamento recusado, bloqueio em análise, aplicação atômica e proteção contra duplicidade.
-- Alteração preserva a reserva original, cria hold somente após aprovação, expira e libera datas automaticamente.
-- Analytics do funil ativo.
-- Operações Fase 1: alterações, pagamentos, cobranças, garantia, integrações, fila e configurações essenciais.
-- Fila transacional com templates, deduplicação, claim, retry, conclusão e eventos de pré-estadia.
-- RLS e RPCs financeiras service-role; mutações SQL perigosas removidas de `anon` e `authenticated`.
+## Não é GO-LIVE
 
-## Estado técnico
+- páginas novas permanecem no Preview / branch desenvolvimento;
+- páginas possuem noindex;
+- pagamento real desativado;
+- produtos de experiência atuais são marcados [DEV]/draft;
+- Termos/Regras/Privacidade são rascunhos de desenvolvimento;
+- nenhum botão/login novo deve ser promovido para produção sem autorização explícita.
 
-- Edge Function `booking-engine`: v37 no momento desta atualização.
-- Cron: expiração de reservas e prazos pós-reserva a cada 5 minutos.
-- Advisor de performance: nenhum FK sem índice.
-- Advisor de segurança: sem alerta crítico; tabelas internas sem policy pública são deliberadamente service-only.
-- Nenhum pagamento real e nenhum envio externo de e-mail estão ativos.
+## Fechamento técnico
 
-## Bloqueios externos pré-GO-LIVE
+- Edge Function booking-engine: versão 38 ativa no Supabase.
+- Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
+- pg_net temporário removido após QA.
+- Índices de FKs adicionados para crescimento.
+- Advisors de segurança sem alerta crítico; avisos restantes são tabelas server-only deliberadamente sem policy pública.
 
-1. Três URLs iCal do Booking.com: `ICAL_BOOKING_CH1`, `ICAL_BOOKING_CH2`, `ICAL_BOOKING_CH3`.
-2. Escolha e credenciais do gateway real para Pix, cartão, webhook, refund e pré-autorização.
-3. Escolha e credenciais do provedor de e-mail; fila e contrato de entrega já estão prontos.
-4. Aprovação jurídica dos documentos marcados como draft.
-5. Habilitar Leaked Password Protection no Supabase Auth.
-6. Aprovação visual final e autorização explícita de GO-LIVE.
+## Dependências antes do GO-LIVE
 
-Produção e `main` não foram alteradas.
+1. Aprovação dos documentos jurídicos finais.
+2. Escolher/configurar gateway real.
+3. QA visual final e aprovação do produto.
+4. Limpeza dos registros/dados marcados como desenvolvimento.
+5. Checklist de GO-LIVE e rollback.
+
+
+## QA técnico mais recente
+
+- booking-engine ativa no Supabase: v38.
+- alteração de reserva e captura de garantia endurecidas com operações atômicas no banco.
+- nenhum pagamento real ativado.
+- produção pública continua fora deste fluxo de GO-LIVE.
+
+### Lacunas técnicas ainda abertas da Fase 1
+
+1. Instrumentação dos eventos de analytics no frontend.
+2. Documentos jurídicos finais aprovados.
+3. Gateway real + webhooks/refunds/pré-autorização.
+4. Leaked Password Protection no Supabase Auth.
+5. QA visual final nos viewports obrigatórios.
