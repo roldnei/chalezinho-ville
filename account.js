@@ -127,7 +127,10 @@ function renderPendingPayments(reservations){
  list.querySelectorAll("[data-cancel-charge]").forEach(b=>b.addEventListener("click",()=>cancelPendingCharge(b.dataset.cancelCharge,b)));
 }
 function renderPendingExperienceCharge(c){
- return '<div class="reservation-inline-pending"><span><strong>Pagamento pendente</strong> · '+esc(c.description||"Experiência")+' · '+brlC(c.amount_cents)+'</span><button class="text-action" data-pay-charge="'+c.id+'">Ir para pagamento</button></div>';
+ const action=chargeUnderReview(c)
+  ?'<span class="payment-review-state">Pagamento em análise</span>'
+  :'<button class="text-action" data-pay-charge="'+c.id+'">Ir para pagamento</button>';
+ return '<div class="reservation-inline-pending"><span><strong>'+(chargeUnderReview(c)?'Pagamento em análise':'Pagamento pendente')+'</strong> · '+esc(c.description||"Experiência")+' · '+brlC(c.amount_cents)+'</span>'+action+'</div>';
 }
 function renderReservations(reservations){
  const box=$("#reservation-list");box.innerHTML="";
