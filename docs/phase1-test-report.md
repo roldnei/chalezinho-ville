@@ -70,3 +70,4 @@ Nenhum pagamento real foi executado.
 54. Pagamento em análise: reserva permanece `pending_payment`, datas protegidas sem expiração automática, pagamento `under_review` — PASS com rollback.
 55. Pagamento aprovado: pagamento `paid`, reserva `confirmed`, `confirmed_at` preenchido e garantia criada idempotentemente — PASS com rollback.
 56. RPCs da nova máquina de estados: execução revogada de `anon` e `authenticated`, concedida apenas a `service_role` — PASS.
+57. Invariante no banco impede marcar como `cancelled` ou `no_show` uma tentativa que nunca foi confirmada — PASS.
