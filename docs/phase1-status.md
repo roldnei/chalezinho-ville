@@ -42,7 +42,7 @@
 ## Fechamento técnico
 
 - Edge Function booking-engine: versão 46 ativa no Supabase de desenvolvimento.
-- Edge Function pms-operations: versão 7 ativa no Supabase de desenvolvimento.
+- Edge Function pms-operations: versão 8 ativa no Supabase de desenvolvimento.
 - Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.

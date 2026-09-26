@@ -99,6 +99,7 @@ async function hub(actor:any){
   const safeReservations=visibleReservations.map((r:any)=>canSeeGuests?r:{...r,guest_email:null,guest_phone:null,stay_amount:null,experience_amount:null,total_amount:null});
   let teamRows:any[]=[];let invitations:any[]=[];
   if(actor.role==="admin"||actor.permissions?.manage_team===true){
+    await admin.from("pms_team_invitations").update({status:"expired",updated_at:new Date().toISOString()}).eq("status","pending").lt("expires_at",new Date().toISOString());
     const users=await Promise.all((team.data||[]).map(async (member:any)=>{const {data}=await admin.auth.admin.getUserById(member.id);return {...member,email:data.user?.email||null,email_confirmed_at:data.user?.email_confirmed_at||null}}));
     teamRows=users;
     const {data:invites}=await admin.from("pms_team_invitations").select("*").in("status",["pending","expired"]).order("created_at",{ascending:false});
@@ -298,6 +299,18 @@ async function teamAction(body:any,actor:{id:string,role?:string}){
     if(!invitation)return json({ok:false,error:"invitation_not_found"},404);
     if(invitation.invited_user_id)await admin.from("profiles").update({pms_access_status:"suspended",updated_at:now}).eq("id",invitation.invited_user_id).eq("pms_access_status","invited");
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_invitation_cancelled",entity_type:"pms_team_invitation",entity_id:invitationId});
+    return json({ok:true});
+  }
+  if(operation==="resend_invite"){
+    const invitationId=clip(body.invitation_id,80);
+    const {data:invitation}=await admin.from("pms_team_invitations").select("*").eq("id",invitationId).in("status",["pending","expired"]).maybeSingle();
+    if(!invitation)return json({ok:false,error:"invitation_not_found"},404);
+    const site=(Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL")||"https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app").replace(/\/$/,"");
+    const {error}=await admin.auth.resend({type:"signup",email:invitation.email,options:{emailRedirectTo:`${site}/auth-callback.html?next=pms-operacao.html%3Fview%3Dteam`}});
+    if(error)return json({ok:false,error:"invite_resend_failed"},502);
+    const now=new Date().toISOString();
+    await admin.from("pms_team_invitations").update({status:"pending",expires_at:new Date(Date.now()+7*86400000).toISOString(),updated_at:now}).eq("id",invitationId);
+    await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_invitation_resent",entity_type:"pms_team_invitation",entity_id:invitationId});
     return json({ok:true});
   }
   if(operation!=="update")return json({ok:false,error:"invalid_operation"},400);
