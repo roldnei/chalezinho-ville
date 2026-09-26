@@ -1,7 +1,9 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-let session=null,state=null,currentView="today",calendarMonth=new Date().toISOString().slice(0,7),filters={search:"",status:"all",property:"all"};
+const validViews=new Set(["today","calendar","reservations","notifications","changes","finance","guarantees","properties","settings"]);
+const requestedView=new URLSearchParams(location.search).get("view");
+let session=null,state=null,currentView=validViews.has(requestedView)?requestedView:"today",calendarMonth=new Date().toISOString().slice(0,7),filters={search:"",status:"all",property:"all"};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const brl=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const date=v=>v?new Date(String(v).length===10?v+"T12:00:00":v).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
@@ -55,7 +57,10 @@ function updateCounts(){
   $("#nav-alert-count").hidden=!unread;$("#top-alert-count").hidden=!unread;
 }
 function showView(view){
+  if(!validViews.has(view))view="today";
   currentView=view;$$('#admin-nav [data-view]').forEach(x=>x.classList.toggle("active",x.dataset.view===view));
+  const nextUrl=view==="today"?"admin.html":`admin.html?view=${encodeURIComponent(view)}`;
+  history.replaceState(null,"",nextUrl);
   const names={today:["OPERAÇÃO DE HOJE","Visão geral"],calendar:["AGENDA UNIFICADA","Calendário"],reservations:["TODAS AS ESTADIAS","Reservas"],notifications:["CENTRAL DE ATENÇÃO","Notificações"],changes:["PEDIDOS DOS HÓSPEDES","Alterações de reserva"],finance:["MOVIMENTAÇÃO","Financeiro"],guarantees:["PRÉ-AUTORIZAÇÕES","Garantias"],properties:["PORTFÓLIO","Imóveis"],settings:["REGRAS DA OPERAÇÃO","Configurações"]};
   $("#admin-context").textContent=names[view][0];$("#admin-title").textContent=names[view][1];
   ({today:renderToday,calendar:renderCalendar,reservations:renderReservations,notifications:renderNotifications,changes:renderChanges,finance:renderFinance,guarantees:renderGuarantees,properties:renderProperties,settings:renderSettings}[view]||renderToday)();
@@ -123,7 +128,14 @@ function renderReservations(){
   $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>GESTÃO DE RESERVAS</small><h2>Estadias</h2></div><button id="new-reservation">+ Nova reserva manual</button></div><div class="admin-filters"><label class="admin-search">Buscar<input id="reservation-search" value="${esc(filters.search)}" placeholder="Nome, código, telefone ou e-mail"></label><label>Status<select id="reservation-status"><option value="all">Todos</option>${["confirmed","pending_payment","hold","cancelled","not_confirmed","no_show"].map(s=>`<option value="${s}" ${filters.status===s?"selected":""}>${statusLabel(s)}</option>`).join("")}</select></label><label>Imóvel<select id="reservation-property"><option value="all">Todos</option>${state.properties.map(p=>`<option value="${p.id}" ${String(filters.property)===String(p.id)?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label></div><div class="admin-reservation-summary"><strong>${rows.length}</strong> reservas encontradas</div><div class="admin-reservation-list">${rows.length?rows.map(r=>reservationCard(r)).join(""):empty("Nenhuma reserva corresponde aos filtros.")}</div></section>`;
   $("#new-reservation").onclick=openManualReservation;$("#reservation-search").oninput=e=>{filters.search=e.target.value;renderReservations()};$("#reservation-status").onchange=e=>{filters.status=e.target.value;renderReservations()};$("#reservation-property").onchange=e=>{filters.property=e.target.value;renderReservations()};bindCards();
 }
-function filteredReservations(){const q=filters.search.trim().toLowerCase();return state.reservations.filter(r=>(filters.status==="all"||r.status===filters.status)&&(filters.property==="all"||String(r.property_id)===String(filters.property))&&(!q||[r.guest_name,r.guest_email,r.guest_phone,r.confirmation_code,prop(r.property_id)?.name].some(v=>String(v||"").toLowerCase().includes(q)))).sort((a,b)=>b.created_at.localeCompare(a.created_at))}
+function filteredReservations(){
+  const q=filters.search.trim().toLowerCase(),reference=today();
+  return state.reservations.filter(r=>(filters.status==="all"||r.status===filters.status)&&(filters.property==="all"||String(r.property_id)===String(filters.property))&&(!q||[r.guest_name,r.guest_email,r.guest_phone,r.confirmation_code,prop(r.property_id)?.name].some(v=>String(v||"").toLowerCase().includes(q)))).sort((a,b)=>{
+    const aUpcoming=a.check_out>=reference,bUpcoming=b.check_out>=reference;
+    if(aUpcoming!==bUpcoming)return aUpcoming?-1:1;
+    return aUpcoming?a.check_in.localeCompare(b.check_in):b.check_in.localeCompare(a.check_in);
+  })
+}
 
 function renderNotifications(){
   const rows=state.notifications;
@@ -133,8 +145,8 @@ function renderNotifications(){
 async function markNotification(id){const n=state.notifications.find(x=>x.id===id);if(!n||n.read_at)return;await api("admin_notification_action",{operation:"mark_read",notification_id:id}).catch(()=>{});n.read_at=new Date().toISOString();updateCounts()}
 
 function renderFinance(){
-  const paid=state.payments.filter(p=>p.status==="paid"),pending=state.payments.filter(p=>["processing","under_review","awaiting_payment"].includes(p.status)),refused=state.payments.filter(p=>p.status==="refused");const total=paid.reduce((s,p)=>s+Number(p.amount_cents||0),0);
-  $("#admin-content").innerHTML=`<div class="admin-kpis">${kpi("Recebido",brl(total),paid.length+" pagamentos")}${kpi("Em andamento",pending.length,"Aguardando conclusão")}${kpi("Recusados",refused.length,"Podem exigir contato")}${kpi("Cobranças adicionais",state.charges.length,"Experiências e alterações")}</div><section class="admin-panel"><div class="admin-panel-head"><div><small>MOVIMENTAÇÃO RECENTE</small><h2>Pagamentos</h2></div></div><div class="finance-list">${state.payments.slice(0,100).map(p=>{const r=state.reservations.find(x=>x.id===p.reservation_id);return `<button data-reservation="${p.reservation_id}" class="finance-row"><div><strong>${esc(r?.guest_name||r?.confirmation_code||"Reserva")}</strong><span>${esc(prop(r?.property_id)?.name||"")} · ${dateTime(p.created_at)}</span></div><span class="admin-status ${statusClass(p.status)}">${statusLabel(p.status)}</span><b>${brl(p.amount_cents)}</b></button>`}).join("")||empty("Nenhum pagamento registrado.")}</div></section>`;bindCards();
+  const paid=state.payments.filter(p=>p.status==="paid"),realPaid=paid.filter(p=>p.provider!=="mock"),testPaid=paid.filter(p=>p.provider==="mock"),pending=state.payments.filter(p=>["processing","under_review","awaiting_payment"].includes(p.status)),refused=state.payments.filter(p=>p.status==="refused"),total=realPaid.reduce((s,p)=>s+Number(p.amount_cents||0),0),testTotal=testPaid.reduce((s,p)=>s+Number(p.amount_cents||0),0);
+  $("#admin-content").innerHTML=`<div class="admin-kpis">${kpi("Recebido",brl(total),realPaid.length+" pagamentos reais")}${kpi("Simulado",brl(testTotal),testPaid.length+" pagamentos de teste")}${kpi("Em andamento",pending.length,"Aguardando conclusão")}${kpi("Recusados",refused.length,"Podem exigir contato")}${kpi("Cobranças adicionais",state.charges.length,"Experiências e alterações")}</div><section class="admin-panel"><div class="admin-panel-head"><div><small>MOVIMENTAÇÃO RECENTE</small><h2>Pagamentos</h2></div></div><div class="finance-list">${state.payments.slice(0,100).map(p=>{const r=state.reservations.find(x=>x.id===p.reservation_id),isTest=p.provider==="mock";return `<button data-reservation="${p.reservation_id}" class="finance-row"><div><strong>${esc(r?.guest_name||r?.confirmation_code||"Reserva")}</strong><span>${esc(prop(r?.property_id)?.name||"")} · ${dateTime(p.created_at)}${isTest?" · TESTE":""}</span></div><span class="admin-status ${statusClass(p.status)}">${statusLabel(p.status)}</span><b>${brl(p.amount_cents)}</b></button>`}).join("")||empty("Nenhum pagamento registrado.")}</div></section>`;bindCards();
 }
 
 function renderChanges(){

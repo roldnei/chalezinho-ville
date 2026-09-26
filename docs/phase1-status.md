@@ -26,8 +26,8 @@
 - Carrinho pós-reserva separado de cobrança, pagamentos pendentes e retry de tentativa recusada.
 - Outbox transacional com catálogo de templates, dedupe, claim, retry/backoff e falha final.
 - RLS e papéis guest/admin.
-- Rota interna de operações da Fase 1 (não é o PMS da Fase 2).
 - Central administrativa unificada em desenvolvimento: agenda, entradas/saídas, reservas, alertas, financeiro, experiências e imóveis.
+- PMS operacional da Fase 1: prontidão por imóvel, tarefas, checklists, equipe, ocorrências, evidências, indicadores e auditoria.
 
 ## Não é GO-LIVE
 
@@ -55,7 +55,7 @@
 3. QA visual final e aprovação do produto.
 4. Limpeza dos registros/dados marcados como desenvolvimento.
 5. Checklist de GO-LIVE e rollback.
-6. Escolher/configurar o provedor transacional de e-mail.
+6. Validar domínio remetente e entrega final do adaptador Brevo já configurado.
 7. Avaliar upgrade do Supabase para habilitar Leaked Password Protection (recurso indisponível no plano Free atual).
 
 
