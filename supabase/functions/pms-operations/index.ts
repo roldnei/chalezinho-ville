@@ -2,7 +2,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 
 const url=Deno.env.get("SUPABASE_URL")||"";
-const publishable=Deno.env.get("SUPABASE_ANON_KEY")||"";
 const service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
 const admin=createClient(url,service,{auth:{persistSession:false,autoRefreshToken:false}});
 const headers={"access-control-allow-origin":"*","access-control-allow-headers":"authorization,content-type,x-client-info","access-control-allow-methods":"POST,OPTIONS","cache-control":"no-store"};
@@ -12,9 +11,8 @@ const clip=(v:unknown,n:number)=>String(v||"").trim().slice(0,n);
 async function operator(request:Request){
   const token=(request.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
   if(!token)return null;
-  const client=createClient(url,publishable,{global:{headers:{authorization:`Bearer ${token}`}},auth:{persistSession:false,autoRefreshToken:false}});
-  const {data:{user}}=await client.auth.getUser(token);
-  if(!user)return null;
+  const {data:{user},error}=await admin.auth.getUser(token);
+  if(error||!user)return null;
   const {data:profile}=await admin.from("profiles").select("role,full_name").eq("id",user.id).maybeSingle();
   if(!profile||!["admin","host","staff"].includes(profile.role))return null;
   return {id:user.id,role:profile.role,name:profile.full_name||user.email||"Equipe"};
