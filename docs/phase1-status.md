@@ -27,7 +27,7 @@
 - Outbox transacional com catálogo de templates, dedupe, claim, retry/backoff e falha final.
 - RLS e papéis guest/admin.
 - Central administrativa unificada em desenvolvimento: agenda, entradas/saídas, reservas, alertas, financeiro, experiências e imóveis.
-- PMS operacional da Fase 1: prontidão por imóvel, tarefas, checklists, equipe, ocorrências, evidências, indicadores e auditoria.
+- PMS operacional da Fase 1: prontidão por imóvel, ficha unificada da reserva, check-in/out, não comparecimento, bloqueios de inventário, tarefas, preparação de experiências, checklists, equipe, ocorrências, evidências, indicadores, notificações e auditoria.
 
 ## Não é GO-LIVE
 
@@ -40,8 +40,8 @@
 
 ## Fechamento técnico
 
-- Edge Function booking-engine: versão 45 ativa no Supabase.
-- Edge Function pms-operations: versão 3 ativa no Supabase.
+- Edge Function booking-engine: versão 46 ativa no Supabase de desenvolvimento.
+- Edge Function pms-operations: versão 5 ativa no Supabase de desenvolvimento.
 - Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.
@@ -62,8 +62,8 @@
 
 ## QA técnico mais recente
 
-- booking-engine ativa no Supabase: v45.
-- pms-operations ativa no Supabase: v3.
+- booking-engine ativa no Supabase: v46.
+- pms-operations ativa no Supabase: v5.
 - alteração de reserva e captura de garantia endurecidas com operações atômicas no banco.
 - nenhum pagamento real ativado.
 - produção pública continua fora deste fluxo de GO-LIVE.

@@ -6,15 +6,20 @@ Módulo isolado da Fase 1, disponível em `pms-operacao.html`.
 
 - painel diário de prontidão por imóvel;
 - agenda conjunta de estadias e tarefas;
+- ficha operacional da reserva com hóspede, contato, valores, experiências, cobranças, notas e tarefas;
+- check-in, check-out e não comparecimento com trilha de auditoria;
 - preparação automática após checkout;
+- preparação automática das experiências pagas antes da entrada;
 - checklist de limpeza e vistoria;
+- designação nominal da tarefa e aprovação final exclusiva de administrador/anfitrião;
+- bloqueios manuais de manutenção, uso do proprietário e operação, incorporados à disponibilidade;
 - tarefas manuais de organização, manutenção e pedidos de hóspedes;
 - ocorrências com gravidade e ciclo de resolução;
 - histórico de ações para futura auditoria de equipe.
 
 ## Isolamento
 
-O módulo usa a Edge Function `pms-operations` e as tabelas `pms_*`. Ele não altera os estados financeiros, a confirmação da reserva, o pagamento, o ledger, o carrinho ou a Área do Hóspede. A futura entrada na navegação da Central Administrativa deve ocorrer apenas depois da conclusão do QA da Fase 1.
+O módulo usa a Edge Function `pms-operations` e as tabelas `pms_*`. Ele lê a posição financeira para oferecer contexto operacional, mas não altera pagamentos, ledger, carrinho ou valores. As transições de check-in/check-out e não comparecimento são explícitas, auditadas e restritas à equipe autorizada.
 
 ## Segurança
 
@@ -23,6 +28,8 @@ O módulo usa a Edge Function `pms-operations` e as tabelas `pms_*`. Ele não al
 - acesso aos dados feito exclusivamente pela Edge Function com `service_role`;
 - operações registradas em `pms_activity_events`;
 - nenhum valor financeiro é aceito ou modificado pelo módulo.
+- perfis de equipe podem ser limitados por imóvel; tarefas atribuídas a outra pessoa não são expostas ao perfil `staff`;
+- somente `admin`/`host` libera o imóvel depois da vistoria completa.
 
 ## Nota de QA visual
 
@@ -55,3 +62,17 @@ A branch `feature/pms-consolidation` incorpora o módulo operacional à suíte a
 - restauração da folha `styles.css` íntegra, corrigindo a Central sem estilos observada no QA móvel.
 
 O PMS continua exclusivo do desenvolvimento e não está ligado à navegação pública.
+
+## Ciclo operacional consolidado
+
+1. Uma reserva confirmada aparece na agenda e na ficha operacional.
+2. Experiências pagas geram uma tarefa de preparação com os itens e quantidades contratados.
+3. O administrador atribui a preparação à pessoa responsável.
+4. No check-out, a reserva muda para `preparing` e a tarefa idempotente de limpeza fica disponível.
+5. A equipe inicia, executa e marca cada item do checklist.
+6. A equipe envia para vistoria; checklist incompleto é bloqueado pelo backend.
+7. Administrador ou anfitrião aprova a vistoria e o imóvel muda para `ready`.
+8. Ocorrências podem ser registradas com gravidade, responsável e evidência privada.
+9. Bloqueios operacionais impedem venda no motor de reservas e aparecem no calendário central.
+
+Cada transição relevante gera atividade/auditoria e os eventos de atribuição, vistoria e liberação alimentam a central de notificações.

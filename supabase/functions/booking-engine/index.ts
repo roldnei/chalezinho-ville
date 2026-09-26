@@ -78,13 +78,15 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   const stay=nights(start,end);
   if(stay<1) throw new Error("invalid_dates");
 
-  const [propertiesQ,reservationsQ,changeHoldsQ,ical,bookingIcal,prices] = await Promise.all([
+  const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices] = await Promise.all([
     retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id")),
     retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
       .lt("check_in",end).gt("check_out",start).in("status",["hold","pending_payment","confirmed"])),
     retryDb("search_change_holds",()=>admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
       .eq("kind","modification").in("status",["awaiting_payment","processing","paid"])
       .lt("target_check_in",end).gt("target_check_out",start).gt("expires_at",new Date().toISOString())),
+    retryDb("search_operational_blocks",()=>admin.from("pms_calendar_blocks").select("id,property_id,start_date,end_date")
+      .eq("status","active").lt("start_date",end).gt("end_date",start)),
     prodJson("/api/ical-airbnb-all"),
     bookingCalendarData(),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
@@ -92,8 +94,9 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   const {data:properties,error:pe}=propertiesQ;
   const {data:dbRows,error:re}=reservationsQ;
   const {data:changeHolds,error:he}=changeHoldsQ;
-  if(pe||re||he){
-    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null,change_holds:he?.code||null}));
+  const {data:operationalBlocks,error:be}=blocksQ;
+  if(pe||re||he||be){
+    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null,change_holds:he?.code||null,operational_blocks:be?.code||null}));
     throw new Error("database_unavailable");
   }
   if(!development && !bookingIcal.configured) throw new Error("booking_not_configured");
@@ -112,7 +115,8 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end)));
     const channelOccupied=airbnbOccupied||bookingOccupied;
     const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id))
-      || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id));
+      || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id))
+      || (operationalBlocks||[]).some((x:any)=>Number(x.property_id)===Number(p.id));
     const minStay=Math.max(1,Number(pr?.min_stay||1));
     const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
     const available=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&stay>=minStay&&hasPrice;
@@ -759,16 +763,17 @@ async function adminHubData(req:Request,body:any){
   const end=validDate(String(body?.end||""))?String(body.end):localDate(185);
   if(end<=start) return json({ok:false,error:"invalid_dates"},400);
 
-  const [propertiesQ,reservationsQ,notificationsQ,integrationsQ,settingsQ,airbnb,booking] = await Promise.all([
+  const [propertiesQ,reservationsQ,notificationsQ,integrationsQ,settingsQ,blocksQ,airbnb,booking] = await Promise.all([
     admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,active,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone,created_at,updated_at").order("id"),
     admin.from("reservations").select("id,property_id,user_id,check_in,check_out,status,source,guests,guest_name,guest_email,guest_phone,stay_amount,experience_amount,total_amount,rate_plan_code,confirmation_code,hold_expires_at,created_at,updated_at,confirmed_at,cancelled_at,not_confirmed_at,not_confirmed_reason,cancellation_actor,cancellation_reason,no_show_at,operational_status,checked_in_at,checked_out_at").lte("check_in",end).gte("check_out",start).order("created_at",{ascending:false}).limit(750),
     admin.from("admin_notifications").select("id,notification_type,severity,title,message,reservation_id,entity_type,entity_id,payload,read_at,created_at").order("created_at",{ascending:false}).limit(150),
     admin.from("property_integrations").select("id,property_id,provider,external_listing_id,pms,environment_key,active,updated_at").order("provider"),
     admin.from("payment_settings").select("*").eq("id",1).single(),
+    admin.from("pms_calendar_blocks").select("*").gte("end_date",start).lte("start_date",end).order("start_date"),
     prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
     bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
   ]);
-  if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error)
+  if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error)
     return json({ok:false,error:"admin_hub_unavailable"},500);
 
   const reservations=reservationsQ.data||[];
@@ -805,6 +810,7 @@ async function adminHubData(req:Request,body:any){
     payments:paymentsQ.data||[],experience_orders:ordersQ.data||[],charges:chargesQ.data||[],
     modifications:modsQ.data||[],guarantees:guaranteesQ.data||[],notes:notesQ.data||[],ledger:ledgerQ.data||[],
     notifications:notificationsQ.data||[],integrations:integrationsQ.data||[],settings:settingsQ.data||{},
+    calendar_blocks:blocksQ.data||[],
     channel_periods:channelPeriods,
     channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
   });
@@ -824,10 +830,11 @@ async function adminReservationAction(req:Request,body:any){
     const guestPhone=String(body?.guest_phone||"").trim().slice(0,50)||null;
     const total=Math.max(0,Number(body?.total_amount||0));
     if(!propertyId||!validDate(checkIn)||!validDate(checkOut)||checkOut<=checkIn||!guestName) return json({ok:false,error:"invalid_reservation"},400);
-    const [{data:property},{data:occupied},{data:changeHolds},airbnb,booking]=await Promise.all([
+    const [{data:property},{data:occupied},{data:changeHolds},{data:blocks},airbnb,booking]=await Promise.all([
       admin.from("properties").select("id,name,max_guests,cleaning_fee,active").eq("id",propertyId).single(),
       admin.from("reservations").select("id").eq("property_id",propertyId).in("status",["hold","pending_payment","confirmed"]).lt("check_in",checkOut).gt("check_out",checkIn).limit(1),
       admin.from("post_booking_charges").select("id").eq("kind","modification").eq("target_property_id",propertyId).in("status",["awaiting_payment","processing","paid"]).gt("expires_at",new Date().toISOString()).lt("target_check_in",checkOut).gt("target_check_out",checkIn).limit(1),
+      admin.from("pms_calendar_blocks").select("id").eq("property_id",propertyId).eq("status","active").lt("start_date",checkOut).gt("end_date",checkIn).limit(1),
       prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
       bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
     ]);
@@ -837,7 +844,7 @@ async function adminReservationAction(req:Request,body:any){
       const listing=(source?.listings||[]).find((x:any)=>x.name===property.name);
       return !listing?.ok || (listing.periods||[]).some((x:any)=>overlaps(x.start,x.end,checkIn,checkOut));
     };
-    if(occupied?.length||changeHolds?.length||externalBlocked(airbnb)||(booking.configured&&externalBlocked(booking))) return json({ok:false,error:"occupied"},409);
+    if(occupied?.length||changeHolds?.length||blocks?.length||externalBlocked(airbnb)||(booking.configured&&externalBlocked(booking))) return json({ok:false,error:"occupied"},409);
     const code=crypto.randomUUID().replaceAll("-","").slice(0,10).toUpperCase();
     const cleaning=Number(property.cleaning_fee||0);
     const {data,error}=await admin.from("reservations").insert({
