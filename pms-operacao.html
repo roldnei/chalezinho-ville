@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#11100f">
+  <title>Operação da Estadia | Chalezinho Ville</title>
+  <link rel="icon" href="favicon.svg">
+  <link rel="stylesheet" href="pms-operacao.css?v=1">
+</head>
+<body>
+  <div id="pms-shell" class="shell" aria-busy="true">
+    <aside class="rail" id="pms-rail">
+      <a class="brand" href="index.html" aria-label="Chalezinho Ville"><span>Chalezinho</span><em>Ville</em><small>Operação da estadia</small></a>
+      <nav class="rail-nav" aria-label="Módulos operacionais">
+        <button class="active" data-view="today"><i>01</i><span>Hoje</span><b id="today-count">0</b></button>
+        <button data-view="agenda"><i>02</i><span>Agenda</span></button>
+        <button data-view="tasks"><i>03</i><span>Tarefas</span><b id="task-count">0</b></button>
+        <button data-view="maintenance"><i>04</i><span>Manutenção</span><b id="issue-count">0</b></button>
+      </nav>
+      <div class="rail-foot"><span id="operator-name">Equipe</span><small>Ambiente de desenvolvimento</small><button id="sign-out">Sair</button></div>
+    </aside>
+    <main class="workspace">
+      <header class="topbar">
+        <button id="menu-toggle" class="menu-toggle" aria-label="Abrir menu"><span></span><span></span></button>
+        <div><p id="eyebrow">OPERAÇÃO DE HOJE</p><h1 id="page-title">A casa em ordem</h1></div>
+        <div class="top-actions"><button id="refresh">Atualizar</button><button id="new-action" class="accent">+ Nova tarefa</button></div>
+      </header>
+      <section id="loading" class="loading"><span></span><p>Organizando a operação…</p></section>
+      <section id="content" class="content" hidden></section>
+    </main>
+  </div>
+
+  <div id="sheet-shell" class="sheet-shell" hidden>
+    <button class="sheet-backdrop" data-close-sheet aria-label="Fechar"></button>
+    <aside class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-title"><button class="sheet-close" data-close-sheet aria-label="Fechar">×</button><div id="sheet-content"></div></aside>
+  </div>
+  <div id="modal-shell" class="modal-shell" hidden>
+    <button class="sheet-backdrop" data-close-modal aria-label="Fechar"></button>
+    <section class="modal" role="dialog" aria-modal="true"><button class="sheet-close" data-close-modal aria-label="Fechar">×</button><div id="modal-content"></div></section>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app-config.js?v=151"></script>
+  <script src="pms-operacao.js?v=1"></script>
+</body>
+</html>
