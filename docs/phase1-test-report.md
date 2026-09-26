@@ -87,3 +87,13 @@ Nenhum pagamento real foi executado.
 71. Limpeza de QA: zero tarefas, ocorrências e modelos `[DEV]`; modelo padrão ativo com 7 itens preservado — PASS.
 72. Edge Functions atuais: `booking-engine` v45 e `pms-operations` v3, ambas ACTIVE — PASS.
 73. Deployment Preview final `dpl_2vJQ4ACdTJUVmX536BS3YV8SWi6e` READY; produção e `main` não alteradas — PASS.
+74. Migração `pms_full_cycle_operations`: bloqueios operacionais, escopo por imóvel, permissões e tempos de execução/vistoria aplicados — PASS (2026-09-26).
+75. Bloqueio `[DEV]` criado pela tela tornou somente o imóvel selecionado indisponível no motor; demais imóveis permaneceram disponíveis — PASS.
+76. Calendário administrativo exibiu o bloqueio operacional na faixa e imóvel corretos, junto das fontes Site/Airbnb/Booking — PASS.
+77. Reserva `A296A1F6C0`: experiência Noite Romântica e tarefas independentes de preparação da experiência e limpeza exibidas na ficha operacional — PASS.
+78. Designação, início, checklist com dois itens, vistoria e aprovação final foram executados pelas telas; `started_at`, `submitted_at` e `completed_at` persistidos — PASS.
+79. Atribuição, solicitação de vistoria e liberação geraram três notificações administrativas; seis eventos operacionais preservaram a trilha do teste — PASS.
+80. Endpoint PMS sem sessão retornou 403; tabela de bloqueios manteve RLS ativo e zero grants para `anon`/`authenticated` — PASS.
+81. Smokes finais da `booking-engine` v46: config 200, search 200, três imóveis e cobertura Booking.com ativa — PASS.
+82. QA `[DEV]` removido: zero tarefas, itens, notificações e bloqueios temporários remanescentes — PASS.
+83. Preview de desenvolvimento `0dd47a87` aberto em navegador real; PMS, reserva, tarefas e calendário administrativo exercitados — PASS.

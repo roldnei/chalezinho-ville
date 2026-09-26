@@ -84,3 +84,14 @@ Validações adicionais concluídas após o marco acima:
 - Tabelas `pms_*` com RLS ativo, sem SELECT para `anon`/`authenticated` e acesso de `service_role` — PASS.
 - Nenhum registro temporário `[DEV]` de tarefa, ocorrência ou checklist permaneceu no banco — PASS.
 - Vercel deployment `dpl_2vJQ4ACdTJUVmX536BS3YV8SWi6e` em estado READY, sem promoção para produção — PASS.
+
+### Ciclo operacional completo do PMS (2026-09-26)
+
+- Ficha da reserva reúne hóspede, contato, datas, total, pagamentos, experiências, observações e tarefas — PASS.
+- Pacote pago gera preparação própria com item/quantidade; a tarefa de limpeza continua separada e idempotente — PASS.
+- Criação, designação, início, checklist, vistoria e liberação final executados pelas telas — PASS.
+- Somente administrador/anfitrião pode aprovar e liberar; checklist incompleto é rejeitado no backend — PASS.
+- Bloqueio manual impede venda no motor e aparece no calendário administrativo — PASS.
+- Notificações de atribuição, vistoria e imóvel pronto geradas com deduplicação — PASS.
+- Segurança: endpoint sem operador 403, RLS ativo e nenhum grant direto de `anon`/`authenticated` — PASS.
+- Nenhum dado temporário `[DEV]` permaneceu no PMS após a rodada — PASS.

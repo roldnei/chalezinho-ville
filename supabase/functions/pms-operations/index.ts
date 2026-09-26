@@ -29,15 +29,16 @@ async function syncTurnovers(actorId:string){
     const scheduled=`${r.check_out}T${String(property?.check_out_time||"11:00").slice(0,5)}:00-03:00`;
     const due=`${r.check_out}T14:30:00-03:00`;
     const {data:existing}=await admin.from("pms_tasks").select("id").eq("reservation_id",r.id).eq("task_type","turnover").maybeSingle();
-    if(existing)continue;
-    const {data:task}=await admin.from("pms_tasks").insert({property_id:r.property_id,reservation_id:r.id,task_type:"turnover",title:`Preparar ${property?.name||"imóvel"}`,description:`Saída de ${r.guest_name||"hóspede"}. Limpeza e vistoria antes da próxima entrada.`,scheduled_for:scheduled,due_at:due,created_by:actorId}).select("id").single();
-    if(task?.id){
-      const {data:templates}=await admin.from("pms_checklist_templates").select("id,property_id,pms_checklist_template_items(label,display_order)").eq("task_type","turnover").eq("active",true).or(`property_id.eq.${r.property_id},property_id.is.null`).order("property_id",{ascending:false});
-      const template=(templates||[]).find((x:any)=>Number(x.property_id)===Number(r.property_id))||(templates||[]).find((x:any)=>x.property_id===null);
-      const labels=template?.pms_checklist_template_items?.sort((a:any,b:any)=>a.display_order-b.display_order).map((x:any)=>x.label)||[
-        "Recolher lixo e itens esquecidos","Trocar enxoval e toalhas","Higienizar banheiro e hidro/spa","Limpar cozinha e conferir utensílios","Repor amenities e itens de boas-vindas","Conferir área externa","Fotografar vistoria final"
-      ];
-      await admin.from("pms_task_checklist_items").insert(labels.map((label:string,index:number)=>({task_id:task.id,label,display_order:index})));
+    if(!existing){
+      const {data:task}=await admin.from("pms_tasks").insert({property_id:r.property_id,reservation_id:r.id,task_type:"turnover",title:`Preparar ${property?.name||"imóvel"}`,description:`Saída de ${r.guest_name||"hóspede"}. Limpeza e vistoria antes da próxima entrada.`,scheduled_for:scheduled,due_at:due,created_by:actorId}).select("id").single();
+      if(task?.id){
+        const {data:templates}=await admin.from("pms_checklist_templates").select("id,property_id,pms_checklist_template_items(label,display_order)").eq("task_type","turnover").eq("active",true).or(`property_id.eq.${r.property_id},property_id.is.null`).order("property_id",{ascending:false});
+        const template=(templates||[]).find((x:any)=>Number(x.property_id)===Number(r.property_id))||(templates||[]).find((x:any)=>x.property_id===null);
+        const labels=template?.pms_checklist_template_items?.sort((a:any,b:any)=>a.display_order-b.display_order).map((x:any)=>x.label)||[
+          "Recolher lixo e itens esquecidos","Trocar enxoval e toalhas","Higienizar banheiro e hidro/spa","Limpar cozinha e conferir utensílios","Repor amenities e itens de boas-vindas","Conferir área externa","Fotografar vistoria final"
+        ];
+        await admin.from("pms_task_checklist_items").insert(labels.map((label:string,index:number)=>({task_id:task.id,label,display_order:index})));
+      }
     }
     const experiences=(r.experience_orders||[]).filter((o:any)=>o.status==="active").flatMap((o:any)=>o.experience_order_items||[]).filter((x:any)=>x.status==="active");
     if(experiences.length){
