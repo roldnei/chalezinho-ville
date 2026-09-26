@@ -97,3 +97,6 @@ Nenhum pagamento real foi executado.
 81. Smokes finais da `booking-engine` v46: config 200, search 200, três imóveis e cobertura Booking.com ativa — PASS.
 82. QA `[DEV]` removido: zero tarefas, itens, notificações e bloqueios temporários remanescentes — PASS.
 83. Preview de desenvolvimento `0dd47a87` aberto em navegador real; PMS, reserva, tarefas e calendário administrativo exercitados — PASS.
+84. Migração `pms_team_access_management`: convites e perfis operacionais permanecem server-only, com RLS e sem grants para `anon`/`authenticated` — PASS (2026-09-26).
+85. Acesso por imóvel deixa de interpretar escopo vazio como acesso global; operadores existentes foram migrados explicitamente para os imóveis já disponíveis — PASS.
+86. Proteções administrativas impedem auto-rebaixamento, auto-suspensão e remoção do último proprietário administrador — PASS.

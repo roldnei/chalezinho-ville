@@ -28,6 +28,7 @@
 - RLS e papéis guest/admin.
 - Central administrativa unificada em desenvolvimento: agenda, entradas/saídas, reservas, alertas, financeiro, experiências e imóveis.
 - PMS operacional da Fase 1: prontidão por imóvel, ficha unificada da reserva, check-in/out, não comparecimento, bloqueios de inventário, tarefas, preparação de experiências, checklists, equipe, ocorrências, evidências, indicadores, notificações e auditoria.
+- Equipe e acessos autogerenciável: convite por e-mail, proprietário/gerente/limpeza/prestador, escopo por imóvel, permissões por módulo, suspensão sem apagar histórico, último acesso e trilha de auditoria.
 
 ## Não é GO-LIVE
 
@@ -41,7 +42,7 @@
 ## Fechamento técnico
 
 - Edge Function booking-engine: versão 46 ativa no Supabase de desenvolvimento.
-- Edge Function pms-operations: versão 6 ativa no Supabase de desenvolvimento.
+- Edge Function pms-operations: versão 7 ativa no Supabase de desenvolvimento.
 - Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.

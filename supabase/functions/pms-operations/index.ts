@@ -13,13 +13,25 @@ async function operator(request:Request){
   if(!token)return null;
   const {data:{user},error}=await admin.auth.getUser(token);
   if(error||!user)return null;
-  const {data:profile}=await admin.from("profiles").select("role,full_name,pms_property_ids,pms_permissions").eq("id",user.id).maybeSingle();
-  if(!profile||!["admin","host","staff"].includes(profile.role))return null;
-  return {id:user.id,role:profile.role,name:profile.full_name||user.email||"Equipe",property_ids:profile.pms_property_ids||[],permissions:profile.pms_permissions||{}};
+  const {data:profile}=await admin.from("profiles").select("role,full_name,pms_property_ids,pms_permissions,pms_access_status,pms_position").eq("id",user.id).maybeSingle();
+  if(!profile||!["admin","host","staff","service_provider"].includes(profile.role))return null;
+  if(profile.pms_access_status==="invited"&&user.email_confirmed_at){
+    await admin.from("profiles").update({pms_access_status:"active",pms_last_access_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",user.id);
+    await admin.from("pms_team_invitations").update({status:"accepted",accepted_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("invited_user_id",user.id).eq("status","pending");
+    profile.pms_access_status="active";
+  }
+  if((profile.pms_access_status||"active")!=="active")return null;
+  admin.from("profiles").update({pms_last_access_at:new Date().toISOString()}).eq("id",user.id).then(()=>{});
+  return {id:user.id,email:user.email||null,role:profile.role,name:profile.full_name||user.email||"Equipe",position:profile.pms_position||null,property_ids:profile.pms_property_ids||[],permissions:profile.pms_permissions||{}};
 }
 
 const canManage=(actor:any)=>actor.role==="admin"||actor.role==="host";
-const canUseProperty=(actor:any,propertyId:number)=>canManage(actor)||!actor.property_ids?.length||actor.property_ids.includes(propertyId);
+const canUseProperty=(actor:any,propertyId:number)=>actor.role==="admin"||actor.property_ids?.includes(propertyId);
+const validRoles=["admin","host","staff","service_provider"];
+const permissionKeys=["reservations","housekeeping","maintenance","finance","manage_team"];
+const roleDefaults=(role:string)=>role==="admin"?Object.fromEntries(permissionKeys.map(k=>[k,true])):role==="host"?{reservations:true,housekeeping:true,maintenance:true,finance:false,manage_team:false}:role==="staff"?{reservations:false,housekeeping:true,maintenance:false,finance:false,manage_team:false}:{reservations:false,housekeeping:false,maintenance:true,finance:false,manage_team:false};
+const cleanPermissions=(value:any,role:string)=>{const defaults=roleDefaults(role);for(const key of permissionKeys)if(typeof value?.[key]==="boolean")defaults[key]=value[key];return defaults};
+const cleanPropertyIds=(value:any,available:number[])=>[...new Set((Array.isArray(value)?value:[]).map(Number).filter((id:number)=>available.includes(id)))];
 
 async function syncTurnovers(actorId:string){
   const start=new Date(Date.now()-2*86400000).toISOString().slice(0,10),end=new Date(Date.now()+45*86400000).toISOString().slice(0,10);
@@ -55,14 +67,14 @@ async function syncTurnovers(actorId:string){
 }
 
 async function hub(actor:any){
-  await syncTurnovers(actor.id);
+  if(canManage(actor))await syncTurnovers(actor.id);
   const start=new Date(Date.now()-7*86400000).toISOString(),end=new Date(Date.now()+60*86400000).toISOString();
   const [properties,tasks,issues,reservations,team,templates,attachments,blocks,notifications,activity]=await Promise.all([
     admin.from("properties").select("id,code,name,cover_image,active,check_in_time,check_out_time").eq("active",true).order("id"),
     admin.from("pms_tasks").select("*,pms_task_checklist_items(*)").gte("scheduled_for",start).lte("scheduled_for",end).order("scheduled_for"),
     admin.from("pms_issues").select("*").not("status","in",'(resolved,cancelled)').order("created_at",{ascending:false}),
     admin.from("reservations").select("id,property_id,user_id,confirmation_code,guest_name,guest_email,guest_phone,guests,check_in,check_out,status,source,rate_plan_code,stay_amount,experience_amount,total_amount,operational_status,checked_in_at,checked_out_at,created_at,experience_orders(status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status))").in("status",["confirmed","cancelled","no_show"]).gte("check_out",new Date(Date.now()-365*86400000).toISOString().slice(0,10)).lte("check_in",new Date(Date.now()+730*86400000).toISOString().slice(0,10)).order("created_at",{ascending:false}).limit(750),
-    admin.from("profiles").select("id,full_name,role,pms_property_ids,pms_permissions").in("role",["admin","host","staff"]).order("full_name"),
+    admin.from("profiles").select("id,full_name,role,pms_property_ids,pms_permissions,pms_access_status,pms_position,pms_last_access_at,created_at").in("role",validRoles).order("full_name"),
     admin.from("pms_checklist_templates").select("*,pms_checklist_template_items(*)").order("name"),
     admin.from("pms_issue_attachments").select("*").order("created_at",{ascending:false}),
     admin.from("pms_calendar_blocks").select("*").gte("end_date",new Date(Date.now()-30*86400000).toISOString().slice(0,10)).order("start_date"),
@@ -82,8 +94,18 @@ async function hub(actor:any){
     admin.from("reservation_notes").select("id,reservation_id,note,author_user_id,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("audit_events").select("id,actor_user_id,action,entity_type,entity_id,old_value,new_value,created_at").in("entity_id",reservationIds).order("created_at",{ascending:false}).limit(250)
   ]):[{data:[]},{data:[]},{data:[]},{data:[]},{data:[]}];
-  const visibleTasks=(tasks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))&&(actor.role!=="staff"||!x.assigned_user_id||x.assigned_user_id===actor.id));
-  return json({ok:true,server_now:new Date().toISOString(),properties:visibleProperties,tasks:visibleTasks,issues:(issues.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),reservations:visibleReservations,team:team.data||[],templates:templates.data||[],attachments:evidence,blocks:(blocks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),notifications:notifications.data||[],activity:activity.data||[],payments:payments.data||[],charges:charges.data||[],guarantees:guarantees.data||[],notes:notes.data||[],audit:audit.data||[],operator:actor});
+  const visibleTasks=(tasks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))&&(!["staff","service_provider"].includes(actor.role)||!x.assigned_user_id||x.assigned_user_id===actor.id));
+  const canSeeGuests=actor.role==="admin"||actor.permissions?.reservations===true;
+  const safeReservations=visibleReservations.map((r:any)=>canSeeGuests?r:{...r,guest_email:null,guest_phone:null,stay_amount:null,experience_amount:null,total_amount:null});
+  let teamRows:any[]=[];let invitations:any[]=[];
+  if(actor.role==="admin"||actor.permissions?.manage_team===true){
+    const users=await Promise.all((team.data||[]).map(async (member:any)=>{const {data}=await admin.auth.admin.getUserById(member.id);return {...member,email:data.user?.email||null,email_confirmed_at:data.user?.email_confirmed_at||null}}));
+    teamRows=users;
+    const {data:invites}=await admin.from("pms_team_invitations").select("*").in("status",["pending","expired"]).order("created_at",{ascending:false});
+    invitations=invites||[];
+  }else teamRows=(team.data||[]).filter((member:any)=>member.id===actor.id).map((member:any)=>({...member,email:null,pms_permissions:{}}));
+  const financial=actor.role==="admin"||actor.permissions?.finance===true;
+  return json({ok:true,server_now:new Date().toISOString(),properties:visibleProperties,tasks:visibleTasks,issues:(issues.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),reservations:safeReservations,team:teamRows,invitations,templates:templates.data||[],attachments:evidence,blocks:(blocks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),notifications:notifications.data||[],activity:activity.data||[],payments:financial?payments.data||[]:[],charges:financial?charges.data||[]:[],guarantees:financial?guarantees.data||[]:[],notes:canSeeGuests?notes.data||[]:[],audit:actor.role==="admin"?audit.data||[]:[],operator:actor});
 }
 
 async function taskAction(body:any,actor:any){
@@ -246,13 +268,54 @@ async function templateAction(body:any,actor:{id:string,role?:string}){
 
 async function teamAction(body:any,actor:{id:string,role?:string}){
   if(actor.role!=="admin")return json({ok:false,error:"admin_required"},403);
-  if(clip(body.operation,30)!=="set_role")return json({ok:false,error:"invalid_operation"},400);
-  const userId=clip(body.user_id,80),role=clip(body.role,30);
-  if(!userId||!["admin","host","staff","guest"].includes(role))return json({ok:false,error:"invalid_role"},400);
-  if(userId===actor.id&&role!=="admin")return json({ok:false,error:"cannot_demote_self"},409);
-  const {data,error}=await admin.from("profiles").update({role,updated_at:new Date().toISOString()}).eq("id",userId).select("id,full_name,role").single();
+  const operation=clip(body.operation,30);
+  const {data:propertyRows}=await admin.from("properties").select("id").eq("active",true);
+  const available=(propertyRows||[]).map((x:any)=>Number(x.id));
+  if(operation==="invite"){
+    const email=clip(body.email,320).toLowerCase(),fullName=clip(body.full_name,160),role=clip(body.role,30),position=clip(body.position,100)||null;
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||fullName.length<2||!validRoles.includes(role))return json({ok:false,error:"invalid_invitation"},400);
+    const propertyIds=role==="admin"?available:cleanPropertyIds(body.property_ids,available),permissions=cleanPermissions(body.permissions,role);
+    if(role!=="admin"&&!propertyIds.length)return json({ok:false,error:"property_required"},400);
+    const {data:list}=await admin.auth.admin.listUsers({page:1,perPage:1000});
+    let invitedUser=list.users.find((u:any)=>u.email?.toLowerCase()===email)||null;
+    if(!invitedUser){
+      const site=(Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL")||"https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app").replace(/\/$/,"");
+      const {data,error}=await admin.auth.admin.inviteUserByEmail(email,{data:{full_name:fullName},redirectTo:`${site}/auth-callback.html?next=pms-operacao.html%3Fview%3Dteam`});
+      if(error||!data.user)return json({ok:false,error:"invite_send_failed"},502);
+      invitedUser=data.user;
+    }
+    const accessStatus=invitedUser.email_confirmed_at?"active":"invited",now=new Date().toISOString();
+    const {error:profileError}=await admin.from("profiles").upsert({id:invitedUser.id,full_name:fullName,role,pms_position:position,pms_property_ids:propertyIds,pms_permissions:permissions,pms_access_status:accessStatus,updated_at:now},{onConflict:"id"});
+    if(profileError)return json({ok:false,error:"profile_create_failed"},500);
+    const {data:invitation,error:inviteError}=await admin.from("pms_team_invitations").upsert({email,full_name:fullName,role,position,property_ids:propertyIds,permissions,status:accessStatus==="active"?"accepted":"pending",invited_user_id:invitedUser.id,invited_by:actor.id,accepted_at:accessStatus==="active"?now:null,cancelled_at:null,expires_at:new Date(Date.now()+7*86400000).toISOString(),updated_at:now},{onConflict:"email"}).select().single();
+    if(inviteError)return json({ok:false,error:"invitation_record_failed"},500);
+    await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_team_invited",entity_type:"profile",entity_id:invitedUser.id,new_value:{email,role,position,property_ids:propertyIds,permissions}});
+    return json({ok:true,invitation});
+  }
+  if(operation==="cancel_invite"){
+    const invitationId=clip(body.invitation_id,80),now=new Date().toISOString();
+    const {data:invitation}=await admin.from("pms_team_invitations").update({status:"cancelled",cancelled_at:now,updated_at:now}).eq("id",invitationId).eq("status","pending").select().maybeSingle();
+    if(!invitation)return json({ok:false,error:"invitation_not_found"},404);
+    if(invitation.invited_user_id)await admin.from("profiles").update({pms_access_status:"suspended",updated_at:now}).eq("id",invitation.invited_user_id).eq("pms_access_status","invited");
+    await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_invitation_cancelled",entity_type:"pms_team_invitation",entity_id:invitationId});
+    return json({ok:true});
+  }
+  if(operation!=="update")return json({ok:false,error:"invalid_operation"},400);
+  const userId=clip(body.user_id,80),role=clip(body.role,30),position=clip(body.position,100)||null,status=clip(body.status,30);
+  if(!userId||!validRoles.includes(role)||!["active","suspended"].includes(status))return json({ok:false,error:"invalid_team_member"},400);
+  if(userId===actor.id&&(role!=="admin"||status!=="active"))return json({ok:false,error:"cannot_remove_self"},409);
+  const {data:before}=await admin.from("profiles").select("id,role,pms_access_status,pms_property_ids,pms_permissions,pms_position").eq("id",userId).maybeSingle();
+  if(!before)return json({ok:false,error:"member_not_found"},404);
+  if(before.role==="admin"&&(role!=="admin"||status!=="active")){
+    const {count}=await admin.from("profiles").select("id",{count:"exact",head:true}).eq("role","admin").eq("pms_access_status","active");
+    if(Number(count||0)<=1)return json({ok:false,error:"last_admin_required"},409);
+  }
+  const propertyIds=role==="admin"?available:cleanPropertyIds(body.property_ids,available),permissions=cleanPermissions(body.permissions,role);
+  if(status==="active"&&role!=="admin"&&!propertyIds.length)return json({ok:false,error:"property_required"},400);
+  const update={role,pms_position:position,pms_property_ids:propertyIds,pms_permissions:permissions,pms_access_status:status,updated_at:new Date().toISOString()};
+  const {data,error}=await admin.from("profiles").update(update).eq("id",userId).select("id,full_name,role,pms_property_ids,pms_permissions,pms_access_status,pms_position,pms_last_access_at").single();
   if(error)return json({ok:false,error:"team_update_failed"},500);
-  await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_team_role_changed",entity_type:"profile",entity_id:userId,new_value:{role}});
+  await admin.from("audit_events").insert({actor_user_id:actor.id,action:status==="suspended"?"pms_team_suspended":"pms_team_updated",entity_type:"profile",entity_id:userId,old_value:before,new_value:update});
   return json({ok:true,member:data});
 }
 
