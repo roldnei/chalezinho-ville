@@ -57,7 +57,7 @@ Validações adicionais concluídas após o marco acima:
 - Compra pós-reserva usa carrinho antes da cobrança e separa “Experiências no carrinho” de “Pagamentos pendentes” — PASS.
 - Termos de Hospedagem, Regras da Propriedade e Política de Privacidade continuam em rascunho e dependem de aprovação antes do GO-LIVE.
 - Gateway real continua não escolhido; pagamentos seguem em modo mock.
-- Provedor transacional de e-mail continua não escolhido; o outbox está pronto, mas não envia externamente.
+- A entrega transacional usa contrato desacoplado `EmailProvider`; o adaptador Brevo está configurado em desenvolvimento. Antes do GO-LIVE ainda é necessário validar o domínio remetente e a entrega real.
 - Leaked Password Protection continua desativado porque o projeto está no plano Supabase Free e o painel exige Pro ou superior.
 - O Preview protegido foi aberto em navegador real e a jornada pública de busca, tarifa e experiência foi exercitada em 1366×768 equivalente. A aprovação visual humana final e os demais dispositivos físicos permanecem pré-GO-LIVE.
 
@@ -71,3 +71,16 @@ Validações adicionais concluídas após o marco acima:
 - Outbox: `queued → processing → queued` no retry e `failed` ao atingir o limite — PASS com rollback.
 - RPCs financeiras e de entrega continuam bloqueadas para `anon`/`authenticated` e disponíveis somente para `service_role` — PASS.
 - Nenhum resíduo `[DEV]` dos testes de outbox — PASS.
+
+### Consolidação do PMS operacional (2026-09-26)
+
+- Preview final `c6eeb131` aberto em navegador real com autenticação administrativa — PASS.
+- Visão de hoje carregou 3 imóveis, prontidão operacional, entradas, saídas, hóspedes e ocorrências — PASS.
+- Calendário unificado carregou reservas do site, Airbnb e Booking.com e exibiu pacotes associados — PASS.
+- Checklists reutilizáveis: modelo padrão ativo com 7 itens e rótulos operacionais revisados — PASS.
+- Equipe e papéis operacionais carregaram com atribuição de administrador/anfitrião/equipe — PASS.
+- Datas e horários de tarefa são convertidos explicitamente de America/Sao_Paulo para UTC; 12:00 local = 15:00Z — PASS automatizado.
+- Sintaxe dos JavaScripts do Preview final — PASS.
+- Tabelas `pms_*` com RLS ativo, sem SELECT para `anon`/`authenticated` e acesso de `service_role` — PASS.
+- Nenhum registro temporário `[DEV]` de tarefa, ocorrência ou checklist permaneceu no banco — PASS.
+- Vercel deployment `dpl_2vJQ4ACdTJUVmX536BS3YV8SWi6e` em estado READY, sem promoção para produção — PASS.

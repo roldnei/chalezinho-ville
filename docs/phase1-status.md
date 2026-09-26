@@ -40,7 +40,8 @@
 
 ## Fechamento técnico
 
-- Edge Function booking-engine: versão 40 ativa no Supabase.
+- Edge Function booking-engine: versão 45 ativa no Supabase.
+- Edge Function pms-operations: versão 3 ativa no Supabase.
 - Último smoke técnico: config 200, search 200 e cobertura Booking.com ativa para CH1/CH2/CH3.
 - pg_net temporário removido após QA.
 - Índices de FKs adicionados para crescimento.
@@ -61,7 +62,8 @@
 
 ## QA técnico mais recente
 
-- booking-engine ativa no Supabase: v40.
+- booking-engine ativa no Supabase: v45.
+- pms-operations ativa no Supabase: v3.
 - alteração de reserva e captura de garantia endurecidas com operações atômicas no banco.
 - nenhum pagamento real ativado.
 - produção pública continua fora deste fluxo de GO-LIVE.
@@ -70,6 +72,6 @@
 
 1. Documentos jurídicos finais aprovados.
 2. Gateway real + webhooks/refunds/pré-autorização.
-3. Provedor transacional de e-mail e credenciais.
+3. Validar domínio remetente e entrega real do adaptador Brevo já configurado; a arquitetura permanece substituível por outro provedor.
 4. Leaked Password Protection, dependente de plano Supabase Pro ou superior.
 5. Aprovação visual humana final nos viewports obrigatórios.

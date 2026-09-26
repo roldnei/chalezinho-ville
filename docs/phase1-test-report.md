@@ -81,3 +81,9 @@ Nenhum pagamento real foi executado.
 65. Painel operacional voltou a listar solicitações após remoção de relacionamento PostgREST inválido; datas solicitadas são exibidas corretamente na pendência — PASS.
 66. Quatro reservas `[DEV]` desta rodada, seus pagamentos, ledger, eventos, quotes e dependências foram removidos; nenhum carrinho ou órfão financeiro permaneceu — PASS.
 67. Edge Function v40: zero respostas 4xx/5xx nos logs do período; Preview `e4a2159` READY; produção e `main` não alteradas — PASS.
+68. PMS final `c6eeb131`: autenticação administrativa, visão de hoje, checklists, equipe e calendário unificado exercitados no Preview — PASS (2026-09-26).
+69. Horários operacionais convertidos de America/Sao_Paulo para UTC sem deslocamento indevido — PASS automatizado (`12:00 -03:00 = 15:00Z`).
+70. Sete tabelas `pms_*`: RLS ativo, `anon`/`authenticated` sem leitura direta e `service_role` autorizado — PASS.
+71. Limpeza de QA: zero tarefas, ocorrências e modelos `[DEV]`; modelo padrão ativo com 7 itens preservado — PASS.
+72. Edge Functions atuais: `booking-engine` v45 e `pms-operations` v3, ambas ACTIVE — PASS.
+73. Deployment Preview final `dpl_2vJQ4ACdTJUVmX536BS3YV8SWi6e` READY; produção e `main` não alteradas — PASS.
