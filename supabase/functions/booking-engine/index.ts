@@ -429,16 +429,19 @@ async function startPayment(req:Request,body:any){
   if(!user) return json({ok:false,error:"authentication_required"},401);
   const {quote_id,quote_option_id,guest_name,guest_email,guest_phone,guests,travel_purpose_code,accepted_document_ids=[],method="mock",installments=1}=body||{};
   if(!quote_id||!quote_option_id||!guest_name||!guest_email||!guest_phone) return json({ok:false,error:"missing_data"},400);
+  const {data:identityPresent,error:identityError}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
+  if(identityError) return json({ok:false,error:"identity_check_unavailable"},500);
+  if(!identityPresent) return json({ok:false,error:"identity_required"},403);
 
   const {data:settings}=await admin.from("payment_settings").select("*").eq("id",1).single();
   const maxInst=Math.max(1,Number(settings?.max_card_installments||1));
   if(method==="card"&&(Number(installments)<1||Number(installments)>maxInst)) return json({ok:false,error:"invalid_installments"},400);
 
   const {data:option,error:optionError}=await admin.from("quote_options")
-    .select("id,quote_id,rate_plans(cancellation_policy_id)")
+    .select("id,quote_id,cancellation_policy_id")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
-  const requiredPolicyId=(option as any).rate_plans?.cancellation_policy_id;
+  const requiredPolicyId=option.cancellation_policy_id;
   const acceptedIds=Array.isArray(accepted_document_ids)?accepted_document_ids.map(String):[];
   if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
     return json({ok:false,error:"policy_acceptance_required"},400);
@@ -462,17 +465,14 @@ async function startPayment(req:Request,body:any){
     .select("*,rate_plans(code,cancellation_policy_id),quotes(property_id)")
     .eq("id",quote_option_id).single();
 
-  const policyIds=new Set<string>((Array.isArray(accepted_document_ids)?accepted_document_ids:[]).map(String));
-  const cancellationId=(opt as any)?.rate_plans?.cancellation_policy_id;
-
-  if(policyIds.size){
-    const {data:docs}=await admin.from("policy_documents").select("id,code,version").in("id",[...policyIds]);
-    if(docs?.length){
-      await admin.from("reservation_policy_acceptances").insert(docs.map((d:any)=>({
-        reservation_id:reservationId,user_id:user.id,document_id:d.id,document_code:d.code,document_version:d.version
-      })));
-    }
-  }
+  const {data:acceptedPolicy,error:policyError}=await admin.from("policy_documents")
+    .select("id,code,version").eq("id",requiredPolicyId).single();
+  if(policyError||!acceptedPolicy) return json({ok:false,error:"policy_unavailable"},409);
+  const {error:acceptanceError}=await admin.from("reservation_policy_acceptances").insert({
+    reservation_id:reservationId,user_id:user.id,document_id:acceptedPolicy.id,
+    document_code:acceptedPolicy.code,document_version:acceptedPolicy.version
+  });
+  if(acceptanceError) return json({ok:false,error:"policy_acceptance_failed"},500);
 
   const {data:qitems}=await admin.from("quote_experience_items").select("*").eq("quote_id",quote_id);
   if(qitems?.length){
@@ -510,6 +510,24 @@ async function startPayment(req:Request,body:any){
   await admin.from("financial_entries").insert(ledger);
 
   return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,hold_expires_at:hold.hold_expires_at,payment});
+}
+
+async function reservationPolicy(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const reservationId=String(body?.reservation_id||"");
+  if(!reservationId) return json({ok:false,error:"missing_data"},400);
+  const {data:reservation,error:reservationError}=await admin.from("reservations")
+    .select("id,user_id,confirmation_code").eq("id",reservationId).single();
+  if(reservationError||!reservation||reservation.user_id!==user.id) return json({ok:false,error:"not_found"},404);
+  const {data:rows,error}=await admin.from("reservation_policy_acceptances")
+    .select("document_code,document_version,accepted_at,policy_documents(title,body,code,version)")
+    .eq("reservation_id",reservationId).order("accepted_at");
+  if(error) return json({ok:false,error:"policy_unavailable"},500);
+  return json({ok:true,confirmation_code:reservation.confirmation_code,documents:(rows||[]).map((a:any)=>({
+    code:a.document_code,version:a.document_version,accepted_at:a.accepted_at,
+    title:a.policy_documents?.title||"Política de cancelamento",body:a.policy_documents?.body||""
+  }))});
 }
 
 async function cancelPendingPayment(req:Request,body:any,development:boolean){
@@ -624,8 +642,14 @@ async function requestModification(req:Request,body:any,development:boolean){
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},409);
     return json({ok:false,error:msg},409);
   }
-  const option=quote.rate_options.find((x:any)=>x.code===r.rate_plan_code && x.selectable) || quote.rate_options.find((x:any)=>x.code==="non_refundable");
-  const originalCents=Math.round(Number(r.stay_amount||0)*100);
+  const option=quote.rate_options.find((x:any)=>x.code===r.rate_plan_code && x.selectable);
+  if(!option) return json({ok:false,error:"original_rate_unavailable"},409);
+  // Include prior paid date/property changes in the price already committed by the guest.
+  const {data:appliedChanges,error:appliedError}=await admin.from("modification_requests")
+    .select("admin_additional_amount_cents").eq("reservation_id",r.id).eq("status","applied");
+  if(appliedError) return json({ok:false,error:"modification_history_unavailable"},500);
+  const originalCents=Math.round(Number(r.stay_amount||0)*100)+(appliedChanges||[])
+    .reduce((sum:number,x:any)=>sum+Number(x.admin_additional_amount_cents||0),0);
   const referenceCents=Number(option?.stay_amount_cents||0);
   const estimatedAdditional=Math.max(0,referenceCents-originalCents);
   const {data:m,error}=await admin.from("modification_requests").insert({
@@ -708,7 +732,33 @@ async function modificationAction(req:Request,body:any,development:boolean){
       return json({ok:false,error:target?.unavailable_reason||"dates_unavailable"},409);
     }
 
-    const amount=Math.max(0,Number(body?.additional_amount_cents||0));
+    // Refresh availability and price when approving; the request-time quote only lasts 15 minutes.
+    let currentQuote:any;
+    try{
+      currentQuote=await createQuote({property_id:targetProperty,check_in:targetIn,check_out:targetOut,
+        guests:Number(m.reservations?.guests||2),experience_variant_ids:[]},development,m.reservation_id);
+    }catch(e){
+      const message=String((e as Error)?.message||"modification_quote_failed");
+      const min=/^minimum_stay:(\d+)$/.exec(message);
+      return json({ok:false,error:min?"minimum_stay":message,min_stay:min?Number(min[1]):undefined},409);
+    }
+    const currentOption=currentQuote.rate_options.find((x:any)=>x.code===m.reservations?.rate_plan_code&&x.selectable);
+    if(!currentOption) return json({ok:false,error:"original_rate_unavailable"},409);
+    const freshReference=Number(currentOption.stay_amount_cents);
+    const {error:repriceError}=await admin.from("modification_requests").update({
+      reference_quote_id:currentQuote.quote_id,reference_amount_cents:freshReference,
+      estimated_additional_amount_cents:Math.max(0,freshReference-Number(m.original_amount_cents))
+    }).eq("id",m.id).in("status",["requested","quoted"]);
+    if(repriceError) return json({ok:false,error:"modification_reprice_failed"},500);
+    if(freshReference!==Number(m.reference_amount_cents))
+      return json({ok:false,error:"modification_price_changed",reference_amount_cents:freshReference,
+        additional_amount_cents:Math.max(0,freshReference-Number(m.original_amount_cents))},409);
+    // The approved charge is calculated server-side; a cheaper replacement keeps the paid price.
+    const originalCents=Number(m.original_amount_cents);
+    const referenceCents=freshReference;
+    if(!Number.isSafeInteger(originalCents)||!Number.isSafeInteger(referenceCents)||originalCents<0||referenceCents<0)
+      return json({ok:false,error:"invalid_modification_quote"},409);
+    const amount=Math.max(0,referenceCents-originalCents);
     const {data:settings}=await admin.from("payment_settings").select("modification_payment_deadline_hours").eq("id",1).single();
     const {data,error}=await admin.rpc("create_modification_charge_atomic",{
       p_request_id:m.id,
@@ -1536,6 +1586,28 @@ Deno.serve(async(req)=>{
     const action=url.searchParams.get("action")||body.action||"config";
     const development=req.headers.get("x-chalezinho-env")==="development";
 
+    if(action==="identity_status"||action==="complete_identity"){
+      const user=await currentUser(req);
+      if(!user) return json({ok:false,error:"authentication_required"},401);
+      if(!development) return json({ok:false,error:"not_available"},403);
+      if(action==="identity_status"){
+        const {data,error}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
+        if(error) return json({ok:false,error:"identity_check_unavailable"},500);
+        return json({ok:true,complete:Boolean(data)});
+      }
+      const {data,error}=await admin.rpc("register_guest_identity",{
+        p_user_id:user.id,
+        p_document_type:body.document_type,
+        p_issuing_country:body.issuing_country,
+        p_document_number:body.document_number
+      });
+      if(error){
+        if(error.code==="23505") return json({ok:false,error:"identity_conflict"},409);
+        if(String(error.message).includes("invalid_document")) return json({ok:false,error:"invalid_document"},400);
+        return json({ok:false,error:"identity_registration_failed"},500);
+      }
+      return json({ok:true,complete:Boolean(data)});
+    }
     if(action==="config"){
       const purposesQ=await retryDb("travel_purposes",()=>admin.from("travel_purposes").select("*").eq("active",true).order("display_order"));
       if(purposesQ.error) return json({ok:false,error:"config_unavailable"},500);
@@ -1577,6 +1649,7 @@ Deno.serve(async(req)=>{
     if(action==="upsell_preview") return await upsellPreview(body);
     if(action==="apply_upsell") return await applyUpsell(body,development);
     if(action==="start_payment") return await startPayment(req,body);
+    if(action==="reservation_policy") return await reservationPolicy(req,body);
     if(action==="cancel_pending_payment") return await cancelPendingPayment(req,body,development);
     if(action==="mock_payment") return await mockPayment(req,body);
     if(action==="start_post_booking_payment") return await startPostBookingPayment(req,body,development);
