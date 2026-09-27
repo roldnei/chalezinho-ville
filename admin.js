@@ -9,7 +9,7 @@ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&
 const brl=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const date=v=>v?new Date(String(v).length===10?v+"T12:00:00":v).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric"}):"—";
 const shortDate=v=>v?new Date(v+"T12:00:00").toLocaleDateString("pt-BR",{day:"2-digit",month:"short"}):"—";
-const dateTime=v=>v?new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+const dateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
 const today=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const prop=id=>state?.properties.find(p=>Number(p.id)===Number(id));
 const byReservation=(rows,id)=>rows.filter(x=>String(x.reservation_id)===String(id));
@@ -242,7 +242,7 @@ function openReservation(id){
   ${mods.length?`<section class="drawer-block"><h3>Alterações</h3>${mods.map(m=>`<div class="drawer-line"><span>${statusLabel(m.status)} · ${date(m.requested_check_in)} a ${date(m.requested_check_out)}</span><strong>${brl(m.admin_additional_amount_cents||0)}</strong></div>`).join("")}</section>`:""}
   ${guarantees.length?`<section class="drawer-block"><h3>Garantia</h3>${guarantees.map(g=>`<div class="drawer-line"><span>${statusLabel(g.status)}</span><strong>${brl(g.amount_cents)}</strong></div>`).join("")}</section>`:""}
   <section class="drawer-block"><h3>Histórico interno</h3><div class="drawer-notes">${notes.length?notes.map(n=>`<p>${esc(n.note)}<small>${dateTime(n.created_at)}</small></p>`).join(""):empty("Nenhuma anotação interna.")}</div><form id="reservation-note-form" class="drawer-note-form"><textarea name="note" rows="2" placeholder="Escreva uma observação para a equipe"></textarea><button>Adicionar</button></form></section>
-  <section class="drawer-actions"><button data-checkin ${r.status!=="confirmed"||r.operational_status==="checked_in"?"disabled":""}>Registrar check-in</button><button data-checkout ${r.status!=="confirmed"||r.operational_status==="checked_out"?"disabled":""}>Registrar checkout</button>${r.status==="confirmed"?'<button class="danger" data-cancel-reservation>Cancelar reserva</button>':""}</section>`;
+  <section class="drawer-actions"><button data-checkin ${r.status!=="confirmed"||r.check_in>today()||r.check_out<today()||r.checked_in_at?"disabled":""}>Registrar check-in</button><button data-checkout ${r.status!=="confirmed"||r.check_in>today()||!r.checked_in_at||r.checked_out_at?"disabled":""}>Registrar checkout</button>${r.status==="confirmed"?'<button class="danger" data-cancel-reservation>Cancelar reserva</button>':""}</section>`;
   $("#reservation-drawer").hidden=false;document.body.classList.add("drawer-open");
   $("#reservation-note-form").onsubmit=e=>addNote(e,r.id);const ci=$("[data-checkin]"),co=$("[data-checkout]"),ca=$("[data-cancel-reservation]");if(ci)ci.onclick=()=>reservationAction(r.id,"check_in");if(co)co.onclick=()=>reservationAction(r.id,"check_out");if(ca)ca.onclick=()=>cancelReservation(r.id);
 }
