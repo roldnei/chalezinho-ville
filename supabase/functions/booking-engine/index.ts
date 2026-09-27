@@ -383,7 +383,7 @@ async function applyUpsell(body:any,development:boolean){
 
   const planIds=[...new Set(newOptions.map((x:any)=>x.rate_plan_id))];
   const {data:plans}=await admin.from("rate_plans")
-    .select("id,code,name,selectable,cancellation_policy_id,policy_documents(title,body,version,code)")
+    .select("id,code,name,selectable,cancellation_policy_id,policy_documents(id,title,body,version,code)")
     .in("id",planIds);
   const byPlan=Object.fromEntries((plans||[]).map((p:any)=>[String(p.id),p]));
   const display=newOptions.map((o:any)=>{
@@ -874,6 +874,7 @@ async function adminReservationAction(req:Request,body:any){
   const {data:reservation,error}=await admin.from("reservations").select("*").eq("id",reservationId).single();
   if(error||!reservation) return json({ok:false,error:"reservation_not_found"},404);
   const now=new Date().toISOString();
+  const todayInBrazil=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 
   if(operation==="add_note"){
     const note=String(body?.note||"").trim().slice(0,2000);
@@ -884,6 +885,7 @@ async function adminReservationAction(req:Request,body:any){
   }
   if(operation==="check_in"){
     if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+    if(reservation.check_in>todayInBrazil||reservation.check_out<todayInBrazil||reservation.checked_in_at) return json({ok:false,error:"check_in_not_allowed"},409);
     const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_in",checked_in_at:reservation.checked_in_at||now,updated_at:now}).eq("id",reservation.id).select().single();
     if(updateError) return json({ok:false,error:"check_in_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_in",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_in_at:data.checked_in_at}});
@@ -891,6 +893,7 @@ async function adminReservationAction(req:Request,body:any){
   }
   if(operation==="check_out"){
     if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+    if(reservation.check_in>todayInBrazil||!reservation.checked_in_at||reservation.checked_out_at) return json({ok:false,error:"check_out_not_allowed"},409);
     const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_out",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservation.id).select().single();
     if(updateError) return json({ok:false,error:"check_out_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_out_at:data.checked_out_at}});
