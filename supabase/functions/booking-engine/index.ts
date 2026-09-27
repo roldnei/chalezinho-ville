@@ -433,6 +433,15 @@ async function startPayment(req:Request,body:any){
   const maxInst=Math.max(1,Number(settings?.max_card_installments||1));
   if(method==="card"&&(Number(installments)<1||Number(installments)>maxInst)) return json({ok:false,error:"invalid_installments"},400);
 
+  const {data:option,error:optionError}=await admin.from("quote_options")
+    .select("id,quote_id,rate_plans(cancellation_policy_id)")
+    .eq("id",quote_option_id).eq("quote_id",quote_id).single();
+  if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
+  const requiredPolicyId=(option as any).rate_plans?.cancellation_policy_id;
+  const acceptedIds=Array.isArray(accepted_document_ids)?accepted_document_ids.map(String):[];
+  if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
+    return json({ok:false,error:"policy_acceptance_required"},400);
+
   const {data:rpc,error:rpcErr}=await admin.rpc("start_payment_hold",{
     p_quote_id:quote_id,p_quote_option_id:quote_option_id,p_user_id:user.id,
     p_guest_name:guest_name,p_guest_email:guest_email,p_guest_phone:guest_phone,p_guests:Number(guests||2)
@@ -454,7 +463,7 @@ async function startPayment(req:Request,body:any){
 
   const policyIds=new Set<string>((Array.isArray(accepted_document_ids)?accepted_document_ids:[]).map(String));
   const cancellationId=(opt as any)?.rate_plans?.cancellation_policy_id;
-  if(cancellationId) policyIds.add(String(cancellationId));
+
   if(policyIds.size){
     const {data:docs}=await admin.from("policy_documents").select("id,code,version").in("id",[...policyIds]);
     if(docs?.length){
