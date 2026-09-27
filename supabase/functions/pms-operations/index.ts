@@ -68,10 +68,10 @@ async function syncTurnovers(actorId:string){
 
 async function hub(actor:any){
   if(canManage(actor))await syncTurnovers(actor.id);
-  const start=new Date(Date.now()-7*86400000).toISOString(),end=new Date(Date.now()+60*86400000).toISOString();
+  const start=new Date(Date.now()-365*86400000).toISOString(),end=new Date(Date.now()+730*86400000).toISOString();
   const [properties,tasks,issues,reservations,team,templates,attachments,blocks,notifications,activity]=await Promise.all([
     admin.from("properties").select("id,code,name,cover_image,active,check_in_time,check_out_time").eq("active",true).order("id"),
-    admin.from("pms_tasks").select("*,pms_task_checklist_items(*)").gte("scheduled_for",start).lte("scheduled_for",end).order("scheduled_for"),
+    admin.from("pms_tasks").select("*,pms_task_checklist_items(*)").gte("scheduled_for",start).lte("scheduled_for",end).order("scheduled_for").limit(1000),
     admin.from("pms_issues").select("*").not("status","in",'(resolved,cancelled)').order("created_at",{ascending:false}),
     admin.from("reservations").select("id,property_id,user_id,confirmation_code,guest_name,guest_email,guest_phone,guests,check_in,check_out,status,source,rate_plan_code,stay_amount,experience_amount,total_amount,operational_status,checked_in_at,checked_out_at,created_at,experience_orders(status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status))").in("status",["confirmed","cancelled","no_show"]).gte("check_out",new Date(Date.now()-365*86400000).toISOString().slice(0,10)).lte("check_in",new Date(Date.now()+730*86400000).toISOString().slice(0,10)).order("created_at",{ascending:false}).limit(750),
     admin.from("profiles").select("id,full_name,role,pms_property_ids,pms_permissions,pms_access_status,pms_position,pms_last_access_at,created_at").in("role",validRoles).order("full_name"),
@@ -195,6 +195,7 @@ async function reservationAction(body:any,actor:any){
   const {data:reservation}=await admin.from("reservations").select("*").eq("id",reservationId).maybeSingle();
   if(!reservation||!canUseProperty(actor,Number(reservation.property_id)))return json({ok:false,error:"reservation_not_found"},404);
   const now=new Date().toISOString();
+  const todayInBrazil=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
   if(operation==="add_note"){
     const note=clip(body.note,2000);if(!note)return json({ok:false,error:"note_required"},400);
     const {data,error}=await admin.from("reservation_notes").insert({reservation_id:reservationId,author_user_id:actor.id,note}).select().single();
@@ -202,6 +203,7 @@ async function reservationAction(body:any,actor:any){
   }
   if(operation==="check_in"){
     if(reservation.status!=="confirmed")return json({ok:false,error:"reservation_not_confirmed"},409);
+    if(reservation.check_in>todayInBrazil||reservation.check_out<todayInBrazil||reservation.checked_in_at)return json({ok:false,error:"check_in_not_allowed"},409);
     const {data,error}=await admin.from("reservations").update({operational_status:"checked_in",checked_in_at:reservation.checked_in_at||now,updated_at:now}).eq("id",reservationId).select().single();
     if(error)return json({ok:false,error:"check_in_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"reservation_check_in",entity_type:"reservation",entity_id:reservationId,new_value:{checked_in_at:data.checked_in_at}});
@@ -209,6 +211,7 @@ async function reservationAction(body:any,actor:any){
   }
   if(operation==="check_out"){
     if(reservation.status!=="confirmed")return json({ok:false,error:"reservation_not_confirmed"},409);
+    if(reservation.check_in>todayInBrazil||!reservation.checked_in_at||reservation.checked_out_at)return json({ok:false,error:"check_out_not_allowed"},409);
     const {data,error}=await admin.from("reservations").update({operational_status:"preparing",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservationId).select().single();
     if(error)return json({ok:false,error:"check_out_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservationId,new_value:{checked_out_at:data.checked_out_at,operational_status:"preparing"}});
