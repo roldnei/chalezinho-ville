@@ -4,7 +4,7 @@ const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null};
-let anonymousId="";
+let anonymousId="",searchSequence=0;
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
@@ -59,17 +59,20 @@ function error(t){$("#booking-error").textContent=t}
 function setFlowError(t){$("#checkout-error").textContent=t}
 
 async function search(){
+ const sequence=++searchSequence;
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
  if(!bi||!bo||bo<=bi)return error("Escolha datas válidas.");
  error("Consultando disponibilidade e valores...");
+ $("#booking-results").classList.add("booking-results-hidden");
  track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
   const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
+  if(sequence!==searchSequence)return;
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
   state.search=d.listings;renderResults(d.listings);error("");
   track("search_completed",{metadata:{nights:nights(bi,bo),guests,available_count:d.listings.filter(x=>x.available).length}});
- }catch(e){error("Não foi possível consultar agora. Tente novamente.");}
+ }catch(e){if(sequence===searchSequence)error("Não foi possível consultar agora. Tente novamente.");}
 }
 function renderResults(list){
  const box=$("#booking-list");box.innerHTML="";$("#booking-results").classList.remove("booking-results-hidden");
