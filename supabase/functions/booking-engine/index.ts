@@ -192,7 +192,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   }
 
   const {data:plans,error:ple}=await admin.from("rate_plans")
-    .select("id,code,name,multiplier_bps,selectable,cancellation_policy_id,policy_documents(title,body,version,code)")
+    .select("id,code,name,multiplier_bps,selectable,cancellation_policy_id,policy_documents(id,title,body,version,code)")
     .eq("active",true).order("display_order");
   if(ple) throw new Error("rate_plan_failed");
 
