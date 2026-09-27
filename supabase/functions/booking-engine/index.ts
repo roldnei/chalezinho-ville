@@ -209,6 +209,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     if(p.selectable) inserted.push(row);
     display.push({
       code:p.code,name:p.name,selectable:p.selectable,
+      accommodation_amount_cents:accommodation,cleaning_fee_cents:cleaningCents,
       stay_amount_cents:accommodation+cleaningCents,
       experience_amount_cents:experienceTotal,total_amount_cents:total,
       cancellation_policy:p.policy_documents||null
