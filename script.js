@@ -1,6 +1,11 @@
 document.addEventListener('DOMContentLoaded',()=>{const els=document.querySelectorAll('.reveal');if(!('IntersectionObserver'in window)){els.forEach(e=>e.classList.add('visible'));return}const io=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('visible');io.unobserve(e.target)}})},{threshold:.12,rootMargin:'0px 0px -6% 0px'});els.forEach(e=>io.observe(e));});
 
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded',async()=>{
+ try{
+  const endpoint='https://irxsaladqhbzhkoaclxy.supabase.co/functions/v1/booking-engine?action=property_media';
+  const response=await fetch(endpoint,{headers:{'X-Chalezinho-Env':'development'}});
+  if(response.ok){const payload=await response.json();if(payload.ok)applyPropertyMedia(payload.properties||[])}
+ }catch(error){console.warn('Galeria indisponível; exibindo fotos atuais.',error)}
  document.querySelectorAll('[data-carousel]').forEach(box=>{
   const slides=Array.from(box.querySelectorAll('.chalet-slide'));
   const dots=Array.from(box.querySelectorAll('.chalet-dots button'));
@@ -46,3 +51,25 @@ document.addEventListener('DOMContentLoaded',()=>{
   });
  });
 });
+
+function applyPropertyMedia(properties){
+ const list=new Map(properties.map(p=>[p.code,p]));
+ const cards=document.querySelector('.collection .cards');
+ if(cards)properties.filter(p=>(p.cover_image||(Array.isArray(p.gallery)&&p.gallery.length))&&!cards.querySelector(`[data-property-code="${CSS.escape(p.code)}"]`)).forEach(p=>{
+  const article=document.createElement('article');article.dataset.propertyCode=p.code;
+  const photo=document.createElement('div');photo.className='chalet-photo chalet-carousel';photo.dataset.carousel='';
+  const badge=document.createElement('span');badge.className='type-badge';badge.textContent=p.property_type==='chalet'?'Chalé':p.property_type==='apartment'?'Apartamento':'Hospedagem';photo.append(badge);
+  for(const [klass,label] of [['prev','Foto anterior'],['next','Próxima foto']]){const b=document.createElement('button');b.className='chalet-arrow '+klass;b.type='button';b.textContent=klass==='prev'?'‹':'›';b.setAttribute('aria-label',label);photo.append(b)}
+  const dots=document.createElement('div');dots.className='chalet-dots';photo.append(dots);article.append(photo);
+  const heading=document.createElement('div');heading.className='chalet-heading';const title=document.createElement('h3'),link=document.createElement('a');link.className='chalet-detail-link';link.href='imovel.html?codigo='+encodeURIComponent(p.code);link.textContent=p.name;title.append(link);heading.append(title);article.append(heading);
+  const description=document.createElement('div'),summary=document.createElement('p');summary.textContent=p.summary||p.tagline||'Conheça este imóvel e consulte as datas disponíveis.';description.append(summary);const details=document.createElement('a');details.href=link.href;details.textContent='Conhecer o imóvel →';description.append(details);article.append(description);cards.append(article)
+ });
+ const usable=p=>{const gallery=(Array.isArray(p.gallery)?p.gallery:[]).map(x=>typeof x==='string'?{url:x,alt:p.name}:x).filter(x=>x&&isPropertyImage(x.url));const cover=p.cover_image&&isPropertyImage(p.cover_image)?p.cover_image:null;return cover?[...gallery.filter(x=>x.url===cover),...gallery.filter(x=>x.url!==cover)]:gallery};
+ document.querySelectorAll('[data-property-code]').forEach(container=>{
+  const p=list.get(container.dataset.propertyCode);if(!p)return;const images=usable(p);if(!images.length)return;
+  const carousel=container.querySelector('[data-carousel]');
+  if(carousel){carousel.querySelectorAll('.chalet-slide').forEach(el=>el.remove());const dots=carousel.querySelector('.chalet-dots');dots.replaceChildren();images.forEach((item,i)=>{const img=document.createElement('img');img.className='chalet-slide'+(i===0?' active':'');img.src=item.url;img.alt=item.alt||p.name;img.loading=i?'lazy':'eager';carousel.insertBefore(img,carousel.querySelector('.chalet-arrow'));const dot=document.createElement('button');dot.type='button';dot.setAttribute('aria-label','Foto '+(i+1));dots.append(dot)});}
+  const hero=container.querySelector('.detail-hero');if(hero){hero.style.backgroundImage=`linear-gradient(0deg,rgba(8,6,4,.78),rgba(8,6,4,.08)),url("${images[0].url}")`;const closing=container.querySelector('.detail-closing');if(closing)closing.style.backgroundImage=`linear-gradient(0deg,rgba(8,6,4,.78),rgba(8,6,4,.18)),url("${images[0].url}")`;const gallery=container.querySelector('.detail-gallery');if(gallery){gallery.replaceChildren();images.forEach(item=>{const figure=document.createElement('figure'),img=document.createElement('img');img.src=item.url;img.alt=item.alt||p.name;img.loading='lazy';figure.append(img);gallery.append(figure)})}}
+ });
+}
+function isPropertyImage(url){return typeof url==='string' && (/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=[0-9]+)?$/.test(url)||url.startsWith('https://irxsaladqhbzhkoaclxy.supabase.co/storage/v1/object/public/property-media/'))}

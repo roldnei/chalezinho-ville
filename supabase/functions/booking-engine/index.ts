@@ -929,6 +929,13 @@ async function adminPropertyAction(req:Request,body:any){
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const operation=String(body?.operation||"");
   if(operation!=="save") return json({ok:false,error:"invalid_operation"},400);
+  const galleryInput=body?.gallery;
+  if(!Array.isArray(galleryInput)||galleryInput.length>40) return json({ok:false,error:"invalid_gallery"},400);
+  const gallery=galleryInput.map((item:any)=>({url:String(item?.url||""),alt:String(item?.alt||"").trim().slice(0,180)}));
+  const allowedPrefix=projectUrl+"/storage/v1/object/public/property-media/";
+  if(gallery.some((item:any)=>!(item.url.startsWith(allowedPrefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=[0-9]+)?$/.test(item.url)))) return json({ok:false,error:"invalid_gallery_url"},400);
+  const coverImage=String(body?.cover_image||"");
+  if(coverImage && !gallery.some((item:any)=>item.url===coverImage)) return json({ok:false,error:"invalid_cover"},400);
   const id=body?.id?Number(body.id):null;
   const name=String(body?.name||"").trim().slice(0,160);
   const code=String(body?.code||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,30);
@@ -938,7 +945,7 @@ async function adminPropertyAction(req:Request,body:any){
   const checkOut=String(body?.check_out_time||"11:00").slice(0,5);
   if(!name||!code||!slug||!/^\d{2}:\d{2}$/.test(checkIn)||!/^\d{2}:\d{2}$/.test(checkOut)) return json({ok:false,error:"invalid_property"},400);
   const payload={
-    name,code,slug,property_type:propertyType,
+    name,code,slug,property_type:propertyType,cover_image:coverImage||null,gallery,
     tagline:String(body?.tagline||"").trim().slice(0,240)||null,
     summary:String(body?.summary||"").trim().slice(0,3000)||null,
     max_guests:Math.max(1,Math.min(50,Math.round(Number(body?.max_guests||2)))),
@@ -948,7 +955,7 @@ async function adminPropertyAction(req:Request,body:any){
   };
   const result=id
     ? await admin.from("properties").update(payload).eq("id",id).select().single()
-    : await admin.from("properties").insert({...payload,gallery:[],features:{}}).select().single();
+    : await admin.from("properties").insert({...payload,features:{}}).select().single();
   if(result.error||!result.data) return json({ok:false,error:"property_save_failed"},409);
   await admin.from("audit_events").insert({actor_user_id:user.id,action:id?"property_updated":"property_created",entity_type:"property",entity_id:String(result.data.id),new_value:{name,code,active:payload.active}});
   return json({ok:true,property:result.data});
@@ -1537,6 +1544,11 @@ Deno.serve(async(req)=>{
         experience_products:productsQ.data||[],
         availability_coverage:{direct:true,airbnb:true,booking:bookingIcalConfigured()}
       });
+    }
+    if(action==="property_media"){
+      const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery").eq("active",true).order("id");
+      if(error) return json({ok:false,error:"media_unavailable"},500);
+      return json({ok:true,properties:data||[]});
     }
     if(action==="search"){
       const start=url.searchParams.get("start")||body.start;
