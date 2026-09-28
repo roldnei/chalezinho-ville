@@ -18,7 +18,8 @@ const sourceLabel=s=>({direct:"Site",manual:"Manual",airbnb:"Airbnb",booking:"Bo
 const statusClass=s=>["confirmed","paid","applied","checked_in","checked_out"].includes(s)?"is-success":["cancelled","not_confirmed","refused","expired","no_show"].includes(s)?"is-muted":["under_review","pending_payment","hold","awaiting_payment"].includes(s)?"is-warning":"";
 
 async function api(action,body={}){
-  const r=await fetch(ENGINE+"?action="+action,{method:"POST",headers:{"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...body})});
+  const endpoint=action==="reservation_refund_action"?C.refundEngine:ENGINE;
+  const r=await fetch(endpoint+"?action="+action,{method:"POST",headers:{"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...body})});
   const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
   if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});
   return d;
@@ -250,7 +251,27 @@ function openReservation(id){
 }
 async function addNote(e,id){e.preventDefault();const f=e.currentTarget,n=f.note.value.trim();if(!n)return;await api("admin_reservation_action",{operation:"add_note",reservation_id:id,note:n});await load(true);openReservation(id)}
 async function reservationAction(id,operation){await api("admin_reservation_action",{operation,reservation_id:id});await load(true);openReservation(id)}
-function cancelReservation(id){$("#admin-modal-content").innerHTML=`<small>CANCELAMENTO</small><h2>Cancelamento temporariamente indisponível</h2><p>O estorno e a conciliação no PagBank precisam estar ativos no servidor antes de cancelar esta reserva. A reserva e as datas permanecem ativas.</p>`;openModal()}
+function cancelReservation(id){
+  $("#admin-modal-content").innerHTML=`<small>CANCELAMENTO · PAGBANK SANDBOX</small><h2>Calcular devolução</h2><form id="refund-prepare" class="admin-form"><p>A reserva permanece ativa até a confirmação do PagBank e da conciliação.</p><label>Justificativa<textarea name="reason" rows="3" required></textarea></label><p class="admin-form-message" role="status"></p><button class="admin-primary">Ver cálculo e cobranças</button></form>`;
+  openModal();$("#refund-prepare").onsubmit=async e=>{
+    e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");
+    b.disabled=true;m.textContent="Conferindo pagamentos e política aceita…";
+    try{const d=await api("reservation_refund_action",{reservation_id:id,operation:"prepare",reason:f.reason.value});renderRefundDecision(id,d)}
+    catch(err){m.textContent=refundError(err)}finally{b.disabled=false}
+  };
+}
+const refundError=e=>({accepted_policy_missing:"A versão aceita da política não foi encontrada.",ledger_review_required:"Os valores pagos não coincidem com o financeiro; revisão necessária.",partial_refund_provider_receipt_required:"Estorno parcial exige comprovante de valor do PagBank; solicitação bloqueada para revisão.",captured_charges_required:"Não há cobrança PagBank paga e identificada para esta reserva.",individual_review_required:"A política exige análise individual.",refund_allocation_requires_review:"A distribuição entre cobranças exige revisão."})[e.message]||"Não foi possível confirmar esta operação. A reserva permanece ativa; consulte a conciliação.";
+function renderRefundDecision(id,d){
+  const alloc=d.calculation?.allocations||[];
+  $("#admin-modal-content").innerHTML=`<small>ESTORNO · ${esc(d.status)}</small><h2>${brl(d.refund_due_cents)} a devolver</h2><p>Confirmado no financeiro: ${brl(d.confirmed_cents)}. Restante: ${brl(Math.max(0,d.refund_due_cents-d.confirmed_cents))}.</p><p>Política aceita: versão ${esc(d.accepted_version||"—")}. A reserva só será cancelada após conciliação.</p><div class="admin-stack">${alloc.map(x=>`<p>Cobrança ${esc(String(x.charge_id||"").slice(-8))}: paga ${brl(x.captured_cents)} · devolução ${brl(x.refund_cents)} · ${esc(x.calculation?.reason)}</p>`).join("")}</div><p class="admin-form-message" role="status"></p><div class="drawer-actions">${d.status==="prepared"?'<button class="admin-danger" id="refund-approve">Aprovar e solicitar estorno</button>':d.status!=="confirmed"?'<button id="refund-reconcile">Consultar PagBank</button>':""}</div>`;
+  const button=$(d.status==="prepared"?"#refund-approve":"#refund-reconcile");
+  if(button)button.onclick=async()=>{
+    button.disabled=true;const m=$("#admin-modal-content .admin-form-message");m.textContent="Consultando PagBank e conciliando…";
+    try{const next=await api("reservation_refund_action",{reservation_id:id,operation:d.status==="prepared"?"approve":"reconcile"});
+      if(next.status==="confirmed"){closeModal();await load(true)}else{m.textContent=`Pendente no PagBank: ${brl(next.confirmed_cents)} confirmado de ${brl(next.refund_due_cents)}. A reserva continua ativa.`;button.disabled=false}}
+    catch(err){m.textContent=refundError(err);button.disabled=false}
+  };
+}
 function closeDrawer(){$("#reservation-drawer").hidden=true;document.body.classList.remove("drawer-open")}
 function openModal(){$("#admin-modal").hidden=false;document.body.classList.add("drawer-open")}
 function closeModal(){$("#admin-modal").hidden=true;if($("#reservation-drawer").hidden)document.body.classList.remove("drawer-open")}
