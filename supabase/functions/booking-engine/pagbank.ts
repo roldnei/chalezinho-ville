@@ -80,8 +80,22 @@ export async function getPagBankCharge(token: string, chargeId: string, fetcher:
     headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error("pagbank_charge_unavailable");
+  if (!response.ok) throw new Error(`pagbank_charge_unavailable_${response.status}`);
   return await response.json() as { id: string; status: string; amount: {value: number; currency: string} };
+}
+
+// The order lookup offers a second authoritative way to read the charge when
+// the sandbox charge lookup has not yet synchronized (which can return 404).
+export async function getPagBankOrderCharge(token:string, orderId:string, chargeId:string,
+  fetcher:typeof fetch=fetch) {
+  if(!token || !/^ORDE_[A-Za-z0-9-]+$/.test(orderId)) throw new Error("invalid_order_id");
+  const response=await fetcher(`${bases.sandbox}/orders/${orderId}`,{
+    headers:{Authorization:`Bearer ${token}`,Accept:"application/json"},signal:AbortSignal.timeout(10000)});
+  if(!response.ok) throw new Error(`pagbank_order_unavailable_${response.status}`);
+  const data=await response.json();
+  const charge=data?.charges?.find((entry:{id:string})=>entry.id===chargeId);
+  if(!charge) throw new Error("pagbank_order_charge_missing");
+  return charge as {id:string;status:string;amount:{value:number;currency:string}};
 }
 
 export async function getPagBankCardPublicKey(token: string, fetcher: typeof fetch = fetch) {
@@ -112,4 +126,38 @@ export async function verifyPagBankNotification(token: string, rawBody: string, 
   let diff = 0;
   for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ actual.charCodeAt(i);
   return diff === 0;
+}
+
+let webhookKeyCache:{key:CryptoKey;expires:number}|null=null;
+export async function verifyPagBankSignedNotification(token:string, rawBody:string, signatureHeader:string,
+  fetcher:typeof fetch=fetch) {
+  const signatures=signatureHeader.split(",").map(x=>x.trim()).filter(Boolean);
+  if(!token||!signatures.length) return false;
+  if(!webhookKeyCache||webhookKeyCache.expires<Date.now()) {
+    const response=await fetcher(`${bases.sandbox}/public-keys?type=webhook`,{
+      headers:{Authorization:`Bearer ${token}`,Accept:"application/json"},signal:AbortSignal.timeout(10000)});
+    if(!response.ok) throw new Error("pagbank_webhook_key_unavailable");
+    const data=await response.json();
+    if(typeof data?.public_key!=="string") throw new Error("pagbank_webhook_key_invalid");
+    const bytes=Uint8Array.from(atob(data.public_key),c=>c.charCodeAt(0));
+    const key=await crypto.subtle.importKey("spki",bytes,{name:"ECDSA",namedCurve:"P-256"},false,["verify"]);
+    webhookKeyCache={key,expires:Date.now()+3600000};
+  }
+  const body=new TextEncoder().encode(rawBody);
+  for(const signature of signatures){
+    try {
+      const der=Uint8Array.from(atob(signature),c=>c.charCodeAt(0));
+      // PagBank sends ASN.1 DER. WebCrypto expects IEEE P1363 (r || s).
+      if(der[0]!==0x30||der[1]!==der.length-2||der[2]!==0x02) continue;
+      const rLen=der[3],sTag=4+rLen;
+      if(der[sTag]!==0x02) continue;
+      const sLen=der[sTag+1];
+      if(sTag+2+sLen!==der.length) continue;
+      const r=der.slice(4,sTag),s=der.slice(sTag+2);
+      const normalize=(v:Uint8Array)=>{while(v.length>32&&v[0]===0)v=v.slice(1);if(v.length>32)throw Error("invalid_signature");const out=new Uint8Array(32);out.set(v,32-v.length);return out};
+      const raw=new Uint8Array(64);raw.set(normalize(r));raw.set(normalize(s),32);
+      if(await crypto.subtle.verify({name:"ECDSA",hash:"SHA-256"},webhookKeyCache.key,raw,body))return true;
+    }catch{/* try remaining rotated signatures */}
+  }
+  return false;
 }
