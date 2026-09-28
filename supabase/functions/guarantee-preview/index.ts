@@ -105,9 +105,9 @@ async function handler(req:Request){
       return reply({ok:false,error:"authorization_window_unavailable"},409);
     const encrypted=String(body?.encrypted_card||"");
     if(encrypted.length<20||encrypted.length>10000)return reply({ok:false,error:"encrypted_card_required"},400);
-    const {data:identity}=await admin.schema("private").from("guest_identities")
-      .select("document_number,document_type").eq("user_id",user.id).maybeSingle();
-    if(identity?.document_type!=="cpf")return reply({ok:false,error:"cpf_required"},409);
+    const {data:identity,error:identityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
+    if(identityError)return reply({ok:false,error:"identity_unavailable"},503);
+    if(identity?.[0]?.document_type!=="cpf")return reply({ok:false,error:"cpf_required"},409);
     const phone=String(g.reservations.guest_phone||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
     if(!/^\d{10,11}$/.test(phone))return reply({ok:false,error:"phone_required"},409);
     const attempt=Number(g.authorization_attempt||0)+1;
@@ -119,7 +119,7 @@ async function handler(req:Request){
       const order=pagBankOrder({referenceId,amountCents:Number(g.amount_cents),method:"card",
         encryptedCard:encrypted,installments:1,preAuthorize:true,
         customer:{name:g.reservations.guest_name,email:g.reservations.guest_email,
-          taxId:identity.document_number,phone:{area:phone.slice(0,2),number:phone.slice(2)}},
+          taxId:identity[0].document_number,phone:{area:phone.slice(0,2),number:phone.slice(2)}},
         notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
       order.items[0].name="Caucao Chalezinho Ville";
       order.charges[0].description="Caucao Chalezinho Ville";
