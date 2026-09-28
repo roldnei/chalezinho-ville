@@ -1110,9 +1110,14 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
       if(allRefundsError) return json({ok:false,error:"refund_history_unavailable"},503);
       let remaining=amount;
       for(const x of allocations){
-        const reserved=(allRefunds||[]).filter((v:any)=>v.payment_id===x.payment_id&&v.state!=="failed")
+        const previousForCharge=(allRefunds||[]).filter((v:any)=>v.payment_id===x.payment_id);
+        // An unresolved request may already have reached PagBank. Allocate a
+        // separate voluntary refund to another charge, never the same one.
+        const unresolved=previousForCharge.some((v:any)=>
+          ["prepared","dispatching","uncertain"].includes(v.state));
+        const reserved=previousForCharge.filter((v:any)=>v.state!=="failed")
           .reduce((s:number,v:any)=>s+Number(v.requested_cents),0);
-        x.refund_cents=Math.min(remaining,Math.max(0,x.captured_cents-reserved));
+        x.refund_cents=unresolved?0:Math.min(remaining,Math.max(0,x.captured_cents-reserved));
         x.calculation={reason:"voluntary_refund",refund_cents:x.refund_cents};
         remaining-=x.refund_cents;
       }
