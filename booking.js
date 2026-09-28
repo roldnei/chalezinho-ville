@@ -392,7 +392,7 @@ async function performStartPayment(choice){
 function renderSandboxPayment(d){
  const box=$("#mock-payment"),pix=d.payment.pix_code;
  box.innerHTML='<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
-  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>O cartão de teste foi enviado. Consultando o resultado…</p>')+
+  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>Consultando o resultado desta cobrança de teste…</p>')+
   '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
  if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=()=>navigator.clipboard.writeText(pix)}
  const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
