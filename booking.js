@@ -11,7 +11,7 @@ function downloadPolicyDocument(doc){
  document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null};
-const pagbankSandbox=new URLSearchParams(location.search).get("pagbank")==="sandbox";
+const pagbankSandbox=window.CHALEZINHO_CONFIG.environment==="development";
 let anonymousId="",searchSequence=0;
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
@@ -299,11 +299,11 @@ function renderGuestStep(){
 }
 function validateGuest(){if(!$("#guest-name").value.trim()||!$("#guest-email").value.trim()||!$("#guest-phone").value.trim()){setFlowError("Preencha seus dados.");return false}return true}
 function renderSummary(){
- const total=Number(state.rate.total_amount_cents||0),cleaning=Number(state.rate.cleaning_fee_cents||0),stay=Number(state.rate.accommodation_amount_cents??(state.rate.stay_amount_cents-cleaning));
+ const total=Number(state.rate.total_amount_cents||0),stay=Number(state.rate.stay_amount_cents||0);
  const perNight=Math.round(stay/stayNights());
  const experiences=state.quote?.experiences||[];
  const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
- $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div><div class="summary-line"><span>Taxa de limpeza</span><strong>'+brlC(cleaning)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
+ $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
  const guarantee=Number(state.property.guarantee_amount_cents||0);
  $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · SIMULAÇÃO</small><h4>'+brlC(guarantee)+'</h4><p>A garantia prevista para esta hospedagem é de '+brlC(guarantee)+'. <strong>Neste ambiente não há pré-autorização nem cobrança real.</strong> O procedimento de garantia e sua liberação serão informados antes de uma reserva real.</p></div>':"";
  const doc=state.rate.cancellation_policy;
@@ -374,8 +374,8 @@ function renderSandboxPayment(d){
 }
 function renderMockPayment(d){
  const exp=(state.quote?.experiences||[]).map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
- const cleaning=Number(state.rate.cleaning_fee_cents||0),accommodation=Number(state.rate.accommodation_amount_cents??(state.rate.stay_amount_cents-cleaning));
- const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(accommodation)+'</strong></div><div class="summary-line"><span>Taxa de limpeza</span><strong>'+brlC(cleaning)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
+ const accommodation=Number(state.rate.stay_amount_cents||0);
+ const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(accommodation)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
  const box=$("#mock-payment");
  box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button><small class="mock-help">Aprovado, Recusado e Expirado são resultados finais. Depois de escolher um deles, os outros deixam de ser válidos para esta pré-reserva.</small></div><p id="mock-result"></p>';
  const buttons=[...box.querySelectorAll("[data-outcome]")];
