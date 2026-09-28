@@ -74,7 +74,13 @@ export async function pagBankInstallmentPlans(token: string, value: number, max:
   const response = await fetcher(`${bases.sandbox}/charges/fees/calculate?${query}`, {
     headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000),
   });
-  if (!response.ok) throw new Error(`pagbank_fees_http_${response.status}`);
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => null);
+    const codes = Array.isArray(errorBody?.error_messages) ? errorBody.error_messages
+      .map((item: any) => String(item?.code || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 40))
+      .filter(Boolean).slice(0, 4) : [];
+    throw new Error(`pagbank_fees_http_${response.status}${codes.length ? "_code_" + codes.join("_") : ""}`);
+  }
   const body = await response.json().catch(() => null);
   const brands = Object.values(body?.payment_methods?.credit_card || {}) as any[];
   if (brands.length !== 1 || !Array.isArray(brands[0]?.installment_plans))

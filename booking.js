@@ -293,7 +293,7 @@ async function next(){
 async function renderLoginStep(){
  const {data:{session}}=await sb.auth.getSession();state.session=session;const box=$("#login-state");
  if(session){const {data:u}=await sb.auth.getUser();if(u.user) state.session={...session,user:u.user};box.innerHTML='<div class="success-state">✓ Você está conectado como <strong>'+esc(u.user?.email||"")+'</strong>.</div>'}
- else box.innerHTML='<p>Para proteger sua reserva e deixar tudo disponível em “Minhas Reservas”, entre ou crie sua conta agora.</p><a class="primary-action inline" href="auth.html?mode=login&return='+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""))+'">Entrar ou criar conta</a>';
+ else {box.innerHTML='<p>Para proteger sua reserva e deixar tudo disponível em “Minhas Reservas”, entre ou crie sua conta agora.</p><a class="primary-action inline" href="auth.html?mode=login&return='+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""))+'">Entrar ou criar conta</a>';box.querySelector('a')?.addEventListener('click',saveResume)}
 }
 function renderGuestStep(){
  const meta=state.session?.user?.user_metadata||{};$("#guest-name").value=$("#guest-name").value||meta.full_name||"";$("#guest-email").value=state.session?.user?.email||"";$("#guest-phone").value=$("#guest-phone").value||meta.phone||"";

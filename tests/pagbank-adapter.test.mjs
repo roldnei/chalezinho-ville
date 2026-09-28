@@ -23,6 +23,8 @@ test('Pix uses exact server amount and 15 minute expiration',()=>{
 
 test('card sends encrypted payload, no raw card number, and captures 100 percent',()=>{
   const order=pagBankOrder({...input,method:'card',encryptedCard:'encrypted-only',installments:2});
+  assert.equal(order.customer.tax_id,customer.taxId);
+  assert.equal(order.charges[0].payment_method.card.holder.tax_id,customer.taxId);
   assert.equal(order.charges[0].payment_method.capture,true);
   assert.equal(order.charges[0].payment_method.card.encrypted,'encrypted-only');
   assert.equal(order.charges[0].payment_method.installments,2);
@@ -64,6 +66,12 @@ test('fees API returns exact buyer total for a card BIN and rejects inconsistent
     async()=>new Response(JSON.stringify({payment_methods:{credit_card:{visa:{installment_plans:[
       {installments:7,installment_value:1500,interest_free:true,amount:{value:10000}}
     ]}}}}),{status:200})),/invalid/);
+});
+
+test('fees API exposes only sanitized error codes for provider diagnostics',async()=>{
+  await assert.rejects(pagBankInstallmentPlans('token',10000,12,6,'453962',
+    async()=>new Response(JSON.stringify({error_messages:[{code:'40001',message:'sensitive text'}]}),{status:400})),
+    error=>error.message==='pagbank_fees_http_400_code_40001');
 });
 
 test('damage authorization is requested without immediate capture',()=>{

@@ -88,7 +88,7 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   try{
     const {terms,plans}=await chargeInstallments(propertyId,amount,1,bin,token);
     return json({ok:true,base_amount_cents:amount,terms,plans});
-  }catch(e){return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
+  }catch(e){console.error(JSON.stringify({event:"installment_options_failed",code:e instanceof Error?e.message:"unknown"}));return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
     "invalid_payment_terms":"installment_plans_unavailable"},503)}
 }
 
