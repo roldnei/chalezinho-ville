@@ -66,6 +66,14 @@ test('damage authorization is requested without immediate capture',()=>{
   assert.equal(order.charges[0].amount.value,input.amountCents);
 });
 
+test('guarantee lookup preserves the provider capture deadline',async()=>{
+  const deadline='2026-10-01T15:00:00-03:00';
+  const charge=await getPagBankCharge('sandbox-token','CHAR_1234567890',async()=>
+    new Response(JSON.stringify({id:'CHAR_1234567890',status:'AUTHORIZED',
+      amount:{value:50000,currency:'BRL'},payment_method:{capture_before:deadline}}),{status:200}));
+  assert.equal(charge.captureBefore,deadline);
+});
+
 test('partial refund and capture preserve amount, sandbox URL and idempotency key',async()=>{
   const calls=[];
   const fetcher=async(url,options)=>{

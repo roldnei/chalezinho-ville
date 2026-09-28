@@ -131,6 +131,7 @@ function normalizeCharge(raw: any) {
   const summary=raw?.amount?.summary;
   return {id:raw?.id as string,status:raw?.status as string,
     amount:{value:raw?.amount?.value as number,currency:raw?.amount?.currency as string},
+    captureBefore:raw?.payment_method?.capture_before as string|undefined,
     summary:summary&&Number.isSafeInteger(summary.paid)&&Number.isSafeInteger(summary.refunded)?
       {...(Number.isSafeInteger(summary.total)?{total:summary.total as number}:{}),
         paid:summary.paid as number,refunded:summary.refunded as number}:undefined,

@@ -18,7 +18,7 @@ const sourceLabel=s=>({direct:"Site",manual:"Manual",airbnb:"Airbnb",booking:"Bo
 const statusClass=s=>["confirmed","paid","applied","checked_in","checked_out"].includes(s)?"is-success":["cancelled","not_confirmed","refused","expired","no_show"].includes(s)?"is-muted":["under_review","pending_payment","hold","awaiting_payment"].includes(s)?"is-warning":"";
 
 async function api(action,body={}){
-  const endpoint=["reservation_refund_action","reservation_cancel_request"].includes(action)?C.refundEngine:ENGINE;
+  const endpoint=["authorize","status","report_incident","capture","release"].includes(action)&&body.guarantee_id?C.guaranteeEngine:["reservation_refund_action","reservation_cancel_request"].includes(action)?C.refundEngine:ENGINE;
   const r=await fetch(endpoint+"?action="+action,{method:"POST",headers:{"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...body})});
   const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
   if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});
@@ -180,8 +180,22 @@ function renderGuarantees(){
   $$('[data-guarantee]').forEach(b=>b.onclick=()=>openGuarantee(b.dataset.guarantee));
 }
 function guaranteeCard(g){const r=state.reservations.find(x=>x.id===g.reservation_id),verified=g.provider==="pagbank_sandbox"&&!!g.provider_authorization_id;return `<article class="admin-operation-card"><div><small>${esc(r?.confirmation_code||"RESERVA")} · ${esc(prop(r?.property_id)?.name||"")}</small><h3>${esc(r?.guest_name||"Hóspede")}</h3><p>${verified?"Pré-autorização PagBank":"Caução sem pré-autorização confirmada"} · ${brl(g.amount_cents)}</p><span class="admin-status ${statusClass(g.status)}">${verified?statusLabel(g.status):"Não autorizada no PagBank"}</span></div><button data-guarantee="${g.id}">Ver garantia</button></article>`}
-function openGuarantee(id){const g=state.guarantees.find(x=>x.id===id);$("#admin-modal-content").innerHTML=`<small>GARANTIA DA HOSPEDAGEM</small><h2>${brl(g.amount_cents)}</h2><p>${g.provider==="pagbank_sandbox"&&g.provider_authorization_id?"Autorização registrada; captura e liberação indisponíveis até a conciliação no PagBank.":"Este registro não representa dinheiro autorizado. Não é possível cobrar ou liberar uma caução sem autorização e conciliação no PagBank."}</p>`;openModal()}
-async function runGuaranteeAction(id,operation){const f=$("#guarantee-form"),m=f.querySelector(".admin-form-message");m.textContent="Processando…";try{await api("guarantee_action",{guarantee_id:id,operation,amount_cents:Math.round(Number(f.amount.value||0)*100),description:f.description.value});closeModal();await load(true);renderGuarantees()}catch(err){m.textContent=({incident_required:"Registre a ocorrência antes de capturar.",capture_exceeds_guarantee:"O valor supera o saldo disponível.",active_incident:"Resolva a ocorrência antes de liberar."})[err.message]||"Não foi possível concluir a ação."}}
+function openGuarantee(id){
+ const g=state.guarantees.find(x=>x.id===id);if(!g)return;
+ const authorized=g.provider==="pagbank_sandbox"&&!!g.provider_authorization_id;
+ const incident=g.incidents?.find(i=>i.status==="open");
+ $("#admin-modal-content").innerHTML=`<small>CAUÇÃO · PAGBANK SANDBOX</small><h2>${brl(g.amount_cents)}</h2><p>${authorized?`Cobrança autorizada até ${dateTime(g.provider_capture_before)}. Estado: ${esc(statusLabel(g.status))}.`:"Ainda não existe autorização confirmada pelo PagBank. Peça ao hóspede para autorizar perto do check-in."}</p><p>Capturado: ${brl(g.captured_amount_cents)}. A reserva financeira só muda após consulta ao PagBank.</p><form id="guarantee-form" class="admin-form"><label>Descrição da ocorrência<input name="description" placeholder="Descreva o dano e a vistoria"></label><label>URL HTTPS da evidência<input name="evidence_url" type="url" placeholder="https://..."></label><label>Valor do dano (R$)<input name="amount" type="number" min="0.01" max="${Number(g.amount_cents)/100}" step="0.01" value="${Number(incident?.requested_capture_cents||0)/100||""}"></label><p class="admin-form-message" role="status"></p><div class="drawer-actions">${g.status==="guaranteed"?'<button type="button" data-guarantee-action="report_incident">Registrar ocorrência</button><button type="button" data-guarantee-action="release">Liberar caução</button>':g.status==="incident_reported"?'<button type="button" class="admin-danger" data-guarantee-action="capture">Capturar valor comprovado</button>':""}<button type="button" data-guarantee-action="status">Consultar PagBank</button></div></form>`;
+ openModal();$("#guarantee-form").querySelectorAll("[data-guarantee-action]").forEach(b=>b.onclick=()=>runGuaranteeAction(id,b.dataset.guaranteeAction));
+}
+async function runGuaranteeAction(id,operation){
+ const f=$("#guarantee-form"),m=f.querySelector(".admin-form-message"),buttons=f.querySelectorAll("button");
+ buttons.forEach(b=>b.disabled=true);m.textContent="Consultando PagBank…";
+ try{const result=await api(operation,{guarantee_id:id,amount_cents:Math.round(Number(f.amount.value||0)*100),description:f.description.value,evidence_url:f.evidence_url.value});
+  if(result.guarantee?.status?.includes("requested")||result.guarantee?.status?.includes("uncertain"))m.textContent="Resultado pendente. Consulte o PagBank antes de nova ação.";
+  else{closeModal();await load(true);renderGuarantees()}
+ }catch(err){m.textContent=({incident_required:"Registre uma ocorrência antes de capturar.",incident_evidence_required:"Descreva o dano e inclua uma URL HTTPS da evidência.",authorization_required:"O PagBank ainda não autorizou esta caução.",capture_result_uncertain:"Captura pendente de conciliação; não repita a cobrança.",release_result_uncertain:"Liberação pendente de conciliação; não repita o cancelamento."})[err.message]||"Não foi possível concluir. Consulte o estado da cobrança antes de tentar novamente."}
+ finally{buttons.forEach(b=>b.disabled=false)}
+}
 
 function renderSettings(){
   const s=state.settings||{},health=state.channel_health||{};

@@ -31,7 +31,39 @@ Deno.serve(async (request) => {
       .eq("provider_payment_id",chargeId).single();
     // A webhook can arrive before the order ID is saved. A non-2xx response
     // lets PagBank retry; the guest can also reconcile via status polling.
-    if(findError||!payment) return new Response("Charge not registered yet",{status:503});
+    if(findError||!payment){
+      const {data:guarantee}=await admin.from("guarantees")
+        .select("id,amount_cents,requested_capture_cents,status,provider_capture_before,reservations(check_out)")
+        .eq("provider","pagbank_sandbox").eq("provider_authorization_id",chargeId).maybeSingle();
+      if(!guarantee)return new Response("Charge not registered yet",{status:503});
+      const charge=await getPagBankCharge(token,chargeId);
+      const original=Number(guarantee.amount_cents);
+      if(charge.id!==chargeId||charge.amount?.currency!=="BRL")return new Response("Charge mismatch",{status:409});
+      if(["authorizing","authorization_uncertain"].includes(guarantee.status)&&charge.status==="AUTHORIZED"&&
+        Number(charge.amount.value)===original){
+        const expiry=Date.parse(charge.captureBefore||guarantee.provider_capture_before||"");
+        const checkout=Date.parse(String((guarantee.reservations as any)?.check_out)+"T11:00:00-03:00");
+        if(Number.isFinite(expiry)&&expiry>checkout+3600000){
+          const {error}=await admin.from("guarantees").update({status:"guaranteed",provider_capture_before:new Date(expiry).toISOString(),
+            provider_last_status:"AUTHORIZED",updated_at:new Date().toISOString()})
+            .eq("id",guarantee.id).in("status",["authorizing","authorization_uncertain"]);
+          if(error)throw error;
+        }
+      }
+      if(["capture_requested","capture_uncertain"].includes(guarantee.status)&&charge.status==="PAID"&&
+        Number(charge.amount.value)===Number(guarantee.requested_capture_cents)){
+        const {error}=await admin.rpc("capture_guarantee_mock_atomic",{
+          p_guarantee_id:guarantee.id,p_actor_user_id:null,
+          p_amount_cents:Number(guarantee.requested_capture_cents)});
+        if(error)throw error;
+      }
+      if(["release_requested","release_uncertain"].includes(guarantee.status)&&charge.status==="CANCELED"){
+        const {error}=await admin.from("guarantees").update({status:"released",provider_last_status:"CANCELED",updated_at:new Date().toISOString()})
+          .eq("id",guarantee.id).in("status",["release_requested","release_uncertain"]);
+        if(error)throw error;
+      }
+      return new Response("ok",{status:200});
+    }
     let charge;
     try{charge=await getPagBankCharge(token,chargeId)}
     catch(error){
