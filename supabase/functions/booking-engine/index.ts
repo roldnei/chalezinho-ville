@@ -1158,6 +1158,24 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     refunds:currentRefunds||[]});
 }
 
+async function reservationRefundStatus(req:Request,body:any,development:boolean){
+  if(!development) return json({ok:false,error:"development_only"},403);
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const reservationId=String(body?.reservation_id||"");
+  const {data:r}=await admin.from("reservations").select("id,user_id").eq("id",reservationId).maybeSingle();
+  if(!r||r.user_id!==user.id) return json({ok:false,error:"reservation_not_found"},404);
+  const {data:c}=await admin.from("reservation_cancellations")
+    .select("id,status,refund_due_cents,accepted_version,created_at").eq("reservation_id",r.id).maybeSingle();
+  if(!c) return json({ok:true,cancellation:null});
+  const {data:refunds}=await admin.from("reservation_refunds")
+    .select("requested_cents,confirmed_cents,state").eq("cancellation_id",c.id);
+  return json({ok:true,cancellation:{status:c.status,refund_due_cents:c.refund_due_cents,
+    confirmed_cents:(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
+    pending_cents:Number(c.refund_due_cents)-(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
+    accepted_version:c.accepted_version,created_at:c.created_at}});
+}
+
 async function adminReservationAction(req:Request,body:any){
   const user=await currentUser(req);
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
@@ -1992,6 +2010,7 @@ Deno.serve(async(req)=>{
     if(action==="admin_cancellation_policy_action") return await adminCancellationPolicyAction(req,body,development);
     if(action==="admin_hub") return await adminHubData(req,body);
     if(action==="reservation_refund_action") return await reservationRefundAction(req,body,development);
+    if(action==="reservation_refund_status") return await reservationRefundStatus(req,body,development);
     if(action==="admin_reservation_action") return await adminReservationAction(req,body);
     if(action==="admin_notification_action") return await adminNotificationAction(req,body);
     if(action==="admin_property_action") return await adminPropertyAction(req,body);

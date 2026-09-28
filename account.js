@@ -24,7 +24,7 @@ async function downloadReservationPolicy(id,button){
 }
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
-async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const r=await fetch(ENGINE+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
+async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const endpoint=action==="reservation_refund_status"?C.refundEngine:ENGINE;const r=await fetch(endpoint+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
 const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
@@ -46,11 +46,24 @@ async function boot(){
  renderExperienceCart(reservationsCache);
  renderPendingPayments(reservationsCache);
  renderReservations(reservationsCache);
+ showRefundStatuses(reservationsCache);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
  if(requestedCharge){
   const charge=charges.find(x=>String(x.id)===String(requestedCharge)&&["awaiting_payment","processing"].includes(x.status));
   if(charge)setTimeout(()=>openChargePayment(charge),100);
  }
+}
+async function showRefundStatuses(rows){
+ await Promise.all(rows.map(async r=>{
+  try{const {cancellation:c}=await api("reservation_refund_status",{reservation_id:r.id});if(!c)return;
+   const card=[...document.querySelectorAll(".account-reservation")].find(x=>x.querySelector(`[data-download-reservation-policy="${r.id}"]`));
+   const target=card?.querySelector(".reservation-detail-copy");if(!target)return;
+   const note=document.createElement("div");note.className="reservation-payment-state "+(c.status==="confirmed"?"success":"info");
+   const due=Number(c.refund_due_cents),confirmed=Number(c.confirmed_cents);
+   note.innerHTML="<small>ESTORNO DA RESERVA</small><strong>"+(c.status==="confirmed"?"Concluído":"Aguardando confirmação do PagBank")+"</strong><p>Solicitado: "+brlC(due)+" · Confirmado: "+brlC(confirmed)+" · Restante: "+brlC(Math.max(0,due-confirmed))+"</p>";
+   target.prepend(note);
+  }catch{/* A failure to read a refund never changes the displayed payment state. */}
+ }));
 }
 
 function renderExperienceCart(reservations){
@@ -224,7 +237,7 @@ function renderReservations(reservations){
   const initialNights=firstAppliedChange?nights(firstAppliedChange.snapshot.original_check_in,firstAppliedChange.snapshot.original_check_out):n;
   const initialLodgingLabel=firstAppliedChange?"Valor inicial da reserva · "+initialNights+" noites":"Hospedagem · "+n+" noites";
   const initialLodgingDetails=firstAppliedChange?"":'<small>'+brl(lodging/n)+' por noite</small>';
-  const paid=payment?.status==="paid";
+  const paid=["paid","refunded"].includes(payment?.status);
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);
   const art=document.createElement("details");art.className="account-reservation reservation-accordion";art.dataset.status=ux.tone;
   if(String(r.id)===String(defaultOpen))art.open=true;
