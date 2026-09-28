@@ -67,7 +67,10 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   if(!development) return json({ok:false,error:"not_allowed"},403);
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
-  const bin=String(body?.credit_card_bin||"");
+  // A reference Mastercard BIN gives an indicative PagBank quote before card entry.
+  // The actual BIN is always queried again and verified when payment starts.
+  const indicative=body?.preview===true;
+  const bin=indicative?"552100":String(body?.credit_card_bin||"");
   if(!/^\d{6}(\d{2})?$/.test(bin)) return json({ok:false,error:"invalid_card_bin"},400);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
@@ -87,7 +90,7 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   }else return json({ok:false,error:"missing_data"},400);
   try{
     const {terms,plans}=await chargeInstallments(propertyId,amount,1,bin,token);
-    return json({ok:true,base_amount_cents:amount,terms,plans});
+    return json({ok:true,base_amount_cents:amount,terms,plans,indicative});
   }catch(e){console.error(JSON.stringify({event:"installment_options_failed",code:e instanceof Error?e.message:"unknown"}));return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
     "invalid_payment_terms":"installment_plans_unavailable"},503)}
 }

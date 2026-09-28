@@ -321,26 +321,36 @@ function renderSummary(){
   card.innerHTML='<label>Nome no cartão<input id="card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="sandbox-card-row"><label>Mês<input id="card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div>';
   pay.appendChild(card);
   let planTimer;
+  let previewPlans=null;
+  const showPlans=(plans,indicative)=>{
+    const select=$("#installments"),previous=Number(select.value||1);
+    select.innerHTML=plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
+    if(plans.some(p=>p.installments===previous))select.value=String(previous);
+    if(indicative)previewPlans=plans;
+    select.dispatchEvent(new Event("change"));
+  };
+  const previewOptionId=state.rate.quote_option_id;
+  api("installment_options",{quote_option_id:previewOptionId,preview:true}).then(quote=>{
+    if(state.rate.quote_option_id===previewOptionId&&!state.installmentQuote&&!$("#card-number")?.value)showPlans(quote.plans,true);
+  }).catch(()=>{$("#installment-total").textContent="Valores acima de "+free+"x indisponíveis no momento. Consulte novamente antes de pagar."});
   $("#card-number").addEventListener("input",()=>{
     clearTimeout(planTimer);state.installmentQuote=null;
     const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
-    if(bin.length!==6)return;
+    if(bin.length!==6){$("#installments").dispatchEvent(new Event("change"));return}
     const optionId=state.rate.quote_option_id;
     planTimer=setTimeout(async()=>{
       try{
         const quote=await api("installment_options",{quote_option_id:optionId,credit_card_bin:bin});
         if(state.rate.quote_option_id!==optionId||$("#card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
         state.installmentQuote={...quote,bin,optionId};
-        const select=$("#installments"),previous=Number(select.value||1);
-        select.innerHTML=quote.plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
-        if(quote.plans.some(p=>p.installments===previous))select.value=String(previous);
-        select.dispatchEvent(new Event("change"));
+        showPlans(quote.plans,false);
       }catch{$("#installment-total").textContent="Não foi possível consultar as parcelas no PagBank. Tente novamente."}
     },250);
   });
   $("#installments").addEventListener("change",()=>{
-    const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
-    $("#installment-total").textContent=plan?'Total a cobrar no cartão: '+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.'):'Informe o cartão para consultar o valor exato no PagBank.';
+    const exact=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
+    const plan=exact||previewPlans?.find(p=>p.installments===Number($("#installments").value));
+    $("#installment-total").textContent=plan?(exact?'Total a cobrar: ':'Simulação antes do cartão: ')+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.')+(exact?'':' Valor final pode variar conforme o cartão e será confirmado antes de pagar.'):'Consultando parcelas no PagBank…';
   });
   pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=paymentChoice().method!=="card"));
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";

@@ -403,25 +403,34 @@ function openChargePayment(chargeInput){
  content.innerHTML='<small>COBRANÇA DA RESERVA · PAGBANK SANDBOX</small><h2>Ir para pagamento de teste</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(amount)+'</strong></div><p>'+rule+'</p><div class="post-payment-methods"><label><input type="radio" name="post-method" value="pix" checked> Pix</label><label><input type="radio" name="post-method" value="card"> Cartão · até '+free+'x sem juros; até '+maxInst+'x com juros</label></div><div id="post-installments-wrap" hidden><label for="post-installments">Parcelamento</label><select id="post-installments">'+opts+'</select><small id="post-installment-total" role="status">Total inicial: '+brlC(amount)+'. Informe o cartão para consultar o valor exato.</small></div><div id="post-card-fields" hidden><label>Nome no cartão<input id="post-card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="post-card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="post-card-short-row"><label>Mês<input id="post-card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="post-card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="post-card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div></div><p>Somente cartões de teste. Nenhuma cobrança real.</p><button class="primary-action" id="post-pay-start">Ir para pagamento de teste</button><div id="post-payment-sim"></div><p id="post-payment-message" class="form-result"></p>';
  content.querySelectorAll('input[name="post-method"]').forEach(r=>r.onchange=()=>{const card=document.querySelector('input[name="post-method"]:checked')?.value==="card";$("#post-installments-wrap").hidden=!card;$("#post-card-fields").hidden=!card});
  let planTimer;
+ let previewPlans=null;
+ const showPlans=(plans,indicative)=>{
+  const select=$("#post-installments"),previous=Number(select.value||1);
+  select.innerHTML=plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
+  if(plans.some(p=>p.installments===previous))select.value=String(previous);
+  if(indicative)previewPlans=plans;
+  select.dispatchEvent(new Event("change"));
+ };
+ api("installment_options",{post_booking_charge_id:charge.id,preview:true}).then(quote=>{
+  if(activeCharge?.id===charge.id&&!postInstallmentQuote&&!$("#post-card-number")?.value)showPlans(quote.plans,true);
+ }).catch(()=>{$("#post-installment-total").textContent="Parcelas com juros indisponíveis no momento. Consulte novamente antes de pagar."});
  $("#post-card-number").oninput=()=>{
   clearTimeout(planTimer);postInstallmentQuote=null;
   const bin=$("#post-card-number").value.replace(/\D/g,"").slice(0,6);
-  if(bin.length!==6)return;
+  if(bin.length!==6){$("#post-installments").dispatchEvent(new Event("change"));return}
   planTimer=setTimeout(async()=>{
     try{
       const quote=await api("installment_options",{post_booking_charge_id:charge.id,credit_card_bin:bin});
       if(activeCharge?.id!==charge.id||$("#post-card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
       postInstallmentQuote={...quote,bin,chargeId:charge.id};
-      const select=$("#post-installments"),previous=Number(select.value||1);
-      select.innerHTML=quote.plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
-      if(quote.plans.some(p=>p.installments===previous))select.value=String(previous);
-      select.dispatchEvent(new Event("change"));
+      showPlans(quote.plans,false);
     }catch{$("#post-installment-total").textContent="Não foi possível consultar o PagBank. Tente novamente."}
   },250);
  };
  $("#post-installments").onchange=()=>{
-  const plan=postInstallmentQuote?.plans.find(p=>p.installments===Number($("#post-installments").value));
-  $("#post-installment-total").textContent=plan?'Total no cartão: '+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.'):'Informe o cartão para consultar o valor exato.';
+  const exact=postInstallmentQuote?.plans.find(p=>p.installments===Number($("#post-installments").value));
+  const plan=exact||previewPlans?.find(p=>p.installments===Number($("#post-installments").value));
+  $("#post-installment-total").textContent=plan?(exact?'Total no cartão: ':'Simulação antes do cartão: ')+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.')+(exact?'':' Valor final pode variar conforme o cartão e será confirmado antes de pagar.'):'Consultando parcelas no PagBank…';
  };
  $("#post-pay-start").onclick=startChargePayment;
 }
