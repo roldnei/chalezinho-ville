@@ -447,6 +447,7 @@ async function applyUpsell(body:any,development:boolean){
 async function startPayment(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
+  if(!development) return json({ok:false,error:"payment_provider_not_ready"},409);
   const {quote_id,quote_option_id,guest_name,guest_email,guest_phone,guests,travel_purpose_code,accepted_document_ids=[],method="mock",installments=1}=body||{};
   const sandbox=development && body?.provider==="pagbank_sandbox";
   const sandboxToken=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
@@ -1857,7 +1858,7 @@ Deno.serve(async(req)=>{
     if(action==="start_payment") return await startPayment(req,body,development);
     if(action==="reservation_policy") return await reservationPolicy(req,body);
     if(action==="cancel_pending_payment") return await cancelPendingPayment(req,body,development);
-    if(action==="mock_payment") return await mockPayment(req,body,development);
+    if(action==="mock_payment") return json({ok:false,error:"not_allowed"},403);
     if(action==="start_post_booking_payment") return await startPostBookingPayment(req,body,development);
     if(action==="confirm_free_post_booking_charge") return await confirmFreePostBookingCharge(req,body);
     if(action==="cancel_post_booking_charge") return await cancelPostBookingCharge(req,body);
