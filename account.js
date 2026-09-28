@@ -1,5 +1,6 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
+const pagbankSandbox=C.environment==="development";
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
 let session=null,profile=null,properties=[],mods=[],charges=[],cartItems=[],reservationsCache=[],shopReservationId=null,paymentSettings={},activeCharge=null;
@@ -184,7 +185,7 @@ function renderReservations(reservations){
   const payment=initialPayment(r),paymentUx=paymentStatus(payment);
   const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
   const pendingExperienceCharges=liveCharges(r.id).filter(c=>["experience_add","experience_upgrade"].includes(c.kind));
-  const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),cleaning=Number(r.cleaning_fee||0),lodging=Number(r.stay_amount||0)-cleaning,per=lodging/n;
+  const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),lodging=Number(r.stay_amount||0),per=lodging/n;
   const paid=payment?.status==="paid";
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);
   const art=document.createElement("details");art.className="account-reservation reservation-accordion";art.dataset.status=ux.tone;
@@ -200,7 +201,7 @@ function renderReservations(reservations){
   const period=r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/");
   const paymentBadge=paymentUx?'<span class="payment-status-badge '+paymentUx.tone+'">'+esc(paymentUx.label)+'</span>':'';
   const paymentPanel=paymentUx?'<div class="reservation-payment-state '+paymentUx.tone+'"><small>STATUS DO PAGAMENTO</small><strong>'+esc(paymentUx.label)+'</strong><p>'+esc(paymentUx.detail)+'</p>'+(payment.method?'<span>'+(payment.method==="pix"?'Pix':payment.method==="card"?'Cartão'+(payment.installments?' · '+payment.installments+'x':''):'Pagamento de teste')+'</span>':'')+'</div>':'';
-  art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-badge-stack"><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span>'+paymentBadge+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>RESERVA · '+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p>'+paymentPanel+'<div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(lodging)+'</strong></div>'+(cleaning?'<div class="reservation-breakdown-row"><span>Taxa de limpeza</span><strong>'+brl(cleaning)+'</strong></div>':'')+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"VALOR DA TENTATIVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';
+  art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-badge-stack"><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span>'+paymentBadge+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>RESERVA · '+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p>'+paymentPanel+'<div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(lodging)+'</strong></div>'+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"VALOR DA TENTATIVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';
   box.appendChild(art);
  });
  box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
@@ -290,21 +291,35 @@ function openChargePayment(chargeInput){
   $("#post-free-confirm").onclick=()=>confirmFreeCharge(charge.id,$("#post-free-confirm"));
   return;
  }
- const maxInst=Math.max(1,Number(paymentSettings.max_card_installments||1));
- const opts=Array.from({length:maxInst},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'x</option>').join("");
+ const maxInst=Math.min(6,Math.max(1,Number(paymentSettings.max_card_installments||1)),Math.max(1,Math.floor(Number(charge.amount_cents||0)/500)));
+ const opts=Array.from({length:maxInst},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'x de aproximadamente '+brlC(Math.round(amount/(i+1)))+' · sem juros</option>').join("");
  const rule=isModification
   ?'A alteração só será confirmada depois do pagamento. As novas datas estão protegidas até <strong>'+deadline+'</strong>. Se o pagamento não for concluído até esse prazo, a solicitação será cancelada automaticamente e sua reserva original continuará válida.'
   :'A experiência ou upgrade só será incluído no valor pago e na reserva depois da confirmação do pagamento.';
- content.innerHTML='<small>COBRANÇA DA RESERVA</small><h2>Ir para pagamento</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(amount)+'</strong></div><p>'+rule+'</p><div class="post-payment-methods"><label><input type="radio" name="post-method" value="pix" checked> Pix</label><label><input type="radio" name="post-method" value="card"> Cartão</label></div><label id="post-installments-wrap" hidden>Parcelamento<select id="post-installments">'+opts+'</select></label><button class="primary-action" id="post-pay-start">Ir para pagamento</button><div id="post-payment-sim"></div><p id="post-payment-message" class="form-result"></p>';
- content.querySelectorAll('input[name="post-method"]').forEach(r=>r.onchange=()=>$("#post-installments-wrap").hidden=r.value!=="card"||!r.checked);
+ content.innerHTML='<small>COBRANÇA DA RESERVA · PAGBANK SANDBOX</small><h2>Ir para pagamento de teste</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(amount)+'</strong></div><p>'+rule+'</p><div class="post-payment-methods"><label><input type="radio" name="post-method" value="pix" checked> Pix</label><label><input type="radio" name="post-method" value="card"> Cartão · até '+maxInst+'x sem juros</label></div><label id="post-installments-wrap" hidden>Parcelamento<select id="post-installments">'+opts+'</select></label><div id="post-card-fields" hidden><label>Nome no cartão<input id="post-card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="post-card-number" inputmode="numeric" autocomplete="cc-number"></label><label>Mês<input id="post-card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="post-card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="post-card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div><p>Somente cartões de teste. Nenhuma cobrança real.</p><button class="primary-action" id="post-pay-start">Ir para pagamento de teste</button><div id="post-payment-sim"></div><p id="post-payment-message" class="form-result"></p>';
+ content.querySelectorAll('input[name="post-method"]').forEach(r=>r.onchange=()=>{const card=document.querySelector('input[name="post-method"]:checked')?.value==="card";$("#post-installments-wrap").hidden=!card;$("#post-card-fields").hidden=!card});
  $("#post-pay-start").onclick=startChargePayment;
+}
+function loadPagBankCardSdk(){
+ if(window.PagSeguro?.encryptCard)return Promise.resolve();
+ return new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://assets.pagseguro.com.br/checkout-sdk-js/rc/dist/browser/pagseguro.min.js";script.onload=resolve;script.onerror=()=>reject(new Error("card_sdk_unavailable"));document.head.appendChild(script)});
+}
+async function encryptPostBookingCard(){
+ const key=await api("pagbank_sandbox_card_key");await loadPagBankCardSdk();
+ const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:$("#post-card-holder").value.trim(),
+  number:$("#post-card-number").value.replace(/\D/g,""),expMonth:$("#post-card-month").value,
+  expYear:$("#post-card-year").value,securityCode:$("#post-card-cvv").value});
+ if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_test_card");
+ ["#post-card-number","#post-card-month","#post-card-year","#post-card-cvv"].forEach(id=>$(id).value="");
+ return card.encryptedCard;
 }
 async function startChargePayment(){
  const btn=$("#post-pay-start");btn.disabled=true;$("#post-payment-message").textContent="Preparando pagamento…";
  const method=document.querySelector('input[name="post-method"]:checked')?.value||"pix";
  const installments=method==="card"?Number($("#post-installments").value||1):1;
  try{
-  const d=await api("start_post_booking_payment",{charge_id:activeCharge.id,method,installments});
+  const encrypted_card=method==="card"?await encryptPostBookingCard():undefined;
+  const d=await api("start_post_booking_payment",{charge_id:activeCharge.id,method,installments,provider:"pagbank_sandbox",encrypted_card});
   if(activeCharge){
    activeCharge.status="processing";
    activeCharge.payment_id=d.payment?.id||activeCharge.payment_id||null;
@@ -312,11 +327,31 @@ async function startChargePayment(){
    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
   }
   $("#post-payment-message").textContent="";
-  renderPostBookingMockPayment(d.payment);
+  renderPostBookingPagBankPayment(d.payment);
  }catch(e){
-  const msg={charge_expired:"O prazo desta cobrança expirou.",payment_provider_not_ready:"O pagamento ainda não está disponível.",invalid_installments:"Escolha um parcelamento válido."}[e.message]||"Não foi possível iniciar o pagamento.";
+  if(e.message==="pagbank_start_uncertain"&&e.data?.payment_id){renderPostBookingPagBankPayment({id:e.data.payment_id});return}
+  const msg={charge_expired:"O prazo desta cobrança expirou.",payment_provider_not_ready:"O pagamento ainda não está disponível.",invalid_installments:"Escolha um parcelamento válido.",invalid_test_card:"Confira os dados do cartão de teste."}[e.message]||"Não foi possível iniciar o pagamento.";
   $("#post-payment-message").textContent=msg;btn.disabled=false;
  }
+}
+function renderPostBookingPagBankPayment(payment){
+ const box=$("#post-payment-sim");
+ box.innerHTML='<div class="post-charge-summary"><span>PagBank sandbox · '+(payment.method==="card"?"Cartão":"Pix")+'</span><strong>'+brlC(payment.amount_cents||activeCharge?.amount_cents)+'</strong></div>'+
+  (payment.pix_code?'<p>Pix copia e cola de teste:</p><textarea readonly aria-label="Pix copia e cola">'+esc(payment.pix_code)+'</textarea>':'')+
+  '<p id="post-sandbox-status" role="status">Consultando a cobrança no PagBank…</p>';
+ clearInterval(window.__postPagbankPoll);
+ const tick=async()=>{try{
+  const s=await api("pagbank_sandbox_status",{payment_id:payment.id});
+  const status=$("#post-sandbox-status");if(!status)return;
+  if(s.manual_review){status.textContent="Pagamento requer conferência manual. Não tente pagar novamente.";clearInterval(window.__postPagbankPoll);return}
+  if(s.charge_status==="applied"){status.textContent="Pagamento aprovado. Experiência incluída na reserva.";clearInterval(window.__postPagbankPoll);setTimeout(()=>location.reload(),1200);return}
+  if(["refused","cancelled","expired"].includes(s.payment_status)){
+   status.textContent="Pagamento não aprovado. Se o prazo da cobrança ainda estiver aberto, tente novamente em Minhas Reservas.";
+   clearInterval(window.__postPagbankPoll);setTimeout(()=>location.reload(),1800);return;
+  }
+  status.textContent=s.payment_status==="under_review"?"Pagamento em análise no PagBank. Aguarde a confirmação.":"Aguardando confirmação do PagBank…";
+ }catch{ /* The webhook and subsequent status checks can still reconcile. */ }};
+ tick();window.__postPagbankPoll=setInterval(tick,5000);
 }
 function renderPostBookingMockPayment(payment){
  const box=$("#post-payment-sim");
