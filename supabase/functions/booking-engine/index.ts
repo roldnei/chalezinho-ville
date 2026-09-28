@@ -1252,7 +1252,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           const diagnostic=String((error as Error)?.message||"");
           // Persist only a whitelisted transport/result code; provider bodies
           // can contain customer or card data and must never enter the ledger.
-          const safeCode=/^pagbank_charge_operation_http_[1-5]\d\d$/.test(diagnostic)?
+          const safeCode=/^pagbank_charge_operation_http_[1-5]\d\d(?:_code_[a-zA-Z0-9_]{1,40})?$/.test(diagnostic)?
             diagnostic:"pagbank_charge_operation_uncertain";
           await admin.from("reservation_refund_attempts").insert({refund_id:refund.id,
             event:"request_uncertain",provider_status:safeCode});

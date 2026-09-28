@@ -63,6 +63,9 @@ test('uncertain refund response cannot confirm a refund',async()=>{
   await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0005',
     async()=>new Response('{"error":"card details must not be logged"}',{status:422})),
     /pagbank_charge_operation_http_422/);
+  await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0006',
+    async()=>new Response(JSON.stringify({error_messages:[{code:'40007',message:'sensitive-test-value'}]}),
+      {status:400})),error=>error.message==='pagbank_charge_operation_http_400_code_40007');
 });
 
 test('cancel response keeps only charge receipt and cumulative refund amount',async()=>{

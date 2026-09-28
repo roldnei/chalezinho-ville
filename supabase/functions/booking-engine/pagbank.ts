@@ -135,7 +135,13 @@ export async function changePagBankCharge(
     signal: AbortSignal.timeout(10000),
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(`pagbank_charge_operation_http_${response.status}`);
+  if (!response.ok) {
+    // Only the provider's machine-readable error code is safe to retain.
+    // Descriptions and the rest of the response may contain customer data.
+    const code=String(body?.error_messages?.[0]?.code||body?.error_messages?.[0]?.error||"");
+    const suffix=/^[a-zA-Z0-9_]{1,40}$/.test(code)?`_code_${code}`:"";
+    throw new Error(`pagbank_charge_operation_http_${response.status}${suffix}`);
+  }
   if (body?.id !== chargeId || body?.amount?.currency !== "BRL" ||
       !Number.isSafeInteger(body?.amount?.value) ||
       !["PAID","CANCELED","AUTHORIZED"].includes(body?.status))
