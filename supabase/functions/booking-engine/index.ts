@@ -450,6 +450,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   const {quote_id,quote_option_id,guest_name,guest_email,guest_phone,guests,travel_purpose_code,accepted_document_ids=[],method="mock",installments=1}=body||{};
   const sandbox=development && body?.provider==="pagbank_sandbox";
   const sandboxToken=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+  if(development&&!sandbox) return json({ok:false,error:"pagbank_sandbox_required"},409);
   if(body?.provider && body.provider!=="pagbank_sandbox") return json({ok:false,error:"invalid_provider"},400);
   if(sandbox && !sandboxToken) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   if(body?.provider==="pagbank_sandbox" && !development) return json({ok:false,error:"not_allowed"},403);
@@ -586,7 +587,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,hold_expires_at:hold.hold_expires_at,payment});
 }
 
-async function reconcileSandboxCharge(paymentId:string,chargeId:string,token:string,orderId?:string){
+async function reconcileSandboxCharge(paymentId:string,chargeId:string,token:string,orderId?:string,postBooking=false){
   let charge;
   try { charge=await getPagBankCharge(token,chargeId); }
   catch(error) {
@@ -594,7 +595,7 @@ async function reconcileSandboxCharge(paymentId:string,chargeId:string,token:str
     charge=await getPagBankOrderCharge(token,orderId,chargeId);
   }
   if(charge.id!==chargeId||charge.amount?.currency!=="BRL") throw new Error("pagbank_charge_mismatch");
-  const {data,error}=await admin.rpc("reconcile_pagbank_sandbox_payment",{
+  const {data,error}=await admin.rpc(postBooking?"reconcile_pagbank_post_booking_payment":"reconcile_pagbank_sandbox_payment",{
     p_payment_id:paymentId,p_charge_id:chargeId,p_status:charge.status,
     p_amount_cents:Number(charge.amount.value)});
   if(error) throw error;
@@ -615,11 +616,15 @@ async function sandboxPaymentStatus(req:Request,body:any,development:boolean){
   const p=rows?.[0];
   if(!p||p.user_id!==user.id||p.provider!=="pagbank_sandbox") return json({ok:false,error:"not_found"},404);
   if(p.provider_payment_id && token) {
-    try { await reconcileSandboxCharge(p.id,p.provider_payment_id,token,p.metadata?.order_id); }
+    try { await reconcileSandboxCharge(p.id,p.provider_payment_id,token,p.metadata?.order_id,p.metadata?.kind==="post_booking_charge"); }
     catch(error) { console.error(JSON.stringify({event:"pagbank_sandbox_status_deferred",payment_id:p.id,error:String(error)})); }
   }
   const {data:latest}=await admin.from("payments").select("status,metadata,reservations(status)").eq("id",p.id).single();
+  const {data:postCharge}=p.metadata?.kind==="post_booking_charge"
+    ?await admin.from("post_booking_charges").select("status").eq("payment_id",p.id).maybeSingle()
+    :{data:null};
   return json({ok:true,payment_id:p.id,amount_cents:p.amount_cents,payment_status:latest?.status||p.status,
+    charge_status:postCharge?.status||null,
     reservation_status:(latest?.reservations as any)?.status||null,
     manual_review:latest?.metadata?.manual_review||null});
 }
@@ -1626,16 +1631,22 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
   const chargeId=String(body?.charge_id||"");
   const method=String(body?.method||"pix");
   const installments=Math.max(1,Number(body?.installments||1));
+  const sandbox=body?.provider==="pagbank_sandbox";
+  if(!sandbox) return json({ok:false,error:"invalid_provider"},400);
   if(!chargeId||!["pix","card"].includes(method)) return json({ok:false,error:"missing_data"},400);
 
   const {data:settings}=await admin.from("payment_settings")
     .select("active_provider,max_card_installments").eq("id",1).single();
   if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},409);
-  if(method==="card"&&installments>Number(settings?.max_card_installments||1))
+  if(method==="card"&&(!Number.isInteger(installments)||installments>Math.min(6,Number(settings?.max_card_installments||1))))
     return json({ok:false,error:"invalid_installments"},400);
+  const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+  if(sandbox&&!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  if(sandbox&&method==="card"&&typeof body?.encrypted_card!=="string")
+    return json({ok:false,error:"encrypted_card_required"},400);
 
   const {data,error}=await admin.rpc("start_post_booking_payment_atomic",{
-    p_charge_id:chargeId,p_user_id:user.id,p_provider:"mock",p_method:method,p_installments:installments
+    p_charge_id:chargeId,p_user_id:user.id,p_provider:sandbox?"pagbank_sandbox":"mock",p_method:method,p_installments:installments
   });
   if(error){
     const msg=String(error.message||"");
@@ -1644,6 +1655,51 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
     return json({ok:false,error:"post_booking_payment_failed"},500);
   }
   const row=Array.isArray(data)?data[0]:data;
+  if(sandbox){
+    const paymentId=row?.payment_id;
+    const {data:payment}=await admin.from("payments").select("provider,provider_payment_id,metadata,status")
+      .eq("id",paymentId).single();
+    if(payment?.provider!=="pagbank_sandbox") return json({ok:false,error:"payment_provider_mismatch"},409);
+    if(payment.provider_payment_id){
+      try{await reconcileSandboxCharge(paymentId,payment.provider_payment_id,token,payment.metadata?.order_id,true)}catch(e){
+        console.error(JSON.stringify({event:"post_booking_status_deferred",payment_id:paymentId,error:String(e)}));
+      }
+      return json({ok:true,payment:{id:paymentId,status:payment.status,amount_cents:Number(row.amount_cents),
+        method,installments:method==="card"?installments:null,provider:"pagbank_sandbox"},
+        charge_status:row.charge_status,charge_expires_at:row.charge_expires_at});
+    }
+    const [{data:charge},{data:identity}]=await Promise.all([
+      admin.from("post_booking_charges").select("reservation_id,amount_cents,expires_at,reservations(guest_name,guest_email,guest_phone)").eq("id",chargeId).eq("user_id",user.id).single(),
+      admin.rpc("guest_payment_identity",{p_user_id:user.id})
+    ]);
+    const id=Array.isArray(identity)?identity[0]:identity;
+    const guest=(charge?.reservations as any);
+    if(!charge||Number(charge.amount_cents)!==Number(row.amount_cents)||id?.document_type!=="cpf"||
+       !guest||String(guest.guest_email).toLowerCase()!==String(user.email).toLowerCase())
+      return json({ok:false,error:"pagbank_customer_invalid",payment_id:paymentId},400);
+    const digits=String(guest.guest_phone||"").replace(/\D/g,"");
+    const phone=digits.startsWith("55")&&digits.length>=12?digits.slice(2):digits;
+    try{
+      const expiry=new Date(Math.min(Date.parse(charge.expires_at),Date.now()+900000));
+      const order=pagBankOrder({referenceId:String(paymentId).replace(/-/g,""),amountCents:Number(row.amount_cents),
+        customer:{name:guest.guest_name,email:guest.guest_email,taxId:id.document_number,
+          phone:{area:phone.slice(0,2),number:phone.slice(2)}},method:method as "pix"|"card",
+        expiresAt:expiry,encryptedCard:body?.encrypted_card,installments,
+        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
+      const result=await createPagBankOrder("sandbox",token,order);
+      const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
+        metadata:{...(payment.metadata||{}),environment:"sandbox",order_id:result.orderId}}).eq("id",paymentId);
+      if(saveError) throw saveError;
+      if(result.status!=="WAITING") await reconcileSandboxCharge(paymentId,result.chargeId,token,result.orderId,true);
+      return json({ok:true,payment:{id:paymentId,status:result.status==="PAID"?"paid":"awaiting_payment",
+        amount_cents:Number(row.amount_cents),method,installments:method==="card"?installments:null,
+        provider:"pagbank_sandbox",pix_code:result.pixCode,qr_image_url:result.qrImageUrl},
+        charge_status:row.charge_status,charge_expires_at:row.charge_expires_at});
+    }catch(e){
+      console.error(JSON.stringify({event:"post_booking_pagbank_uncertain",payment_id:paymentId,error:String(e)}));
+      return json({ok:false,error:"pagbank_start_uncertain",payment_id:paymentId},503);
+    }
+  }
   return json({ok:true,payment:{
     id:row?.payment_id||null,status:row?.payment_status||"awaiting_payment",
     amount_cents:Number(row?.amount_cents||0),method,installments:method==="card"?installments:null
