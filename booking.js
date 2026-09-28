@@ -10,7 +10,7 @@ function downloadPolicyDocument(doc){
  const link=document.createElement("a");link.href=url;link.download=`chalezinho-politica-${String(doc.code||"cancelamento").replace(/[^a-z0-9_-]/gi,"-")}-v${String(doc.version||"").replace(/[^0-9.]/g,"")}.txt`;
  document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null};
+const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null,installmentQuote:null};
 const pagbankSandbox=window.CHALEZINHO_CONFIG.environment==="development";
 let anonymousId="",searchSequence=0;
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
@@ -265,7 +265,8 @@ async function maybeOfferUpsell(){
      $("#upsell-yes").textContent="Continuar para pagamento";
      $("#upsell-no").hidden=true;
      $("#upsell-yes").disabled=false;
-     $("#upsell-yes").onclick=async()=>{$("#upsell-modal").hidden=true;await performStartPayment(choice)};
+     $("#upsell-yes").onclick=async()=>{$("#upsell-modal").hidden=true;
+       setFlowError("O pacote mudou. Confira o novo total e consulte novamente as parcelas antes de pagar.")};
    }catch(e){
      $("#upsell-total").textContent="Não foi possível atualizar o pacote.";
      $("#upsell-yes").disabled=false;$("#upsell-no").disabled=false;
@@ -309,13 +310,38 @@ function renderSummary(){
  const doc=state.rate.cancellation_policy;
  const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
- const pay=$("#payment-options"),max=Math.min(6,Number(state.config.payment_settings.max_card_installments||1),Math.max(1,Math.floor(total/500)));
- pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+max+'x sem juros para o hóspede</label><select id="installments" aria-label="Parcelas sem juros">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'x de '+brlC(Math.round(total/(i+1)))+' · sem juros</option>').join("")+'</select><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
+ const pay=$("#payment-options"),terms=state.property.features?.payment_terms||{max_installments:12,no_interest_installments:6};
+ const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
+ const free=Math.min(Number(terms.no_interest_installments),max);
+ state.installmentQuote=null;
+ pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'" '+(i+1>free?'disabled':'')+'>'+(i+1)+'x de '+(i+1<=free?brlC(Math.round(total/(i+1)))+' · sem juros':'consulte o valor após informar o cartão')+'</option>').join("")+'</select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
  if(pagbankSandbox){
   pay.querySelector(".dev-note").textContent="PagBank sandbox: use somente cartões de teste. Nenhuma cobrança real será feita.";
   const card=document.createElement("div");card.id="sandbox-card-fields";card.hidden=true;
   card.innerHTML='<label>Nome no cartão<input id="card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="sandbox-card-row"><label>Mês<input id="card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div>';
   pay.appendChild(card);
+  let planTimer;
+  $("#card-number").addEventListener("input",()=>{
+    clearTimeout(planTimer);state.installmentQuote=null;
+    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
+    if(bin.length!==6)return;
+    const optionId=state.rate.quote_option_id;
+    planTimer=setTimeout(async()=>{
+      try{
+        const quote=await api("installment_options",{quote_option_id:optionId,credit_card_bin:bin});
+        if(state.rate.quote_option_id!==optionId||$("#card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
+        state.installmentQuote={...quote,bin,optionId};
+        const select=$("#installments"),previous=Number(select.value||1);
+        select.innerHTML=quote.plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
+        if(quote.plans.some(p=>p.installments===previous))select.value=String(previous);
+        select.dispatchEvent(new Event("change"));
+      }catch{$("#installment-total").textContent="Não foi possível consultar as parcelas no PagBank. Tente novamente."}
+    },250);
+  });
+  $("#installments").addEventListener("change",()=>{
+    const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
+    $("#installment-total").textContent=plan?'Total a cobrar no cartão: '+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.'):'Informe o cartão para consultar o valor exato no PagBank.';
+  });
   pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=paymentChoice().method!=="card"));
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
   resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
@@ -345,8 +371,13 @@ async function performStartPayment(choice){
  const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
+  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,6):undefined;
+  const quoted=state.installmentQuote;
+  const plan=quoted?.plans.find(p=>p.installments===installments);
+  if(method==="card"&&(!plan||quoted.bin!==credit_card_bin||quoted.optionId!==state.rate.quote_option_id))
+    throw new Error("installment_quote_required");
   const encrypted_card=pagbankSandbox&&method==="card"?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
@@ -356,7 +387,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  const box=$("#mock-payment"),pix=d.payment.pix_code;

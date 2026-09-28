@@ -1,6 +1,6 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder } from "./pagbank.ts";
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans } from "./pagbank.ts";
 import { calculateCancellationRefund } from "./refund-policy.ts";
 
 const corsHeaders = {
@@ -34,6 +34,63 @@ function overlaps(a:string,b:string,s:string,e:string){ return a < e && b > s; }
 function nights(a:string,b:string){ return Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000); }
 function validDate(v:string){ return /^\d{4}-\d{2}-\d{2}$/.test(v||""); }
 function cents(v:number){ return Math.round(Number(v||0)*100); }
+function paymentTerms(features:any){
+  const value=features?.payment_terms||{};
+  const max=Number(value.max_installments??12),free=Number(value.no_interest_installments??6);
+  if(!Number.isInteger(max)||max<1||max>12||!Number.isInteger(free)||free<0||free>max||free===1)
+    throw new Error("invalid_payment_terms");
+  return {max_installments:max,no_interest_installments:free};
+}
+function spreadBuyerFee(amounts:number[],fee:number){
+  const base=amounts.reduce((s,v)=>s+v,0);
+  if(!Number.isSafeInteger(base)||base<1||!Number.isSafeInteger(fee)||fee<0||
+      amounts.some(v=>!Number.isSafeInteger(v)||v<0)) throw new Error("invalid_fee_allocation");
+  let remaining=fee;
+  return amounts.map((value,index)=>{
+    const share=index===amounts.length-1?remaining:Math.floor(fee*value/base);
+    remaining-=share;return value+share;
+  });
+}
+async function chargeInstallments(propertyId:number,amountCents:number,installments:number,bin:string,token:string){
+  const {data:property,error}=await admin.from("properties").select("features").eq("id",propertyId).single();
+  if(error||!property) throw new Error("property_unavailable");
+  const terms=paymentTerms(property.features);
+  if(!Number.isInteger(installments)||installments<1||installments>terms.max_installments)
+    throw new Error("invalid_installments");
+  const plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
+    terms.no_interest_installments,bin);
+  const plan=plans.find(p=>p.installments===installments);
+  if(!plan) throw new Error("installment_unavailable");
+  return {plan,terms,plans};
+}
+async function installmentOptions(req:Request,body:any,development:boolean){
+  if(!development) return json({ok:false,error:"not_allowed"},403);
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const bin=String(body?.credit_card_bin||"");
+  if(!/^\d{6}(\d{2})?$/.test(bin)) return json({ok:false,error:"invalid_card_bin"},400);
+  const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+  if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  let amount=0,propertyId=0;
+  if(body?.quote_option_id){
+    const {data:option}=await admin.from("quote_options").select("total_amount_cents,quotes(property_id,expires_at)")
+      .eq("id",String(body.quote_option_id)).maybeSingle();
+    const quote=option?.quotes as any;
+    if(!quote||Date.parse(quote.expires_at)<=Date.now()) return json({ok:false,error:"quote_expired"},409);
+    amount=Number(option.total_amount_cents);propertyId=Number(quote.property_id);
+  }else if(body?.post_booking_charge_id){
+    const {data:charge}=await admin.from("post_booking_charges")
+      .select("amount_cents,expires_at,reservations(property_id)")
+      .eq("id",String(body.post_booking_charge_id)).eq("user_id",user.id).maybeSingle();
+    if(!charge||Date.parse(charge.expires_at)<=Date.now()) return json({ok:false,error:"charge_expired"},409);
+    amount=Number(charge.amount_cents);propertyId=Number((charge.reservations as any)?.property_id);
+  }else return json({ok:false,error:"missing_data"},400);
+  try{
+    const {terms,plans}=await chargeInstallments(propertyId,amount,1,bin,token);
+    return json({ok:true,base_amount_cents:amount,terms,plans});
+  }catch(e){return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
+    "invalid_payment_terms":"installment_plans_unavailable"},503)}
+}
 
 async function currentUser(req:Request){
   const auth=req.headers.get("authorization")||"";
@@ -478,15 +535,28 @@ async function startPayment(req:Request,body:any,development:boolean){
   // Until the provider is wired to a verified webhook, never create a hold
   // that appears payable through the development-only mock workflow.
   if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},503);
-  const maxInst=Math.max(1,Number(settings?.max_card_installments||1));
-  if(method==="card"&&(Number(installments)<1||Number(installments)>maxInst)) return json({ok:false,error:"invalid_installments"},400);
+  if(method==="card"&&(!Number.isInteger(Number(installments))||Number(installments)<1||Number(installments)>12))
+    return json({ok:false,error:"invalid_installments"},400);
 
   const {data:option,error:optionError}=await admin.from("quote_options")
-    .select("id,quote_id,cancellation_policy_id,total_amount_cents")
+    .select("id,quote_id,cancellation_policy_id,total_amount_cents,quotes(property_id)")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
   if(method==="card"&&Number(option.total_amount_cents)/Number(installments)<500)
     return json({ok:false,error:"installment_below_minimum"},400);
+  let selectedPlan:any=null;
+  if(method==="card"){
+    try{
+      selectedPlan=(await chargeInstallments(Number((option.quotes as any)?.property_id),
+        Number(option.total_amount_cents),Number(installments),String(body?.credit_card_bin||""),sandboxToken)).plan;
+    }catch(e){return json({ok:false,error:e instanceof Error&&e.message==="invalid_installments"?
+      "invalid_installments":"installment_plans_unavailable"},409)}
+  }
+  const baseAmount=Number(option.total_amount_cents);
+  const buyerInterest=Number(selectedPlan?.buyer_interest_cents||0);
+  const chargedAmount=baseAmount+buyerInterest;
+  if(method==="card"&&Number(body?.quoted_total_cents)!==chargedAmount)
+    return json({ok:false,error:"installment_quote_changed"},409);
   const requiredPolicyId=option.cancellation_policy_id;
   const acceptedIds=Array.isArray(accepted_document_ids)?accepted_document_ids.map(String):[];
   if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
@@ -537,9 +607,10 @@ async function startPayment(req:Request,body:any,development:boolean){
     reservation_id:reservationId,user_id:user.id,provider:sandbox?"pagbank_sandbox":"mock",
     method:method==="pix"?"pix":method==="card"?"card":"mock",
     installments:method==="card"?Number(installments):null,
-    amount_cents:Number(opt.total_amount_cents),
+    amount_cents:chargedAmount,
     status:"awaiting_payment",idempotency_key:paymentIdempotency,
-    metadata:{development:true,environment:sandbox?"sandbox":"mock"}
+    metadata:{development:true,environment:sandbox?"sandbox":"mock",
+      base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}
   }).select().single();
   if(payErr) return json({ok:false,error:"payment_create_failed"},500);
 
@@ -553,7 +624,10 @@ async function startPayment(req:Request,body:any,development:boolean){
       amount_cents:Number(x.unit_price_cents)*Number(x.quantity),description:x.product_name_snapshot
     });
   }
-  await admin.from("financial_entries").insert(ledger);
+  const allocated=spreadBuyerFee(ledger.map(x=>x.amount_cents),buyerInterest);
+  ledger.forEach((line,index)=>line.amount_cents=allocated[index]);
+  const {error:ledgerError}=await admin.from("financial_entries").insert(ledger);
+  if(ledgerError) return json({ok:false,error:"ledger_create_failed",payment_id:payment.id},503);
 
   if(sandbox){
     const digits=String(guest_phone).replace(/\D/g,"");
@@ -561,16 +635,18 @@ async function startPayment(req:Request,body:any,development:boolean){
     const expiry=new Date(Math.min(Date.parse(hold.hold_expires_at),Date.now()+900000));
     let order;
     try{
-      order=pagBankOrder({referenceId:payment.id.replace(/-/g,""),amountCents:Number(opt.total_amount_cents),
+      order=pagBankOrder({referenceId:payment.id.replace(/-/g,""),amountCents:chargedAmount,
         customer:{name:guest_name,email:guest_email,taxId:sandboxIdentity.document_number,
           phone:{area:phone.slice(0,2),number:phone.slice(2)}},method,
         expiresAt:expiry,encryptedCard:body?.encrypted_card,installments:Number(installments),
+        buyerInterest:buyerInterest?{total:buyerInterest,installments:Number(selectedPlan.buyer_interest_installments)}:undefined,
         notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
     }catch{return json({ok:false,error:"pagbank_customer_invalid",payment_id:payment.id},400)}
     try{
       const result=await createPagBankOrder("sandbox",sandboxToken,order);
       const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
-        metadata:{development:true,environment:"sandbox",order_id:result.orderId}}).eq("id",payment.id);
+        metadata:{development:true,environment:"sandbox",order_id:result.orderId,
+          base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}}).eq("id",payment.id);
       if(saveError) throw new Error("pagbank_payment_save_failed");
       if(result.status!=="WAITING") {
         try { await reconcileSandboxCharge(payment.id,result.chargeId,sandboxToken,result.orderId); }
@@ -1541,6 +1617,11 @@ async function adminPropertyAction(req:Request,body:any){
   const checkIn=String(body?.check_in_time||"15:00").slice(0,5);
   const checkOut=String(body?.check_out_time||"11:00").slice(0,5);
   if(!name||!code||!slug||!/^\d{2}:\d{2}$/.test(checkIn)||!/^\d{2}:\d{2}$/.test(checkOut)) return json({ok:false,error:"invalid_property"},400);
+  let terms;
+  try { terms=paymentTerms({payment_terms:{max_installments:Number(body?.max_installments??12),
+    no_interest_installments:Number(body?.no_interest_installments??6)}}); }
+  catch { return json({ok:false,error:"invalid_payment_terms"},400); }
+  const {data:previous}=id?await admin.from("properties").select("features").eq("id",id).single():{data:null};
   const payload={
     name,code,slug,property_type:propertyType,cover_image:coverImage||null,gallery,
     tagline:String(body?.tagline||"").trim().slice(0,240)||null,
@@ -1548,11 +1629,12 @@ async function adminPropertyAction(req:Request,body:any){
     max_guests:Math.max(1,Math.min(50,Math.round(Number(body?.max_guests||2)))),
     cleaning_fee:Math.max(0,Math.min(100000,Number(body?.cleaning_fee||0))),
     guarantee_amount_cents:Math.max(0,Math.min(100000000,Math.round(Number(body?.guarantee_amount_cents||0)))),
-    check_in_time:checkIn,check_out_time:checkOut,timezone:"America/Sao_Paulo",active:body?.active!==false,updated_at:new Date().toISOString()
+    check_in_time:checkIn,check_out_time:checkOut,timezone:"America/Sao_Paulo",active:body?.active!==false,
+    features:{...(previous?.features||{}),payment_terms:terms},updated_at:new Date().toISOString()
   };
   const result=id
     ? await admin.from("properties").update(payload).eq("id",id).select().single()
-    : await admin.from("properties").insert({...payload,features:{}}).select().single();
+    : await admin.from("properties").insert(payload).select().single();
   if(result.error||!result.data) return json({ok:false,error:"property_save_failed"},409);
   await admin.from("audit_events").insert({actor_user_id:user.id,action:id?"property_updated":"property_created",entity_type:"property",entity_id:String(result.data.id),new_value:{name,code,active:payload.active}});
   return json({ok:true,property:result.data});
@@ -2016,12 +2098,27 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
   const {data:settings}=await admin.from("payment_settings")
     .select("active_provider,max_card_installments").eq("id",1).single();
   if(settings?.active_provider!=="mock") return json({ok:false,error:"payment_provider_not_ready"},409);
-  if(method==="card"&&(!Number.isInteger(installments)||installments>Math.min(6,Number(settings?.max_card_installments||1))))
+  if(method==="card"&&(!Number.isInteger(installments)||installments>12))
     return json({ok:false,error:"invalid_installments"},400);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(sandbox&&!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   if(sandbox&&method==="card"&&typeof body?.encrypted_card!=="string")
     return json({ok:false,error:"encrypted_card_required"},400);
+
+  const {data:chargeTerms}=await admin.from("post_booking_charges")
+    .select("amount_cents,reservations(property_id)").eq("id",chargeId).eq("user_id",user.id).maybeSingle();
+  if(!chargeTerms) return json({ok:false,error:"charge_not_found"},404);
+  const baseAmount=Number(chargeTerms.amount_cents);
+  let plan:any=null;
+  if(method==="card"){
+    try{plan=(await chargeInstallments(Number((chargeTerms.reservations as any)?.property_id),baseAmount,
+      installments,String(body?.credit_card_bin||""),token)).plan}
+    catch{return json({ok:false,error:"installment_plans_unavailable"},409)}
+  }
+  const buyerInterest=Number(plan?.buyer_interest_cents||0);
+  const chargeTotal=baseAmount+buyerInterest;
+  if(method==="card"&&Number(body?.quoted_total_cents)!==chargeTotal)
+    return json({ok:false,error:"installment_quote_changed"},409);
 
   const {data,error}=await admin.rpc("start_post_booking_payment_atomic",{
     p_charge_id:chargeId,p_user_id:user.id,p_provider:sandbox?"pagbank_sandbox":"mock",p_method:method,p_installments:installments
@@ -2035,14 +2132,18 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
   const row=Array.isArray(data)?data[0]:data;
   if(sandbox){
     const paymentId=row?.payment_id;
-    const {data:payment}=await admin.from("payments").select("provider,provider_payment_id,metadata,status")
+    const {data:payment}=await admin.from("payments").select("provider,provider_payment_id,metadata,status,amount_cents,method,installments")
       .eq("id",paymentId).single();
     if(payment?.provider!=="pagbank_sandbox") return json({ok:false,error:"payment_provider_mismatch"},409);
+    if(payment.method!==method||Number(payment.installments||1)!==installments||
+       ![baseAmount,chargeTotal].includes(Number(payment.amount_cents)))
+      return json({ok:false,error:"payment_terms_mismatch"},409);
     if(payment.provider_payment_id){
+      if(Number(payment.amount_cents)!==chargeTotal) return json({ok:false,error:"payment_terms_mismatch"},409);
       try{await reconcileSandboxCharge(paymentId,payment.provider_payment_id,token,payment.metadata?.order_id,true)}catch(e){
         console.error(JSON.stringify({event:"post_booking_status_deferred",payment_id:paymentId,error:String(e)}));
       }
-      return json({ok:true,payment:{id:paymentId,status:payment.status,amount_cents:Number(row.amount_cents),
+      return json({ok:true,payment:{id:paymentId,status:payment.status,amount_cents:chargeTotal,
         method,installments:method==="card"?installments:null,provider:"pagbank_sandbox"},
         charge_status:row.charge_status,charge_expires_at:row.charge_expires_at});
     }
@@ -2058,19 +2159,26 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
     const digits=String(guest.guest_phone||"").replace(/\D/g,"");
     const phone=digits.startsWith("55")&&digits.length>=12?digits.slice(2):digits;
     try{
+      const {data:amountSaved,error:amountError}=await admin.from("payments").update({amount_cents:chargeTotal,
+        metadata:{...(payment.metadata||{}),environment:"sandbox",base_amount_cents:baseAmount,
+          buyer_interest_cents:buyerInterest}}).eq("id",paymentId)
+        .eq("status","awaiting_payment").is("provider_payment_id",null).select("id").maybeSingle();
+      if(amountError||!amountSaved) throw new Error("payment_state_changed");
       const expiry=new Date(Math.min(Date.parse(charge.expires_at),Date.now()+900000));
-      const order=pagBankOrder({referenceId:String(paymentId).replace(/-/g,""),amountCents:Number(row.amount_cents),
+      const order=pagBankOrder({referenceId:String(paymentId).replace(/-/g,""),amountCents:chargeTotal,
         customer:{name:guest.guest_name,email:guest.guest_email,taxId:id.document_number,
           phone:{area:phone.slice(0,2),number:phone.slice(2)}},method:method as "pix"|"card",
         expiresAt:expiry,encryptedCard:body?.encrypted_card,installments,
+        buyerInterest:buyerInterest?{total:buyerInterest,installments:Number(plan.buyer_interest_installments)}:undefined,
         notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
       const result=await createPagBankOrder("sandbox",token,order);
       const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
-        metadata:{...(payment.metadata||{}),environment:"sandbox",order_id:result.orderId}}).eq("id",paymentId);
+        metadata:{...(payment.metadata||{}),environment:"sandbox",order_id:result.orderId,
+          base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}}).eq("id",paymentId);
       if(saveError) throw saveError;
       if(result.status!=="WAITING") await reconcileSandboxCharge(paymentId,result.chargeId,token,result.orderId,true);
       return json({ok:true,payment:{id:paymentId,status:result.status==="PAID"?"paid":"awaiting_payment",
-        amount_cents:Number(row.amount_cents),method,installments:method==="card"?installments:null,
+        amount_cents:chargeTotal,method,installments:method==="card"?installments:null,
         provider:"pagbank_sandbox",pix_code:result.pixCode,qr_image_url:result.qrImageUrl},
         charge_status:row.charge_status,charge_expires_at:row.charge_expires_at});
     }catch(e){
@@ -2232,6 +2340,7 @@ Deno.serve(async(req)=>{
       return json({ok:true,public_key:await getPagBankCardPublicKey(token)});
     }
     if(action==="pagbank_sandbox_status") return await sandboxPaymentStatus(req,body,development);
+    if(action==="installment_options") return await installmentOptions(req,body,development);
     if(action==="start_payment") return await startPayment(req,body,development);
     if(action==="reservation_policy") return await reservationPolicy(req,body);
     if(action==="cancel_pending_payment") return await cancelPendingPayment(req,body,development);
