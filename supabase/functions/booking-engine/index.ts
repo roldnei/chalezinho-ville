@@ -1026,16 +1026,38 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   const user=await currentUser(req);
   if(!user||!(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const reservationId=String(body?.reservation_id||""),operation=String(body?.operation||"");
+  const kind=body?.kind==="voluntary_refund"?"voluntary_refund":"policy_cancellation";
   const {data:r}=await admin.from("reservations").select("id,status,rate_plan_code,check_in,checked_in_at,created_at")
     .eq("id",reservationId).maybeSingle();
-  if(!r||r.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+  if(!r) return json({ok:false,error:"reservation_not_found"},404);
+  if(operation==="list"){
+    const {data:cases}=await admin.from("reservation_cancellations")
+      .select("id,kind,status,reason,refund_due_cents,created_at")
+      .eq("reservation_id",r.id).order("created_at",{ascending:false});
+    return json({ok:true,cases:cases||[]});
+  }
+  if(r.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
   if(r.checked_in_at) return json({ok:false,error:"individual_review_required"},409);
-  const {data:existing}=await admin.from("reservation_cancellations").select("*")
-    .eq("reservation_id",r.id).maybeSingle();
+  const requestKey=String(body?.operation_key||"");
+  if(kind==="voluntary_refund"&&operation==="prepare"&&!/^[0-9a-f-]{36}$/i.test(requestKey))
+    return json({ok:false,error:"operation_key_required"},400);
+  const caseQuery=admin.from("reservation_cancellations").select("*")
+    .eq("reservation_id",r.id).eq("kind",kind);
+  const {data:existing}=kind==="voluntary_refund"?
+    (body?.case_id?await caseQuery.eq("id",String(body.case_id)).maybeSingle():
+      operation==="prepare"?await caseQuery.eq("operation_key",requestKey).maybeSingle():{data:null}):
+    await caseQuery.maybeSingle();
   let cancellation=existing;
   if(operation==="prepare"&&!cancellation){
     const reason=String(body?.reason||"").trim().slice(0,1000);
     if(!reason) return json({ok:false,error:"reason_required"},400);
+    if(kind==="voluntary_refund"&&body?.case_id) return json({ok:false,error:"case_not_found"},404);
+    const {data:request}=body?.guest_request_id&&kind==="policy_cancellation"?
+      await admin.from("reservation_cancel_requests").select("id,reservation_id,status,requested_at,reason")
+        .eq("id",String(body.guest_request_id)).eq("reservation_id",r.id).maybeSingle():{data:null};
+    if(body?.guest_request_id&&(!request||request.status!=="requested"))
+      return json({ok:false,error:"guest_request_not_pending"},409);
+    const requestedAt=request?.requested_at||new Date().toISOString();
     const {data:accepted}=await admin.from("reservation_policy_acceptances")
       .select("document_id,document_version,accepted_at,document_code")
       .eq("reservation_id",r.id).eq("document_code",r.rate_plan_code+"_v1")
@@ -1047,7 +1069,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     const {data:payments,error:paymentsError}=await admin.from("payments")
       .select("id,provider,provider_payment_id,amount_cents,status")
       .eq("reservation_id",r.id).eq("provider","pagbank_sandbox")
-      .eq("status","paid").order("created_at");
+      .in("status",["paid","refunded"]).order("created_at");
     if(paymentsError||!payments?.length||payments.some((p:any)=>!p.provider_payment_id))
       return json({ok:false,error:"captured_charges_required"},409);
     const {data:entries,error:entriesError}=await admin.from("financial_entries")
@@ -1062,26 +1084,47 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
         return json({ok:false,error:"ledger_review_required",payment_id:p.id},409);
       const sum=(kind:string)=>lines.filter((e:any)=>e.entry_type===kind)
         .reduce((total:number,e:any)=>total+Number(e.amount_cents),0);
-      const calculation=calculateCancellationRefund({
-        plan:r.rate_plan_code,acceptedAt:accepted.accepted_at,requestedAt:new Date().toISOString(),checkIn:r.check_in,
+      const calculation=kind==="voluntary_refund"?null:calculateCancellationRefund({
+        plan:r.rate_plan_code,acceptedAt:accepted.accepted_at,requestedAt:requestedAt,checkIn:r.check_in,
         withdrawalDays:Number(rule.withdrawal_days),fullRefundDaysBeforeCheckIn:Number(rule.full_refund_days_before_checkin),
         lateAccommodationRefundPercent:Number(rule.late_accommodation_refund_percent),
         accommodationCents:sum("accommodation"),paidModificationCents:sum("additional_charge"),
         cleaningCents:sum("cleaning"),unprovidedExperiencesCents:sum("experience")+sum("upgrade")
       });
-      if(calculation.requiresReview) return json({ok:false,error:"individual_review_required"},409);
+      if(calculation?.requiresReview) return json({ok:false,error:"individual_review_required"},409);
+      const {data:previous,error:previousError}=await admin.from("reservation_refunds")
+        .select("confirmed_cents,state").eq("payment_id",p.id);
+      if(previousError) return json({ok:false,error:"refund_history_unavailable"},503);
+      if(kind==="policy_cancellation"&&(previous||[]).some((v:any)=>["prepared","dispatching","uncertain"].includes(v.state)))
+        return json({ok:false,error:"previous_refund_pending"},409);
+      const alreadyReturned=(previous||[]).reduce((s:number,v:any)=>s+Number(v.confirmed_cents),0);
       allocations.push({payment_id:p.id,charge_id:p.provider_payment_id,captured_cents:Number(p.amount_cents),
-        refund_cents:calculation.totalRefundCents,calculation});
+        refund_cents:Math.max(0,(calculation?.totalRefundCents||0)-alreadyReturned),
+        previously_refunded_cents:alreadyReturned,calculation});
+    }
+    if(kind==="voluntary_refund"){
+      const amount=Number(body?.amount_cents);
+      if(!Number.isSafeInteger(amount)||amount<1) return json({ok:false,error:"invalid_refund_amount"},400);
+      const {data:allRefunds,error:allRefundsError}=await admin.from("reservation_refunds")
+        .select("payment_id,requested_cents,state").in("payment_id",allocations.map(x=>x.payment_id));
+      if(allRefundsError) return json({ok:false,error:"refund_history_unavailable"},503);
+      let remaining=amount;
+      for(const x of allocations){
+        const reserved=(allRefunds||[]).filter((v:any)=>v.payment_id===x.payment_id&&v.state!=="failed")
+          .reduce((s:number,v:any)=>s+Number(v.requested_cents),0);
+        x.refund_cents=Math.min(remaining,Math.max(0,x.captured_cents-reserved));
+        x.calculation={reason:"voluntary_refund",refund_cents:x.refund_cents};
+        remaining-=x.refund_cents;
+      }
+      if(remaining!==0) return json({ok:false,error:"refund_exceeds_captured"},409);
     }
     const refundDue=allocations.reduce((sum,x)=>sum+x.refund_cents,0);
-    // A partial refund needs an independently verifiable provider receipt.
-    // Until available, never submit a request that cannot be reconciled.
-    if(allocations.some(x=>x.refund_cents>0&&x.refund_cents!==x.captured_cents))
-      return json({ok:false,error:"partial_refund_provider_receipt_required",calculation:{allocations}},409);
     const {data:created,error:createError}=await admin.from("reservation_cancellations").insert({
       reservation_id:r.id,actor_user_id:user.id,accepted_document_id:accepted.document_id,
-      accepted_version:accepted.document_version,accepted_at:accepted.accepted_at,reason,
-      refund_due_cents:refundDue,calculation:{allocations,policy_rule_id:rule.id}
+      accepted_version:accepted.document_version,accepted_at:accepted.accepted_at,
+      reason:request?.reason||reason,kind,requested_at:requestedAt,guest_request_id:request?.id||null,
+      operation_key:kind==="voluntary_refund"?requestKey:null,
+      refund_due_cents:refundDue,calculation:{allocations,policy_rule_id:rule.id,requested_at:requestedAt,reason:request?.reason||reason}
     }).select().single();
     if(createError||!created) return json({ok:false,error:"cancellation_prepare_failed"},409);
     cancellation=created;
@@ -1092,11 +1135,12 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     }
   }
   if(!cancellation) return json({ok:false,error:"cancellation_not_prepared"},409);
-  const {data:refunds}=await admin.from("reservation_refunds").select("id,payment_id,charge_id,requested_cents,confirmed_cents,state,idempotency_key")
+  const {data:refunds,error:refundsError}=await admin.from("reservation_refunds").select("id,payment_id,charge_id,requested_cents,confirmed_cents,state,idempotency_key")
     .eq("cancellation_id",cancellation.id).order("created_at");
+  if(refundsError) return json({ok:false,error:"refund_history_unavailable",cancellation_id:cancellation.id},503);
   const due=Number(cancellation.refund_due_cents),allocated=(refunds||[]).reduce((s:number,x:any)=>s+Number(x.requested_cents),0);
   if(allocated!==due) return json({ok:false,error:"refund_allocation_requires_review",cancellation_id:cancellation.id},409);
-  if(operation==="prepare"||operation==="status") return json({ok:true,cancellation_id:cancellation.id,
+  if(operation==="prepare"||operation==="status") return json({ok:true,cancellation_id:cancellation.id,kind:cancellation.kind,
     status:cancellation.status,accepted_version:cancellation.accepted_version,calculation:cancellation.calculation,
     refund_due_cents:due,confirmed_cents:(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
     refunds:(refunds||[]).map((x:any)=>({payment_id:x.payment_id,requested_cents:x.requested_cents,confirmed_cents:x.confirmed_cents,state:x.state}))});
@@ -1115,12 +1159,21 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     }
   }
   if(operation==="approve"){
-    if(cancellation.status!=="prepared") return json({ok:false,error:"cancellation_already_submitted"},409);
-    const {data:activated,error:activationError}=await admin.from("reservation_cancellations")
-      .update({status:"pending_provider",approved_at:new Date().toISOString()})
-      .eq("id",cancellation.id).eq("status","prepared").select("id").maybeSingle();
-    if(activationError||!activated) return json({ok:false,error:"cancellation_already_submitted"},409);
-    if(due===0){
+    if(!["prepared","pending_provider"].includes(cancellation.status))
+      return json({ok:false,error:"cancellation_already_submitted"},409);
+    if(cancellation.status==="prepared"){
+      const {data:activated,error:activationError}=await admin.from("reservation_cancellations")
+        .update({status:"pending_provider",approved_at:new Date().toISOString()})
+        .eq("id",cancellation.id).eq("status","prepared").select("id").maybeSingle();
+      if(activationError||!activated) return json({ok:false,error:"cancellation_already_submitted"},409);
+      if(cancellation.guest_request_id){
+        const {data:updated}=await admin.from("reservation_cancel_requests")
+          .update({status:"approved",decided_by:user.id,decided_at:new Date().toISOString()})
+          .eq("id",cancellation.guest_request_id).eq("status","requested").select("id").maybeSingle();
+        if(!updated) return json({ok:false,error:"guest_request_state_changed"},409);
+      }
+    }
+    if(due===0&&cancellation.kind==="policy_cancellation"){
       const {error:zeroError}=await admin.rpc("confirm_zero_refund_cancellation",{p_cancellation_id:cancellation.id});
       if(zeroError) return json({ok:false,error:"cancellation_reconciliation_required",cancellation_id:cancellation.id},409);
       return json({ok:true,status:"confirmed",cancellation_id:cancellation.id,refund_due_cents:0,confirmed_cents:0,refunds:[]});
@@ -1129,43 +1182,72 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   for(const refund of refunds||[]){
     if(refund.state==="confirmed") continue;
     if(operation==="approve"&&refund.state==="prepared"){
-      const {data:claim}=await admin.rpc("claim_reservation_refund",{p_refund_id:refund.id});
+      const {data:claim,error:claimError}=await admin.rpc("claim_reservation_refund",{p_refund_id:refund.id});
+      if(claimError) return json({ok:false,error:"refund_claim_unavailable",cancellation_id:cancellation.id},503);
       const row=Array.isArray(claim)?claim[0]:claim;
       if(row){
+        let precheckPassed=false;
         try{
           const before=(await readRefundCharge(refund)).charge;
           if(before.id!==row.charge_id||before.status!=="PAID"||before.amount?.currency!=="BRL"||
-            Number(before.amount?.value)<Number(row.requested_cents)) throw new Error("provider_precheck_failed");
+            Number(before.amount?.value)<Number(row.requested_cents)||
+            !Number.isSafeInteger(before.summary?.refunded)||!Number.isSafeInteger(before.summary?.paid))
+            throw new Error("provider_precheck_failed");
+          const {data:priorRefunds,error:priorError}=await admin.from("reservation_refunds")
+            .select("confirmed_cents").eq("payment_id",refund.payment_id).eq("state","confirmed");
+          if(priorError) throw new Error("refund_history_unavailable");
+          const prior=(priorRefunds||[]).reduce((sum:number,x:any)=>sum+Number(x.confirmed_cents),0);
+          if(before.summary.paid!==Number(before.amount.value)||before.summary.refunded!==prior)
+            throw new Error("provider_refund_balance_mismatch");
+          const {error:dispatchError}=await admin.rpc("mark_refund_dispatch",{p_refund_id:refund.id});
+          if(dispatchError) throw new Error("dispatch_not_recorded");
+          precheckPassed=true;
           await changePagBankCharge(token,row.charge_id,"cancel",Number(row.requested_cents),row.idempotency_key);
           await admin.from("reservation_refund_attempts").insert({refund_id:refund.id,event:"request_accepted"});
         }catch{
+          if(!precheckPassed){
+            const {error:resetError}=await admin.rpc("refund_precheck_failed",{p_refund_id:refund.id});
+            if(resetError) return json({ok:false,error:"refund_precheck_state_uncertain",cancellation_id:cancellation.id},503);
+            providerChecks.push({refund_id:refund.id,status:"precheck_failed"});
+            continue;
+          }
           await admin.from("reservation_refund_attempts").insert({refund_id:refund.id,event:"request_uncertain"});
         }
-        await admin.from("reservation_refunds").update({state:"uncertain"}).eq("id",refund.id).eq("state","dispatching");
+        if(precheckPassed) await admin.from("reservation_refunds").update({state:"uncertain"})
+          .eq("id",refund.id).eq("state","dispatching");
       }
     }
-    // For partial refunds the charge's CANCELED status does not prove the
-    // refunded portion; leave it pending until a provider receipt exposes it.
-    if(Number(refund.requested_cents)===Number(cancellation.calculation.allocations
-      .find((x:any)=>x.payment_id===refund.payment_id)?.captured_cents)){
+    if(["dispatching","uncertain"].includes(refund.state)||operation==="approve"&&refund.state==="prepared"){
       try{
         const observed=await readRefundCharge(refund),charge=observed.charge;
         providerChecks.push({refund_id:refund.id,status:charge.status,source:observed.source,
-          amount_cents:charge.amount?.currency==="BRL"?Number(charge.amount.value):null});
-        if(charge.id===refund.charge_id&&charge.status==="CANCELED"&&charge.amount?.currency==="BRL"&&
-          Number(charge.amount.value)===Number(refund.requested_cents)){
+          amount_cents:charge.amount?.currency==="BRL"?Number(charge.amount.value):null,
+          provider_refunded_cents:Number.isSafeInteger(charge.summary?.refunded)?charge.summary.refunded:null});
+        const {data:priorRefunds,error:priorError}=await admin.from("reservation_refunds")
+          .select("confirmed_cents").eq("payment_id",refund.payment_id).eq("state","confirmed");
+        if(priorError) throw new Error("refund_history_unavailable");
+        const prior=(priorRefunds||[]).reduce((sum:number,x:any)=>sum+Number(x.confirmed_cents),0);
+        const {data:originalPayment,error:paymentError}=await admin.from("payments").select("amount_cents")
+          .eq("id",refund.payment_id).maybeSingle();
+        if(paymentError) throw new Error("payment_unavailable");
+        if(charge.id===refund.charge_id&&["PAID","CANCELED"].includes(charge.status)&&
+          charge.amount?.currency==="BRL"&&charge.amount.value===Number(originalPayment?.amount_cents)&&
+          charge.summary?.paid===Number(originalPayment?.amount_cents)&&
+          charge.summary?.refunded===prior+Number(refund.requested_cents)){
           const {error:confirmationError}=await admin.rpc("confirm_reservation_refund",{p_refund_id:refund.id,p_charge_id:refund.charge_id,
-            p_provider_status:charge.status,p_confirmed_cents:Number(refund.requested_cents)});
+            p_provider_status:charge.status,p_provider_paid_cents:charge.summary.paid,
+            p_provider_refunded_cents:charge.summary.refunded});
           if(confirmationError) await admin.from("reservation_refund_attempts")
             .insert({refund_id:refund.id,event:"provider_unknown",provider_status:charge.status});
         }
       }catch{providerChecks.push({refund_id:refund.id,status:"unavailable"});}
     }
   }
-  const [{data:current},{data:currentRefunds}]=await Promise.all([
+  const [{data:current,error:currentError},{data:currentRefunds,error:currentRefundsError}]=await Promise.all([
     admin.from("reservation_cancellations").select("status").eq("id",cancellation.id).single(),
     admin.from("reservation_refunds").select("state,requested_cents,confirmed_cents").eq("cancellation_id",cancellation.id)
   ]);
+  if(currentError||currentRefundsError) return json({ok:false,error:"refund_reconciliation_unavailable",cancellation_id:cancellation.id},503);
   return json({ok:true,status:current?.status||"pending_provider",cancellation_id:cancellation.id,
     refund_due_cents:due,confirmed_cents:(currentRefunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
     refunds:currentRefunds||[],provider_checks:providerChecks});
@@ -1178,15 +1260,69 @@ async function reservationRefundStatus(req:Request,body:any,development:boolean)
   const reservationId=String(body?.reservation_id||"");
   const {data:r}=await admin.from("reservations").select("id,user_id").eq("id",reservationId).maybeSingle();
   if(!r||r.user_id!==user.id) return json({ok:false,error:"reservation_not_found"},404);
-  const {data:c}=await admin.from("reservation_cancellations")
-    .select("id,status,refund_due_cents,accepted_version,created_at").eq("reservation_id",r.id).maybeSingle();
-  if(!c) return json({ok:true,cancellation:null});
-  const {data:refunds}=await admin.from("reservation_refunds")
-    .select("requested_cents,confirmed_cents,state").eq("cancellation_id",c.id);
-  return json({ok:true,cancellation:{status:c.status,refund_due_cents:c.refund_due_cents,
-    confirmed_cents:(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
-    pending_cents:Number(c.refund_due_cents)-(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
-    accepted_version:c.accepted_version,created_at:c.created_at}});
+  const {data:cases}=await admin.from("reservation_cancellations")
+    .select("id,kind,status,refund_due_cents,accepted_version,created_at")
+    .eq("reservation_id",r.id).order("created_at",{ascending:false});
+  const {data:refunds}=cases?.length?await admin.from("reservation_refunds")
+    .select("cancellation_id,requested_cents,confirmed_cents,state").in("cancellation_id",cases.map((c:any)=>c.id)):{data:[]};
+  return json({ok:true,cases:(cases||[]).map((c:any)=>{
+    const confirmed=(refunds||[]).filter((x:any)=>x.cancellation_id===c.id)
+      .reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0);
+    return {kind:c.kind,status:c.status,refund_due_cents:Number(c.refund_due_cents),
+      confirmed_cents:confirmed,pending_cents:Number(c.refund_due_cents)-confirmed,
+      accepted_version:c.accepted_version,created_at:c.created_at};
+  })});
+}
+
+async function reservationCancelRequest(req:Request,body:any,development:boolean){
+  if(!development) return json({ok:false,error:"development_only"},403);
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const operation=String(body?.operation||"");
+  if(operation==="list"){
+    if(!(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+    const {data,error}=await admin.from("reservation_cancel_requests")
+      .select("id,reservation_id,reason,requested_at,status,decision_note,cancellation_id")
+      .in("status",["requested","approved","processing"]).order("requested_at",{ascending:true});
+    return error?json({ok:false,error:"requests_unavailable"},503):json({ok:true,requests:data||[]});
+  }
+  const reservationId=String(body?.reservation_id||"");
+  const {data:r}=await admin.from("reservations")
+    .select("id,user_id,status,check_in,checked_in_at").eq("id",reservationId).maybeSingle();
+  if(!r) return json({ok:false,error:"reservation_not_found"},404);
+  const isAdmin=await userIsAdmin(user);
+  if(operation==="request"){
+    if(r.user_id!==user.id) return json({ok:false,error:"reservation_not_found"},404);
+    if(r.status!=="confirmed"||r.checked_in_at||Date.parse(`${r.check_in}T15:00:00-03:00`)<=Date.now())
+      return json({ok:false,error:"cancellation_requires_review"},409);
+    const reason=String(body?.reason||"").trim().slice(0,1000);
+    if(reason.length<5) return json({ok:false,error:"reason_required"},400);
+    const {data:existing}=await admin.from("reservation_cancel_requests")
+      .select("id,status,requested_at").eq("reservation_id",r.id)
+      .in("status",["requested","approved","processing"]).maybeSingle();
+    if(existing) return json({ok:true,request:existing});
+    const {data,error}=await admin.from("reservation_cancel_requests")
+      .insert({reservation_id:r.id,guest_user_id:user.id,reason}).select("id,status,requested_at").single();
+    return error?json({ok:false,error:"request_already_exists"},409):json({ok:true,request:data});
+  }
+  if(operation==="status"){
+    if(r.user_id!==user.id&&!isAdmin) return json({ok:false,error:"reservation_not_found"},404);
+    const {data}=await admin.from("reservation_cancel_requests")
+      .select("id,status,requested_at,decided_at,decision_note,cancellation_id")
+      .eq("reservation_id",r.id).order("requested_at",{ascending:false}).limit(5);
+    return json({ok:true,requests:data||[]});
+  }
+  if(operation==="reject"){
+    if(!isAdmin) return json({ok:false,error:"admin_required"},403);
+    const note=String(body?.decision_note||"").trim().slice(0,1000);
+    if(!note) return json({ok:false,error:"reason_required"},400);
+    const {data,error}=await admin.from("reservation_cancel_requests")
+      .update({status:"rejected",decided_by:user.id,decided_at:new Date().toISOString(),decision_note:note})
+      .eq("id",String(body?.request_id||"")).eq("reservation_id",r.id).eq("status","requested")
+      .select("id").maybeSingle();
+    return error||!data?json({ok:false,error:"request_state_changed"},409):json({ok:true,request_id:data.id,status:"rejected"});
+  }
+  return json({ok:false,error:"invalid_operation"},400);
 }
 
 async function adminReservationAction(req:Request,body:any){
@@ -2024,6 +2160,7 @@ Deno.serve(async(req)=>{
     if(action==="admin_hub") return await adminHubData(req,body);
     if(action==="reservation_refund_action") return await reservationRefundAction(req,body,development);
     if(action==="reservation_refund_status") return await reservationRefundStatus(req,body,development);
+    if(action==="reservation_cancel_request") return await reservationCancelRequest(req,body,development);
     if(action==="admin_reservation_action") return await adminReservationAction(req,body);
     if(action==="admin_notification_action") return await adminNotificationAction(req,body);
     if(action==="admin_property_action") return await adminPropertyAction(req,body);

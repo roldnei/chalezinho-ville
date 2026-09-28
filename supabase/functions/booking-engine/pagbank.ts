@@ -82,7 +82,7 @@ export async function getPagBankCharge(token: string, chargeId: string, fetcher:
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`pagbank_charge_unavailable_${response.status}`);
-  return await response.json() as { id: string; status: string; amount: {value: number; currency: string} };
+  return await response.json() as { id: string; status: string; amount: {value: number; currency: string}; summary?: {total:number;paid:number;refunded:number} };
 }
 
 // A successful HTTP response records only a provider request. The caller must
@@ -120,7 +120,7 @@ export async function getPagBankOrderCharge(token:string, orderId:string, charge
   const data=await response.json();
   const charge=data?.charges?.find((entry:{id:string})=>entry.id===chargeId);
   if(!charge) throw new Error("pagbank_order_charge_missing");
-  return charge as {id:string;status:string;amount:{value:number;currency:string}};
+  return charge as {id:string;status:string;amount:{value:number;currency:string};summary?:{total:number;paid:number;refunded:number}};
 }
 
 export async function getPagBankCardPublicKey(token: string, fetcher: typeof fetch = fetch) {
