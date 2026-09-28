@@ -65,9 +65,41 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
   const body = await response.json().catch(() => null);
   if (!response.ok || !body?.id || !body?.charges?.[0]?.id) throw new Error("pagbank_order_failed");
   const charge = body.charges[0];
+  if (charge.amount?.currency !== "BRL" || Number(charge.amount?.value) !== order.charges[0].amount.value ||
+      !["WAITING", "PAID", "IN_ANALYSIS", "AUTHORIZED", "DECLINED"].includes(charge.status) ||
+      (order.charges[0].payment_method.type === "PIX" && !charge.qr_code?.text))
+    throw new Error("pagbank_order_response_invalid");
   return { orderId: body.id as string, chargeId: charge.id as string,
     status: charge.status as string, pixCode: charge.qr_code?.text as string | undefined,
     qrImageUrl: charge.links?.find((link: {rel:string}) => link.rel === "QRCODE.PNG")?.href as string | undefined };
+}
+
+export async function getPagBankCharge(token: string, chargeId: string, fetcher: typeof fetch = fetch) {
+  if (!token || !/^CHAR_[A-Za-z0-9-]+$/.test(chargeId)) throw new Error("invalid_charge_id");
+  const response = await fetcher(`${bases.sandbox}/charges/${chargeId}`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error("pagbank_charge_unavailable");
+  return await response.json() as { id: string; status: string; amount: {value: number; currency: string} };
+}
+
+export async function getPagBankCardPublicKey(token: string, fetcher: typeof fetch = fetch) {
+  let response = await fetcher(`${bases.sandbox}/public-keys/card`, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+  });
+  if(response.status===404){
+    response=await fetcher(`${bases.sandbox}/public-keys`,{
+      method:"POST",headers:{Authorization:`Bearer ${token}`,Accept:"application/json",
+        "Content-Type":"application/json"},body:JSON.stringify({type:"card"}),
+      signal:AbortSignal.timeout(10000),
+    });
+  }
+  if (!response.ok) throw new Error("pagbank_card_key_unavailable");
+  const data = await response.json();
+  if (typeof data?.public_key !== "string") throw new Error("pagbank_card_key_unavailable");
+  return data.public_key as string;
 }
 
 // PagBank signs the exact unformatted request body with SHA-256(token + '-' + body).
