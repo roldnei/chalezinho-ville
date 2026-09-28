@@ -17,6 +17,17 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const admin = createClient(projectUrl, serviceKey, {auth:{persistSession:false,autoRefreshToken:false}});
 
+async function developmentPolicies(){
+  const {data,error}=await admin.from("cancellation_policy_assignments")
+    .select("rate_plan_code,cancellation_policy_rules!inner(withdrawal_days,full_refund_days_before_checkin,late_accommodation_refund_percent,policy_documents!inner(id,title,body,version,code))")
+    .eq("environment","development");
+  if(error) throw new Error("cancellation_policy_unavailable");
+  return data||[];
+}
+function policyForPlan(rows:any[],code:string){
+  return (rows.find((row:any)=>row.rate_plan_code===code)?.cancellation_policy_rules as any)?.policy_documents||null;
+}
+
 function overlaps(a:string,b:string,s:string,e:string){ return a < e && b > s; }
 function nights(a:string,b:string){ return Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000); }
 function validDate(v:string){ return /^\d{4}-\d{2}-\d{2}$/.test(v||""); }
@@ -195,16 +206,19 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     .select("id,code,name,multiplier_bps,selectable,cancellation_policy_id,policy_documents(id,title,body,version,code)")
     .eq("active",true).order("display_order");
   if(ple) throw new Error("rate_plan_failed");
+  const policyAssignments=development?await developmentPolicies():[];
 
   const inserted:any[]=[];
   const display:any[]=[];
   for(const p of plans||[]){
+    const cancellationPolicy=development&&p.selectable?policyForPlan(policyAssignments,p.code):p.policy_documents;
+    if(development&&p.selectable&&!cancellationPolicy) throw new Error("cancellation_policy_unavailable");
     const accommodation=Math.round(baseCents*Number(p.multiplier_bps)/10000);
     const total=accommodation+cleaningCents+experienceTotal;
     const row={
       quote_id:q.id,rate_plan_id:p.id,accommodation_amount_cents:accommodation,
       cleaning_fee_cents:cleaningCents,total_amount_cents:total,
-      cancellation_policy_id:p.cancellation_policy_id
+      cancellation_policy_id:cancellationPolicy?.id||null
     };
     if(p.selectable) inserted.push(row);
     display.push({
@@ -212,7 +226,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
       accommodation_amount_cents:accommodation,cleaning_fee_cents:cleaningCents,
       stay_amount_cents:accommodation+cleaningCents,
       experience_amount_cents:experienceTotal,total_amount_cents:total,
-      cancellation_policy:p.policy_documents||null
+      cancellation_policy:cancellationPolicy||null
     });
   }
   let optionRows:any[]=[];
@@ -387,13 +401,18 @@ async function applyUpsell(body:any,development:boolean){
     .select("id,code,name,selectable,cancellation_policy_id,policy_documents(id,title,body,version,code)")
     .in("id",planIds);
   const byPlan=Object.fromEntries((plans||[]).map((p:any)=>[String(p.id),p]));
+  const policyIds=[...new Set(newOptions.map((o:any)=>o.cancellation_policy_id).filter(Boolean))];
+  const {data:policyDocs,error:policyError}=policyIds.length?await admin.from("policy_documents")
+    .select("id,title,body,version,code").in("id",policyIds):{data:[],error:null};
+  if(policyError) return json({ok:false,error:"cancellation_policy_unavailable"},500);
+  const policyById=Object.fromEntries((policyDocs||[]).map((d:any)=>[String(d.id),d]));
   const display=newOptions.map((o:any)=>{
     const p=byPlan[String(o.rate_plan_id)]||{};
     return {
       quote_option_id:o.id,code:p.code,name:p.name,selectable:p.selectable!==false,
       stay_amount_cents:Number(o.accommodation_amount_cents)+Number(o.cleaning_fee_cents),
       experience_amount_cents:newExperienceTotal,total_amount_cents:o.total_amount_cents,
-      cancellation_policy:p.policy_documents||null
+      cancellation_policy:policyById[String(o.cancellation_policy_id)]||null
     };
   });
   const selected=display.find((x:any)=>String(newOptions.find((o:any)=>String(o.id)===String(x.quote_option_id))?.rate_plan_id)===String(oldSelected.rate_plan_id));
@@ -835,6 +854,9 @@ async function adminHubData(req:Request,body:any){
   ]);
   if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error)
     return json({ok:false,error:"admin_hub_unavailable"},500);
+  let cancellationPolicies:any[];
+  try { cancellationPolicies=await developmentPolicies(); }
+  catch { return json({ok:false,error:"cancellation_policy_unavailable"},500); }
 
   const reservations=reservationsQ.data||[];
   const reservationIds=reservations.map((r:any)=>r.id);
@@ -870,10 +892,30 @@ async function adminHubData(req:Request,body:any){
     payments:paymentsQ.data||[],experience_orders:ordersQ.data||[],charges:chargesQ.data||[],
     modifications:modsQ.data||[],guarantees:guaranteesQ.data||[],notes:notesQ.data||[],ledger:ledgerQ.data||[],
     notifications:notificationsQ.data||[],integrations:integrationsQ.data||[],settings:settingsQ.data||{},
+    cancellation_policies:cancellationPolicies,
     calendar_blocks:blocksQ.data||[],
     channel_periods:channelPeriods,
     channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
   });
+}
+
+async function adminCancellationPolicyAction(req:Request,body:any,development:boolean){
+  if(!development) return json({ok:false,error:"development_only"},403);
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const code=String(body?.rate_plan_code||"");
+  const withdrawal=Number(body?.withdrawal_days);
+  const full=Number(body?.full_refund_days_before_checkin);
+  const late=Number(body?.late_accommodation_refund_percent);
+  if(!["refundable","non_refundable"].includes(code)||![withdrawal,full,late].every(Number.isInteger)
+     ||withdrawal<7||withdrawal>30||full<1||full>365||late<0||late>100||(code==="non_refundable"&&late!==0))
+    return json({ok:false,error:"invalid_policy_configuration"},400);
+  const {data,error}=await admin.rpc("save_development_cancellation_policy",{
+    p_rate_plan_code:code,p_withdrawal_days:withdrawal,
+    p_full_refund_days_before_checkin:full,p_late_accommodation_refund_percent:late
+  });
+  if(error) return json({ok:false,error:"policy_save_failed"},500);
+  return json({ok:true,document_id:data});
 }
 
 async function adminReservationAction(req:Request,body:any){
@@ -1584,7 +1626,10 @@ Deno.serve(async(req)=>{
     let body:any={};
     if(req.method==="POST") body=await req.json().catch(()=>({}));
     const action=url.searchParams.get("action")||body.action||"config";
-    const development=req.headers.get("x-chalezinho-env")==="development";
+    const origin=req.headers.get("origin")||"";
+    const development=req.headers.get("x-chalezinho-env")==="development" &&
+      (origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
+       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
 
     if(action==="identity_status"||action==="complete_identity"){
       const user=await currentUser(req);
@@ -1659,6 +1704,7 @@ Deno.serve(async(req)=>{
     if(action==="modification_action") return await modificationAction(req,body,development);
     if(action==="ops") return await opsData(req);
     if(action==="ops_settings_action") return await opsSettingsAction(req,body);
+    if(action==="admin_cancellation_policy_action") return await adminCancellationPolicyAction(req,body,development);
     if(action==="admin_hub") return await adminHubData(req,body);
     if(action==="admin_reservation_action") return await adminReservationAction(req,body);
     if(action==="admin_notification_action") return await adminNotificationAction(req,body);
