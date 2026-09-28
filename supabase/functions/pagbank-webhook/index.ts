@@ -50,12 +50,17 @@ Deno.serve(async (request) => {
           if(error)throw error;
         }
       }
-      if(["capture_requested","capture_uncertain"].includes(guarantee.status)&&charge.status==="PAID"&&
-        Number(charge.amount.value)===Number(guarantee.requested_capture_cents)){
+      const captured=Number(guarantee.requested_capture_cents);
+      if(["capture_requested","capture_uncertain"].includes(guarantee.status)&&charge.status==="PAID"&&captured>0&&(
+        (Number(charge.amount.value)===captured&&(!charge.summary||charge.summary.paid===captured))||
+        (Number(charge.amount.value)===original&&charge.summary?.paid===captured))){
         const {error}=await admin.rpc("capture_guarantee_mock_atomic",{
           p_guarantee_id:guarantee.id,p_actor_user_id:null,
-          p_amount_cents:Number(guarantee.requested_capture_cents)});
+          p_amount_cents:captured});
         if(error)throw error;
+        const {error:statusError}=await admin.from("guarantees").update({provider_last_status:"PAID",
+          provider_error_code:null,updated_at:new Date().toISOString()}).eq("id",guarantee.id).eq("status","captured");
+        if(statusError)throw statusError;
       }
       if(["release_requested","release_uncertain"].includes(guarantee.status)&&charge.status==="CANCELED"){
         const {error}=await admin.from("guarantees").update({status:"released",provider_last_status:"CANCELED",updated_at:new Date().toISOString()})

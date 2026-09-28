@@ -70,7 +70,17 @@ async function reconcile(g:any){
       const {error}=await admin.rpc("capture_guarantee_mock_atomic",{
         p_guarantee_id:g.id,p_actor_user_id:null,p_amount_cents:captured});
       if(error)throw new Error("guarantee_capture_ledger_unavailable");
+      const {error:statusError}=await admin.from("guarantees").update({provider_last_status:"PAID",
+        provider_error_code:null,updated_at:new Date().toISOString()}).eq("id",g.id).eq("status","captured");
+      if(statusError)throw new Error("guarantee_capture_status_unavailable");
     }
+  }
+  if(g.status==="captured"&&charge?.status==="PAID"&&captured>0&&(
+    (Number(charge.amount.value)===captured&&(!charge.summary||charge.summary.paid===captured))||
+    (Number(charge.amount.value)===initial&&charge.summary?.paid===captured))){
+    const {error}=await admin.from("guarantees").update({provider_last_status:"PAID",
+      provider_error_code:null,updated_at:new Date().toISOString()}).eq("id",g.id).eq("status","captured");
+    if(error)throw new Error("guarantee_capture_status_unavailable");
   }
   if(["release_requested","release_uncertain"].includes(g.status)&&charge?.status==="CANCELED"){
     await setState(g,g.status,{status:"released",provider_last_status:"CANCELED",provider_error_code:null});
