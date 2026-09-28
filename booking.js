@@ -316,6 +316,15 @@ function renderSummary(){
   card.innerHTML='<label>Nome no cartão<input id="card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="sandbox-card-row"><label>Mês<input id="card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div>';
   pay.appendChild(card);
   pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=paymentChoice().method!=="card"));
+  const resume=document.createElement("button");resume.type="button";resume.className="text-action";
+  resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
+  resume.onclick=async()=>{resume.disabled=true;
+   try{const s=await api("pagbank_sandbox_status",{});
+    state.activePayment={payment_id:s.payment_id,provider:"pagbank_sandbox",status:s.payment_status};
+    renderSandboxPayment({payment:{id:s.payment_id,amount_cents:s.amount_cents},confirmation_code:"Última cobrança de teste"});
+    showStep(6);setFlowError("");
+   }catch(e){setFlowError(e.message==="not_found"?"Nenhuma cobrança de teste recente foi encontrada.":"Não foi possível consultar a cobrança agora.");}
+   finally{resume.disabled=false;}};
  }
 }
 function loadPagBankSdk(){
@@ -340,7 +349,13 @@ async function performStartPayment(choice){
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
- }catch(e){track("payment_failed",{property_id:state.property?.id||null,metadata:{stage:"start_payment",reason:e.message||"unknown"}});setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="pagbank_start_uncertain"?"Não foi possível confirmar a criação da cobrança. Verifique a reserva antes de tentar novamente.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+ }catch(e){track("payment_failed",{property_id:state.property?.id||null,metadata:{stage:"start_payment",reason:e.message||"unknown"}});
+  if(e.message==="pagbank_start_uncertain"&&e.data?.payment_id){
+   const id=e.data.payment_id;state.activePayment={payment_id:id,provider:"pagbank_sandbox",status:"awaiting_payment"};
+   renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
+   showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
+  }
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  const box=$("#mock-payment"),pix=d.payment.pix_code;
