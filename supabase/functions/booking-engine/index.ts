@@ -1,6 +1,6 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { createPagBankOrder, getPagBankCardPublicKey, getPagBankCharge, pagBankOrder } from "./pagbank.ts";
+import { createPagBankOrder, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder } from "./pagbank.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -567,7 +567,10 @@ async function startPayment(req:Request,body:any,development:boolean){
       const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
         metadata:{development:true,environment:"sandbox",order_id:result.orderId}}).eq("id",payment.id);
       if(saveError) throw new Error("pagbank_payment_save_failed");
-      if(result.status!=="WAITING") await reconcileSandboxCharge(payment.id,result.chargeId,sandboxToken);
+      if(result.status!=="WAITING") {
+        try { await reconcileSandboxCharge(payment.id,result.chargeId,sandboxToken,result.orderId); }
+        catch(error) { console.error(JSON.stringify({event:"pagbank_sandbox_reconcile_deferred",payment_id:payment.id,error:String(error)})); }
+      }
       return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,
         hold_expires_at:hold.hold_expires_at,payment:{...payment,provider:"pagbank_sandbox",
           provider_payment_id:result.chargeId,status:result.status==="PAID"?"paid":"awaiting_payment",
@@ -581,8 +584,13 @@ async function startPayment(req:Request,body:any,development:boolean){
   return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,hold_expires_at:hold.hold_expires_at,payment});
 }
 
-async function reconcileSandboxCharge(paymentId:string,chargeId:string,token:string){
-  const charge=await getPagBankCharge(token,chargeId);
+async function reconcileSandboxCharge(paymentId:string,chargeId:string,token:string,orderId?:string){
+  let charge;
+  try { charge=await getPagBankCharge(token,chargeId); }
+  catch(error) {
+    if(!orderId) throw error;
+    charge=await getPagBankOrderCharge(token,orderId,chargeId);
+  }
   if(charge.id!==chargeId||charge.amount?.currency!=="BRL") throw new Error("pagbank_charge_mismatch");
   const {data,error}=await admin.rpc("reconcile_pagbank_sandbox_payment",{
     p_payment_id:paymentId,p_charge_id:chargeId,p_status:charge.status,
@@ -596,13 +604,20 @@ async function sandboxPaymentStatus(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
-  const {data:p}=await admin.from("payments")
+  let paymentQuery=admin.from("payments")
     .select("id,user_id,provider,provider_payment_id,status,metadata,amount_cents,reservations(status)")
-    .eq("id",String(body?.payment_id||"")).single();
+    .eq("user_id",user.id).eq("provider","pagbank_sandbox");
+  if(body?.payment_id) paymentQuery=paymentQuery.eq("id",String(body.payment_id));
+  else paymentQuery=paymentQuery.gte("created_at",new Date(Date.now()-86400000).toISOString()).order("created_at",{ascending:false}).limit(1);
+  const {data:rows}=await paymentQuery.limit(1);
+  const p=rows?.[0];
   if(!p||p.user_id!==user.id||p.provider!=="pagbank_sandbox") return json({ok:false,error:"not_found"},404);
-  if(p.provider_payment_id && token) await reconcileSandboxCharge(p.id,p.provider_payment_id,token);
+  if(p.provider_payment_id && token) {
+    try { await reconcileSandboxCharge(p.id,p.provider_payment_id,token,p.metadata?.order_id); }
+    catch(error) { console.error(JSON.stringify({event:"pagbank_sandbox_status_deferred",payment_id:p.id,error:String(error)})); }
+  }
   const {data:latest}=await admin.from("payments").select("status,metadata,reservations(status)").eq("id",p.id).single();
-  return json({ok:true,payment_status:latest?.status||p.status,
+  return json({ok:true,payment_id:p.id,amount_cents:p.amount_cents,payment_status:latest?.status||p.status,
     reservation_status:(latest?.reservations as any)?.status||null,
     manual_review:latest?.metadata?.manual_review||null});
 }
