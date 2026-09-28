@@ -82,7 +82,7 @@ export async function getPagBankCharge(token: string, chargeId: string, fetcher:
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`pagbank_charge_unavailable_${response.status}`);
-  return normalizeCharge(await response.json());
+  return {...normalizeCharge(await response.json()),httpStatus:response.status};
 }
 
 // Charge responses put the cumulative refund under amount.summary. Keep the
@@ -92,7 +92,8 @@ function normalizeCharge(raw: any) {
   return {id:raw?.id as string,status:raw?.status as string,
     amount:{value:raw?.amount?.value as number,currency:raw?.amount?.currency as string},
     summary:summary&&Number.isSafeInteger(summary.paid)&&Number.isSafeInteger(summary.refunded)?
-      {paid:summary.paid as number,refunded:summary.refunded as number}:undefined,
+      {...(Number.isSafeInteger(summary.total)?{total:summary.total as number}:{}),
+        paid:summary.paid as number,refunded:summary.refunded as number}:undefined,
     links:raw?.links as Array<{rel:string;href:string}>|undefined};
 }
 
@@ -140,7 +141,8 @@ export async function changePagBankCharge(
     // Descriptions and the rest of the response may contain customer data.
     const code=String(body?.error_messages?.[0]?.code||body?.error_messages?.[0]?.error||"");
     const suffix=/^[a-zA-Z0-9_]{1,40}$/.test(code)?`_code_${code}`:"";
-    throw new Error(`pagbank_charge_operation_http_${response.status}${suffix}`);
+    throw Object.assign(new Error(`pagbank_charge_operation_http_${response.status}${suffix}`),
+      {httpStatus:response.status,errorCode:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null});
   }
   if (body?.id !== chargeId || body?.amount?.currency !== "BRL" ||
       !Number.isSafeInteger(body?.amount?.value) ||
@@ -148,6 +150,7 @@ export async function changePagBankCharge(
     throw new Error("pagbank_charge_operation_uncertain");
   const charge=normalizeCharge(body);
   return {chargeId:charge.id,status:charge.status,amountCents:charge.amount.value,
+    httpStatus:response.status,
     summary:charge.summary||null};
 }
 
@@ -162,7 +165,7 @@ export async function getPagBankOrderCharge(token:string, orderId:string, charge
   const data=await response.json();
   const charge=data?.charges?.find((entry:{id:string})=>entry.id===chargeId);
   if(!charge) throw new Error("pagbank_order_charge_missing");
-  return normalizeCharge(charge);
+  return {...normalizeCharge(charge),httpStatus:response.status};
 }
 
 export async function getPagBankCardPublicKey(token: string, fetcher: typeof fetch = fetch) {

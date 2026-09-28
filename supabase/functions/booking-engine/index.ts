@@ -1155,6 +1155,21 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   const providerChecks:any[]=[];
+  async function recordRefundObservation(refund:any,phase:"post"|"get",source:"charge"|"order",
+    charge:any,transport?:{httpStatus?:number;errorCode?:string|null}){
+    const summary=charge?.summary;
+    const {error}=await admin.from("reservation_refund_provider_observations").insert({
+      refund_id:refund.id,phase,source,charge_id:refund.charge_id,
+      http_status:Number.isInteger(transport?.httpStatus)?transport!.httpStatus:null,
+      error_code:transport?.errorCode||null,
+      charge_status:/^[A-Z_]{1,40}$/.test(String(charge?.status||""))?charge.status:null,
+      amount_value:Number.isSafeInteger(charge?.amount?.value)?charge.amount.value:null,
+      summary_total:Number.isSafeInteger(summary?.total)?summary.total:null,
+      summary_paid:Number.isSafeInteger(summary?.paid)?summary.paid:null,
+      summary_refunded:Number.isSafeInteger(summary?.refunded)?summary.refunded:null
+    });
+    if(error) throw new Error("refund_observation_unavailable");
+  }
   async function readRefundCharge(refund:any){
     try{return {charge:await getPagBankCharge(token,refund.charge_id),source:"charge"}}
     catch(chargeError){
@@ -1239,6 +1254,9 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           precheckPassed=true;
           const receipt=await changePagBankCharge(token,row.charge_id,"cancel",Number(row.requested_cents),row.idempotency_key);
           if(receipt.amountCents!==Number(originalPayment.amount_cents)) throw new Error("provider_response_amount_mismatch");
+          await recordRefundObservation(refund,"post","charge",{
+            status:receipt.status,amount:{value:receipt.amountCents},summary:receipt.summary},
+            {httpStatus:receipt.httpStatus});
           const {error:receiptError}=await admin.from("reservation_refunds")
             .update({provider_status:receipt.status,provider_paid_cents:receipt.summary?.paid||null,
               provider_refunded_cents:receipt.summary?.refunded??null})
@@ -1255,6 +1273,11 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
             continue;
           }
           const diagnostic=String((error as Error)?.message||"");
+          const providerError=error as Error&{httpStatus?:number;errorCode?:string};
+          if(Number.isInteger(providerError?.httpStatus)){
+            try{await recordRefundObservation(refund,"post","charge",null,
+              {httpStatus:providerError.httpStatus,errorCode:providerError.errorCode})}catch{/* the request stays uncertain */}
+          }
           // Persist only a whitelisted transport/result code; provider bodies
           // can contain customer or card data and must never enter the ledger.
           const safeCode=/^pagbank_charge_operation_http_[1-5]\d\d(?:_code_[a-zA-Z0-9_]{1,40})?$/.test(diagnostic)?
@@ -1269,6 +1292,8 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     if(["dispatching","uncertain"].includes(refund.state)||operation==="approve"&&refund.state==="prepared"){
       try{
         const observed=await readRefundCharge(refund),charge=observed.charge;
+        await recordRefundObservation(refund,"get",observed.source as "charge"|"order",charge,
+          {httpStatus:charge.httpStatus});
         providerChecks.push({refund_id:refund.id,status:charge.status,source:observed.source,
           amount_cents:charge.amount?.currency==="BRL"?Number(charge.amount.value):null,
           provider_refunded_cents:Number.isSafeInteger(charge.summary?.refunded)?charge.summary.refunded:null});
@@ -1288,6 +1313,15 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
             p_provider_refunded_cents:charge.summary.refunded});
           if(confirmationError) await admin.from("reservation_refund_attempts")
             .insert({refund_id:refund.id,event:"provider_unknown",provider_status:charge.status});
+        }else if(charge.id===refund.charge_id&&charge.httpStatus===200&&
+          ["PAID","CANCELED"].includes(charge.status)&&charge.amount?.currency==="BRL"&&
+          charge.amount.value===Number(originalPayment?.amount_cents)&&charge.summary==null){
+          // The POST receipt's exact cumulative summary can be confirmed only
+          // with an independently observed GET of the same charge. The RPC
+          // checks both immutable observations and all ledger invariants.
+          await admin.rpc("confirm_reservation_refund_from_receipt",{
+            p_refund_id:refund.id,p_charge_id:refund.charge_id,
+            p_get_status:charge.status,p_get_amount:charge.amount.value});
         }
       }catch{providerChecks.push({refund_id:refund.id,status:"unavailable"});}
     }

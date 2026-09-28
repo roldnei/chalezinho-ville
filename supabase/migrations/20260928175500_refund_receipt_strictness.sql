@@ -1,0 +1,48 @@
+-- Strengthen receipt fallback checks before use.
+create or replace function public.confirm_reservation_refund_from_receipt(
+  p_refund_id uuid,p_charge_id text,p_get_status text,p_get_amount bigint
+) returns text language plpgsql security definer set search_path = '' as $$
+declare v public.reservation_refunds%rowtype; p public.payments%rowtype;
+  v_post public.reservation_refund_provider_observations%rowtype;
+  v_get public.reservation_refund_provider_observations%rowtype;
+  v_prior bigint;
+begin
+  select * into v from public.reservation_refunds where id=p_refund_id for update;
+  if not found then raise exception 'refund_not_found'; end if;
+  if v.state='confirmed' then return 'confirmed'; end if;
+  select * into p from public.payments where id=v.payment_id;
+  select * into v_post from public.reservation_refund_provider_observations
+    where refund_id=v.id and phase='post' and http_status between 200 and 299
+      and source='charge' and charge_id=v.charge_id
+      and amount_value=p.amount_cents and summary_total=p.amount_cents
+      and summary_paid=p.amount_cents
+      and summary_refunded=v.provider_refunded_cents
+    order by observed_at desc limit 1;
+  select * into v_get from public.reservation_refund_provider_observations
+    where refund_id=v.id and phase='get' and source='charge' and charge_id=v.charge_id
+      and charge_status=p_get_status and amount_value=p_get_amount
+      and observed_at>v_post.observed_at
+    order by observed_at desc limit 1;
+  select coalesce(sum(confirmed_cents),0) into v_prior
+    from public.reservation_refunds where payment_id=p.id and id<>v.id and state='confirmed';
+  if v.state not in ('dispatching','uncertain') or v.sent_at is null
+    or v.charge_id is distinct from p_charge_id
+    or p.provider<>'pagbank_sandbox' or p.status not in ('paid','refunded')
+    or p.provider_payment_id is distinct from v.charge_id
+    or v_post.id is null or v_get.id is null or v_get.http_status<>200
+    or v_get.summary_refunded is not null or v_get.summary_paid is not null
+    or p_get_status not in ('PAID','CANCELED') or p_get_amount<>p.amount_cents
+    or v.provider_paid_cents is distinct from p.amount_cents
+    or v.provider_refunded_cents is distinct from v_prior+v.requested_cents
+    or v.provider_refunded_cents>p.amount_cents
+    or not exists(select 1 from public.reservation_refund_attempts
+      where refund_id=v.id and event='request_accepted') then
+    raise exception 'provider_receipt_not_reconciled';
+  end if;
+  return public.confirm_reservation_refund(v.id,v.charge_id,p_get_status,
+    v.provider_paid_cents,v.provider_refunded_cents);
+end $$;
+revoke all on function public.confirm_reservation_refund_from_receipt(uuid,text,text,bigint)
+  from public,anon,authenticated;
+grant execute on function public.confirm_reservation_refund_from_receipt(uuid,text,text,bigint)
+  to service_role;

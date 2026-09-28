@@ -74,18 +74,32 @@ test('cancel response keeps only charge receipt and cumulative refund amount',as
       id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL',
         summary:{paid:2500,refunded:100}},payment_method:{card:{number:'sensitive-test-value'}}
     }),{status:201}));
-  assert.deepEqual(result,{chargeId:'CHAR_test',status:'PAID',amountCents:2500,
+  assert.deepEqual(result,{chargeId:'CHAR_test',status:'PAID',amountCents:2500,httpStatus:201,
     summary:{paid:2500,refunded:100}});
   assert.equal(JSON.stringify(result).includes('sensitive-test-value'),false);
 });
 
 test('direct charge consultation omits unsupported Accept header and retains refund summary',async()=>{
-  const charge={id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL',summary:{paid:2500,refunded:0}}};
+  const charge={id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL',summary:{total:2500,paid:2500,refunded:0}}};
   const fetcher=async(_url,options)=>{
     assert.equal(options.headers.Accept,undefined);
     return new Response(JSON.stringify(charge),{status:200});
   };
-  assert.deepEqual((await getPagBankCharge('sandbox-token','CHAR_test',fetcher)).summary,charge.amount.summary);
+  const result=await getPagBankCharge('sandbox-token','CHAR_test',fetcher);
+  assert.deepEqual(result.summary,charge.amount.summary);
+  assert.equal(result.httpStatus,200);
+});
+
+test('POST receipt retains the exact cumulative amount even when later GET omits summary',async()=>{
+  const receipt=await changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0007',
+    async()=>new Response(JSON.stringify({id:'CHAR_test',status:'PAID',amount:{
+      value:2500,currency:'BRL',summary:{total:2500,paid:2500,refunded:100}}}),{status:201}));
+  const read=await getPagBankCharge('token','CHAR_test',async()=>new Response(JSON.stringify({
+    id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL'}}),{status:200}));
+  assert.deepEqual(receipt.summary,{total:2500,paid:2500,refunded:100});
+  assert.equal(receipt.httpStatus,201);
+  assert.equal(read.summary,undefined);
+  assert.equal(read.httpStatus,200);
 });
 
 test('first refund may be requested without summary but cannot be confirmed from PAID alone',()=>{
