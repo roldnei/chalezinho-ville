@@ -305,6 +305,17 @@ function renderRefundDecision(id,d){
   const mayApprove=d.status==="prepared"||(d.status==="pending_provider"&&d.refunds?.some(x=>x.state==="prepared"));
   $("#admin-modal-content").innerHTML=`<small>${voluntary?"ESTORNO VOLUNTÁRIO":"CANCELAMENTO"} · ${caseState}</small><h2>${brl(d.refund_due_cents)} a devolver</h2><p>Confirmado no financeiro: ${brl(d.confirmed_cents)}. Restante: ${brl(Math.max(0,d.refund_due_cents-d.confirmed_cents))}.</p><p>Política aceita: versão ${esc(d.accepted_version||"—")}. ${voluntary?"A reserva continuará ativa após o estorno.":"A reserva só será cancelada após conciliação."}</p><div class="admin-stack">${alloc.map(x=>`<p>Cobrança ${esc(String(x.charge_id||"").slice(-8))}: paga ${brl(x.captured_cents)} · devolução ${brl(x.refund_cents)} · ${esc(x.calculation?.reason==="withdrawal_window"?"arrependimento em até 7 dias":x.calculation?.reason==="voluntary_refund"?"estorno voluntário":x.calculation?.reason||"calculado pela política")}</p>`).join("")}</div><p class="admin-form-message" role="status"></p><div class="drawer-actions">${mayApprove?'<button class="admin-danger" id="refund-approve">Aprovar e solicitar estorno</button>':d.status!=="confirmed"?'<button id="refund-reconcile">Consultar PagBank</button>':""}</div>`;
   const button=$(mayApprove?"#refund-approve":"#refund-reconcile");
+  if(mayApprove&&button){
+    button.disabled=true;
+    const message=$("#admin-modal-content .admin-form-message");
+    message.textContent="Conferindo o saldo de cada cobrança no PagBank…";
+    api("reservation_refund_action",{reservation_id:id,kind:voluntary?"voluntary_refund":"policy_cancellation",
+      case_id:d.cancellation_id,operation:"preflight"}).then(result=>{
+      if(!button.isConnected)return;
+      if(result.ready){button.disabled=false;message.textContent="Saldo e cobrança conferidos. A aprovação enviará o estorno ao PagBank sandbox."}
+      else message.textContent="Envio bloqueado: o PagBank não informou o saldo estornado de todas as cobranças. A reserva permanece ativa; concilie no provedor antes de prosseguir.";
+    }).catch(()=>{if(button.isConnected)message.textContent="Consulta ao PagBank indisponível. Envio bloqueado; tente novamente após a consulta voltar."});
+  }
   if(button)button.onclick=async()=>{
     button.disabled=true;const m=$("#admin-modal-content .admin-form-message");m.textContent="Consultando PagBank e conciliando…";
     try{const next=await api("reservation_refund_action",{reservation_id:id,kind:voluntary?"voluntary_refund":"policy_cancellation",case_id:d.cancellation_id,operation:mayApprove?"approve":"reconcile"});

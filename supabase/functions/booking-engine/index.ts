@@ -1160,6 +1160,27 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
       return {charge:await getPagBankOrderCharge(token,orderId,refund.charge_id),source:"order"};
     }
   }
+  if(operation==="preflight"){
+    const checks:any[]=[];
+    for(const refund of refunds||[]){
+      if(refund.state!=="prepared") continue;
+      try{
+        const {charge,source}=await readRefundCharge(refund);
+        const {data:payment,error:paymentError}=await admin.from("payments")
+          .select("amount_cents").eq("id",refund.payment_id).single();
+        const {data:prior,error:priorError}=await admin.from("reservation_refunds")
+          .select("confirmed_cents").eq("payment_id",refund.payment_id).eq("state","confirmed");
+        if(paymentError||priorError) throw new Error("database_unavailable");
+        const confirmed=(prior||[]).reduce((total:number,x:any)=>total+Number(x.confirmed_cents),0);
+        checks.push({payment_id:refund.payment_id,source,status:charge.status,
+          ready:charge.id===refund.charge_id&&charge.status==="PAID"&&charge.amount?.currency==="BRL"&&
+            charge.amount.value===Number(payment.amount_cents)&&charge.summary?.paid===Number(payment.amount_cents)&&
+            charge.summary?.refunded===confirmed&&Number(refund.requested_cents)<=Number(payment.amount_cents)-confirmed,
+          provider_refunded_cents:Number.isSafeInteger(charge.summary?.refunded)?charge.summary.refunded:null});
+      }catch{checks.push({payment_id:refund.payment_id,ready:false,status:"unavailable"});}
+    }
+    return json({ok:true,ready:checks.length>0&&checks.every(x=>x.ready),checks});
+  }
   if(operation==="approve"){
     if(!["prepared","pending_provider"].includes(cancellation.status))
       return json({ok:false,error:"cancellation_already_submitted"},409);
