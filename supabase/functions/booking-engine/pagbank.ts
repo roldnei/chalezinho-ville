@@ -21,6 +21,7 @@ export function pagBankOrder(input: {
   expiresAt?: Date;
   encryptedCard?: string;
   installments?: number;
+  buyerInterest?: { total: number; installments: number };
   preAuthorize?: boolean;
   notificationUrl: string;
 }) {
@@ -44,15 +45,54 @@ export function pagBankOrder(input: {
       card: { encrypted: input.encryptedCard, store: false,
         holder: { name: customer.name, tax_id: customer.taxId } } };
   }
+  const interest = input.buyerInterest;
+  if (interest && (method !== "card" || !Number.isSafeInteger(interest.total) || interest.total < 1 ||
+      !Number.isInteger(interest.installments) || interest.installments < 1 || interest.installments >= input.installments! ||
+      amountCents <= interest.total)) throw new Error("invalid_buyer_interest");
+  const chargeAmount = interest ? { value: amountCents, currency: "BRL",
+    fees: { buyer: { interest: interest } } } : { value: amountCents, currency: "BRL" };
   return {
     reference_id: referenceId,
     customer: { name: customer.name, email: customer.email, tax_id: customer.taxId,
       phones: [{ country: "55", area: customer.phone.area, number: customer.phone.number, type: "MOBILE" }] },
-    items: [{ reference_id: referenceId, name: "Reserva Chalezinho Ville", quantity: 1, unit_amount: amountCents }],
+    items: [{ reference_id: referenceId, name: "Reserva Chalezinho Ville", quantity: 1,
+      unit_amount: amountCents - (interest?.total || 0) }],
     charges: [{ reference_id: referenceId, description: "Reserva Chalezinho Ville",
-      amount: { value: amountCents, currency: "BRL" }, payment_method: paymentMethod }],
+      amount: chargeAmount, payment_method: paymentMethod }],
     notification_urls: [notificationUrl],
   };
+}
+
+// The sandbox rate table is illustrative; never compute a percentage locally.
+export async function pagBankInstallmentPlans(token: string, value: number, max: number,
+  free: number, bin: string, fetcher: typeof fetch = fetch) {
+  if (!token || !Number.isSafeInteger(value) || value < 500 || !Number.isInteger(max) || max < 1 || max > 12 ||
+      !Number.isInteger(free) || free < 0 || free > max || free === 1 || !/^\d{6}(\d{2})?$/.test(bin))
+    throw new Error("invalid_installment_request");
+  const query = new URLSearchParams({ payment_methods: "CREDIT_CARD", value: String(value),
+    max_installments: String(max), max_installments_no_interest: String(free), credit_card_bin: bin });
+  const response = await fetcher(`${bases.sandbox}/charges/fees/calculate?${query}`, {
+    headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10000),
+  });
+  if (!response.ok) throw new Error(`pagbank_fees_http_${response.status}`);
+  const body = await response.json().catch(() => null);
+  const brands = Object.values(body?.payment_methods?.credit_card || {}) as any[];
+  if (brands.length !== 1 || !Array.isArray(brands[0]?.installment_plans))
+    throw new Error("pagbank_fees_response_invalid");
+  return brands[0].installment_plans.map((p: any) => {
+    const count = Number(p.installments), total = Number(p.amount?.value), fee = Number(p.amount?.fees?.buyer?.interest?.total || 0);
+    const feeInstallments = Number(p.amount?.fees?.buyer?.interest?.installments || 0);
+    if (!Number.isInteger(count) || count < 1 || count > max || !Number.isSafeInteger(total) ||
+        !Number.isSafeInteger(fee) || fee < 0 || total !== value + fee ||
+        Boolean(p.interest_free) !== (fee === 0) ||
+        (count <= Math.max(1, free) && fee !== 0) ||
+        (count > Math.max(1, free) && (fee < 1 || feeInstallments !== count - free)) ||
+        !Number.isInteger(p.installment_value) || p.installment_value < 500)
+      throw new Error("pagbank_fees_response_invalid");
+    return { installments: count, installment_cents: p.installment_value as number,
+      total_cents: total, buyer_interest_cents: fee, buyer_interest_installments: feeInstallments,
+      interest_free: fee === 0 };
+  });
 }
 
 export async function createPagBankOrder(environment: PagBankEnvironment, token: string,

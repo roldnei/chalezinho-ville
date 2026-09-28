@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
-import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
@@ -30,6 +30,34 @@ test('one and six installments charge the same booking total without a buyer fee
     assert.equal(order.items[0].unit_amount,input.amountCents);
     assert.equal(order.charges[0].payment_method.installments,installments);
   }
+});
+
+test('buyer interest comes from the provider plan and keeps the item at the base price',()=>{
+  const order=pagBankOrder({...input,amountCents:202740,method:'card',encryptedCard:'encrypted-only',
+    installments:7,buyerInterest:{total:3490,installments:1}});
+  assert.equal(order.items[0].unit_amount,199250);
+  assert.equal(order.charges[0].amount.value,202740);
+  assert.deepEqual(order.charges[0].amount.fees.buyer.interest,{total:3490,installments:1});
+});
+
+test('fees API returns exact buyer total for a card BIN and rejects inconsistent plans',async()=>{
+  const fetcher=async(url,options)=>{
+    assert.match(url,/max_installments_no_interest=6/);
+    assert.match(url,/credit_card_bin=453962/);
+    assert.equal(options.headers.Authorization,'Bearer sandbox-token');
+    return new Response(JSON.stringify({payment_methods:{credit_card:{visa:{installment_plans:[
+      {installments:1,installment_value:10000,interest_free:true,amount:{value:10000}},
+      {installments:7,installment_value:1500,interest_free:false,amount:{value:10500,
+        fees:{buyer:{interest:{total:500,installments:1}}}}}
+    ]}}}}),{status:200});
+  };
+  const plans=await pagBankInstallmentPlans('sandbox-token',10000,12,6,'453962',fetcher);
+  assert.equal(plans[1].total_cents,10500);
+  assert.equal(plans[1].buyer_interest_cents,500);
+  await assert.rejects(pagBankInstallmentPlans('sandbox-token',10000,12,6,'453962',
+    async()=>new Response(JSON.stringify({payment_methods:{credit_card:{visa:{installment_plans:[
+      {installments:7,installment_value:1500,interest_free:true,amount:{value:10000}}
+    ]}}}}),{status:200})),/invalid/);
 });
 
 test('damage authorization is requested without immediate capture',()=>{
