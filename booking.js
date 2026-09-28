@@ -20,7 +20,7 @@ const stayNights=()=>nights($("#book-in").value,$("#book-out").value);
 const nightly=c=>Math.round(Number(c||0)/stayNights());
 
 async function api(action,body=null){
- const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development"};
+ const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","apikey":C.supabaseKey,Authorization:"Bearer "+(state.session?.access_token||C.supabaseKey)};
  if(state.session?.access_token) headers.Authorization="Bearer "+state.session.access_token;
  const r=await fetch(ENGINE+"?action="+encodeURIComponent(action),{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});
  const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
@@ -78,7 +78,7 @@ async function search(){
  track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
-  const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
+  const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development","apikey":C.supabaseKey,Authorization:"Bearer "+(state.session?.access_token||C.supabaseKey)}}),d=await r.json();
   if(sequence!==searchSequence)return;
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
   state.search=d.listings;renderResults(d.listings);error("");
