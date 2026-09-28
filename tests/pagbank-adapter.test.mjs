@@ -60,13 +60,16 @@ test('uncertain refund response cannot confirm a refund',async()=>{
   const fetcher=async()=>new Response('{"status":"CANCELED"}',{status:201});
   await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0002',fetcher),/uncertain/);
   await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',0,'refund-attempt-0003',fetcher),/invalid/);
+  await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0005',
+    async()=>new Response('{"error":"card details must not be logged"}',{status:422})),
+    /pagbank_charge_operation_http_422/);
 });
 
 test('cancel response keeps only charge receipt and cumulative refund amount',async()=>{
   const result=await changePagBankCharge('token','CHAR_test','cancel',100,
     'refund-attempt-0004',async()=>new Response(JSON.stringify({
-      id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL'},
-      summary:{paid:2500,refunded:100},payment_method:{card:{number:'sensitive-test-value'}}
+      id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL',
+        summary:{paid:2500,refunded:100}},payment_method:{card:{number:'sensitive-test-value'}}
     }),{status:201}));
   assert.deepEqual(result,{chargeId:'CHAR_test',status:'PAID',amountCents:2500,
     summary:{paid:2500,refunded:100}});
@@ -74,12 +77,12 @@ test('cancel response keeps only charge receipt and cumulative refund amount',as
 });
 
 test('direct charge consultation omits unsupported Accept header and retains refund summary',async()=>{
-  const charge={id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL'},summary:{paid:2500,refunded:0}};
+  const charge={id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL',summary:{paid:2500,refunded:0}}};
   const fetcher=async(_url,options)=>{
     assert.equal(options.headers.Accept,undefined);
     return new Response(JSON.stringify(charge),{status:200});
   };
-  assert.deepEqual((await getPagBankCharge('sandbox-token','CHAR_test',fetcher)).summary,charge.summary);
+  assert.deepEqual((await getPagBankCharge('sandbox-token','CHAR_test',fetcher)).summary,charge.amount.summary);
 });
 
 test('first refund may be requested without summary but cannot be confirmed from PAID alone',()=>{
@@ -121,9 +124,11 @@ test('webhook rejects modified payload or signature',async()=>{
   assert.equal(await verifyPagBankNotification(token,raw,'bad'),false);
 });
 
-test('order lookup requires the exact charge',async()=>{
-  const fetcher=async()=>new Response(JSON.stringify({charges:[{id:'CHAR_test',status:'PAID',amount:{value:100,currency:'BRL'}}]}));
-  assert.equal((await getPagBankOrderCharge('token','ORDE_test','CHAR_test',fetcher)).status,'PAID');
+test('order lookup requires the exact charge and reads nested refund amount',async()=>{
+  const fetcher=async()=>new Response(JSON.stringify({charges:[{id:'CHAR_test',status:'PAID',amount:{value:100,currency:'BRL',summary:{paid:100,refunded:20}}}]}));
+  const result=await getPagBankOrderCharge('token','ORDE_test','CHAR_test',fetcher);
+  assert.equal(result.status,'PAID');
+  assert.deepEqual(result.summary,{paid:100,refunded:20});
   await assert.rejects(getPagBankOrderCharge('token','ORDE_test','CHAR_other',fetcher));
 });
 

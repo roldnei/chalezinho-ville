@@ -1242,14 +1242,20 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           const {error:attemptError}=await admin.from("reservation_refund_attempts")
             .insert({refund_id:refund.id,event:"request_accepted",provider_status:receipt.status});
           if(attemptError) throw new Error("provider_attempt_unavailable");
-        }catch{
+        }catch(error){
           if(!precheckPassed){
             const {error:resetError}=await admin.rpc("refund_precheck_failed",{p_refund_id:refund.id});
             if(resetError) return json({ok:false,error:"refund_precheck_state_uncertain",cancellation_id:cancellation.id},503);
             providerChecks.push({refund_id:refund.id,status:"precheck_failed"});
             continue;
           }
-          await admin.from("reservation_refund_attempts").insert({refund_id:refund.id,event:"request_uncertain"});
+          const diagnostic=String((error as Error)?.message||"");
+          // Persist only a whitelisted transport/result code; provider bodies
+          // can contain customer or card data and must never enter the ledger.
+          const safeCode=/^pagbank_charge_operation_http_[1-5]\d\d$/.test(diagnostic)?
+            diagnostic:"pagbank_charge_operation_uncertain";
+          await admin.from("reservation_refund_attempts").insert({refund_id:refund.id,
+            event:"request_uncertain",provider_status:safeCode});
         }
         if(precheckPassed) await admin.from("reservation_refunds").update({state:"uncertain"})
           .eq("id",refund.id).eq("state","dispatching");
