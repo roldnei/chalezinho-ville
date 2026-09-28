@@ -41,7 +41,8 @@ Deno.serve(async (request) => {
     if(charge.id!==chargeId||charge.amount?.currency!=="BRL"||
       Number(charge.amount.value)!==Number(payment.amount_cents))
       return new Response("Charge mismatch",{status:409});
-    const {error}=await admin.rpc("reconcile_pagbank_sandbox_payment",{
+    const {error}=await admin.rpc(payment.metadata?.kind==="post_booking_charge"
+      ?"reconcile_pagbank_post_booking_payment":"reconcile_pagbank_sandbox_payment",{
       p_payment_id:payment.id,p_charge_id:chargeId,p_status:charge.status,
       p_amount_cents:Number(charge.amount.value)});
     if(error) throw error;
