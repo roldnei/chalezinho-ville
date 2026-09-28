@@ -479,9 +479,11 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(method==="card"&&(Number(installments)<1||Number(installments)>maxInst)) return json({ok:false,error:"invalid_installments"},400);
 
   const {data:option,error:optionError}=await admin.from("quote_options")
-    .select("id,quote_id,cancellation_policy_id")
+    .select("id,quote_id,cancellation_policy_id,total_amount_cents")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
+  if(method==="card"&&Number(option.total_amount_cents)/Number(installments)<500)
+    return json({ok:false,error:"installment_below_minimum"},400);
   const requiredPolicyId=option.cancellation_policy_id;
   const acceptedIds=Array.isArray(accepted_document_ids)?accepted_document_ids.map(String):[];
   if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))

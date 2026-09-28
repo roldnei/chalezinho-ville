@@ -23,6 +23,15 @@ test('card sends encrypted payload, no raw card number, and captures 100 percent
   assert.equal(JSON.stringify(order).includes('4242424242424242'),false);
 });
 
+test('one and six installments charge the same booking total without a buyer fee',()=>{
+  for(const installments of [1,6]){
+    const order=pagBankOrder({...input,method:'card',encryptedCard:'encrypted-only',installments});
+    assert.equal(order.charges[0].amount.value,input.amountCents);
+    assert.equal(order.items[0].unit_amount,input.amountCents);
+    assert.equal(order.charges[0].payment_method.installments,installments);
+  }
+});
+
 test('invalid amounts and expired Pix cannot produce an order',()=>{
   assert.throws(()=>pagBankOrder({...input,amountCents:0,method:'pix',expiresAt:new Date(Date.now()+900000)}));
   assert.throws(()=>pagBankOrder({...input,method:'pix',expiresAt:new Date(Date.now()-1000)}));
