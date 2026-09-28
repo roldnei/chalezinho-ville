@@ -1146,7 +1146,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     status:cancellation.status,accepted_version:cancellation.accepted_version,calculation:cancellation.calculation,
     refund_due_cents:due,confirmed_cents:(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
     refunds:(refunds||[]).map((x:any)=>({payment_id:x.payment_id,requested_cents:x.requested_cents,confirmed_cents:x.confirmed_cents,state:x.state}))});
-  if(!["approve","reconcile"].includes(operation)) return json({ok:false,error:"invalid_operation"},400);
+  if(!["approve","reconcile","preflight"].includes(operation)) return json({ok:false,error:"invalid_operation"},400);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   const providerChecks:any[]=[];
