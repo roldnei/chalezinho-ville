@@ -1,6 +1,6 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { changePagBankCharge, createPagBankOrder, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder } from "./pagbank.ts";
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder } from "./pagbank.ts";
 import { calculateCancellationRefund } from "./refund-policy.ts";
 
 const corsHeaders = {
@@ -1151,14 +1151,13 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   const providerChecks:any[]=[];
   async function readRefundCharge(refund:any){
-    try{return {charge:await getPagBankCharge(token,refund.charge_id),source:"charge",direct_error:null}}
+    try{return {charge:await getPagBankCharge(token,refund.charge_id),source:"charge"}}
     catch(chargeError){
       const {data:payment}=await admin.from("payments").select("metadata")
         .eq("id",refund.payment_id).eq("provider_payment_id",refund.charge_id).maybeSingle();
       const orderId=String(payment?.metadata?.order_id||"");
       if(!/^ORDE_[A-Za-z0-9-]+$/.test(orderId)) throw chargeError;
-      return {charge:await getPagBankOrderCharge(token,orderId,refund.charge_id),source:"order",
-        direct_error:String((chargeError as Error)?.message||"charge_lookup_failed").replace(/[^a-z0-9_]/gi,"").slice(0,80)};
+      return {charge:await getPagBankOrderCharge(token,orderId,refund.charge_id),source:"order"};
     }
   }
   if(operation==="preflight"){
@@ -1166,22 +1165,21 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     for(const refund of refunds||[]){
       if(refund.state!=="prepared") continue;
       try{
-        const {charge,source,direct_error}=await readRefundCharge(refund);
+        const {charge,source}=await readRefundCharge(refund);
         const {data:payment,error:paymentError}=await admin.from("payments")
-          .select("amount_cents").eq("id",refund.payment_id).single();
+          .select("amount_cents,status").eq("id",refund.payment_id).single();
         const {data:prior,error:priorError}=await admin.from("reservation_refunds")
-          .select("confirmed_cents").eq("payment_id",refund.payment_id).eq("state","confirmed");
+          .select("id,confirmed_cents,state").eq("payment_id",refund.payment_id);
         if(paymentError||priorError) throw new Error("database_unavailable");
-        const confirmed=(prior||[]).reduce((total:number,x:any)=>total+Number(x.confirmed_cents),0);
-        checks.push({payment_id:refund.payment_id,source,status:charge.status,direct_error,
-          summary_present:charge.summary!=null,
-          paid_type:typeof charge.summary?.paid,refunded_type:typeof charge.summary?.refunded,
-          summary_fields:Object.keys(charge.summary||{}),
-          charge_fields:Object.keys(charge).filter(k=>!["payment_method","customer","raw_data"].includes(k)),
-          self_link_path:(()=>{try{return new URL(charge.links?.find((x:any)=>x.rel==="SELF")?.href).pathname}catch{return null}})(),
-          ready:charge.id===refund.charge_id&&charge.status==="PAID"&&charge.amount?.currency==="BRL"&&
-            charge.amount.value===Number(payment.amount_cents)&&charge.summary?.paid===Number(payment.amount_cents)&&
-            charge.summary?.refunded===confirmed&&Number(refund.requested_cents)<=Number(payment.amount_cents)-confirmed,
+        const confirmed=(prior||[]).filter((x:any)=>x.state==="confirmed")
+          .reduce((total:number,x:any)=>total+Number(x.confirmed_cents),0);
+        const gate=evaluateRefundPrecheck(charge,{chargeId:refund.charge_id,
+          capturedCents:Number(payment.amount_cents),requestedCents:Number(refund.requested_cents),
+          confirmedCents:confirmed,otherOpenRefund:(prior||[]).some((x:any)=>x.id!==refund.id&&
+            ["prepared","dispatching","uncertain"].includes(x.state))});
+        checks.push({payment_id:refund.payment_id,source,status:charge.status,
+          mode:gate.mode,
+          ready:gate.ready&&payment.status==="paid",
           provider_refunded_cents:Number.isSafeInteger(charge.summary?.refunded)?charge.summary.refunded:null});
       }catch{checks.push({payment_id:refund.payment_id,ready:false,status:"unavailable"});}
     }
@@ -1218,21 +1216,32 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
         let precheckPassed=false;
         try{
           const before=(await readRefundCharge(refund)).charge;
-          if(before.id!==row.charge_id||before.status!=="PAID"||before.amount?.currency!=="BRL"||
-            Number(before.amount?.value)<Number(row.requested_cents)||
-            !Number.isSafeInteger(before.summary?.refunded)||!Number.isSafeInteger(before.summary?.paid))
-            throw new Error("provider_precheck_failed");
+          const {data:originalPayment,error:paymentError}=await admin.from("payments")
+            .select("amount_cents,status").eq("id",refund.payment_id).single();
           const {data:priorRefunds,error:priorError}=await admin.from("reservation_refunds")
-            .select("confirmed_cents").eq("payment_id",refund.payment_id).eq("state","confirmed");
-          if(priorError) throw new Error("refund_history_unavailable");
-          const prior=(priorRefunds||[]).reduce((sum:number,x:any)=>sum+Number(x.confirmed_cents),0);
-          if(before.summary.paid!==Number(before.amount.value)||before.summary.refunded!==prior)
+            .select("id,confirmed_cents,state").eq("payment_id",refund.payment_id);
+          if(priorError||paymentError||originalPayment?.status!=="paid") throw new Error("refund_history_unavailable");
+          const prior=(priorRefunds||[]).filter((x:any)=>x.state==="confirmed")
+            .reduce((sum:number,x:any)=>sum+Number(x.confirmed_cents),0);
+          const gate=evaluateRefundPrecheck(before,{chargeId:row.charge_id,
+            capturedCents:Number(originalPayment.amount_cents),requestedCents:Number(row.requested_cents),
+            confirmedCents:prior,otherOpenRefund:(priorRefunds||[]).some((x:any)=>x.id!==refund.id&&
+              ["prepared","dispatching","uncertain"].includes(x.state))});
+          if(!gate.ready)
             throw new Error("provider_refund_balance_mismatch");
           const {error:dispatchError}=await admin.rpc("mark_refund_dispatch",{p_refund_id:refund.id});
           if(dispatchError) throw new Error("dispatch_not_recorded");
           precheckPassed=true;
-          await changePagBankCharge(token,row.charge_id,"cancel",Number(row.requested_cents),row.idempotency_key);
-          await admin.from("reservation_refund_attempts").insert({refund_id:refund.id,event:"request_accepted"});
+          const receipt=await changePagBankCharge(token,row.charge_id,"cancel",Number(row.requested_cents),row.idempotency_key);
+          if(receipt.amountCents!==Number(originalPayment.amount_cents)) throw new Error("provider_response_amount_mismatch");
+          const {error:receiptError}=await admin.from("reservation_refunds")
+            .update({provider_status:receipt.status,provider_paid_cents:receipt.summary?.paid||null,
+              provider_refunded_cents:receipt.summary?.refunded??null})
+            .eq("id",refund.id).eq("state","dispatching");
+          if(receiptError) throw new Error("provider_receipt_unavailable");
+          const {error:attemptError}=await admin.from("reservation_refund_attempts")
+            .insert({refund_id:refund.id,event:"request_accepted",provider_status:receipt.status});
+          if(attemptError) throw new Error("provider_attempt_unavailable");
         }catch{
           if(!precheckPassed){
             const {error:resetError}=await admin.rpc("refund_precheck_failed",{p_refund_id:refund.id});

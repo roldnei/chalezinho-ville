@@ -78,11 +78,31 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
 export async function getPagBankCharge(token: string, chargeId: string, fetcher: typeof fetch = fetch) {
   if (!token || !/^CHAR_[A-Za-z0-9-]+$/.test(chargeId)) throw new Error("invalid_charge_id");
   const response = await fetcher(`${bases.sandbox}/charges/${chargeId}`, {
-    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10000),
   });
   if (!response.ok) throw new Error(`pagbank_charge_unavailable_${response.status}`);
   return await response.json() as { id: string; status: string; amount: {value: number; currency: string}; summary?: {total:number;paid:number;refunded:number}; links?: Array<{rel:string;href:string}> };
+}
+
+// The sandbox may omit `summary` even on a successful direct charge lookup.
+// A first refund can still be requested against a PAID charge; PagBank must
+// enforce the remaining balance. Without the summary, its result stays
+// unconfirmed until a later provider read supplies exact refund evidence.
+export function evaluateRefundPrecheck(charge: {
+  id:string;status:string;amount?:{value:number;currency:string};
+  summary?:{paid:number;refunded:number}
+}, input:{chargeId:string;capturedCents:number;requestedCents:number;
+  confirmedCents:number;otherOpenRefund:boolean}) {
+  const base=charge.id===input.chargeId&&charge.status==="PAID"&&
+    charge.amount?.currency==="BRL"&&charge.amount.value===input.capturedCents&&
+    Number.isSafeInteger(input.capturedCents)&&Number.isSafeInteger(input.requestedCents)&&
+    input.requestedCents>0&&input.requestedCents<=input.capturedCents-input.confirmedCents&&
+    !input.otherOpenRefund;
+  if(!base) return {ready:false,mode:"invalid_charge"};
+  if(charge.summary!=null) return {ready:charge.summary.paid===input.capturedCents&&
+    charge.summary.refunded===input.confirmedCents,mode:"provider_summary"};
+  return {ready:input.confirmedCents===0,mode:"provider_limit"};
 }
 
 // A successful HTTP response records only a provider request. The caller must
@@ -98,19 +118,24 @@ export async function changePagBankCharge(
     throw new Error("invalid_charge_operation");
   const response = await fetcher(`${bases.sandbox}/charges/${chargeId}/${operation}`, {
     method: "POST",
-    headers: {Authorization: `Bearer ${token}`, Accept: "application/json",
+    headers: {Authorization: `Bearer ${token}`,
       "Content-Type": "application/json", "x-idempotency-key": idempotencyKey},
     body: JSON.stringify({amount: {value: amountCents}}),
     signal: AbortSignal.timeout(10000),
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok || body?.id !== chargeId || body?.amount?.currency !== "BRL")
+  if (!response.ok || body?.id !== chargeId || body?.amount?.currency !== "BRL" ||
+      !Number.isSafeInteger(body?.amount?.value) ||
+      !["PAID","CANCELED","AUTHORIZED"].includes(body?.status))
     throw new Error("pagbank_charge_operation_uncertain");
-  return {chargeId: body.id as string, status: body.status as string};
+  return {chargeId: body.id as string, status: body.status as string,
+    amountCents:body.amount.value as number,
+    summary:body.summary&&Number.isSafeInteger(body.summary.paid)&&Number.isSafeInteger(body.summary.refunded)?
+      {paid:body.summary.paid as number,refunded:body.summary.refunded as number}:null};
 }
 
-// The order lookup offers a second authoritative way to read the charge when
-// the sandbox charge lookup has not yet synchronized (which can return 404).
+// The order lookup offers a secondary status read if the direct charge
+// endpoint is temporarily unavailable; it may omit the refund summary.
 export async function getPagBankOrderCharge(token:string, orderId:string, chargeId:string,
   fetcher:typeof fetch=fetch) {
   if(!token || !/^ORDE_[A-Za-z0-9-]+$/.test(orderId)) throw new Error("invalid_order_id");

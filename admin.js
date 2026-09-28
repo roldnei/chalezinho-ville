@@ -312,9 +312,11 @@ function renderRefundDecision(id,d){
     api("reservation_refund_action",{reservation_id:id,kind:voluntary?"voluntary_refund":"policy_cancellation",
       case_id:d.cancellation_id,operation:"preflight"}).then(result=>{
       if(!button.isConnected)return;
-      if(result.ready){button.disabled=false;message.textContent="Saldo e cobrança conferidos. A aprovação enviará o estorno ao PagBank sandbox."}
+      if(result.ready){button.disabled=false;message.textContent=result.checks?.some(c=>c.mode==="provider_limit")?
+        "Cobrança paga conferida. O sandbox omitiu o saldo devolvido; o PagBank validará o limite no envio. O estorno continuará pendente até confirmação do valor pelo provedor.":
+        "Saldo e cobrança conferidos. A aprovação enviará o estorno ao PagBank sandbox."}
       else message.textContent="Envio bloqueado: " + (result.checks||[]).map(c=>
-        `cobrança ${String(c.payment_id||"").slice(-8)}: ${c.status||"indisponível"} via ${c.source||"consulta"}; consulta direta ${c.direct_error||"200"}; resumo ${c.summary_present?"presente":"ausente"}; devolvido ${c.provider_refunded_cents==null?"indisponível":brl(c.provider_refunded_cents)}; link ${c.self_link_path||"ausente"}`
+        `cobrança ${String(c.payment_id||"").slice(-8)}: ${c.status||"indisponível"} via ${c.source||"consulta"}; saldo devolvido ${c.provider_refunded_cents==null?"indisponível":brl(c.provider_refunded_cents)}`
       ).join("; ")+". A reserva permanece ativa.";
     }).catch(()=>{if(button.isConnected)message.textContent="Consulta ao PagBank indisponível. Envio bloqueado; tente novamente após a consulta voltar."});
   }

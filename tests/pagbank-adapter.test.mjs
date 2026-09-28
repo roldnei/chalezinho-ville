@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
-import { changePagBankCharge, createPagBankOrder, getPagBankOrderCharge, pagBankOrder, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
@@ -52,6 +52,7 @@ test('partial refund and capture preserve amount, sandbox URL and idempotency ke
     assert.deepEqual(JSON.parse(call.options.body),{amount:{value:2500}});
     assert.equal(call.options.headers['x-idempotency-key'],'refund-attempt-0001');
     assert.equal(call.options.headers.Authorization,'Bearer sandbox-token');
+    assert.equal(call.options.headers.Accept,undefined);
   }
 });
 
@@ -59,6 +60,38 @@ test('uncertain refund response cannot confirm a refund',async()=>{
   const fetcher=async()=>new Response('{"status":"CANCELED"}',{status:201});
   await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0002',fetcher),/uncertain/);
   await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',0,'refund-attempt-0003',fetcher),/invalid/);
+});
+
+test('cancel response keeps only charge receipt and cumulative refund amount',async()=>{
+  const result=await changePagBankCharge('token','CHAR_test','cancel',100,
+    'refund-attempt-0004',async()=>new Response(JSON.stringify({
+      id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL'},
+      summary:{paid:2500,refunded:100},payment_method:{card:{number:'sensitive-test-value'}}
+    }),{status:201}));
+  assert.deepEqual(result,{chargeId:'CHAR_test',status:'PAID',amountCents:2500,
+    summary:{paid:2500,refunded:100}});
+  assert.equal(JSON.stringify(result).includes('sensitive-test-value'),false);
+});
+
+test('direct charge consultation omits unsupported Accept header and retains refund summary',async()=>{
+  const charge={id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL'},summary:{paid:2500,refunded:0}};
+  const fetcher=async(_url,options)=>{
+    assert.equal(options.headers.Accept,undefined);
+    return new Response(JSON.stringify(charge),{status:200});
+  };
+  assert.deepEqual((await getPagBankCharge('sandbox-token','CHAR_test',fetcher)).summary,charge.summary);
+});
+
+test('first refund may be requested without summary but cannot be confirmed from PAID alone',()=>{
+  const charge={id:'CHAR_test',status:'PAID',amount:{value:2500,currency:'BRL'}};
+  const input={chargeId:'CHAR_test',capturedCents:2500,requestedCents:100,
+    confirmedCents:0,otherOpenRefund:false};
+  assert.deepEqual(evaluateRefundPrecheck(charge,input),{ready:true,mode:'provider_limit'});
+  assert.equal(evaluateRefundPrecheck(charge,{...input,confirmedCents:100}).ready,false);
+  assert.equal(evaluateRefundPrecheck(charge,{...input,otherOpenRefund:true}).ready,false);
+  assert.equal(evaluateRefundPrecheck(charge,{...input,requestedCents:2501}).ready,false);
+  assert.deepEqual(evaluateRefundPrecheck({...charge,summary:{paid:2500,refunded:100}},
+    {...input,confirmedCents:100}),{ready:true,mode:'provider_summary'});
 });
 
 test('invalid amounts and expired Pix cannot produce an order',()=>{
