@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
-import { createPagBankOrder, pagBankOrder, verifyPagBankNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+import { createPagBankOrder, getPagBankOrderCharge, pagBankOrder, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
@@ -48,4 +48,20 @@ test('webhook rejects modified payload or signature',async()=>{
   assert.equal(await verifyPagBankNotification(token,raw,signature),true);
   assert.equal(await verifyPagBankNotification(token,raw+' ',signature),false);
   assert.equal(await verifyPagBankNotification(token,raw,'bad'),false);
+});
+
+test('order lookup requires the exact charge',async()=>{
+  const fetcher=async()=>new Response(JSON.stringify({charges:[{id:'CHAR_test',status:'PAID',amount:{value:100,currency:'BRL'}}]}));
+  assert.equal((await getPagBankOrderCharge('token','ORDE_test','CHAR_test',fetcher)).status,'PAID');
+  await assert.rejects(getPagBankOrderCharge('token','ORDE_test','CHAR_other',fetcher));
+});
+
+test('new webhook signature accepts only matching ECDSA payload',async()=>{
+  const {publicKey,privateKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+  const public_key=publicKey.export({type:'spki',format:'der'}).toString('base64');
+  const fetcher=async()=>new Response(JSON.stringify({public_key}));
+  const raw='{"id":"CHAR_test","status":"PAID"}';
+  const signature=sign('sha256',Buffer.from(raw),privateKey).toString('base64');
+  assert.equal(await verifyPagBankSignedNotification('token',raw,signature,fetcher),true);
+  assert.equal(await verifyPagBankSignedNotification('token',raw+' ',signature,fetcher),false);
 });
