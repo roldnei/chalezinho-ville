@@ -47,11 +47,11 @@ async function load(silent=false){
   if(!silent){$("#admin-loading").hidden=false;$("#admin-content").hidden=true}
   try{
     const start=new Date();start.setMonth(start.getMonth()-2);const end=new Date();end.setMonth(end.getMonth()+12);
-    const [hub,cancelRequests]=await Promise.all([
+    const [hub,cancelRequestsResult]=await Promise.all([
       api("admin_hub",{start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10)}),
-      api("reservation_cancel_request",{operation:"list"})
+      api("reservation_cancel_request",{operation:"list"}).then(value=>({value}),error=>({error}))
     ]);
-    state={...hub,cancel_requests:cancelRequests.requests||[]};
+    state={...hub,cancel_requests:cancelRequestsResult.value?.requests||[]};
     updateCounts();showView(currentView);
     $("#admin-loading").hidden=true;$("#admin-content").hidden=false;$("#admin-app").setAttribute("aria-busy","false");
   }catch(e){$("#admin-loading").textContent="Não foi possível carregar a operação. Atualize a página ou tente novamente em instantes."}
