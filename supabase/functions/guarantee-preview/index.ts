@@ -11,6 +11,24 @@ const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status
 const id=(v:unknown)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v||""));
 const asMoney=(v:unknown)=>Number.isSafeInteger(v)&&Number(v)>0;
 const brazilTime=(date:string,hour:string)=>Date.parse(`${date}T${hour}:00-03:00`);
+const evidenceBucket="guarantee-evidence";
+async function verifiedEvidence(guaranteeId:string,input:unknown){
+  if(!Array.isArray(input)||input.length<2||input.length>11)return null;
+  const seen=new Set<string>(),result=[];
+  for(const item of input){
+    const kind=item?.kind, path=String(item?.path||""), name=String(item?.name||"").slice(0,120);
+    const match=new RegExp(`^${guaranteeId}/(damage|receipt)/([0-9a-f-]{36})\\.(jpg|png|webp|pdf)$`,"i").exec(path);
+    if(!match||match[1]!==kind||seen.has(path)||!name||
+      (kind==="damage"&&match[3]==="pdf"))return null;
+    seen.add(path);
+    const {data,error}=await admin.storage.from(evidenceBucket).list(`${guaranteeId}/${kind}`,{limit:100});
+    const object=data?.find(x=>x.name===path.split("/").pop());
+    if(error||!object||!object.metadata?.size||object.metadata.size>8388608)return null;
+    result.push({bucket:evidenceBucket,kind,path,name,content_type:object.metadata.mimetype});
+  }
+  if(result.filter(x=>x.kind==="damage").length<1||result.filter(x=>x.kind==="receipt").length!==1)return null;
+  return result;
+}
 
 async function caller(req:Request){
   const jwt=(req.headers.get("authorization")||"").replace(/^Bearer\s+/i,"");
@@ -151,13 +169,13 @@ async function handler(req:Request){
   if(action==="report_incident"){
     if(g.status!=="guaranteed"||!g.provider_authorization_id)return reply({ok:false,error:"authorization_required"},409);
     const description=String(body?.description||"").trim().slice(0,1000);
-    const evidenceUrl=String(body?.evidence_url||"").trim();
-    if(description.length<10||!/^https:\/\/[a-z0-9.-]+\//i.test(evidenceUrl))
+    const evidence=await verifiedEvidence(g.id,body?.evidence);
+    if(description.length<5||!evidence||!asMoney(body?.amount_cents)||Number(body.amount_cents)>Number(g.amount_cents))
       return reply({ok:false,error:"incident_evidence_required"},400);
     if(!(await setState(g,"guaranteed",{status:"incident_reported"})))
       return reply({ok:false,error:"guarantee_state_changed"},409);
     const {data:incident,error}=await admin.from("incidents").insert({guarantee_id:g.id,
-      description,requested_capture_cents:Number(body?.amount_cents||0),evidence:[{url:evidenceUrl}],status:"open"})
+      description,requested_capture_cents:Number(body.amount_cents),evidence,status:"open"})
       .select("id").single();
     if(error){await setState(g,"incident_reported",{status:"guaranteed"});
       return reply({ok:false,error:"incident_create_failed"},503)}
@@ -173,6 +191,8 @@ async function handler(req:Request){
       .eq("guarantee_id",g.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
     if(!incident?.evidence?.length||Number(incident.requested_capture_cents)!==Number(amount))
       return reply({ok:false,error:"incident_amount_mismatch"},409);
+    if(incident.evidence.some((x:any)=>x.bucket===evidenceBucket)&&
+      !await verifiedEvidence(g.id,incident.evidence))return reply({ok:false,error:"incident_evidence_missing"},409);
     const before=await observe(g);
     if(before?.status!=="AUTHORIZED"||Number(before.amount.value)!==Number(g.amount_cents)||
       Date.parse(g.provider_capture_before||"")<=Date.now()+3600000)
