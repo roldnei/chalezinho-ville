@@ -1135,6 +1135,8 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     }
   }
   if(!cancellation) return json({ok:false,error:"cancellation_not_prepared"},409);
+  if(kind==="policy_cancellation"&&body?.guest_request_id&&cancellation.guest_request_id!==String(body.guest_request_id))
+    return json({ok:false,error:"cancellation_already_in_progress"},409);
   const {data:refunds,error:refundsError}=await admin.from("reservation_refunds").select("id,payment_id,charge_id,requested_cents,confirmed_cents,state,idempotency_key")
     .eq("cancellation_id",cancellation.id).order("created_at");
   if(refundsError) return json({ok:false,error:"refund_history_unavailable",cancellation_id:cancellation.id},503);
@@ -1295,6 +1297,10 @@ async function reservationCancelRequest(req:Request,body:any,development:boolean
     if(r.user_id!==user.id) return json({ok:false,error:"reservation_not_found"},404);
     if(r.status!=="confirmed"||r.checked_in_at||Date.parse(`${r.check_in}T15:00:00-03:00`)<=Date.now())
       return json({ok:false,error:"cancellation_requires_review"},409);
+    const {data:existingCancellation,error:cancelError}=await admin.from("reservation_cancellations")
+      .select("id,status").eq("reservation_id",r.id).eq("kind","policy_cancellation").maybeSingle();
+    if(cancelError) return json({ok:false,error:"cancellation_unavailable"},503);
+    if(existingCancellation) return json({ok:false,error:"cancellation_already_in_progress"},409);
     const reason=String(body?.reason||"").trim().slice(0,1000);
     if(reason.length<5) return json({ok:false,error:"reason_required"},400);
     const {data:existing}=await admin.from("reservation_cancel_requests")

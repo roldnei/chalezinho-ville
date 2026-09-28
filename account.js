@@ -70,6 +70,8 @@ async function showCancellationRequests(rows){
       rejected:"Solicitação recusada. Sua reserva continua válida."}[current.status];
     if(message){const node=document.createElement("p");node.className="reservation-inline-pending";node.textContent=message;target.append(node)}
    }
+   const {cases}=await api("reservation_refund_status",{reservation_id:r.id});
+   if((cases||[]).some(c=>c.kind==="policy_cancellation"))return;
    if(r.status!=="confirmed"||["requested","approved","processing"].includes(current?.status)||
       Date.parse(r.check_in+"T15:00:00-03:00")<=Date.now())return;
    const form=document.createElement("form");form.className="account-form";
