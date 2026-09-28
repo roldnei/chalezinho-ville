@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
-import { createPagBankOrder, getPagBankOrderCharge, pagBankOrder, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+import { changePagBankCharge, createPagBankOrder, getPagBankOrderCharge, pagBankOrder, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
@@ -30,6 +30,35 @@ test('one and six installments charge the same booking total without a buyer fee
     assert.equal(order.items[0].unit_amount,input.amountCents);
     assert.equal(order.charges[0].payment_method.installments,installments);
   }
+});
+
+test('damage authorization is requested without immediate capture',()=>{
+  const order=pagBankOrder({...input,method:'card',encryptedCard:'encrypted-only',installments:1,preAuthorize:true});
+  assert.equal(order.charges[0].payment_method.capture,false);
+  assert.equal(order.charges[0].amount.value,input.amountCents);
+});
+
+test('partial refund and capture preserve amount, sandbox URL and idempotency key',async()=>{
+  const calls=[];
+  const fetcher=async(url,options)=>{
+    calls.push({url,options});
+    return new Response(JSON.stringify({id:'CHAR_test',status:'CANCELED',amount:{currency:'BRL',value:2500}}),{status:201});
+  };
+  for(const op of ['cancel','capture'])
+    assert.equal((await changePagBankCharge('sandbox-token','CHAR_test',op,2500,'refund-attempt-0001',fetcher)).chargeId,'CHAR_test');
+  assert.equal(calls[0].url,'https://sandbox.api.pagseguro.com/charges/CHAR_test/cancel');
+  assert.equal(calls[1].url,'https://sandbox.api.pagseguro.com/charges/CHAR_test/capture');
+  for(const call of calls){
+    assert.deepEqual(JSON.parse(call.options.body),{amount:{value:2500}});
+    assert.equal(call.options.headers['x-idempotency-key'],'refund-attempt-0001');
+    assert.equal(call.options.headers.Authorization,'Bearer sandbox-token');
+  }
+});
+
+test('uncertain refund response cannot confirm a refund',async()=>{
+  const fetcher=async()=>new Response('{"status":"CANCELED"}',{status:201});
+  await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',100,'refund-attempt-0002',fetcher),/uncertain/);
+  await assert.rejects(changePagBankCharge('token','CHAR_test','cancel',0,'refund-attempt-0003',fetcher),/invalid/);
 });
 
 test('invalid amounts and expired Pix cannot produce an order',()=>{

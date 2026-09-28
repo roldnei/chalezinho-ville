@@ -573,14 +573,14 @@ async function startPayment(req:Request,body:any,development:boolean){
       if(saveError) throw new Error("pagbank_payment_save_failed");
       if(result.status!=="WAITING") {
         try { await reconcileSandboxCharge(payment.id,result.chargeId,sandboxToken,result.orderId); }
-        catch(error) { console.error(JSON.stringify({event:"pagbank_sandbox_reconcile_deferred",payment_id:payment.id,error:String(error)})); }
+        catch { console.error(JSON.stringify({event:"pagbank_sandbox_reconcile_deferred",payment_id:payment.id})); }
       }
       return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,
         hold_expires_at:hold.hold_expires_at,payment:{...payment,provider:"pagbank_sandbox",
-          provider_payment_id:result.chargeId,status:result.status==="PAID"?"paid":"awaiting_payment",
+          provider_payment_id:result.chargeId,status:"processing",
           pix_code:result.pixCode,qr_image_url:result.qrImageUrl}});
-    }catch(e){
-      console.error(JSON.stringify({event:"pagbank_sandbox_start_failed",payment_id:payment.id,error:String(e)}));
+    }catch{
+      console.error(JSON.stringify({event:"pagbank_sandbox_start_failed",payment_id:payment.id}));
       return json({ok:false,error:"pagbank_start_uncertain",payment_id:payment.id},503);
     }
   }
@@ -618,7 +618,7 @@ async function sandboxPaymentStatus(req:Request,body:any,development:boolean){
   if(!p||p.user_id!==user.id||p.provider!=="pagbank_sandbox") return json({ok:false,error:"not_found"},404);
   if(p.provider_payment_id && token) {
     try { await reconcileSandboxCharge(p.id,p.provider_payment_id,token,p.metadata?.order_id,p.metadata?.kind==="post_booking_charge"); }
-    catch(error) { console.error(JSON.stringify({event:"pagbank_sandbox_status_deferred",payment_id:p.id,error:String(error)})); }
+    catch { console.error(JSON.stringify({event:"pagbank_sandbox_status_deferred",payment_id:p.id})); }
   }
   const {data:latest}=await admin.from("payments").select("status,metadata,reservations(status)").eq("id",p.id).single();
   const {data:postCharge}=p.metadata?.kind==="post_booking_charge"
@@ -1105,10 +1105,8 @@ async function adminReservationAction(req:Request,body:any){
     if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_cancellable"},409);
     const reason=String(body?.reason||"").trim().slice(0,1000);
     if(!reason) return json({ok:false,error:"cancellation_reason_required"},400);
-    const {data,error:updateError}=await admin.from("reservations").update({status:"cancelled",cancelled_at:now,cancellation_actor:"admin",cancellation_reason:reason,updated_at:now}).eq("id",reservation.id).eq("status","confirmed").select().single();
-    if(updateError||!data) return json({ok:false,error:"reservation_cancel_failed"},500);
-    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_cancelled",entity_type:"reservation",entity_id:reservation.id,old_value:{status:"confirmed"},new_value:{status:"cancelled",reason}});
-    return json({ok:true,reservation:data,refund_created:false});
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_cancellation_requested",entity_type:"reservation",entity_id:reservation.id,new_value:{reason,state:"pending_refund_reconciliation"}});
+    return json({ok:false,error:"refund_reconciliation_required",status:"pending",reservation_id:reservation.id},409);
   }
   return json({ok:false,error:"invalid_operation"},400);
 }
@@ -1204,14 +1202,12 @@ async function guaranteeAction(req:Request,body:any){
   if(!g) return json({ok:false,error:"not_found"},404);
 
   if(operation==="release"){
-    if(g.status==="released") return json({ok:true,status:"released"});
-    if(["captured","incident_reported","capture_requested","disputed"].includes(g.status))
-      return json({ok:false,error:g.status==="captured"?"guarantee_already_captured":"active_incident"},409);
-    await admin.from("guarantees").update({status:"released",updated_at:new Date().toISOString()}).eq("id",g.id);
-    return json({ok:true,status:"released"});
+    return json({ok:false,error:"pagbank_authorization_reconciliation_required"},409);
   }
 
   if(operation==="report_incident"){
+    if(g.provider!=="pagbank_sandbox"||!g.provider_authorization_id)
+      return json({ok:false,error:"pagbank_authorization_required"},409);
     if(["released","captured","resolved"].includes(g.status)) return json({ok:false,error:"guarantee_not_available"},409);
     if(["incident_reported","capture_requested"].includes(g.status)){
       const {data:existing}=await admin.from("incidents").select("*").eq("guarantee_id",g.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
@@ -1227,18 +1223,7 @@ async function guaranteeAction(req:Request,body:any){
   }
 
   if(operation==="capture"){
-    const amount=Math.max(0,Number(amount_cents||0));
-    const {data:rpc,error:rpcErr}=await admin.rpc("capture_guarantee_mock_atomic",{
-      p_guarantee_id:g.id,p_actor_user_id:user.id,p_amount_cents:amount
-    });
-    if(rpcErr){
-      const msg=String(rpcErr.message||"");
-      if(msg.includes("capture_exceeds_guarantee")) return json({ok:false,error:"capture_exceeds_guarantee"},400);
-      if(msg.includes("incident_required")) return json({ok:false,error:"incident_required"},409);
-      return json({ok:false,error:"guarantee_capture_failed"},500);
-    }
-    const row=Array.isArray(rpc)?rpc[0]:rpc;
-    return json({ok:true,status:"captured",captured_amount_cents:Number(row?.captured_amount_cents||0),released_amount_cents:Number(row?.released_amount_cents||0)});
+    return json({ok:false,error:"pagbank_capture_reconciliation_required"},409);
   }
 
   return json({ok:false,error:"invalid_operation"},400);

@@ -21,6 +21,7 @@ export function pagBankOrder(input: {
   expiresAt?: Date;
   encryptedCard?: string;
   installments?: number;
+  preAuthorize?: boolean;
   notificationUrl: string;
 }) {
   const { referenceId, amountCents, customer, method, notificationUrl } = input;
@@ -39,7 +40,7 @@ export function pagBankOrder(input: {
   } else {
     if (!input.encryptedCard || !Number.isInteger(input.installments) || input.installments! < 1 || input.installments! > 24)
       throw new Error("invalid_card_data");
-    paymentMethod = { type: "CREDIT_CARD", installments: input.installments, capture: true,
+    paymentMethod = { type: "CREDIT_CARD", installments: input.installments, capture: !input.preAuthorize,
       card: { encrypted: input.encryptedCard, store: false,
         holder: { name: customer.name, tax_id: customer.taxId } } };
   }
@@ -82,6 +83,30 @@ export async function getPagBankCharge(token: string, chargeId: string, fetcher:
   });
   if (!response.ok) throw new Error(`pagbank_charge_unavailable_${response.status}`);
   return await response.json() as { id: string; status: string; amount: {value: number; currency: string} };
+}
+
+// A successful HTTP response records only a provider request. The caller must
+// subsequently query the charge and reconcile the outcome before changing any
+// local paid/refunded/captured/released state.
+export async function changePagBankCharge(
+  token: string, chargeId: string, operation: "cancel" | "capture",
+  amountCents: number, idempotencyKey: string, fetcher: typeof fetch = fetch,
+) {
+  if (!token || !/^CHAR_[A-Za-z0-9-]+$/.test(chargeId) ||
+      !Number.isSafeInteger(amountCents) || amountCents < 1 ||
+      !/^[a-zA-Z0-9_-]{16,128}$/.test(idempotencyKey))
+    throw new Error("invalid_charge_operation");
+  const response = await fetcher(`${bases.sandbox}/charges/${chargeId}/${operation}`, {
+    method: "POST",
+    headers: {Authorization: `Bearer ${token}`, Accept: "application/json",
+      "Content-Type": "application/json", "x-idempotency-key": idempotencyKey},
+    body: JSON.stringify({amount: {value: amountCents}}),
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || body?.id !== chargeId || body?.amount?.currency !== "BRL")
+    throw new Error("pagbank_charge_operation_uncertain");
+  return {chargeId: body.id as string, status: body.status as string};
 }
 
 // The order lookup offers a second authoritative way to read the charge when
