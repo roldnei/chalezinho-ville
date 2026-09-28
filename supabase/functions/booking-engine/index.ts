@@ -1173,6 +1173,9 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
         if(paymentError||priorError) throw new Error("database_unavailable");
         const confirmed=(prior||[]).reduce((total:number,x:any)=>total+Number(x.confirmed_cents),0);
         checks.push({payment_id:refund.payment_id,source,status:charge.status,
+          summary_present:charge.summary!=null,
+          paid_type:typeof charge.summary?.paid,refunded_type:typeof charge.summary?.refunded,
+          summary_fields:Object.keys(charge.summary||{}),
           ready:charge.id===refund.charge_id&&charge.status==="PAID"&&charge.amount?.currency==="BRL"&&
             charge.amount.value===Number(payment.amount_cents)&&charge.summary?.paid===Number(payment.amount_cents)&&
             charge.summary?.refunded===confirmed&&Number(refund.requested_cents)<=Number(payment.amount_cents)-confirmed,
