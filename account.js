@@ -27,7 +27,7 @@ catch{anonymousId=crypto.randomUUID()}
 async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const r=await fetch(ENGINE+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
-const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
 async function boot(){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
  $("#account-email").textContent=session.user.email||"";
@@ -97,7 +97,7 @@ function liveCharges(reservationId=null){
    &&["awaiting_payment","processing"].includes(c.status)
    &&(!c.expires_at||Date.parse(c.expires_at)>now));
 }
-function fmtDate(v){return v?new Date(v).toLocaleDateString("pt-BR"):"—"}
+function fmtDate(v){return v?new Date(v).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"}):"—"}
 function initialPayment(r){
  return [...(r.payments||[])]
    .filter(p=>p?.metadata?.kind!=="post_booking_charge")
