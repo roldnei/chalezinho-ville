@@ -1,8 +1,9 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
+const pagbankSandbox=C.environment==="development";
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
-let session=null,profile=null,properties=[],mods=[],charges=[],cartItems=[],reservationsCache=[],shopReservationId=null,paymentSettings={},activeCharge=null;
+let session=null,profile=null,properties=[],mods=[],charges=[],cartItems=[],reservationsCache=[],shopReservationId=null,paymentSettings={},activeCharge=null,postInstallmentQuote=null;
 const esc=v=>String(v??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 let anonymousId="";
 function downloadAcceptedPolicy(doc,code){
@@ -23,17 +24,17 @@ async function downloadReservationPolicy(id,button){
 }
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
-async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const r=await fetch(ENGINE+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
+async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const endpoint=["reservation_refund_status","reservation_cancel_request"].includes(action)?C.refundEngine:ENGINE;const r=await fetch(endpoint+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
-const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
 async function boot(){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
  $("#account-email").textContent=session.user.email||"";
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
   sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,not_confirmed_at,not_confirmed_reason,cancelled_at,cancellation_actor,cancellation_reason,no_show_at,guests,rate_plan_code,stay_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image),payments(id,status,amount_cents,method,installments,metadata,created_at,updated_at),guarantees(status,amount_cents,captured_amount_cents),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
-  sb.from("properties").select("id,name,active").eq("active",true).order("id"),
+  sb.from("properties").select("id,name,active,features").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,status,admin_note,payment_charge_id,payment_due_at,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("post_booking_cart_items").select("id,reservation_id,target_variant_id,package_type,purchase_mode,amount_cents,description,snapshot,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
@@ -45,11 +46,63 @@ async function boot(){
  renderExperienceCart(reservationsCache);
  renderPendingPayments(reservationsCache);
  renderReservations(reservationsCache);
+ showRefundStatuses(reservationsCache);
+ showCancellationRequests(reservationsCache);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
  if(requestedCharge){
   const charge=charges.find(x=>String(x.id)===String(requestedCharge)&&["awaiting_payment","processing"].includes(x.status));
   if(charge)setTimeout(()=>openChargePayment(charge),100);
  }
+}
+async function showCancellationRequests(rows){
+ await Promise.all(rows.map(async r=>{
+  const target=[...document.querySelectorAll(".account-reservation")]
+    .find(x=>x.querySelector(`[data-download-reservation-policy="${r.id}"]`))?.querySelector(".reservation-detail-copy");
+  if(!target)return;
+  try{
+   const {requests}=await api("reservation_cancel_request",{operation:"status",reservation_id:r.id});
+   const current=(requests||[])[0];
+   if(current){
+    const message={requested:"Cancelamento solicitado. A reserva e as datas continuam válidas até a decisão.",
+      approved:"Cancelamento aprovado. Aguardando conciliação do estorno.",
+      processing:"Estorno em processamento. A reserva continua válida até confirmação.",
+      completed:"Cancelamento concluído após confirmação do estorno.",
+      rejected:"Solicitação recusada. Sua reserva continua válida."}[current.status];
+    if(message){const node=document.createElement("p");node.className="reservation-inline-pending";node.textContent=message;target.append(node)}
+   }
+   const {cases}=await api("reservation_refund_status",{reservation_id:r.id});
+   if((cases||[]).some(c=>c.kind==="policy_cancellation"))return;
+   if(r.status!=="confirmed"||["requested","approved","processing"].includes(current?.status)||
+      Date.parse(r.check_in+"T15:00:00-03:00")<=Date.now())return;
+   const form=document.createElement("form");form.className="account-form";
+   form.innerHTML='<button type="button" class="reservation-action">Solicitar cancelamento</button>'+
+     '<div hidden><label>Motivo da solicitação<textarea name="reason" rows="3" minlength="5" required></textarea></label>'+
+     '<p>A reserva permanece válida até a aprovação e a confirmação do estorno conforme a política aceita.</p>'+
+     '<button class="primary-action">Enviar solicitação</button><p role="status"></p></div>';
+   target.append(form);form.querySelector('button[type="button"]').onclick=()=>{form.querySelector("div").hidden=false};
+   form.onsubmit=async event=>{
+    event.preventDefault();const button=form.querySelector(".primary-action"),message=form.querySelector('[role="status"]');
+    button.disabled=true;message.textContent="Enviando solicitação…";
+    try{await api("reservation_cancel_request",{operation:"request",reservation_id:r.id,reason:form.elements.reason.value});
+      form.innerHTML='<p class="reservation-inline-pending">Solicitação enviada. A reserva permanece válida até a decisão e a conciliação.</p>'}
+    catch{message.textContent="Não foi possível enviar a solicitação. A reserva permanece válida.";button.disabled=false}
+   };
+  }catch{/* The reservation remains visible when cancellation status is unavailable. */}
+ }));
+}
+async function showRefundStatuses(rows){
+ await Promise.all(rows.map(async r=>{
+  try{const {cases}=await api("reservation_refund_status",{reservation_id:r.id});if(!cases?.length)return;
+   const card=[...document.querySelectorAll(".account-reservation")].find(x=>x.querySelector(`[data-download-reservation-policy="${r.id}"]`));
+   const target=card?.querySelector(".reservation-detail-copy");if(!target)return;
+   for(const c of cases){
+    const note=document.createElement("div");note.className="reservation-payment-state "+(c.status==="confirmed"?"success":"info");
+    const due=Number(c.refund_due_cents),confirmed=Number(c.confirmed_cents);
+    note.innerHTML="<small>"+(c.kind==="voluntary_refund"?"ESTORNO VOLUNTÁRIO":"ESTORNO DO CANCELAMENTO")+"</small><strong>"+(c.status==="confirmed"?"Concluído":"Aguardando confirmação do PagBank")+"</strong><p>Solicitado: "+brlC(due)+" · Confirmado: "+brlC(confirmed)+" · Restante: "+brlC(Math.max(0,due-confirmed))+"</p>";
+    target.prepend(note);
+   }
+  }catch{/* A failure to read a refund never changes the displayed payment state. */}
+ }));
 }
 
 function renderExperienceCart(reservations){
@@ -96,7 +149,7 @@ function liveCharges(reservationId=null){
    &&["awaiting_payment","processing"].includes(c.status)
    &&(!c.expires_at||Date.parse(c.expires_at)>now));
 }
-function fmtDate(v){return v?new Date(v).toLocaleDateString("pt-BR"):"—"}
+function fmtDate(v){return v?new Date(v).toLocaleDateString("pt-BR",{timeZone:"America/Sao_Paulo"}):"—"}
 function initialPayment(r){
  return [...(r.payments||[])]
    .filter(p=>p?.metadata?.kind!=="post_booking_charge")
@@ -122,6 +175,7 @@ function paymentStatus(p){
 }
 function reservationStatus(r){
  const now=Date.now(),checkIn=Date.parse(r.check_in+"T15:00:00-03:00"),checkOut=Date.parse(r.check_out+"T11:00:00-03:00");
+ if(r.status==="not_confirmed"&&(r.payments||[]).some(p=>p.status==="paid"&&p?.metadata?.kind!=="post_booking_charge")) return {label:"Pagamento recebido · reserva em análise",tone:"danger",priority:0,needsAction:true};
  if(r.status==="pending_payment") return {label:"Aguardando confirmação",tone:"action",priority:0,needsAction:true};
  if(r.status==="not_confirmed") return {label:"Não confirmada",tone:"muted",priority:4,needsAction:false};
  if(r.status==="cancelled") return {label:"Cancelada",tone:"muted",priority:4,needsAction:false};
@@ -170,6 +224,40 @@ function renderPendingExperienceCharge(c){
   :'<button class="text-action" data-pay-charge="'+c.id+'">Ir para pagamento</button>';
  return '<div class="reservation-inline-pending"><span><strong>'+(chargeUnderReview(c)?'Pagamento em análise':'Pagamento pendente')+'</strong> · '+esc(c.description||"Experiência")+' · '+brlC(c.amount_cents)+'</span>'+action+'</div>';
 }
+function renderExperiencePaymentHistory(r){
+ const related=charges.filter(c=>c.reservation_id===r.id&&["experience_add","experience_upgrade"].includes(c.kind));
+ if(!related.length)return "";
+ const entries=related.flatMap(c=>{
+  const attempts=(r.payments||[]).filter(p=>p.metadata?.post_booking_charge_id===c.id)
+    .sort((a,b)=>Date.parse(b.created_at||0)-Date.parse(a.created_at||0));
+  if(!attempts.length)return [];
+  return attempts.map(p=>{
+   const applied=c.status==="applied"&&p.status==="paid";
+   const label=applied?"Pagamento aprovado · experiência incluída"
+    :p.status==="refused"?"Pagamento recusado · experiência não incluída"
+    :p.status==="under_review"?"Pagamento em análise · aguarde"
+    :p.status==="paid"?"Pagamento recebido · conferência necessária"
+    :p.status==="expired"?"Pagamento expirado · experiência não incluída"
+    :"Pagamento aguardando confirmação";
+   const tone=applied?"success":p.status==="refused"?"danger":"info";
+   const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":"Pagamento";
+   return {date:p.created_at||c.created_at,html:'<div class="experience-payment-event '+tone+'"><strong>'+esc(label)+'</strong><span>'+esc(c.description||"Experiência")+' · '+brlC(p.amount_cents||c.amount_cents)+'</span><small>'+esc(method)+' · '+fmtDateTime(p.created_at||c.created_at)+'</small></div>'};
+  });
+ }).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
+ return entries.length?'<section class="experience-payment-history" aria-label="Pagamentos das experiências"><h4>Pagamentos das experiências</h4>'+entries.map(e=>e.html).join("")+'</section>':"";
+}
+function renderModificationPaymentHistory(r){
+ const related=charges.filter(c=>c.reservation_id===r.id&&c.kind==="modification");
+ const entries=related.flatMap(c=>(r.payments||[])
+  .filter(p=>p.metadata?.post_booking_charge_id===c.id)
+  .map(p=>{
+   const applied=c.status==="applied"&&p.status==="paid";
+   const label=applied?"Pagamento aprovado · alteração aplicada":p.status==="refused"?"Pagamento recusado · alteração não aplicada":p.status==="under_review"?"Pagamento em análise · aguarde":"Pagamento aguardando confirmação";
+   const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":"Pagamento";
+   return {date:p.created_at||c.created_at,html:'<div class="experience-payment-event '+(applied?"success":p.status==="refused"?"danger":"info")+'"><strong>'+esc(label)+'</strong><span>'+esc(c.description||"Alteração de reserva")+' · '+brlC(p.amount_cents||c.amount_cents)+'</span><small>'+esc(method)+' · '+fmtDateTime(p.created_at||c.created_at)+'</small></div>'};
+  })).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
+ return entries.length?'<section class="experience-payment-history" aria-label="Pagamentos das alterações"><h4>Pagamentos das alterações</h4>'+entries.map(e=>e.html).join("")+'</section>':"";
+}
 function renderReservations(reservations){
  const box=$("#reservation-list");box.innerHTML="";
  if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
@@ -182,15 +270,23 @@ function renderReservations(reservations){
  sorted.forEach(r=>{
   const ux=reservationStatus(r),active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&![ "requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status)).slice(0,2);
   const payment=initialPayment(r),paymentUx=paymentStatus(payment);
+  if(paymentUx&&payment?.status==="paid"&&r.status==="not_confirmed") Object.assign(paymentUx,{label:"Pagamento recebido · conciliação necessária",tone:"danger",detail:"O PagBank informou pagamento, mas a reserva não foi confirmada. A equipe precisa verificar a disponibilidade e resolver o valor recebido."});
   const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
   const pendingExperienceCharges=liveCharges(r.id).filter(c=>["experience_add","experience_upgrade"].includes(c.kind));
-  const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),cleaning=Number(r.cleaning_fee||0),lodging=Number(r.stay_amount||0)-cleaning,per=lodging/n;
-  const paid=payment?.status==="paid";
+  const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),lodging=Number(r.stay_amount||0);
+  const firstAppliedChange=charges.filter(c=>c.reservation_id===r.id&&c.kind==="modification"&&c.status==="applied"&&c.snapshot?.original_check_in&&c.snapshot?.original_check_out).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at))[0];
+  const initialNights=firstAppliedChange?nights(firstAppliedChange.snapshot.original_check_in,firstAppliedChange.snapshot.original_check_out):n;
+  const initialLodgingLabel=firstAppliedChange?"Valor inicial da reserva · "+initialNights+" noites":"Hospedagem · "+n+" noites";
+  const initialLodgingDetails=firstAppliedChange?"":'<small>'+brl(lodging/n)+' por noite</small>';
+  const paid=["paid","refunded"].includes(payment?.status)&&r.status==="confirmed";
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);
   const art=document.createElement("details");art.className="account-reservation reservation-accordion";art.dataset.status=ux.tone;
   if(String(r.id)===String(defaultOpen))art.open=true;
   const expRows=expItems.map(i=>'<div class="reservation-breakdown-row"><span>'+esc(i.product_name_snapshot)+'</span><strong>'+brlC(Number(i.unit_price_cents))+'</strong></div>').join("");
   const revisionRow=appliedRevision>0?'<div class="reservation-breakdown-row tariff-revision"><span>Revisão de tarifa da alteração</span><strong>+'+brlC(appliedRevision)+'</strong></div>':"";
+  const buyerFees=(r.payments||[]).filter(p=>["paid","refunded","partially_refunded"].includes(p.status))
+    .reduce((sum,p)=>sum+Number(p.metadata?.buyer_interest_cents||0),0);
+  const buyerFeeRow=buyerFees>0?'<div class="reservation-breakdown-row"><span>Juros do parcelamento no cartão</span><strong>'+brlC(buyerFees)+'</strong></div>':"";
   const pendingCharges=pendingExperienceCharges.map(renderPendingExperienceCharge).join("");
   const canShop=r.status==="confirmed"&&Date.parse(r.check_in+"T15:00:00-03:00")>Date.now();
   const experienceAction=canShop?'<button class="reservation-action experience-action" data-experience-shop="'+r.id+'">Adicionar experiência</button>':"";
@@ -200,7 +296,9 @@ function renderReservations(reservations){
   const period=r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/");
   const paymentBadge=paymentUx?'<span class="payment-status-badge '+paymentUx.tone+'">'+esc(paymentUx.label)+'</span>':'';
   const paymentPanel=paymentUx?'<div class="reservation-payment-state '+paymentUx.tone+'"><small>STATUS DO PAGAMENTO</small><strong>'+esc(paymentUx.label)+'</strong><p>'+esc(paymentUx.detail)+'</p>'+(payment.method?'<span>'+(payment.method==="pix"?'Pix':payment.method==="card"?'Cartão'+(payment.installments?' · '+payment.installments+'x':''):'Pagamento de teste')+'</span>':'')+'</div>':'';
-  art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-badge-stack"><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span>'+paymentBadge+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>RESERVA · '+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p>'+paymentPanel+'<div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>Hospedagem · '+n+' noites<small>'+brl(per)+' por noite</small></span><strong>'+brl(lodging)+'</strong></div>'+(cleaning?'<div class="reservation-breakdown-row"><span>Taxa de limpeza</span><strong>'+brl(cleaning)+'</strong></div>':'')+expRows+revisionRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":"VALOR DA TENTATIVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div><span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';
+  const experiencePaymentHistory=renderExperiencePaymentHistory(r);
+  const modificationPaymentHistory=renderModificationPaymentHistory(r);
+  art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-badge-stack"><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span>'+paymentBadge+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>RESERVA · '+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p>'+paymentPanel+'<div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>'+initialLodgingLabel+initialLodgingDetails+'</span><strong>'+brl(lodging)+'</strong></div>'+expRows+revisionRow+buyerFeeRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":payment?.status==="paid"?"VALOR RECEBIDO · EM CONCILIAÇÃO":"VALOR DA TENTATIVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div>'+experiencePaymentHistory+modificationPaymentHistory+'<span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';
   box.appendChild(art);
  });
  box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
@@ -290,21 +388,66 @@ function openChargePayment(chargeInput){
   $("#post-free-confirm").onclick=()=>confirmFreeCharge(charge.id,$("#post-free-confirm"));
   return;
  }
- const maxInst=Math.max(1,Number(paymentSettings.max_card_installments||1));
- const opts=Array.from({length:maxInst},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'x</option>').join("");
+ const reserve=reservationsCache.find(r=>r.id===charge.reservation_id),property=properties.find(p=>p.id===reserve?.property_id);
+ const terms=property?.features?.payment_terms||{max_installments:12,no_interest_installments:6};
+ const maxInst=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(Number(charge.amount_cents||0)/500)));
+ const free=Math.min(Number(terms.no_interest_installments),maxInst);
+ postInstallmentQuote=null;
+ const opts=Array.from({length:maxInst},(_,i)=>'<option value="'+(i+1)+'" '+(i+1>free?'disabled':'')+'>'+(i+1)+'x de '+(i+1<=free?brlC(Math.round(amount/(i+1)))+' · sem juros':'consulte após informar o cartão')+'</option>').join("");
  const rule=isModification
   ?'A alteração só será confirmada depois do pagamento. As novas datas estão protegidas até <strong>'+deadline+'</strong>. Se o pagamento não for concluído até esse prazo, a solicitação será cancelada automaticamente e sua reserva original continuará válida.'
   :'A experiência ou upgrade só será incluído no valor pago e na reserva depois da confirmação do pagamento.';
- content.innerHTML='<small>COBRANÇA DA RESERVA</small><h2>Ir para pagamento</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(amount)+'</strong></div><p>'+rule+'</p><div class="post-payment-methods"><label><input type="radio" name="post-method" value="pix" checked> Pix</label><label><input type="radio" name="post-method" value="card"> Cartão</label></div><label id="post-installments-wrap" hidden>Parcelamento<select id="post-installments">'+opts+'</select></label><button class="primary-action" id="post-pay-start">Ir para pagamento</button><div id="post-payment-sim"></div><p id="post-payment-message" class="form-result"></p>';
- content.querySelectorAll('input[name="post-method"]').forEach(r=>r.onchange=()=>$("#post-installments-wrap").hidden=r.value!=="card"||!r.checked);
+ content.innerHTML='<small>COBRANÇA DA RESERVA · PAGBANK SANDBOX</small><h2>Ir para pagamento de teste</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(amount)+'</strong></div><p>'+rule+'</p><div class="post-payment-methods"><label><input type="radio" name="post-method" value="pix" checked> Pix</label><label><input type="radio" name="post-method" value="card"> Cartão · até '+free+'x sem juros; até '+maxInst+'x com juros</label></div><div id="post-installments-wrap" hidden><label for="post-installments">Parcelamento</label><select id="post-installments">'+opts+'</select><small id="post-installment-total" role="status">Total inicial: '+brlC(amount)+'. Informe o cartão para consultar o valor exato.</small></div><div id="post-card-fields" hidden><label>Nome no cartão<input id="post-card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="post-card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="post-card-short-row"><label>Mês<input id="post-card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="post-card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="post-card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div></div><p>Somente cartões de teste. Nenhuma cobrança real.</p><button class="primary-action" id="post-pay-start">Ir para pagamento de teste</button><div id="post-payment-sim"></div><p id="post-payment-message" class="form-result"></p>';
+ content.querySelectorAll('input[name="post-method"]').forEach(r=>r.onchange=()=>{const card=document.querySelector('input[name="post-method"]:checked')?.value==="card";$("#post-installments-wrap").hidden=!card;$("#post-card-fields").hidden=!card});
+ let planTimer;
+ $("#post-card-number").oninput=()=>{
+  clearTimeout(planTimer);postInstallmentQuote=null;
+  const bin=$("#post-card-number").value.replace(/\D/g,"").slice(0,6);
+  if(bin.length!==6)return;
+  planTimer=setTimeout(async()=>{
+    try{
+      const quote=await api("installment_options",{post_booking_charge_id:charge.id,credit_card_bin:bin});
+      if(activeCharge?.id!==charge.id||$("#post-card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
+      postInstallmentQuote={...quote,bin,chargeId:charge.id};
+      const select=$("#post-installments"),previous=Number(select.value||1);
+      select.innerHTML=quote.plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
+      if(quote.plans.some(p=>p.installments===previous))select.value=String(previous);
+      select.dispatchEvent(new Event("change"));
+    }catch{$("#post-installment-total").textContent="Não foi possível consultar o PagBank. Tente novamente."}
+  },250);
+ };
+ $("#post-installments").onchange=()=>{
+  const plan=postInstallmentQuote?.plans.find(p=>p.installments===Number($("#post-installments").value));
+  $("#post-installment-total").textContent=plan?'Total no cartão: '+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.'):'Informe o cartão para consultar o valor exato.';
+ };
  $("#post-pay-start").onclick=startChargePayment;
+}
+function loadPagBankCardSdk(){
+ if(window.PagSeguro?.encryptCard)return Promise.resolve();
+ return new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://assets.pagseguro.com.br/checkout-sdk-js/rc/dist/browser/pagseguro.min.js";script.onload=resolve;script.onerror=()=>reject(new Error("card_sdk_unavailable"));document.head.appendChild(script)});
+}
+async function encryptPostBookingCard(){
+ const key=await api("pagbank_sandbox_card_key");await loadPagBankCardSdk();
+ const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:$("#post-card-holder").value.trim(),
+  number:$("#post-card-number").value.replace(/\D/g,""),expMonth:$("#post-card-month").value,
+  expYear:$("#post-card-year").value,securityCode:$("#post-card-cvv").value});
+ if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_test_card");
+ ["#post-card-number","#post-card-month","#post-card-year","#post-card-cvv"].forEach(id=>$(id).value="");
+ return card.encryptedCard;
 }
 async function startChargePayment(){
  const btn=$("#post-pay-start");btn.disabled=true;$("#post-payment-message").textContent="Preparando pagamento…";
  const method=document.querySelector('input[name="post-method"]:checked')?.value||"pix";
  const installments=method==="card"?Number($("#post-installments").value||1):1;
  try{
-  const d=await api("start_post_booking_payment",{charge_id:activeCharge.id,method,installments});
+  const credit_card_bin=method==="card"?$("#post-card-number").value.replace(/\D/g,"").slice(0,6):undefined;
+  const quote=postInstallmentQuote;
+  const plan=quote?.plans.find(p=>p.installments===installments);
+  if(method==="card"&&(!plan||quote.bin!==credit_card_bin||quote.chargeId!==activeCharge.id))
+    throw new Error("installment_quote_required");
+  const encrypted_card=method==="card"?await encryptPostBookingCard():undefined;
+  const d=await api("start_post_booking_payment",{charge_id:activeCharge.id,method,installments,
+    credit_card_bin,quoted_total_cents:plan?.total_cents,provider:"pagbank_sandbox",encrypted_card});
   if(activeCharge){
    activeCharge.status="processing";
    activeCharge.payment_id=d.payment?.id||activeCharge.payment_id||null;
@@ -312,11 +455,45 @@ async function startChargePayment(){
    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
   }
   $("#post-payment-message").textContent="";
-  renderPostBookingMockPayment(d.payment);
+  renderPostBookingPagBankPayment(d.payment);
  }catch(e){
-  const msg={charge_expired:"O prazo desta cobrança expirou.",payment_provider_not_ready:"O pagamento ainda não está disponível.",invalid_installments:"Escolha um parcelamento válido."}[e.message]||"Não foi possível iniciar o pagamento.";
+  if(e.message==="pagbank_start_uncertain"&&e.data?.payment_id){renderPostBookingPagBankPayment({id:e.data.payment_id});return}
+  const msg={charge_expired:"O prazo desta cobrança expirou.",payment_provider_not_ready:"O pagamento ainda não está disponível.",invalid_installments:"Escolha um parcelamento válido.",installment_quote_required:"Consulte as parcelas no PagBank antes de pagar.",installment_quote_changed:"O valor das parcelas mudou. Consulte novamente antes de pagar.",invalid_test_card:"Confira os dados do cartão de teste."}[e.message]||"Não foi possível iniciar o pagamento.";
   $("#post-payment-message").textContent=msg;btn.disabled=false;
  }
+}
+function renderPostBookingPagBankPayment(payment){
+ const box=$("#post-payment-sim");
+ box.innerHTML='<div class="post-charge-summary"><span>PagBank sandbox · '+(payment.method==="card"?"Cartão":"Pix")+'</span><strong>'+brlC(payment.amount_cents||activeCharge?.amount_cents)+'</strong></div>'+
+  (payment.pix_code?'<p>Pix copia e cola de teste:</p><textarea readonly aria-label="Pix copia e cola">'+esc(payment.pix_code)+'</textarea>':'')+
+  '<p id="post-sandbox-status" role="status">Consultando a cobrança no PagBank…</p>';
+ $("#post-pay-start").hidden=true;
+ $("#post-card-fields").hidden=true;
+ $("#post-installments-wrap").hidden=true;
+ clearInterval(window.__postPagbankPoll);
+ let failures=0;
+ const finish=(message,allowRefresh=true)=>{
+  const status=$("#post-sandbox-status");if(!status)return;
+  status.textContent=message;
+  clearInterval(window.__postPagbankPoll);
+  if(allowRefresh){const button=document.createElement("button");button.type="button";button.className="primary-action compact";button.textContent="Ver resultado em Minhas Reservas";button.onclick=()=>location.reload();box.appendChild(button)}
+ };
+ const tick=async()=>{try{
+  const s=await api("pagbank_sandbox_status",{payment_id:payment.id});
+  failures=0;
+  const status=$("#post-sandbox-status");if(!status)return;
+  if(s.manual_review){finish("Pagamento recebido, mas a experiência requer conferência manual. Não pague novamente.");return}
+  if(s.charge_status==="applied"){finish("Pagamento aprovado pelo PagBank. Experiência incluída na reserva.");return}
+  if(["refused","cancelled","expired"].includes(s.payment_status)){
+   finish("Pagamento recusado ou encerrado pelo PagBank. A experiência não foi incluída. Se o prazo estiver aberto, você poderá tentar novamente em Minhas Reservas.");return;
+  }
+  status.textContent=s.payment_status==="under_review"?"Pagamento em análise no PagBank. Aguarde a confirmação.":"Aguardando confirmação do PagBank…";
+ }catch{
+  failures++;
+  if(failures>=3){finish("Não foi possível consultar o resultado agora. Não repita o pagamento antes de conferir Minhas Reservas.",false);
+   const button=document.createElement("button");button.type="button";button.className="primary-action compact";button.textContent="Consultar novamente";button.onclick=()=>{button.remove();failures=0;tick()};box.appendChild(button)}
+ }};
+ tick();window.__postPagbankPoll=setInterval(tick,5000);
 }
 function renderPostBookingMockPayment(payment){
  const box=$("#post-payment-sim");

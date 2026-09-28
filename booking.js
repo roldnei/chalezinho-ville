@@ -10,7 +10,8 @@ function downloadPolicyDocument(doc){
  const link=document.createElement("a");link.href=url;link.download=`chalezinho-politica-${String(doc.code||"cancelamento").replace(/[^a-z0-9_-]/gi,"-")}-v${String(doc.version||"").replace(/[^0-9.]/g,"")}.txt`;
  document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null};
+const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null,installmentQuote:null};
+const pagbankSandbox=window.CHALEZINHO_CONFIG.environment==="development";
 let anonymousId="",searchSequence=0;
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
@@ -19,7 +20,7 @@ const stayNights=()=>nights($("#book-in").value,$("#book-out").value);
 const nightly=c=>Math.round(Number(c||0)/stayNights());
 
 async function api(action,body=null){
- const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development"};
+ const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","apikey":C.supabaseKey,Authorization:"Bearer "+(state.session?.access_token||C.supabaseKey)};
  if(state.session?.access_token) headers.Authorization="Bearer "+state.session.access_token;
  const r=await fetch(ENGINE+"?action="+encodeURIComponent(action),{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});
  const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
@@ -43,6 +44,9 @@ async function init(){
 }
 async function closeCheckout(){
  const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
+ if(step===6&&active?.provider==="pagbank_sandbox"){
+  $("#checkout-modal").hidden=true;setFlowError("");return;
+ }
  if(step===6&&active?.payment_id&&active.status==="awaiting_payment"){
   btn.disabled=true;setFlowError("Encerrando a tentativa de pagamento e liberando as datas…");
   try{
@@ -61,7 +65,7 @@ async function closeCheckout(){
  }
  $("#checkout-modal").hidden=true;
 }
-function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · nenhum pagamento real será realizado";document.body.prepend(b)}
+function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
 function error(t){$("#booking-error").textContent=t}
 function setFlowError(t){$("#checkout-error").textContent=t}
 
@@ -74,7 +78,7 @@ async function search(){
  track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
-  const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
+  const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development","apikey":C.supabaseKey,Authorization:"Bearer "+(state.session?.access_token||C.supabaseKey)}}),d=await r.json();
   if(sequence!==searchSequence)return;
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
   state.search=d.listings;renderResults(d.listings);error("");
@@ -118,7 +122,7 @@ function showStep(n){
  setFlowError("");
  $("#checkout-panel").dataset.step=String(n);$$(".checkout-step").forEach(x=>x.hidden=Number(x.dataset.step)!==n);$$(".progress-dot").forEach(x=>x.classList.toggle("active",Number(x.dataset.dot)<=Math.min(n,5)));
  $("#step-back").hidden=n===1||n===6;$("#step-next").hidden=n===6;
- $("#step-next").textContent=n===5?"Iniciar pagamento de teste":"Continuar";
+ $("#step-next").textContent=n===5?(pagbankSandbox?"Ir para pagamento de teste":"Iniciar pagamento de teste"):"Continuar";
 }
 async function generateQuote(withExperiences){
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
@@ -261,7 +265,8 @@ async function maybeOfferUpsell(){
      $("#upsell-yes").textContent="Continuar para pagamento";
      $("#upsell-no").hidden=true;
      $("#upsell-yes").disabled=false;
-     $("#upsell-yes").onclick=async()=>{$("#upsell-modal").hidden=true;await performStartPayment(choice)};
+     $("#upsell-yes").onclick=async()=>{$("#upsell-modal").hidden=true;
+       setFlowError("O pacote mudou. Confira o novo total e consulte novamente as parcelas antes de pagar.")};
    }catch(e){
      $("#upsell-total").textContent="Não foi possível atualizar o pacote.";
      $("#upsell-yes").disabled=false;$("#upsell-no").disabled=false;
@@ -278,8 +283,8 @@ async function next(){
  const step=Number($("#checkout-panel").dataset.step||1);
  if(step===1){if(!state.rate)return setFlowError("Escolha uma tarifa para continuar.");showStep(2);renderExperienceStep();return}
  if(step===2){try{await refreshQuoteAfterExperiences();track("checkout_started",{property_id:state.property?.id||null,metadata:{rate_code:state.rateCode,total_cents:Number(state.rate?.total_amount_cents||0)}});showStep(3);await renderLoginStep()}catch(e){setFlowError("Não foi possível atualizar o pacote. Tente novamente.");}return}
- if(step===3){if(!state.session){saveResume();location.href="auth.html?mode=login&return="+encodeURIComponent("reservar.html?resume=1");return}
-  try{const identity=await api("identity_status");if(!identity.complete){saveResume();location.href="auth.html?mode=identify&return="+encodeURIComponent("reservar.html?resume=1");return}}
+ if(step===3){if(!state.session){saveResume();location.href="auth.html?mode=login&return="+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""));return}
+  try{const identity=await api("identity_status");if(!identity.complete){saveResume();location.href="auth.html?mode=identify&return="+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""));return}}
   catch{setFlowError("Não foi possível conferir seus dados agora. Tente novamente.");return}
   showStep(4);renderGuestStep();return}
  if(step===4){if(!validateGuest())return;showStep(5);renderSummary();return}
@@ -288,38 +293,120 @@ async function next(){
 async function renderLoginStep(){
  const {data:{session}}=await sb.auth.getSession();state.session=session;const box=$("#login-state");
  if(session){const {data:u}=await sb.auth.getUser();box.innerHTML='<div class="success-state">✓ Você está conectado como <strong>'+u.user.email+'</strong>.</div>'}
- else box.innerHTML='<p>Para proteger sua reserva e deixar tudo disponível em “Minhas Reservas”, entre ou crie sua conta agora.</p><a class="primary-action inline" href="auth.html?mode=login&return='+encodeURIComponent("reservar.html?resume=1")+'">Entrar ou criar conta</a>';
+ else box.innerHTML='<p>Para proteger sua reserva e deixar tudo disponível em “Minhas Reservas”, entre ou crie sua conta agora.</p><a class="primary-action inline" href="auth.html?mode=login&return='+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""))+'">Entrar ou criar conta</a>';
 }
 function renderGuestStep(){
  const meta=state.session?.user?.user_metadata||{};$("#guest-name").value=$("#guest-name").value||meta.full_name||"";$("#guest-email").value=state.session?.user?.email||"";$("#guest-phone").value=$("#guest-phone").value||meta.phone||"";
 }
 function validateGuest(){if(!$("#guest-name").value.trim()||!$("#guest-email").value.trim()||!$("#guest-phone").value.trim()){setFlowError("Preencha seus dados.");return false}return true}
 function renderSummary(){
- const total=Number(state.rate.total_amount_cents||0),cleaning=Number(state.rate.cleaning_fee_cents||0),stay=Number(state.rate.accommodation_amount_cents??(state.rate.stay_amount_cents-cleaning));
+ const total=Number(state.rate.total_amount_cents||0),stay=Number(state.rate.stay_amount_cents||0);
  const perNight=Math.round(stay/stayNights());
  const experiences=state.quote?.experiences||[];
  const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
- $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div><div class="summary-line"><span>Taxa de limpeza</span><strong>'+brlC(cleaning)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
+ $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
  const guarantee=Number(state.property.guarantee_amount_cents||0);
  $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · SIMULAÇÃO</small><h4>'+brlC(guarantee)+'</h4><p>A garantia prevista para esta hospedagem é de '+brlC(guarantee)+'. <strong>Neste ambiente não há pré-autorização nem cobrança real.</strong> O procedimento de garantia e sua liberação serão informados antes de uma reserva real.</p></div>':"";
  const doc=state.rate.cancellation_policy;
  const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
- const pay=$("#payment-options"),max=Number(state.config.payment_settings.max_card_installments||1);pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão</label><select id="installments">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'">'+(i+1)+'x</option>').join("")+'</select><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
+ const pay=$("#payment-options"),terms=state.property.features?.payment_terms||{max_installments:12,no_interest_installments:6};
+ const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
+ const free=Math.min(Number(terms.no_interest_installments),max);
+ state.installmentQuote=null;
+ pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'" '+(i+1>free?'disabled':'')+'>'+(i+1)+'x de '+(i+1<=free?brlC(Math.round(total/(i+1)))+' · sem juros':'consulte o valor após informar o cartão')+'</option>').join("")+'</select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
+ if(pagbankSandbox){
+  pay.querySelector(".dev-note").textContent="PagBank sandbox: use somente cartões de teste. Nenhuma cobrança real será feita.";
+  const card=document.createElement("div");card.id="sandbox-card-fields";card.hidden=true;
+  card.innerHTML='<label>Nome no cartão<input id="card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="sandbox-card-row"><label>Mês<input id="card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div>';
+  pay.appendChild(card);
+  let planTimer;
+  $("#card-number").addEventListener("input",()=>{
+    clearTimeout(planTimer);state.installmentQuote=null;
+    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
+    if(bin.length!==6)return;
+    const optionId=state.rate.quote_option_id;
+    planTimer=setTimeout(async()=>{
+      try{
+        const quote=await api("installment_options",{quote_option_id:optionId,credit_card_bin:bin});
+        if(state.rate.quote_option_id!==optionId||$("#card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
+        state.installmentQuote={...quote,bin,optionId};
+        const select=$("#installments"),previous=Number(select.value||1);
+        select.innerHTML=quote.plans.map(p=>'<option value="'+p.installments+'">'+p.installments+'x de '+brlC(p.installment_cents)+' · total '+brlC(p.total_cents)+(p.interest_free?' · sem juros':' · juros '+brlC(p.buyer_interest_cents))+'</option>').join("");
+        if(quote.plans.some(p=>p.installments===previous))select.value=String(previous);
+        select.dispatchEvent(new Event("change"));
+      }catch{$("#installment-total").textContent="Não foi possível consultar as parcelas no PagBank. Tente novamente."}
+    },250);
+  });
+  $("#installments").addEventListener("change",()=>{
+    const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
+    $("#installment-total").textContent=plan?'Total a cobrar no cartão: '+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.'):'Informe o cartão para consultar o valor exato no PagBank.';
+  });
+  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=paymentChoice().method!=="card"));
+  const resume=document.createElement("button");resume.type="button";resume.className="text-action";
+  resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
+  resume.onclick=async()=>{resume.disabled=true;
+   try{const s=await api("pagbank_sandbox_status",{});
+    state.activePayment={payment_id:s.payment_id,provider:"pagbank_sandbox",status:s.payment_status};
+    renderSandboxPayment({payment:{id:s.payment_id,amount_cents:s.amount_cents},confirmation_code:"Última cobrança de teste"});
+    showStep(6);setFlowError("");
+   }catch(e){setFlowError(e.message==="not_found"?"Nenhuma cobrança de teste recente foi encontrada.":"Não foi possível consultar a cobrança agora.");}
+   finally{resume.disabled=false;}};
+ }
+}
+function loadPagBankSdk(){
+ if(window.PagSeguro?.encryptCard)return Promise.resolve();
+ return new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://assets.pagseguro.com.br/checkout-sdk-js/rc/dist/browser/pagseguro.min.js";script.onload=resolve;script.onerror=()=>reject(new Error("card_sdk_unavailable"));document.head.appendChild(script)});
+}
+async function encryptSandboxCard(){
+ const key=await api("pagbank_sandbox_card_key");await loadPagBankSdk();
+ const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:$("#card-holder").value.trim(),
+  number:$("#card-number").value.replace(/\D/g,""),expMonth:$("#card-month").value,
+  expYear:$("#card-year").value,securityCode:$("#card-cvv").value});
+ if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_test_card");
+ ["#card-number","#card-month","#card-year","#card-cvv"].forEach(id=>$(id).value="");
+ return card.encryptedCard;
 }
 async function performStartPayment(choice){
  const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments});
-  state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment"};
-  renderMockPayment(d);showStep(6);setFlowError("");
- }catch(e){track("payment_failed",{property_id:state.property?.id||null,metadata:{stage:"start_payment",reason:e.message||"unknown"}});setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":"Não foi possível iniciar o pagamento de teste.")}
+  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,6):undefined;
+  const quoted=state.installmentQuote;
+  const plan=quoted?.plans.find(p=>p.installments===installments);
+  if(method==="card"&&(!plan||quoted.bin!==credit_card_bin||quoted.optionId!==state.rate.quote_option_id))
+    throw new Error("installment_quote_required");
+  const encrypted_card=pagbankSandbox&&method==="card"?await encryptSandboxCard():undefined;
+  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
+  if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
+  showStep(6);setFlowError("");
+ }catch(e){track("payment_failed",{property_id:state.property?.id||null,metadata:{stage:"start_payment",reason:e.message||"unknown"}});
+  if(e.message==="pagbank_start_uncertain"&&e.data?.payment_id){
+   const id=e.data.payment_id;state.activePayment={payment_id:id,provider:"pagbank_sandbox",status:"awaiting_payment"};
+   renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
+   showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
+  }
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+}
+function renderSandboxPayment(d){
+ const box=$("#mock-payment"),pix=d.payment.pix_code;
+ box.innerHTML='<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
+  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>Consultando o resultado desta cobrança de teste…</p>')+
+  '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
+ if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=()=>navigator.clipboard.writeText(pix)}
+ const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
+  try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
+   if(s.manual_review){$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
+   if(s.reservation_status==="confirmed"){$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
+   if(["refused","cancelled","expired"].includes(s.payment_status)){$("#sandbox-payment-result").textContent="Pagamento não aprovado. Faça uma nova consulta para tentar outra reserva.";clearInterval(window.__pagbankPoll)}
+  }catch{ /* The provider may still be processing; the webhook is authoritative. */ }};
+ clearInterval(window.__pagbankPoll);tick();window.__pagbankPoll=setInterval(tick,5000);
 }
 function renderMockPayment(d){
  const exp=(state.quote?.experiences||[]).map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
- const cleaning=Number(state.rate.cleaning_fee_cents||0),accommodation=Number(state.rate.accommodation_amount_cents??(state.rate.stay_amount_cents-cleaning));
- const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(accommodation)+'</strong></div><div class="summary-line"><span>Taxa de limpeza</span><strong>'+brlC(cleaning)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
+ const accommodation=Number(state.rate.stay_amount_cents||0);
+ const breakdown='<div class="booking-breakdown payment-final"><div class="summary-line"><span>Hospedagem</span><strong>'+brlC(accommodation)+'</strong></div>'+exp+'<div class="summary-total"><span>TOTAL PARA PAGAMENTO</span><strong>'+brlC(state.rate.total_amount_cents)+'</strong></div></div>';
  const box=$("#mock-payment");
  box.innerHTML='<div class="success-state"><small>PRÉ-RESERVA DE PAGAMENTO</small><h3>'+d.confirmation_code+'</h3><p>Agora sim as datas estão protegidas temporariamente enquanto o pagamento é processado.</p></div>'+breakdown+'<div class="mock-controls"><span>SIMULAR RESULTADO:</span><button data-outcome="paid">Aprovado</button><button data-outcome="under_review">Em análise</button><button data-outcome="refused">Recusado</button><button data-outcome="expired">Expirado</button><small class="mock-help">Aprovado, Recusado e Expirado são resultados finais. Depois de escolher um deles, os outros deixam de ser válidos para esta pré-reserva.</small></div><p id="mock-result"></p>';
  const buttons=[...box.querySelectorAll("[data-outcome]")];
