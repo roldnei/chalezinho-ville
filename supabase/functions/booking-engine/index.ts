@@ -1103,6 +1103,17 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   if(!["approve","reconcile"].includes(operation)) return json({ok:false,error:"invalid_operation"},400);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  const providerChecks:any[]=[];
+  async function readRefundCharge(refund:any){
+    try{return {charge:await getPagBankCharge(token,refund.charge_id),source:"charge"}}
+    catch(chargeError){
+      const {data:payment}=await admin.from("payments").select("metadata")
+        .eq("id",refund.payment_id).eq("provider_payment_id",refund.charge_id).maybeSingle();
+      const orderId=String(payment?.metadata?.order_id||"");
+      if(!/^ORDE_[A-Za-z0-9-]+$/.test(orderId)) throw chargeError;
+      return {charge:await getPagBankOrderCharge(token,orderId,refund.charge_id),source:"order"};
+    }
+  }
   if(operation==="approve"){
     if(cancellation.status!=="prepared") return json({ok:false,error:"cancellation_already_submitted"},409);
     const {data:activated,error:activationError}=await admin.from("reservation_cancellations")
@@ -1122,7 +1133,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
       const row=Array.isArray(claim)?claim[0]:claim;
       if(row){
         try{
-          const before=await getPagBankCharge(token,row.charge_id);
+          const before=(await readRefundCharge(refund)).charge;
           if(before.id!==row.charge_id||before.status!=="PAID"||before.amount?.currency!=="BRL"||
             Number(before.amount?.value)<Number(row.requested_cents)) throw new Error("provider_precheck_failed");
           await changePagBankCharge(token,row.charge_id,"cancel",Number(row.requested_cents),row.idempotency_key);
@@ -1138,7 +1149,9 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     if(Number(refund.requested_cents)===Number(cancellation.calculation.allocations
       .find((x:any)=>x.payment_id===refund.payment_id)?.captured_cents)){
       try{
-        const charge=await getPagBankCharge(token,refund.charge_id);
+        const observed=await readRefundCharge(refund),charge=observed.charge;
+        providerChecks.push({refund_id:refund.id,status:charge.status,source:observed.source,
+          amount_cents:charge.amount?.currency==="BRL"?Number(charge.amount.value):null});
         if(charge.id===refund.charge_id&&charge.status==="CANCELED"&&charge.amount?.currency==="BRL"&&
           Number(charge.amount.value)===Number(refund.requested_cents)){
           const {error:confirmationError}=await admin.rpc("confirm_reservation_refund",{p_refund_id:refund.id,p_charge_id:refund.charge_id,
@@ -1146,7 +1159,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           if(confirmationError) await admin.from("reservation_refund_attempts")
             .insert({refund_id:refund.id,event:"provider_unknown",provider_status:charge.status});
         }
-      }catch{/* uncertain remains pending for later provider inspection */}
+      }catch{providerChecks.push({refund_id:refund.id,status:"unavailable"});}
     }
   }
   const [{data:current},{data:currentRefunds}]=await Promise.all([
@@ -1155,7 +1168,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   ]);
   return json({ok:true,status:current?.status||"pending_provider",cancellation_id:cancellation.id,
     refund_due_cents:due,confirmed_cents:(currentRefunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
-    refunds:currentRefunds||[]});
+    refunds:currentRefunds||[],provider_checks:providerChecks});
 }
 
 async function reservationRefundStatus(req:Request,body:any,development:boolean){

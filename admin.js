@@ -268,8 +268,13 @@ function renderRefundDecision(id,d){
   if(button)button.onclick=async()=>{
     button.disabled=true;const m=$("#admin-modal-content .admin-form-message");m.textContent="Consultando PagBank e conciliando…";
     try{const next=await api("reservation_refund_action",{reservation_id:id,operation:d.status==="prepared"?"approve":"reconcile"});
-      if(next.status==="confirmed"){closeModal();await load(true)}else{m.textContent=`Pendente no PagBank: ${brl(next.confirmed_cents)} confirmado de ${brl(next.refund_due_cents)}. A reserva continua ativa.`;button.disabled=false}}
-    catch(err){m.textContent=refundError(err);button.disabled=false}
+      if(next.status==="confirmed"){closeModal();await load(true)}else{
+        const observed=(next.provider_checks||[]).map(c=>c.status==="unavailable"?"consulta ao provedor indisponível":`cobrança ${esc(c.status)} consultada pelo ${c.source==="order"?"pedido":"identificador da cobrança"}`).join("; ");
+        m.textContent=`Estorno pendente: ${brl(next.confirmed_cents)} confirmado de ${brl(next.refund_due_cents)}. ${observed}. A reserva continua ativa.`;
+        if(d.status==="prepared")renderRefundDecision(id,{...d,...next,status:"pending_provider"});else button.disabled=false}}
+    catch(err){m.textContent=refundError(err);if(err.message==="cancellation_already_submitted"){
+      try{renderRefundDecision(id,await api("reservation_refund_action",{reservation_id:id,operation:"status"}))}catch{button.disabled=false}
+    }else button.disabled=false}
   };
 }
 function closeDrawer(){$("#reservation-drawer").hidden=true;document.body.classList.remove("drawer-open")}
