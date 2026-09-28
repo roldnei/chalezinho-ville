@@ -1708,6 +1708,7 @@ Deno.serve(async(req)=>{
     const origin=req.headers.get("origin")||"";
     const development=req.headers.get("x-chalezinho-env")==="development" &&
       (origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
 
     if(action==="identity_status"||action==="complete_identity"){
