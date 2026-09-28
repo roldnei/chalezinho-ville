@@ -1151,13 +1151,14 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   const providerChecks:any[]=[];
   async function readRefundCharge(refund:any){
-    try{return {charge:await getPagBankCharge(token,refund.charge_id),source:"charge"}}
+    try{return {charge:await getPagBankCharge(token,refund.charge_id),source:"charge",direct_error:null}}
     catch(chargeError){
       const {data:payment}=await admin.from("payments").select("metadata")
         .eq("id",refund.payment_id).eq("provider_payment_id",refund.charge_id).maybeSingle();
       const orderId=String(payment?.metadata?.order_id||"");
       if(!/^ORDE_[A-Za-z0-9-]+$/.test(orderId)) throw chargeError;
-      return {charge:await getPagBankOrderCharge(token,orderId,refund.charge_id),source:"order"};
+      return {charge:await getPagBankOrderCharge(token,orderId,refund.charge_id),source:"order",
+        direct_error:String((chargeError as Error)?.message||"charge_lookup_failed").replace(/[^a-z0-9_]/gi,"").slice(0,80)};
     }
   }
   if(operation==="preflight"){
@@ -1165,17 +1166,19 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     for(const refund of refunds||[]){
       if(refund.state!=="prepared") continue;
       try{
-        const {charge,source}=await readRefundCharge(refund);
+        const {charge,source,direct_error}=await readRefundCharge(refund);
         const {data:payment,error:paymentError}=await admin.from("payments")
           .select("amount_cents").eq("id",refund.payment_id).single();
         const {data:prior,error:priorError}=await admin.from("reservation_refunds")
           .select("confirmed_cents").eq("payment_id",refund.payment_id).eq("state","confirmed");
         if(paymentError||priorError) throw new Error("database_unavailable");
         const confirmed=(prior||[]).reduce((total:number,x:any)=>total+Number(x.confirmed_cents),0);
-        checks.push({payment_id:refund.payment_id,source,status:charge.status,
+        checks.push({payment_id:refund.payment_id,source,status:charge.status,direct_error,
           summary_present:charge.summary!=null,
           paid_type:typeof charge.summary?.paid,refunded_type:typeof charge.summary?.refunded,
           summary_fields:Object.keys(charge.summary||{}),
+          charge_fields:Object.keys(charge).filter(k=>!["payment_method","customer","raw_data"].includes(k)),
+          self_link_path:(()=>{try{return new URL(charge.links?.find((x:any)=>x.rel==="SELF")?.href).pathname}catch{return null}})(),
           ready:charge.id===refund.charge_id&&charge.status==="PAID"&&charge.amount?.currency==="BRL"&&
             charge.amount.value===Number(payment.amount_cents)&&charge.summary?.paid===Number(payment.amount_cents)&&
             charge.summary?.refunded===confirmed&&Number(refund.requested_cents)<=Number(payment.amount_cents)-confirmed,

@@ -314,7 +314,7 @@ function renderRefundDecision(id,d){
       if(!button.isConnected)return;
       if(result.ready){button.disabled=false;message.textContent="Saldo e cobrança conferidos. A aprovação enviará o estorno ao PagBank sandbox."}
       else message.textContent="Envio bloqueado: " + (result.checks||[]).map(c=>
-        `cobrança ${String(c.payment_id||"").slice(-8)}: ${c.status||"indisponível"} via ${c.source||"consulta"}; resumo ${c.summary_present?"presente":"ausente"}; devolvido ${c.provider_refunded_cents==null?"indisponível":brl(c.provider_refunded_cents)}`
+        `cobrança ${String(c.payment_id||"").slice(-8)}: ${c.status||"indisponível"} via ${c.source||"consulta"}; consulta direta ${c.direct_error||"200"}; resumo ${c.summary_present?"presente":"ausente"}; devolvido ${c.provider_refunded_cents==null?"indisponível":brl(c.provider_refunded_cents)}; link ${c.self_link_path||"ausente"}`
       ).join("; ")+". A reserva permanece ativa.";
     }).catch(()=>{if(button.isConnected)message.textContent="Consulta ao PagBank indisponível. Envio bloqueado; tente novamente após a consulta voltar."});
   }
