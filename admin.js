@@ -184,16 +184,33 @@ function openGuarantee(id){
  const g=state.guarantees.find(x=>x.id===id);if(!g)return;
  const authorized=g.provider==="pagbank_sandbox"&&!!g.provider_authorization_id;
  const incident=g.incidents?.find(i=>i.status==="open");
- $("#admin-modal-content").innerHTML=`<small>CAUÇÃO · PAGBANK SANDBOX</small><h2>${brl(g.amount_cents)}</h2><p>${authorized?`Cobrança autorizada até ${dateTime(g.provider_capture_before)}. Estado: ${esc(statusLabel(g.status))}.`:"Ainda não existe autorização confirmada pelo PagBank. Peça ao hóspede para autorizar perto do check-in."}</p><p>Capturado: ${brl(g.captured_amount_cents)}. A reserva financeira só muda após consulta ao PagBank.</p><form id="guarantee-form" class="admin-form"><label>Descrição da ocorrência<input name="description" placeholder="Descreva o dano e a vistoria"></label><label>URL HTTPS da evidência<input name="evidence_url" type="url" placeholder="https://..."></label><label>Valor do dano (R$)<input name="amount" type="number" min="0.01" max="${Number(g.amount_cents)/100}" step="0.01" value="${Number(incident?.requested_capture_cents||0)/100||""}"></label><p class="admin-form-message" role="status"></p><div class="drawer-actions">${g.status==="guaranteed"?'<button type="button" data-guarantee-action="report_incident">Registrar ocorrência</button><button type="button" data-guarantee-action="release">Liberar caução</button>':g.status==="incident_reported"?'<button type="button" class="admin-danger" data-guarantee-action="capture">Capturar valor comprovado</button>':""}<button type="button" data-guarantee-action="status">Consultar PagBank</button></div></form>`;
+ $("#admin-modal-content").innerHTML=`<small>CAUÇÃO · PAGBANK SANDBOX</small><h2>${brl(g.amount_cents)}</h2><p>${authorized?`Cobrança autorizada até ${dateTime(g.provider_capture_before)}. Estado: ${esc(statusLabel(g.status))}.`:"Ainda não existe autorização confirmada pelo PagBank. Peça ao hóspede para autorizar perto do check-in."}</p><p>Capturado: ${brl(g.captured_amount_cents)}. A reserva financeira só muda após consulta ao PagBank.</p><form id="guarantee-form" class="admin-form"><label>Descrição da ocorrência<input name="description" placeholder="Descreva o dano e a vistoria" value="${esc(incident?.description||"")}"></label>${g.status==="guaranteed"?'<label>Fotos do dano (JPG, PNG ou WebP; até 8 MB cada)<input name="damage_files" type="file" accept="image/jpeg,image/png,image/webp" multiple required></label><label>Recibo do valor cobrado (imagem ou PDF; até 8 MB)<input name="receipt_file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" required></label>':""}<div id="guarantee-evidence">${(incident?.evidence||[]).filter(x=>x.path).map(x=>`<button type="button" data-evidence-path="${esc(x.path)}">Abrir ${x.kind==="damage"?"foto do dano":"recibo"}: ${esc(x.name||"anexo")}</button>`).join("")}</div><label>Valor do dano (R$)<input name="amount" type="number" min="0.01" max="${Number(g.amount_cents)/100}" step="0.01" value="${Number(incident?.requested_capture_cents||0)/100||""}"></label><p class="admin-form-message" role="status"></p><div class="drawer-actions">${g.status==="guaranteed"?'<button type="button" data-guarantee-action="report_incident">Registrar ocorrência</button><button type="button" data-guarantee-action="release">Liberar caução</button>':g.status==="incident_reported"?'<button type="button" class="admin-danger" data-guarantee-action="capture">Capturar valor comprovado</button>':""}<button type="button" data-guarantee-action="status">Consultar PagBank</button></div></form>`;
  openModal();$("#guarantee-form").querySelectorAll("[data-guarantee-action]").forEach(b=>b.onclick=()=>runGuaranteeAction(id,b.dataset.guaranteeAction));
+ $("#guarantee-evidence").querySelectorAll("[data-evidence-path]").forEach(b=>b.onclick=async()=>{const {data,error}=await sb.storage.from("guarantee-evidence").createSignedUrl(b.dataset.evidencePath,60);if(error)$("#guarantee-form .admin-form-message").textContent="Não foi possível abrir o anexo.";else window.open(data.signedUrl,"_blank","noopener")});
+}
+async function uploadGuaranteeEvidence(id,form,status){
+ const damage=[...(form.damage_files?.files||[])],receipt=[...(form.receipt_file?.files||[])];
+ if(!damage.length||receipt.length!==1||damage.length>10)throw new Error("incident_files_required");
+ const evidence=[];
+ for(const [kind,files] of [["damage",damage],["receipt",receipt]])for(const file of files){
+  const types={"image/jpeg":"jpg","image/png":"png","image/webp":"webp",...(kind==="receipt"?{"application/pdf":"pdf"}:{})};
+  if(!types[file.type]||!file.size||file.size>8388608)throw new Error("incident_file_invalid");
+  const path=`${id}/${kind}/${crypto.randomUUID()}.${types[file.type]}`;
+  status.textContent=`Enviando ${file.name}…`;
+  const {error}=await sb.storage.from("guarantee-evidence").upload(path,file,{contentType:file.type,upsert:false});
+  if(error)throw new Error("incident_upload_failed");
+  evidence.push({kind,path,name:file.name.slice(0,120),content_type:file.type});
+ }
+ return evidence;
 }
 async function runGuaranteeAction(id,operation){
  const f=$("#guarantee-form"),m=f.querySelector(".admin-form-message"),buttons=f.querySelectorAll("button");
  buttons.forEach(b=>b.disabled=true);m.textContent="Consultando PagBank…";
- try{const result=await api(operation,{guarantee_id:id,amount_cents:Math.round(Number(f.amount.value||0)*100),description:f.description.value,evidence_url:f.evidence_url.value});
+ try{const evidence=operation==="report_incident"?await uploadGuaranteeEvidence(id,f,m):undefined;
+  const result=await api(operation,{guarantee_id:id,amount_cents:Math.round(Number(f.amount.value||0)*100),description:f.description.value,evidence});
   if(result.guarantee?.status?.includes("requested")||result.guarantee?.status?.includes("uncertain"))m.textContent="Resultado pendente. Consulte o PagBank antes de nova ação.";
   else{closeModal();await load(true);renderGuarantees()}
- }catch(err){m.textContent=({incident_required:"Registre uma ocorrência antes de capturar.",incident_evidence_required:"Descreva o dano e inclua uma URL HTTPS da evidência.",authorization_required:"O PagBank ainda não autorizou esta caução.",capture_result_uncertain:"Captura pendente de conciliação; não repita a cobrança.",release_result_uncertain:"Liberação pendente de conciliação; não repita o cancelamento."})[err.message]||"Não foi possível concluir. Consulte o estado da cobrança antes de tentar novamente."}
+ }catch(err){m.textContent=({incident_required:"Registre uma ocorrência antes de capturar.",incident_evidence_required:"Descreva o dano e anexe fotos e recibo.",incident_files_required:"Inclua de uma a dez fotos do dano e um recibo.",incident_file_invalid:"Formato inválido ou arquivo acima de 8 MB.",incident_upload_failed:"Falha no envio dos anexos. Tente novamente.",authorization_required:"O PagBank ainda não autorizou esta caução.",capture_result_uncertain:"Captura pendente de conciliação; não repita a cobrança.",release_result_uncertain:"Liberação pendente de conciliação; não repita o cancelamento."})[err.message]||"Não foi possível concluir. Consulte o estado da cobrança antes de tentar novamente."}
  finally{buttons.forEach(b=>b.disabled=false)}
 }
 
