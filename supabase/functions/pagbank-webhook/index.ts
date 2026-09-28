@@ -15,10 +15,10 @@ Deno.serve(async (request) => {
     try { authenticated=await verifyPagBankSignedNotification(token,raw,signed); }
     catch(error){console.error(JSON.stringify({event:"pagbank_webhook_key_error",error:String(error)}));return new Response("Retry later",{status:503});}
   }
-  if(!authenticated){
-    console.error(JSON.stringify({event:"pagbank_webhook_signature_missing_or_invalid",legacy_header:!!signature,signed_header:!!signed}));
-    return new Response("Invalid signature",{status:401});
-  }
+  // The PagBank sandbox can omit both documented signature headers. An
+  // unsigned message is only a hint: never trust its status, amount or user.
+  // Reconcile exclusively from the server-authenticated PagBank lookup below.
+  if(!authenticated&&(signature||signed)) return new Response("Invalid signature",{status:401});
   let payload:any;
   try { payload=JSON.parse(raw); } catch { return new Response("Invalid body",{status:400}); }
   const chargeId=String(payload?.id||payload?.charges?.[0]?.id||"");
