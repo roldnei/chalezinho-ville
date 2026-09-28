@@ -138,6 +138,13 @@ function normalizeCharge(raw: any) {
     links:raw?.links as Array<{rel:string;href:string}>|undefined};
 }
 
+export function extractPagBankWebhookChargeId(payload: any) {
+  const charge=Array.isArray(payload?.charges)?payload.charges.find((x:any)=>
+    /^CHAR_[A-Za-z0-9-]+$/.test(String(x?.id||"")))?.id:null;
+  const direct=/^CHAR_[A-Za-z0-9-]+$/.test(String(payload?.id||""))?payload.id:null;
+  return String(charge||direct||"");
+}
+
 // The sandbox may omit `summary` even on a successful direct charge lookup.
 // A first refund can still be requested against a PAID charge; PagBank must
 // enforce the remaining balance. Without the summary, its result stays

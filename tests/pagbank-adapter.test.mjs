@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
-import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, extractPagBankWebhookChargeId, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
   notificationUrl:'https://example.com/functions/v1/pagbank-webhook'};
+
+test('Orders webhook selects the charge rather than the top-level order ID',()=>{
+  assert.equal(extractPagBankWebhookChargeId({id:'ORDE_123',charges:[{id:'CHAR_abc-123'}]}),'CHAR_abc-123');
+  assert.equal(extractPagBankWebhookChargeId({id:'CHAR_legacy'}),'CHAR_legacy');
+  assert.equal(extractPagBankWebhookChargeId({id:'ORDE_123',charges:[]}), '');
+});
 
 test('Pix uses exact server amount and 15 minute expiration',()=>{
   const expiry=new Date(Date.now()+15*60000);

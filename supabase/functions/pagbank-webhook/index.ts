@@ -1,5 +1,5 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getPagBankCharge, getPagBankOrderCharge, verifyPagBankNotification, verifyPagBankSignedNotification } from "../booking-engine/pagbank.ts";
+import { extractPagBankWebhookChargeId, getPagBankCharge, getPagBankOrderCharge, verifyPagBankNotification, verifyPagBankSignedNotification } from "../booking-engine/pagbank.ts";
 
 // Public endpoint: verify_jwt is off because PagBank does not send a Supabase JWT.
 // Every notification is authenticated using the PagBank signature and then
@@ -21,7 +21,7 @@ Deno.serve(async (request) => {
   if(!authenticated&&(signature||signed)) return new Response("Invalid signature",{status:401});
   let payload:any;
   try { payload=JSON.parse(raw); } catch { return new Response("Invalid body",{status:400}); }
-  const chargeId=String(payload?.id||payload?.charges?.[0]?.id||"");
+  const chargeId=extractPagBankWebhookChargeId(payload);
   if(!/^CHAR_[A-Za-z0-9-]+$/.test(chargeId)) return new Response("Invalid charge",{status:400});
   try {
     const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
