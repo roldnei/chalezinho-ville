@@ -314,7 +314,7 @@ function renderSummary(){
  const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
  const free=Math.min(Number(terms.no_interest_installments),max);
  state.installmentQuote=null;
- pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'" '+(i+1>free?'disabled':'')+'>'+(i+1)+'x de '+(i+1<=free?brlC(Math.round(total/(i+1)))+' · sem juros':'consulte o valor após informar o cartão')+'</option>').join("")+'</select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
+ pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'" '+(i+1>free?'disabled':'')+'>'+(i+1)+'x de '+(i+1<=free?brlC(Math.round(total/(i+1)))+' · sem juros':'consulte o valor após informar o cartão')+'</option>').join("")+'</select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p id="installment-warning" role="status"></p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
  if(pagbankSandbox){
   pay.querySelector(".dev-note").textContent="PagBank sandbox: use somente cartões de teste. Nenhuma cobrança real será feita.";
   const card=document.createElement("div");card.id="sandbox-card-fields";card.hidden=!guarantee;
@@ -335,6 +335,7 @@ function renderSummary(){
   }).catch(()=>{$("#installment-total").textContent="Valores acima de "+free+"x indisponíveis no momento. Consulte novamente antes de pagar."});
   $("#card-number").addEventListener("input",()=>{
     clearTimeout(planTimer);state.installmentQuote=null;
+    $("#installment-warning").textContent="";
     const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
     if(bin.length!==6){$("#installments").dispatchEvent(new Event("change"));return}
     const optionId=state.rate.quote_option_id;
@@ -344,6 +345,7 @@ function renderSummary(){
         if(state.rate.quote_option_id!==optionId||$("#card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
         state.installmentQuote={...quote,bin,optionId};
         showPlans(quote.plans,false);
+        $("#installment-warning").textContent=quote.fee_fallback?"O PagBank não calculou juros para este cartão. Escolha uma das parcelas sem juros disponíveis; para parcelar com juros, use outro cartão de teste.":"";
       }catch{$("#installment-total").textContent="Não foi possível consultar as parcelas no PagBank. Tente novamente."}
     },250);
   });

@@ -57,11 +57,25 @@ async function chargeInstallments(propertyId:number,amountCents:number,installme
   const terms=paymentTerms(property.features);
   if(!Number.isInteger(installments)||installments<1||installments>terms.max_installments)
     throw new Error("invalid_installments");
-  const plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
-    terms.no_interest_installments,bin);
+  let plans,feeFallback=false;
+  try{
+    plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
+      terms.no_interest_installments,bin);
+  }catch(error){
+    // Some sandbox card BINs are rejected by the fee simulator. Never invent
+    // buyer interest; the merchant-funded installments still use the exact
+    // reservation total and can be presented safely.
+    if(!(error instanceof Error)||!error.message.startsWith("pagbank_fees_http_400")||
+       !/^\d{6}(\d{2})?$/.test(bin))throw error;
+    feeFallback=true;
+    plans=Array.from({length:Math.min(terms.max_installments,Math.max(1,terms.no_interest_installments))},(_,i)=>({
+      installments:i+1,installment_cents:Math.ceil(amountCents/(i+1)),total_cents:amountCents,
+      buyer_interest_cents:0,buyer_interest_installments:0,interest_free:true
+    })).filter(p=>p.installment_cents>=500);
+  }
   const plan=plans.find(p=>p.installments===installments);
   if(!plan) throw new Error("installment_unavailable");
-  return {plan,terms,plans};
+  return {plan,terms,plans,feeFallback};
 }
 async function installmentOptions(req:Request,body:any,development:boolean){
   if(!development) return json({ok:false,error:"not_allowed"},403);
@@ -89,8 +103,8 @@ async function installmentOptions(req:Request,body:any,development:boolean){
     amount=Number(charge.amount_cents);propertyId=Number((charge.reservations as any)?.property_id);
   }else return json({ok:false,error:"missing_data"},400);
   try{
-    const {terms,plans}=await chargeInstallments(propertyId,amount,1,bin,token);
-    return json({ok:true,base_amount_cents:amount,terms,plans,indicative});
+    const {terms,plans,feeFallback}=await chargeInstallments(propertyId,amount,1,bin,token);
+    return json({ok:true,base_amount_cents:amount,terms,plans,indicative,fee_fallback:feeFallback});
   }catch(e){console.error(JSON.stringify({event:"installment_options_failed",code:e instanceof Error?e.message:"unknown"}));return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
     "invalid_payment_terms":"installment_plans_unavailable"},503)}
 }
