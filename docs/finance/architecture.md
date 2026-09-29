@@ -48,3 +48,19 @@ PASS exige integração UI → API → regra → banco → gateway → reconcili
 Testes com gateway simulado são identificados como locais, não homologação PagBank.
 40008 não equivale a estorno. Captura parcial não comprova por si só a liberação no emissor.
 7–12 parcelas com valor firme pré-cartão exigem contrato de cotação não dependente do BIN ou tabela comercial aprovada; não inventar taxa nem mudar valor silenciosamente.
+
+## Continuação a partir de fa7e880 — 29/09/2026
+
+### Crédito de experiência
+
+`experience-credits.ts` autentica o administrador e encaminha uma decisão explícita de serviço não prestado. Não aceita valor de crédito informado pelo navegador e não chama o gateway. `prepare_experience_credit` bloqueia a reserva, o item e os pagamentos e cria, em uma única transação, o caso de devolução, o vínculo imutável ao item e todas as reservas de saldo. Falha em qualquer alocação desfaz a operação inteira.
+
+`experience_credits` guarda o item, responsável, justificativa, chave de idempotência e atestado de serviço não prestado. O evento financeiro contém o vínculo ao item. Na aprovação do caso, o item é cancelado; a projeção reconhece o crédito pela decisão em `reservation_cancellations`, sem duplicá-lo pelo registro auxiliar. O total histórico da reserva permanece como base contratada. O valor recebido só cai quando o fluxo existente confirma o comprovante do provedor. A reserva continua ativa. O item não pode ser reutilizado em upgrade ou reativado durante esse processo.
+
+Escopo automático deliberadamente restrito: item ativo, reserva confirmada antes do check-in, preço integralmente atribuído no ledger e sem estornos anteriores no mesmo pagamento. Upgrade, juros atribuídos ao item, vínculo legado incompleto, serviço prestado ou decisão financeira já pendente exigem revisão. O cancelamento de um rascunho de crédito e a solicitação do hóspede para um item isolado ainda não foram implementados. O hóspede pode acompanhar a devolução na reserva.
+
+### Política comercial versionada
+
+`commercial_free_cancellation_hours` é independente de `withdrawal_days`. Regras antigas recebem zero horas comerciais adicionais, preservando o comportamento anterior. A migração gera novos documentos **draft** e novas regras para cotações de desenvolvimento com 24 horas; não altera aceitações anteriores. Regras são append-only e a edição administrativa sempre cria uma versão.
+
+O cálculo consulta o documento originalmente aceito. Exatamente 24 horas ainda pertence à janela comercial; ultrapassá-la não remove os demais prazos já concedidos. Os sete dias que já existiam no contrato continuam válidos. Estadia iniciada permanece sujeita a análise individual. Nenhuma afirmação de validação jurídica nova é feita por esta mudança.

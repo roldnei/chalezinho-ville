@@ -1,3 +1,4 @@
+import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
 import {reservationRefundService} from "../_shared/finance/reservation-refunds.ts";
@@ -27,9 +28,11 @@ const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 const admin = createClient(projectUrl, serviceKey, {auth:{persistSession:false,autoRefreshToken:false}});
 const {reservationRefundAction,reservationRefundStatus,reservationCancelRequest}=reservationRefundService({admin,currentUser,userIsAdmin,json});
 
+const experienceCredit=experienceCreditService({admin,currentUser,userIsAdmin,json});
+
 async function developmentPolicies(){
   const {data,error}=await admin.from("cancellation_policy_assignments")
-    .select("rate_plan_code,cancellation_policy_rules!inner(withdrawal_days,full_refund_days_before_checkin,late_accommodation_refund_percent,policy_documents!inner(id,title,body,version,code))")
+    .select("rate_plan_code,cancellation_policy_rules!inner(commercial_free_cancellation_hours,withdrawal_days,full_refund_days_before_checkin,late_accommodation_refund_percent,policy_documents!inner(id,title,body,version,code))")
     .eq("environment","development");
   if(error) throw new Error("cancellation_policy_unavailable");
   return data||[];
@@ -1150,13 +1153,14 @@ async function adminCancellationPolicyAction(req:Request,body:any,development:bo
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const code=String(body?.rate_plan_code||"");
   const withdrawal=Number(body?.withdrawal_days);
+  const commercial=Number(body?.commercial_free_cancellation_hours);
   const full=Number(body?.full_refund_days_before_checkin);
   const late=Number(body?.late_accommodation_refund_percent);
-  if(!["refundable","non_refundable"].includes(code)||![withdrawal,full,late].every(Number.isInteger)
-     ||withdrawal<7||withdrawal>30||full<1||full>365||late<0||late>100||(code==="non_refundable"&&late!==0))
+  if(!["refundable","non_refundable"].includes(code)||![commercial,withdrawal,full,late].every(Number.isInteger)
+     ||commercial<0||commercial>720||withdrawal<7||withdrawal>30||full<1||full>365||late<0||late>100||(code==="non_refundable"&&late!==0))
     return json({ok:false,error:"invalid_policy_configuration"},400);
-  const {data,error}=await admin.rpc("save_development_cancellation_policy",{
-    p_rate_plan_code:code,p_withdrawal_days:withdrawal,
+  const {data,error}=await admin.rpc("save_finance_cancellation_policy",{
+    p_rate_plan_code:code,p_withdrawal_days:withdrawal,p_commercial_free_hours:commercial,
     p_full_refund_days_before_checkin:full,p_late_accommodation_refund_percent:late
   });
   if(error) return json({ok:false,error:"policy_save_failed"},500);
@@ -2014,6 +2018,7 @@ Deno.serve(async(req)=>{
       return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""))});
     }
     if(action==="admin_hub") return await adminHubData(req,body);
+    if(action==="experience_credit") return await experienceCredit(req,body,development);
     if(action==="reservation_refund_action") return await reservationRefundAction(req,body,development);
     if(action==="reservation_refund_status") return await reservationRefundStatus(req,body,development);
     if(action==="reservation_cancel_request") return await reservationCancelRequest(req,body,development);

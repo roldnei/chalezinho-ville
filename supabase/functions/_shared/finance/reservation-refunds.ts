@@ -69,6 +69,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
         .reduce((total:number,e:any)=>total+Number(e.amount_cents),0);
       const calculation=kind==="voluntary_refund"?null:calculateCancellationRefund({
         plan:r.rate_plan_code,acceptedAt:accepted.accepted_at,requestedAt:requestedAt,checkIn:r.check_in,
+        commercialFreeCancellationHours:Number(rule.commercial_free_cancellation_hours||0),
         withdrawalDays:Number(rule.withdrawal_days),fullRefundDaysBeforeCheckIn:Number(rule.full_refund_days_before_checkin),
         lateAccommodationRefundPercent:Number(rule.late_accommodation_refund_percent),
         accommodationCents:sum("accommodation"),paidModificationCents:sum("additional_charge"),
@@ -322,14 +323,14 @@ async function reservationRefundStatus(req:Request,body:any,development:boolean)
   const {data:r}=await admin.from("reservations").select("id,user_id").eq("id",reservationId).maybeSingle();
   if(!r||r.user_id!==user.id) return json({ok:false,error:"reservation_not_found"},404);
   const {data:cases}=await admin.from("reservation_cancellations")
-    .select("id,kind,status,refund_due_cents,accepted_version,created_at")
+    .select("id,kind,status,refund_due_cents,accepted_version,created_at,calculation")
     .eq("reservation_id",r.id).order("created_at",{ascending:false});
   const {data:refunds}=cases?.length?await admin.from("reservation_refunds")
     .select("cancellation_id,requested_cents,confirmed_cents,state").in("cancellation_id",cases.map((c:any)=>c.id)):{data:[]};
   return json({ok:true,cases:(cases||[]).map((c:any)=>{
     const confirmed=(refunds||[]).filter((x:any)=>x.cancellation_id===c.id)
       .reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0);
-    return {kind:c.kind,status:c.status,refund_due_cents:Number(c.refund_due_cents),
+    return {kind:c.kind,credit_reason:c.calculation?.reason==='unprovided_experience'?'unprovided_experience':null,status:c.status,refund_due_cents:Number(c.refund_due_cents),
       confirmed_cents:confirmed,pending_cents:Number(c.refund_due_cents)-confirmed,
       accepted_version:c.accepted_version,created_at:c.created_at};
   })});

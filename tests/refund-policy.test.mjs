@@ -35,3 +35,19 @@ test('started stay requires review and cannot produce automatic amount',()=>{
   assert.equal(row.requiresReview,true);
   assert.equal('totalRefundCents' in row,false);
 });
+
+test('commercial 24h boundary is inclusive, separate from accepted additional window',()=>{
+ for(const plan of ['refundable','non_refundable']){
+  const policy={...base,plan,commercialFreeCancellationHours:24,lateAccommodationRefundPercent:plan==='refundable'?50:0};
+  const boundary=calculateCancellationRefund({...policy,requestedAt:'2026-09-29T04:00:00Z'});
+  assert.equal(boundary.reason,'commercial_free_window');assert.equal(boundary.totalRefundCents,193220);
+  assert.equal(calculateCancellationRefund({...policy,requestedAt:'2026-09-29T04:00:00.001Z'}).reason,'withdrawal_window');
+ }
+});
+test('commercial window never rewrites old rules and rejects malformed hours',()=>{
+ assert.equal(calculateCancellationRefund({...base,requestedAt:'2026-09-29T04:00:00Z'}).reason,'withdrawal_window');
+ for(const hours of [-1,1.5,721,NaN])assert.throws(()=>calculateCancellationRefund({...base,commercialFreeCancellationHours:hours,requestedAt:'2026-09-29T04:00:00Z'}),/invalid_refund_policy/);
+});
+test('commercial window still sends an already started stay to individual review',()=>{
+ assert.equal(calculateCancellationRefund({...base,acceptedAt:'2026-12-01T17:00:00Z',requestedAt:'2026-12-01T18:00:00Z',commercialFreeCancellationHours:24}).requiresReview,true);
+});

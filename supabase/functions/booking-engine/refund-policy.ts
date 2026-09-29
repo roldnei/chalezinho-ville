@@ -6,6 +6,7 @@ export type RefundPolicyInput = {
   requestedAt: string;
   checkIn: string;
   withdrawalDays: number;
+  commercialFreeCancellationHours?: number;
   fullRefundDaysBeforeCheckIn: number;
   lateAccommodationRefundPercent: number;
   accommodationCents: number;
@@ -18,6 +19,8 @@ export function calculateCancellationRefund(input: RefundPolicyInput) {
   const {plan,acceptedAt,requestedAt,checkIn,withdrawalDays,
     fullRefundDaysBeforeCheckIn,lateAccommodationRefundPercent,
     accommodationCents,cleaningCents,unprovidedExperiencesCents,paidModificationCents}=input;
+  const commercialHours=input.commercialFreeCancellationHours??0;
+  if(!Number.isSafeInteger(commercialHours)||commercialHours<0||commercialHours>720) throw new Error("invalid_refund_policy");
   if(!["refundable","non_refundable"].includes(plan)||
     ![withdrawalDays,fullRefundDaysBeforeCheckIn,lateAccommodationRefundPercent,
       accommodationCents,cleaningCents,unprovidedExperiencesCents,paidModificationCents]
@@ -33,14 +36,15 @@ export function calculateCancellationRefund(input: RefundPolicyInput) {
     throw new Error("invalid_refund_dates");
   // A stay already in progress and legal exceptions require a human decision.
   if(requested>=arrival) return {requiresReview:true,reason:"stay_started"} as const;
+  const commercial=commercialHours>0&&requested<=accepted+commercialHours*3600000;
   const withdrawal=requested<=accepted+withdrawalDays*86400000;
   const fullBeforeArrival=requested<=arrival-fullRefundDaysBeforeCheckIn*86400000;
-  const percent=withdrawal||plan==="refundable"&&fullBeforeArrival?100:
+  const percent=commercial||withdrawal||plan==="refundable"&&fullBeforeArrival?100:
     plan==="refundable"?lateAccommodationRefundPercent:0;
   // A paid price increase is part of the accommodation consideration.
   const lodgingCents=accommodationCents+paidModificationCents;
   const lodgingRefundCents=Math.round(lodgingCents*percent/100);
-  return {requiresReview:false,reason:withdrawal?"withdrawal_window":
+  return {requiresReview:false,reason:commercial?"commercial_free_window":withdrawal?"withdrawal_window":
     fullBeforeArrival&&plan==="refundable"?"early_refundable":"late_policy",
     lodgingRefundCents,cleaningRefundCents:cleaningCents,
     experienceRefundCents:unprovidedExperiencesCents,
