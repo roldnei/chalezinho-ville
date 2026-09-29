@@ -164,6 +164,8 @@ export async function getPagBankCharge(token: string, chargeId: string, fetcher:
 function normalizeCharge(raw: any) {
   const summary=raw?.amount?.summary;
   return {id:raw?.id as string,status:raw?.status as string,
+    referenceId:raw?.reference_id as string|undefined,
+    declineCode:typeof raw?.payment_response?.code==='string'&&/^\d{1,5}$/.test(raw.payment_response.code)?raw.payment_response.code:undefined,
     amount:{value:raw?.amount?.value as number,currency:raw?.amount?.currency as string},
       captureBefore:raw?.payment_method?.capture_before as string|undefined,
       cardBrand:raw?.payment_method?.card?.brand as string|undefined,

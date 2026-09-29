@@ -16,6 +16,7 @@ export interface PaymentGateway {
   cancelAuthorization(id: string, cents: number, key: string): ReturnType<typeof changePagBankCharge>;
   refund(id: string, cents: number, key: string): ReturnType<typeof changePagBankCharge>;
   getPayment(id: string,orderId?:string): Promise<ProviderCharge>;
+  getOrderPayment(orderId:string,id:string):Promise<ProviderCharge>;
   getRefund(id: string,orderId?:string): Promise<ProviderCharge>;
   authenticateWebhook(raw: string, headers: Headers): Promise<boolean>;
 }
@@ -45,6 +46,7 @@ export function paymentGateway(provider: string, token: string, fetcher: typeof 
     cancelAuthorization: (id,cents,key) => change(id,'cancel',cents,key),
     refund: (id,cents,key) => change(id,'cancel',cents,key),
     getPayment: read, getRefund: read,
+    getOrderPayment: (orderId,id)=>getPagBankOrderCharge(token,orderId,id,fetcher),
     async authenticateWebhook(raw,headers) {
       const signature=headers.get('x-authenticity-token')||'';
       if(await verifyPagBankNotification(token,raw,signature)) return true;

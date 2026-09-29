@@ -6,6 +6,7 @@ import {loadInstallmentOffer} from "../_shared/finance/installments.ts";
 import {reservationFinance} from "../_shared/finance/reservation-report.ts";
 import {reservationIncident} from "../_shared/finance/incidents.ts";
 import {paymentTerms,assertPaymentMethod,validatePaymentSettings} from "../_shared/finance/settings.ts";
+import {guaranteeCoverage} from "../_shared/finance/guarantee-lifecycle.ts";
 import {guaranteeState} from "../_shared/finance/model.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -630,7 +631,7 @@ async function startPayment(req:Request,body:any,development:boolean){
 
   if(guaranteeToken){
     const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
-      user_id:user.id,card_token:guaranteeToken,consented_at:new Date().toISOString()});
+      user_id:user.id,card_token:guaranteeToken,consented_at:new Date().toISOString(),consent_version:body.guarantee_consent_version==="guarantee-v2"?"guarantee-v2":"guarantee-v1",renewal_consent:body.guarantee_consent_version==="guarantee-v2"&&body.guarantee_renewal_consent===true});
     if(error)return json({ok:false,error:"guarantee_token_save_failed"},503);
   }
 
@@ -716,7 +717,7 @@ async function startPayment(req:Request,body:any,development:boolean){
         if(!result.cardToken||!/^CARD_[A-Za-z0-9-]+$/.test(result.cardToken))
           throw new Error("guarantee_token_missing");
         const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
-          user_id:user.id,card_token:result.cardToken,consented_at:new Date().toISOString()});
+          user_id:user.id,card_token:result.cardToken,consented_at:new Date().toISOString(),consent_version:body.guarantee_consent_version==="guarantee-v2"?"guarantee-v2":"guarantee-v1",renewal_consent:body.guarantee_consent_version==="guarantee-v2"&&body.guarantee_renewal_consent===true});
         if(error)throw new Error("guarantee_token_save_failed");
       }
       if(result.status!=="WAITING") {
@@ -1116,7 +1117,7 @@ async function adminHubData(req:Request,body:any){
     admin.from("experience_orders").select("id,reservation_id,status,created_at,experience_order_items(id,product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,created_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,description,snapshot,expires_at,applied_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,status,admin_additional_amount_cents,estimated_additional_amount_cents,admin_note,payment_due_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
-    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents!incidents_guarantee_id_fkey(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,attention_code,provider_error_code,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents!incidents_guarantee_id_fkey(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("reservation_notes").select("id,reservation_id,author_user_id,note,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("financial_entries").select("id,reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents,currency,description,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false})
   ]) : [{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty}];
@@ -1232,9 +1233,10 @@ async function adminReservationAction(req:Request,body:any){
   if(operation==="check_in"){
     if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
     if(reservation.check_in>todayInBrazil||reservation.check_out<todayInBrazil||reservation.checked_in_at) return json({ok:false,error:"check_in_not_allowed"},409);
-    const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_in",checked_in_at:reservation.checked_in_at||now,updated_at:now}).eq("id",reservation.id).select().single();
-    if(updateError) return json({ok:false,error:"check_in_failed"},500);
-    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_in",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_in_at:data.checked_in_at}});
+    const {data,error:updateError}=await admin.rpc("check_in_with_guarantee",{p_reservation:reservation.id,
+      p_actor:user.id,p_exception_reason:body.guarantee_exception_reason||null});
+    if(updateError)return json({ok:false,error:String(updateError.message).includes("guarantee_check_in_exception_required")?
+      "guarantee_check_in_exception_required":"check_in_failed"},409);
     return json({ok:true,reservation:data});
   }
   if(operation==="check_out"){

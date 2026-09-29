@@ -47,9 +47,13 @@ Deno.serve(async (request) => {
     // A webhook can arrive before the order ID is saved. A non-2xx response
     // lets PagBank retry; the guest can also reconcile via status polling.
     if(findError||!payment){
-      const {data:guarantee}=await admin.from("guarantees")
+      const {data:authorization}=await admin.from("guarantee_authorizations").select("guarantee_id")
+        .eq("provider_charge_id",chargeId).maybeSingle();
+      let query=admin.from("guarantees")
         .select("*,reservations(check_out)")
-        .eq("provider","pagbank_sandbox").eq("provider_authorization_id",chargeId).maybeSingle();
+        .eq("provider","pagbank_sandbox");
+      query=authorization?query.eq("id",authorization.guarantee_id):query.eq("provider_authorization_id",chargeId);
+      const {data:guarantee}=await query.maybeSingle();
       if(!guarantee)return new Response("Charge not registered yet",{status:503});
       await reconcileGuarantee(admin,guarantee,paymentGateway("pagbank_sandbox",token));
       return new Response("ok",{status:200});

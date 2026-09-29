@@ -1,5 +1,7 @@
 import {createClient} from "npm:@supabase/supabase-js@2";
 
+import {authorizeGuarantee,loadGuaranteeLifecycle,recoverGuaranteeAuthorization,guaranteeCoverage} from "../_shared/finance/guarantee-lifecycle.ts";
+import {tokenizePagBankCard} from "../booking-engine/pagbank.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
 import {reconcileReservationRefunds} from "../_shared/finance/refund-reconciliation.ts";
@@ -14,7 +16,7 @@ const headers={"Content-Type":"application/json","Cache-Control":"no-store",
 const reply=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers});
 const id=(v:unknown)=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v||""));
 const asMoney=(v:unknown)=>Number.isSafeInteger(v)&&Number(v)>0;
-const brazilTime=(date:string,hour:string)=>Date.parse(`${date}T${hour}:00-03:00`);
+
 const evidenceBucket="guarantee-evidence";
 async function verifiedEvidence(guaranteeId:string,input:unknown){
   if(!Array.isArray(input)||input.length<2||input.length>11)return null;
@@ -46,16 +48,10 @@ async function isAdmin(userId:string){
   const {data}=await admin.from("profiles").select("role").eq("id",userId).maybeSingle();
   return data?.role==="admin";
 }
-async function loadGuarantee(guaranteeId:string){
-  const {data,error}=await admin.from("guarantees")
-    .select("*,reservations(id,user_id,status,check_in,check_out,guest_name,guest_email,guest_phone,confirmation_code)")
-    .eq("id",guaranteeId).maybeSingle();
-  if(error)throw new Error("guarantee_unavailable");
-  return data;
-}
+async function loadGuarantee(guaranteeId:string){return loadGuaranteeLifecycle(admin,guaranteeId);}
 function publicState(g:any){return {id:g.id,status:g.status,amount_cents:Number(g.amount_cents),
   captured_amount_cents:Number(g.captured_amount_cents),capture_before:g.provider_capture_before,
-  provider_error_code:g.provider_error_code||null};}
+  provider_error_code:g.provider_error_code||null,attention_code:g.attention_code||null,coverage:guaranteeCoverage(g,g.reservations)};}
 async function setState(g:any,expected:string,values:Record<string,unknown>){
   const {data,error}=await admin.from("guarantees").update({...values,updated_at:new Date().toISOString()})
     .eq("id",g.id).eq("status",expected).select("id").maybeSingle();
@@ -78,57 +74,18 @@ async function reconcile(g:any){
 async function authorizeDueGuarantees(guaranteeId?:string){
   if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
   await admin.rpc("purge_unconfirmed_guarantee_tokens");
-  const today=new Date().toISOString().slice(0,10),latest=new Date(Date.now()+3*86400000).toISOString().slice(0,10);
-  let query=admin.from("guarantees")
-    .select("*,reservations!inner(id,user_id,status,check_in,check_out,guest_name,guest_email,guest_phone)")
-    .eq("status","pending").eq("reservations.status","confirmed")
-    .gte("reservations.check_out",today).lte("reservations.check_in",latest);
+  let query=admin.from("guarantees").select("id,reservations!inner(status,check_in,check_out)")
+    .in("status",["pending","guaranteed"]).eq("reservations.status","confirmed")
+    .gte("reservations.check_out",new Date().toISOString().slice(0,10))
+    .lte("reservations.check_in",new Date(Date.now()+3*86400000).toISOString().slice(0,10))
+    .lte("next_action_at",new Date().toISOString());
   if(guaranteeId)query=query.eq("id",guaranteeId);
-  const {data:rows,error}=await query.order("created_at").limit(50);
+  const {data:rows,error}=await query.order("next_action_at").limit(20);
   if(error)return reply({ok:false,error:"guarantees_unavailable"},503);
-  const now=Date.now(),results:{id:string;status:string}[]=[];
-  for(const g of rows||[]){
-    const r=g.reservations,checkin=brazilTime(r?.check_in||"","15:00"),
-      checkout=brazilTime(r?.check_out||"","11:00");
-    if(r?.status!=="confirmed"||!Number.isFinite(checkin)||!Number.isFinite(checkout)||
-      now<checkin-48*3600000||now>checkout||checkout>now+5*86400000)continue;
-    const {data:saved}=await admin.from("guarantee_card_tokens").select("card_token,user_id")
-      .eq("reservation_id",r.id).maybeSingle();
-    if(!saved||saved.user_id!==r.user_id){
-      await admin.from("guarantees").update({provider_error_code:"card_token_missing"}).eq("id",g.id).eq("status","pending");
-      results.push({id:g.id,status:"card_token_missing"});continue;
-    }
-    const {data:identity}=await admin.rpc("guest_payment_identity",{p_user_id:r.user_id});
-    const holder=Array.isArray(identity)?identity[0]:identity;
-    const phone=String(r.guest_phone||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
-    if(holder?.document_type!=="cpf"||!/^[0-9]{10,11}$/.test(phone)){
-      results.push({id:g.id,status:"identity_unavailable"});continue;
-    }
-    const attempt=Number(g.authorization_attempt||0)+1;
-    if(attempt>3||!(await setState(g,"pending",{status:"authorizing",authorization_attempt:attempt,
-      provider:"pagbank_sandbox",provider_error_code:null})))continue;
-    try{
-      const referenceId=g.id.replaceAll("-","")+"a"+attempt;
-      const orderInput={referenceId,amountCents:Number(g.amount_cents),method:"card" as const,
-        cardToken:saved.card_token,installments:1,preAuthorize:true,
-        customer:{name:r.guest_name,email:r.guest_email,taxId:holder.document_number,
-          phone:{area:phone.slice(0,2),number:phone.slice(2)}},
-        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook",description:"Caucao Chalezinho Ville"};
-      const created=await paymentGateway("pagbank_sandbox",token).authorizeCard(orderInput);
-      const {data:savedOrder,error:saveError}=await admin.from("guarantees").update({
-        provider_order_id:created.orderId,provider_authorization_id:created.chargeId,
-        provider_last_status:created.status,status:"authorization_uncertain",updated_at:new Date().toISOString()})
-        .eq("id",g.id).eq("status","authorizing").select("id").maybeSingle();
-      if(saveError||!savedOrder)throw new Error("authorization_persistence_uncertain");
-      const state=await reconcile(await loadGuarantee(g.id));
-      results.push({id:g.id,status:state.status});
-    }catch{
-      // The provider may have created an authorization. Never retry the
-      // payment blindly; an uncertain result requires reconciliation.
-      await setState(g,"authorizing",{status:"authorization_uncertain",
-        provider_error_code:"provider_result_unknown"});
-      results.push({id:g.id,status:"authorization_uncertain"});
-    }
+  const results=[];
+  for(const g of rows||[]) {
+    try{results.push(await authorizeGuarantee(admin,g.id,paymentGateway("pagbank_sandbox",token),projectUrl+"/functions/v1/pagbank-webhook"));}
+    catch{results.push({id:g.id,status:"reconciliation_pending"});}
   }
   return reply({ok:true,results});
 }
@@ -171,7 +128,7 @@ async function maintainFinance(){
   }
   const {data:rows,error}=await admin.from('guarantees')
     .select('*,reservations(id,user_id,status,check_in,check_out)')
-    .eq('provider','pagbank_sandbox').not('provider_authorization_id','is',null)
+    .eq('provider','pagbank_sandbox')
     .in('status',['authorizing','authorization_uncertain','guaranteed','incident_reported','capture_requested','capture_uncertain','release_requested','release_uncertain'])
     .order('updated_at').limit(50);
   if(error)return reply({ok:false,error:'guarantees_unavailable'},503);
@@ -185,7 +142,7 @@ async function maintainFinance(){
     try{
       const current=await reconcile(g);
       // Only cancelled bookings with no incident can release automatically.
-      if(g.reservations?.status==='cancelled'&&current.status==='guaranteed'){
+      if((g.reservations?.status==='cancelled'||g.attention_code==='reservation_changed')&&current.status==='guaranteed'){
         const before=await observe(current);
         if(before?.status==='AUTHORIZED'&&before.amount.value===Number(g.amount_cents)&&
           await claimRelease(g.id)){
@@ -231,50 +188,41 @@ async function handler(req:Request){
     const result=await authorizeDueGuarantees(g.id);
     if(!result.ok)return result;
     const updated=await loadGuarantee(g.id);
-    if(updated.status==="pending")return reply({ok:false,error:updated.provider_error_code||"authorization_window_unavailable"},409);
+    if(updated.status==="pending")return reply({ok:false,error:updated.attention_code||updated.provider_error_code||"authorization_window_unavailable"},409);
     return reply({ok:true,guarantee:publicState(updated)});
   }
   if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
-  if(action==="authorize"){
-    if(!owner||g.reservations?.status!=="confirmed"||g.status!=="pending")
-      return reply({ok:false,error:"authorization_not_available"},409);
-    const now=Date.now(),checkin=brazilTime(g.reservations.check_in,"15:00"),checkout=brazilTime(g.reservations.check_out,"11:00");
-    // Six days is the shortest published card window. Leave a safety margin.
-    if(now<checkin-48*3600000||now>checkout||checkout>now+5*86400000)
-      return reply({ok:false,error:"authorization_window_unavailable"},409);
-    const encrypted=String(body?.encrypted_card||"");
-    if(encrypted.length<20||encrypted.length>10000)return reply({ok:false,error:"encrypted_card_required"},400);
-    const {data:identity,error:identityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
-    if(identityError)return reply({ok:false,error:"identity_unavailable"},503);
-    if(identity?.[0]?.document_type!=="cpf")return reply({ok:false,error:"cpf_required"},409);
-    const phone=String(g.reservations.guest_phone||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
-    if(!/^\d{10,11}$/.test(phone))return reply({ok:false,error:"phone_required"},409);
-    const attempt=Number(g.authorization_attempt||0)+1;
-    if(attempt>3)return reply({ok:false,error:"authorization_attempts_exhausted"},409);
-    if(!(await setState(g,"pending",{status:"authorizing",authorization_attempt:attempt,
-      provider:"pagbank_sandbox",provider_error_code:null})))
-      return reply({ok:false,error:"authorization_in_progress"},409);
-    const referenceId=g.id.replaceAll("-","")+"a"+attempt;
-    try{
-      const orderInput={referenceId,amountCents:Number(g.amount_cents),method:"card" as const,
-        encryptedCard:encrypted,installments:1,preAuthorize:true,
-        customer:{name:g.reservations.guest_name,email:g.reservations.guest_email,
-          taxId:identity[0].document_number,phone:{area:phone.slice(0,2),number:phone.slice(2)}},
-        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook",description:"Caucao Chalezinho Ville"};
-      const created=await paymentGateway("pagbank_sandbox",token).authorizeCard(orderInput);
-      const {data:saved,error:saveError}=await admin.from("guarantees").update({provider_order_id:created.orderId,
-        provider_authorization_id:created.chargeId,provider_last_status:created.status,
-        status:"authorization_uncertain",updated_at:new Date().toISOString()})
-        .eq("id",g.id).eq("status","authorizing").select("id").maybeSingle();
-      if(saveError||!saved)throw new Error("authorization_persistence_uncertain");
-      g=await loadGuarantee(g.id);
-      const state=await reconcile(g);
-      return reply({ok:true,guarantee:state});
-    }catch{
-      await setState(g,"authorizing",{status:"authorization_uncertain",provider_error_code:"provider_result_unknown"});
-      return reply({ok:false,error:"authorization_result_uncertain"},503);
-    }
+  if(action==="replace_card"){
+    if(!owner||body.consent!==true)return reply({ok:false,error:"guarantee_consent_required"},400);
+    const encrypted=String(body.encrypted_card||"");
+    if(!id(body.operation_key)||encrypted.length<20||encrypted.length>10000)
+      return reply({ok:false,error:"encrypted_card_required"},400);
+    const {error:claimError}=await admin.rpc("claim_guarantee_card_update",{p_guarantee:g.id,p_actor:user.id,p_key:body.operation_key});
+    if(claimError)return reply({ok:false,error:"card_update_unavailable"},409);
+    let cardToken:string;
+    try{cardToken=await tokenizePagBankCard(token,encrypted)}
+    catch{return reply({ok:false,error:"card_update_provider_unavailable"},503)}
+    const {error:saveError}=await admin.rpc("save_guarantee_card",{p_guarantee:g.id,p_actor:user.id,p_key:body.operation_key,
+      p_token:cardToken,p_renewal:body.renewal_consent===true});
+    if(saveError)return reply({ok:false,error:"card_update_unavailable"},409);
+    await authorizeDueGuarantees(g.id);
+    return reply({ok:true,guarantee:publicState(await loadGuarantee(g.id))});
   }
+  if(action==="authorization_history"){
+    const {data,error}=await admin.from("guarantee_authorizations")
+      .select("id,reference_id,purpose,state,amount_cents,provider_charge_id,provider_order_id,capture_before,provider_error_code,created_at")
+      .eq("guarantee_id",g.id).order("created_at",{ascending:false});
+    if(error)return reply({ok:false,error:"authorization_history_unavailable"},503);
+    return reply({ok:true,authorizations:data||[],coverage:guaranteeCoverage(g,g.reservations)});
+  }
+  if(action==="recover_authorization"){
+    if(!manager)return reply({ok:false,error:"admin_required"},403);
+    if(!id(body.authorization_id)||!/^CHAR_[A-Za-z0-9-]+$/.test(body.charge_id||"")||!/^ORDE_[A-Za-z0-9-]+$/.test(body.order_id||""))
+      return reply({ok:false,error:"invalid_authorization_reference"},400);
+    return reply({ok:true,guarantee:publicState(await recoverGuaranteeAuthorization(admin,g.id,body.authorization_id,
+      body.charge_id,body.order_id,paymentGateway("pagbank_sandbox",token)))});
+  }
+  if(action==="authorize")return reply({ok:false,error:"use_card_replacement"},410);
   if(!manager)return reply({ok:false,error:"admin_required"},403);
   if(action==="retry_refund"){
     if(!id(body.refund_id))return reply({ok:false,error:"invalid_refund_request"},400);
@@ -331,6 +279,7 @@ async function handler(req:Request){
     if(['AMEX','AMERICAN_EXPRESS'].includes(String(before?.cardBrand||'').toUpperCase())&&Number(amount)!==Number(g.amount_cents))
       return reply({ok:false,error:"card_partial_capture_unsupported"},409);
     if(before?.status!=="AUTHORIZED"||Number(before.amount.value)!==Number(g.amount_cents)||
+      !Number.isFinite(Date.parse(g.provider_capture_before||""))||
       Date.parse(g.provider_capture_before||"")<=Date.now()+3600000)
       return reply({ok:false,error:"authorization_not_capturable"},409);
     if(!(await setState(g,"incident_reported",{status:"capture_requested",requested_capture_cents:Number(amount)})))

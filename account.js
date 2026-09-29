@@ -34,7 +34,7 @@ async function boot(){
  $("#account-email").textContent=session.user.email||"";
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
-  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,not_confirmed_at,not_confirmed_reason,cancelled_at,cancellation_actor,cancellation_reason,no_show_at,guests,rate_plan_code,stay_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image),payments(id,status,amount_cents,method,installments,metadata,created_at,updated_at),guarantees(id,status,amount_cents,captured_amount_cents,provider_capture_before,provider_error_code),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
+  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,not_confirmed_at,not_confirmed_reason,cancelled_at,cancellation_actor,cancellation_reason,no_show_at,guests,rate_plan_code,stay_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image,check_out_time),payments(id,status,amount_cents,method,installments,metadata,created_at,updated_at),guarantees(id,status,amount_cents,captured_amount_cents,provider_capture_before,provider_error_code,attention_code),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,status))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("properties").select("id,name,active,features").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,status,admin_note,payment_charge_id,payment_due_at,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)").eq("user_id",session.user.id).order("created_at",{ascending:false}),
@@ -323,6 +323,7 @@ function renderReservations(reservations){
   };
   art.addEventListener('toggle',()=>{if(art.open)loadFinance()});if(art.open)loadFinance();
  });
+  box.querySelectorAll("[data-guarantee-card]").forEach(b=>b.addEventListener("click",()=>openGuaranteeCard(b.dataset.guaranteeCard)));
   box.querySelectorAll("[data-guarantee-status]").forEach(b=>b.addEventListener("click",async()=>{b.disabled=true;try{await guaranteeApi("status",{guarantee_id:b.dataset.guaranteeStatus});location.reload()}catch{b.disabled=false}}));
   box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
  box.querySelectorAll("[data-download-reservation-policy]").forEach(b=>b.addEventListener("click",()=>downloadReservationPolicy(b.dataset.downloadReservationPolicy,b)));
@@ -569,12 +570,48 @@ async function cancelPendingCharge(chargeId,btn){
  catch(e){btn.disabled=false;alert(e.message==="payment_processing"?"O pagamento está em análise e não pode ser cancelado neste momento.":"Não foi possível cancelar agora.")}
 }
 
+function guaranteeAttention(code){return {
+ authorization_declined:"O banco recusou a caução. Sua reserva continua confirmada; atualize o cartão ou fale com o atendimento.",
+ card_token_missing:"Informe um cartão para regularizar a caução desta reserva.",
+ renewal_consent_required:"A autorização atual não cobre toda a estadia. Atualize o cartão e autorize a renovação, ou fale com o atendimento.",
+ authorization_result_uncertain:"Estamos consultando o resultado com o PagBank. Uma nova autorização só será solicitada depois de esclarecer a anterior.",
+ authorization_expired:"A autorização anterior venceu. A caução precisa ser regularizada.",
+ authorization_attempts_exhausted:"O limite de tentativas foi atingido. Entre em contato com o atendimento.",
+ authorization_cleanup_pending:"A nova garantia foi processada, mas a liberação do bloqueio anterior ainda precisa ser confirmada.",
+ incident_requires_review:"Há uma ocorrência em análise. A equipe acompanhará a caução.",
+ identity_unavailable:"Confira seus dados cadastrais com o atendimento para regularizar a caução.",
+ captured_guarantee_dates_changed:"As datas mudaram após uma cobrança de dano. A equipe precisa revisar a garantia.",
+ unexpected_provider_capture:"Há uma divergência na garantia em análise pela equipe."
+ }[code]||"";}
 function renderGuarantee(g,r){
  if(!g)return "";
  const amount=brlC(g.amount_cents),captured=Number(g.captured_amount_cents||0);
- const text=g.status==="released"?"Garantia liberada.":g.status==="captured"?"Foi utilizado "+brlC(captured)+" em uma ocorrência registrada.":g.status==="guaranteed"?"Valor autorizado no cartão até "+fmtDateTime(g.provider_capture_before)+".":g.status==="pending"&&g.provider_error_code==="card_token_missing"?"O cartão da caução não foi vinculado a esta reserva. Entre em contato com o atendimento.":g.status==="pending"&&(r.status!=="confirmed"||Date.parse(r.check_out+"T11:00:00-03:00")<Date.now())?"Não houve pré-autorização confirmada para esta estadia.":g.status==="pending"?"Pré-autorização programada para perto do check-in com o cartão informado na reserva.":"Aguardando confirmação do PagBank.";
- const action=!["pending","released","captured","guaranteed"].includes(g.status)?'<button type="button" data-guarantee-status="'+esc(g.id)+'">Consultar caução</button>':"";
- return '<div class="guest-guarantee"><small>GARANTIA DA HOSPEDAGEM · SANDBOX</small><strong>'+amount+'</strong><p>'+text+' A autorização reserva temporariamente o limite do cartão; não é cobrada na reserva. Danos comprovados podem gerar captura parcial. Sem danos, a autorização é liberada.</p>'+action+'</div>';
+ const expiry=Date.parse(g.provider_capture_before||""),departure=Date.parse(r.check_out+"T"+String(r.properties?.check_out_time||"11:00").slice(0,5)+":00-03:00");
+ const attention=guaranteeAttention(g.attention_code||g.provider_error_code);
+ const text=g.status==="released"?"Garantia liberada.":g.status==="captured"?"Foi utilizado "+brlC(captured)+" em uma ocorrência registrada.":
+  attention|| (g.status==="guaranteed"?(expiry<=Date.now()?"A autorização venceu; a caução precisa ser regularizada.":"Valor autorizado até "+fmtDateTime(g.provider_capture_before)+"."+(expiry<departure+3600000?" O prazo atual não cobre o fim da estadia; será necessária renovação ou avaliação da equipe.":"")):
+  g.status==="pending"?"Pré-autorização programada para perto do check-in com o cartão desta reserva.":"Aguardando confirmação do PagBank.");
+ const canUpdate=r.status==="confirmed"&&departure>Date.now()&&["pending","guaranteed"].includes(g.status);
+ return '<div class="guest-guarantee"><small>GARANTIA DA HOSPEDAGEM · SANDBOX</small><strong>'+amount+'</strong><p>'+text+'</p><p>A autorização reserva temporariamente o limite do cartão. Danos comprovados podem gerar captura parcial ou integral. O valor da hospedagem é tratado separadamente.</p>'+
+  (canUpdate?'<button type="button" data-guarantee-card="'+esc(g.id)+'">Atualizar cartão da caução</button>':"")+
+  '<button type="button" data-guarantee-status="'+esc(g.id)+'">Consultar caução</button></div>';
+}
+function openGuaranteeCard(id){
+ const r=reservationsCache.find(r=>(r.guarantees||[]).some(g=>g.id===id)),g=r?.guarantees.find(g=>g.id===id);if(!g)return;
+ const modal=document.createElement("div");modal.className="booking-modal";modal.setAttribute("role","dialog");modal.setAttribute("aria-modal","true");modal.setAttribute("aria-label","Atualizar cartão da caução");
+ modal.innerHTML='<div class="booking-panel post-payment-panel"><button type="button" class="modal-close" aria-label="Fechar">×</button><small>CAUÇÃO · '+esc(r.confirmation_code)+'</small><h2>Atualizar cartão</h2><p>Valor da caução: '+brlC(g.amount_cents)+'. O PagBank guarda o cartão. O site guarda apenas um token vinculado a esta reserva.</p><form class="account-form"><label>Nome no cartão<input name="holder" autocomplete="cc-name" required></label><label>Número do cartão<input name="number" inputmode="numeric" autocomplete="cc-number" required></label><label>Mês<input name="month" inputmode="numeric" autocomplete="cc-exp-month" maxlength="2" required></label><label>Ano<input name="year" inputmode="numeric" autocomplete="cc-exp-year" maxlength="4" required></label><label>Código de segurança<input name="cvv" type="password" inputmode="numeric" autocomplete="cc-csc" maxlength="4" required></label><label><input name="consent" type="checkbox" required> Autorizo o uso deste cartão exclusivamente para a caução desta reserva e eventuais danos comprovados.</label><label><input name="renewal" type="checkbox"> Autorizo renovações durante esta estadia. Entendo que duas autorizações podem bloquear temporariamente até '+brlC(Number(g.amount_cents)*2)+' do limite, até a confirmação da liberação anterior.</label><p>Uma autorização já ativa continua válida. A troca será usada na próxima solicitação necessária.</p><p class="form-result" role="status"></p><button class="primary-action" type="submit">Salvar cartão da caução</button></form></div>';
+ document.body.appendChild(modal);modal.querySelector('.modal-close').onclick=()=>modal.remove();
+ const form=modal.querySelector('form'),fields=form.elements;fields.holder.value=profile?.full_name||"";fields.holder.focus();
+ form.onsubmit=async e=>{e.preventDefault();const btn=form.querySelector('button'),message=form.querySelector('.form-result');btn.disabled=true;message.textContent="Validando cartão com o PagBank…";
+  try{
+   const key=await api("pagbank_sandbox_card_key");await loadPagBankCardSdk();
+   const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:fields.holder.value.trim(),number:fields.number.value.replace(/\D/g,""),expMonth:fields.month.value,expYear:fields.year.value,securityCode:fields.cvv.value});
+   if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_card");
+   ["number","month","year","cvv"].forEach(n=>fields[n].value="");
+   await guaranteeApi("replace_card",{guarantee_id:id,operation_key:crypto.randomUUID(),encrypted_card:card.encryptedCard,consent:fields.consent.checked,renewal_consent:fields.renewal.checked});
+   message.textContent="Cartão atualizado. Consultando a caução…";await boot();modal.remove();
+  }catch(error){message.textContent=error.message==="invalid_card"?"Confira os dados do cartão.":error.message==="card_update_unavailable"?"Há uma operação em andamento ou uma tentativa recente. Aguarde um minuto e consulte a caução.":"O cartão não foi atualizado. A reserva continua válida. Consulte a caução ou tente novamente mais tarde.";btn.disabled=false;}
+ };
 }
 function renderModification(m){
  const target=properties.find(p=>Number(p.id)===Number(m.requested_property_id))?.name||"propriedade solicitada";

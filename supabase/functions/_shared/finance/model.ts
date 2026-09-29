@@ -26,7 +26,8 @@ export function guaranteeState(g:any) {
       capture_requested:'processing',capture_uncertain:'processing'} as Record<string,string>)[g.status]||g.status;
   return {status,required_cents:authorized,authorized_cents:confirmedAuthorization?authorized:0,captured_cents:captured,
     refunded_cents:refunded,
-    available_cents:['guaranteed','incident_reported'].includes(g.status)?authorized-captured:0,
+    available_cents:['guaranteed','incident_reported'].includes(g.status)&&
+      (!g.provider_capture_before||Date.parse(g.provider_capture_before)>Date.now())?authorized-captured:0,
     released_cents:g.status==='released'?authorized:money(g.released_amount_cents||0),
     uncaptured_cents:authorized-captured,
     release_confirmed:g.status==='released'||g.release_confirmed===true};
