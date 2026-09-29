@@ -98,6 +98,9 @@ test('fees API exposes only sanitized error codes for provider diagnostics',asyn
   await assert.rejects(pagBankInstallmentPlans('token',10000,12,6,'45396206',
     async()=>new Response(JSON.stringify({errors:[{code:'fees_not_configured',message:'private account details'}]}),{status:400})),
     error=>error.message==='pagbank_fees_http_400_code_fees_not_configured');
+  await assert.rejects(pagBankInstallmentPlans('token',10000,12,6,'45396206',
+    async()=>new Response(JSON.stringify({error_messages:[{error:'credit_card_bin_data_not_found',description:'private details'}]}),{status:400})),
+    error=>error.message==='pagbank_fees_http_400_code_credit_card_bin_data_not_found');
 });
 
 test('damage authorization is requested without immediate capture',()=>{

@@ -62,7 +62,7 @@ async function chargeInstallments(propertyId:number,amountCents:number,installme
     plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
       terms.no_interest_installments,bin);
   }catch(error){
-    if(bin.length===8&&error instanceof Error&&error.message.startsWith("pagbank_fees_http_400")){
+    if(bin.length===8&&error instanceof Error&&error.message==="pagbank_fees_http_400_code_credit_card_bin_data_not_found"){
       try{plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
         terms.no_interest_installments,bin.slice(0,6));}
       catch(retryError){error=retryError;}
@@ -73,7 +73,7 @@ async function chargeInstallments(propertyId:number,amountCents:number,installme
     // Some sandbox card BINs are rejected by the fee simulator. Never invent
     // buyer interest; the merchant-funded installments still use the exact
     // reservation total and can be presented safely.
-    if(!(error instanceof Error)||!error.message.startsWith("pagbank_fees_http_400")||
+    if(!(error instanceof Error)||error.message!=="pagbank_fees_http_400_code_credit_card_bin_data_not_found"||
        !/^\d{6}(\d{2})?$/.test(bin))throw error;
     feeFallback=true;
     plans=Array.from({length:Math.min(terms.max_installments,Math.max(1,terms.no_interest_installments))},(_,i)=>({
