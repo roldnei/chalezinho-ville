@@ -404,6 +404,8 @@ async function performStartPayment(choice){
   setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
+ clearInterval(window.__quoteTimer);
+ $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
  box.innerHTML='<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
   (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>O cartão de teste foi enviado. Consultando o resultado…</p>')+
@@ -412,7 +414,7 @@ function renderSandboxPayment(d){
  const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
   try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
    if(s.manual_review){$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
-   if(s.reservation_status==="confirmed"){$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
+   if(s.reservation_status==="confirmed"){$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
    if(["refused","cancelled","expired"].includes(s.payment_status)){$("#sandbox-payment-result").textContent="Pagamento não aprovado. Faça uma nova consulta para tentar outra reserva.";clearInterval(window.__pagbankPoll)}
   }catch{ /* The provider may still be processing; the webhook is authoritative. */ }};
  clearInterval(window.__pagbankPoll);tick();window.__pagbankPoll=setInterval(tick,5000);

@@ -1,3 +1,5 @@
+> Registro histórico. Para o estado atual do ambiente isolado e os testes reais, consulte [homologação de 29/09/2026](homologation-live-20260929.md).
+
 # Módulo financeiro — ponto de controle de desenvolvimento
 
 Data: 29/09/2026. Branch: `refactor/reservation-finance`. Base original: `b20abf5`; continuação: `fa7e880`.

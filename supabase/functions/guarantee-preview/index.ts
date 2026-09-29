@@ -132,6 +132,11 @@ async function authorizeDueGuarantees(guaranteeId?:string){
   }
   return reply({ok:true,results});
 }
+async function claimRelease(guaranteeId:string,actor:string|null=null){
+  const {data,error}=await admin.rpc('claim_guarantee_release',{p_guarantee:guaranteeId,p_actor:actor});
+  if(error)throw new Error('guarantee_release_claim_failed');
+  return data===true;
+}
 
 // Provider reads recover missed notifications. All writes use the same atomic
 // reconciliation functions as checkout and webhooks; this job never invents money.
@@ -183,7 +188,7 @@ async function maintainFinance(){
       if(g.reservations?.status==='cancelled'&&current.status==='guaranteed'){
         const before=await observe(current);
         if(before?.status==='AUTHORIZED'&&before.amount.value===Number(g.amount_cents)&&
-          await setState(current,'guaranteed',{status:'release_requested'})){
+          await claimRelease(g.id)){
           await gateway.cancelAuthorization(g.provider_authorization_id,Number(g.amount_cents),g.id.replaceAll('-','')+'release');
           await reconcile(await loadGuarantee(g.id));
         }
@@ -340,8 +345,8 @@ async function handler(req:Request){
   const before=await observe(g);
   if(before?.status!=="AUTHORIZED"||Number(before.amount.value)!==Number(g.amount_cents))
     return reply({ok:false,error:"authorization_not_releasable"},409);
-  if(!(await setState(g,"guaranteed",{status:"release_requested"})))
-    return reply({ok:false,error:"guarantee_state_changed"},409);
+  if(!(await claimRelease(g.id,user.id)))
+    return reply({ok:false,error:"active_incident_or_operation"},409);
   try{await paymentGateway("pagbank_sandbox",token).cancelAuthorization(g.provider_authorization_id,Number(g.amount_cents),
     g.id.replaceAll("-","")+"release");}
   catch{return reply({ok:false,error:"release_result_uncertain"},503)}

@@ -27,3 +27,19 @@ Todas verificam o ambiente; as ações autenticadas verificam o usuário no serv
 Configuração pública em `app-config.js`; reserva, estorno e consulta financeira
 usam `booking-engine`. Caução usa `guarantee-preview` e o mesmo ledger por reserva.
 O build recusa produção e o projeto compartilhado anterior.
+
+## Processamento periódico
+
+O job `finance-lifecycle` foi habilitado no projeto isolado, a cada cinco minutos.
+Ele consulta pagamentos e devoluções pendentes, reconcilia cauções e solicita as
+pré-autorizações elegíveis. Seu destino vem de `finance_project_url` no Vault;
+configure esse valor com a URL do projeto isolado antes da migration de agendamento.
+A credencial `guarantee_dispatch_secret` permanece somente no servidor. O dispatcher
+recusa explicitamente o host do banco compartilhado. Não restaurar o job HTTP
+histórico `authorize-due-guarantees`, cujo destino era o projeto anterior.
+
+O sandbox PagBank foi observado sem os cabeçalhos de assinatura. Seus avisos
+sem assinatura só acionam consulta autenticada de cobrança já registrada,
+limitada a uma por cobrança a cada 30 segundos. Nenhum valor do aviso é usado
+para confirmar pagamento. Assinaturas inválidas continuam rejeitadas. Essa
+exceção não habilita execução do backend em produção.
