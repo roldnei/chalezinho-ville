@@ -220,12 +220,16 @@ export async function changePagBankCharge(
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    // Only the provider's machine-readable error code is safe to retain.
-    // Descriptions and the rest of the response may contain customer data.
+    // Never retain raw descriptions: they may contain customer data. Recognize
+    // this exact, documented-in-support sandbox symptom as a fixed safe tag.
     const code=String(body?.error_messages?.[0]?.code||body?.error_messages?.[0]?.error||"");
+    const errorHint=code==='40008'&&body?.error_messages?.[0]?.description==='Transaction is not found.'?
+      'transaction_not_found':null;
     const suffix=/^[a-zA-Z0-9_]{1,40}$/.test(code)?`_code_${code}`:"";
+    console.warn(JSON.stringify({event:'pagbank_charge_rejected',operation,http_status:response.status,
+      code:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null,hint:errorHint}));
     throw Object.assign(new Error(`pagbank_charge_operation_http_${response.status}${suffix}`),
-      {httpStatus:response.status,errorCode:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null});
+      {httpStatus:response.status,errorCode:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null,errorHint});
   }
   if (body?.id !== chargeId || body?.amount?.currency !== "BRL" ||
       !Number.isSafeInteger(body?.amount?.value) ||

@@ -2,6 +2,20 @@ import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
 import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, extractPagBankWebhookChargeId, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, tokenizePagBankCard, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+test('refund diagnostics retain only a fixed sandbox hint and never raw provider text',async()=>{
+  const logged=[],warn=console.warn;console.warn=x=>logged.push(x);
+  try{
+    for(const [description,hint] of [['Transaction is not found.','transaction_not_found'],['Private customer details must not leak',null]]){
+      await assert.rejects(changePagBankCharge('private-token','CHAR_test','cancel',100,'diagnostic-test-0001',
+        async()=>new Response(JSON.stringify({error_messages:[{code:'40008',description}]}),{status:400})),
+        error=>error.errorCode==='40008'&&error.errorHint===hint&&!error.message.includes(description));
+    }
+    assert.equal(JSON.parse(logged[0]).hint,'transaction_not_found');
+    assert.equal(JSON.parse(logged[1]).hint,null);
+    assert.ok(!JSON.stringify(logged).includes('Private customer'));
+    assert.ok(!JSON.stringify(logged).includes('private-token'));
+  }finally{console.warn=warn;}
+});
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
