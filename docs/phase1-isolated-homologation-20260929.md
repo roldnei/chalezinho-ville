@@ -14,7 +14,9 @@ Escopo: Supabase `pxfqmnhqodqyaaqeyjgr`, branch `fix/reservation-finance-lifecyc
 
 ## Evidências registradas
 
-142 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados.
+147 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
+
+Correções finais: a Área do Hóspede considera checkout registrado e horários configurados; notificações atrasadas do Brevo não apagam entrega confirmada, falhas de persistência retornam resposta repetível e timestamp inválido recebe erro controlado. Webhook v2 publicado e chamada sem credencial recusada (401). Entrega real pelo Brevo ainda não homologada.
 
 Reserva de ensaio `DEDFD40744` / `7823e966-dc9b-4591-9601-0d9c5f03f696`: base criada manualmente como fixture, vinculada à conta QA. A hospedagem desta fixture NÃO foi vendida no gateway. Os adicionais abaixo foram transações reais de sandbox, sem simulação de status pago no banco:
 
@@ -32,11 +34,14 @@ Reserva de ensaio `DEDFD40744` / `7823e966-dc9b-4591-9601-0d9c5f03f696`: base cr
 | Checklist | Pronto sem vistoria recusado; vistoria com itens pendentes recusada; conclusão dos itens → vistoria → pronto aprovada |
 | Check-in/out | Fixture `QAOPS2909`: entrada, saída e auditoria; saída antes da entrada, repetição e no-show após entrada recusados |
 | Confirmação de conta | E-mail recebido pelo proprietário e `email_confirmed_at` confirmado no banco |
+| Administrador suspenso | `admin_hub` respondeu 403; acesso da conta QA restaurado após o teste |
+| Bloqueios e liberação | Dois imóveis indisponíveis enquanto bloqueados; os três disponíveis após cancelamento dos bloqueios, sem cobertura Booking ainda |
 
 A fixture operacional foi inserida diretamente no banco isolado para testar transições na data atual, pois os calendários externos bloqueiam os três imóveis nessa data. Isto NÃO constitui teste de uma venda disponível nessa data. Check-in utilizou exceção administrativa explícita e auditada, exclusivamente para a fixture sem hospedagem real.
 
 ## Ainda em execução
 
 - Configurar Brevo, comprovar mensagens operacionais e concluir recuperação de senha.
-- Validar UI final, equipe/prestador e disponibilidade após as últimas correções; limpar os bloqueios e produtos temporários de QA.
+- UI de adicionais conferida com valores e pagamentos aplicados. Equipe/prestador validados. Bloqueios, tarefas e ocorrências temporários cancelados; produtos de ensaio restaurados a rascunho e upgrade arquivado, preservando histórico.
+- Configurar os três calendários privados Booking antes de declarar cobertura completa; produção já recusa pesquisa sem eles, desenvolvimento permite ensaios sem a integração.
 - Consolidar documentação de lançamento/reversão e avaliação de conteúdo. Não declarar homologação geral ou liberação de produção antes dessas evidências.
