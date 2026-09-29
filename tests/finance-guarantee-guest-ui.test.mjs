@@ -5,16 +5,18 @@ import {JSDOM} from 'jsdom';
 const html=await readFile(new URL('../conta.html',import.meta.url),'utf8');
 const js=await readFile(new URL('../account.js',import.meta.url),'utf8');
 const rid='10000000-0000-4000-8000-000000000001',gid='20000000-0000-4000-8000-000000000001';
-async function setup(){
+async function setup({settledCancellation=false}={}){
  const dom=new JSDOM(html,{url:'https://example.test/conta.html',runScripts:'outside-only'}),w=dom.window,calls=[];
  const reservation={id:rid,confirmation_code:'QA-CAUCAO',user_id:rid,status:'confirmed',check_in:'2099-10-01',check_out:'2099-10-10',created_at:'2026-09-29',guests:2,total_amount:1000,stay_amount:1000,properties:{name:'Chalé QA'},payments:[],guarantees:[{id:gid,status:'pending',amount_cents:50000,captured_amount_cents:0,attention_code:'authorization_declined'}]};
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://example.test',supabaseKey:'fixture',bookingEngine:'/engine',guaranteeEngine:'/guarantee'};
- const dataFor=t=>t==='profiles'?{id:rid,full_name:'Hospede Teste',role:'guest'}:t==='reservations'?[reservation]:[];
+ let reservationReads=0;
+ const dataFor=t=>t==='profiles'?{id:rid,full_name:'Hospede Teste',role:'guest'}:t==='reservations'?[structuredClone({...reservation,status:settledCancellation&&++reservationReads>1?'cancelled':'confirmed'})]:[];
  w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'fixture',user:{id:rid,email:'qa@example.test'}}}})},from:t=>{
   const q={};for(const name of ['select','eq','order','in','limit'])q[name]=()=>q;
   q.then=resolve=>Promise.resolve({data:dataFor(t)}).then(resolve);q.maybeSingle=()=>Promise.resolve({data:dataFor(t)});return q;
  }})};
  w.fetch=async(_url,options)=>{const body=JSON.parse(options.body);calls.push(body);
+  if(settledCancellation&&body.action==='reservation_refund_status')return {ok:true,json:async()=>({ok:true,cases:[{kind:'policy_cancellation',status:'confirmed',refund_due_cents:100000,confirmed_cents:100000}]})};
   return {ok:true,json:async()=>body.action==='config'?{ok:true,payment_settings:{}}:body.action==='pagbank_sandbox_card_key'?{ok:true,public_key:'fixture-public-key'}:{ok:true,requests:[],cases:[],finance:{guarantees:[],payments:[],events:[]}}};
  };
  w.PagSeguro={encryptCard:input=>{assert.equal(input.number,'4111111111111111');assert.equal(input.securityCode,'123');return {encryptedCard:'encrypted-fixture-only-no-real-card'}}};
@@ -25,6 +27,15 @@ async function setup(){
 test('guest sees declined guarantee independently from confirmed reservation',async()=>{
  const {dom,w}=await setup();assert.match(w.document.body.textContent,/banco recusou a caução/);assert.match(w.document.body.textContent,/Sua reserva continua confirmada/);
  assert.ok(w.document.querySelector('[data-guarantee-card]'));dom.window.close();
+});
+
+test('a cancellation settled during page load refreshes reservation actions and badges once',async()=>{
+ const {dom,w}=await setup({settledCancellation:true});
+ try{
+  for(let i=0;i<100&&!w.document.body.textContent.includes('RESERVA · CANCELADA');i++)await new Promise(r=>setTimeout(r,5));
+  assert.match(w.document.body.textContent,/RESERVA · CANCELADA/);
+  assert.equal(w.document.querySelector('[data-guarantee-card]'),null,'cancelled stay cannot replace or authorize its card');
+ }finally{dom.window.close()}
 });
 test('replacement sends encrypted card, reservation-scoped ID and explicit renewal choice only',async()=>{
  const {dom,w,calls}=await setup();w.document.querySelector('[data-guarantee-card]').click();

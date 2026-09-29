@@ -29,7 +29,7 @@ async function guaranteeApi(action,body={}){const r=await fetch(C.guaranteeEngin
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
 const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
-async function boot(){
+async function boot({afterRefundRefresh=false}={}){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
  $("#account-email").textContent=session.user.email||"";
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
@@ -47,7 +47,7 @@ async function boot(){
  renderExperienceCart(reservationsCache);
  renderPendingPayments(reservationsCache);
  renderReservations(reservationsCache);
- showRefundStatuses(reservationsCache);
+ showRefundStatuses(reservationsCache,!afterRefundRefresh);
  showCancellationRequests(reservationsCache);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
  if(requestedCharge){
@@ -91,9 +91,11 @@ async function showCancellationRequests(rows){
   }catch{/* The reservation remains visible when cancellation status is unavailable. */}
  }));
 }
-async function showRefundStatuses(rows){
+async function showRefundStatuses(rows,allowRefresh=true){
+ let needsRefresh=false;
  await Promise.all(rows.map(async r=>{
   try{const {cases}=await api("reservation_refund_status",{reservation_id:r.id});if(!cases?.length)return;
+   if(allowRefresh&&r.status!=="cancelled"&&cases.some(c=>c.kind==="policy_cancellation"&&c.status==="confirmed"))needsRefresh=true;
    const card=[...document.querySelectorAll(".account-reservation")].find(x=>x.querySelector(`[data-download-reservation-policy="${r.id}"]`));
    const target=card?.querySelector(".reservation-detail-copy");if(!target)return;
    for(const c of cases){
@@ -104,6 +106,9 @@ async function showRefundStatuses(rows){
    }
   }catch{/* A failure to read a refund never changes the displayed payment state. */}
  }));
+ // A refund can settle between the first reservation read and the status read.
+ // Refresh once from the database so actions and badges use the committed state.
+ if(needsRefresh)await boot({afterRefundRefresh:true});
 }
 
 function renderExperienceCart(reservations){
@@ -315,7 +320,7 @@ function renderReservations(reservations){
     finance.innerHTML='<h4>Financeiro desta reserva</h4>'+lines.map(([label,value])=>
      '<div class="reservation-breakdown-row"><span>'+label+'</span><strong>'+brlC(value)+'</strong></div>').join('')+
      (f.guarantees||[]).map(g=>'<p>Caução: autorizada '+brlC(g.authorized_cents)+', utilizada '+brlC(g.captured_cents)+
-       ', estornada '+brlC(g.refunded_cents)+'. '+(g.release_confirmed?'Liberação confirmada: '+brlC(g.released_cents)+'.':'Liberação ainda não confirmada.')+'</p>').join('')+
+       ', estornada '+brlC(g.refunded_cents)+'. '+(g.release_confirmed?'Liberação confirmada: '+brlC(g.released_cents)+'.':!g.authorized_cents&&!g.captured_cents?'Sem bloqueio de limite confirmado.':'Liberação ainda não confirmada.')+'</p>').join('')+
      (f.incidents||[]).map(i=>'<p>Ocorrência: '+esc(i.description)+' · '+brlC(i.requested_capture_cents)+
        ' · '+esc(({approved:'Aprovada',no_charge:'Sem cobrança',pending:'Em análise'})[i.decision]||i.status)+'</p>').join('');
    }catch{loaded=false;finance.textContent='Resumo financeiro temporariamente indisponível. ';

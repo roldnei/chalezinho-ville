@@ -121,7 +121,11 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 400 || response.status === 422) throw new Error("pagbank_order_rejected");
+    const definiteErrors=new Set(['40001','40002','40003','40010','40011','required_parameter','invalid_parameter','parameter_unknow','parameter_required_missing','parameter_required_empty','ENCRYPTED CARD ALREADY USED']);
+    const errors=Array.isArray(body?.error_messages)?body.error_messages:[];
+    if ([400,422].includes(response.status)&&!body?.id&&!body?.charges?.length&&errors.length>0&&
+        errors.every((error:any)=>definiteErrors.has(String(error.code||error.error||''))))
+      throw new Error("pagbank_order_rejected");
     throw new Error("pagbank_order_failed");
   }
   if (!body?.id || !body?.charges?.[0]?.id) throw new Error("pagbank_order_failed");

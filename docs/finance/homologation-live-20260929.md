@@ -6,6 +6,14 @@ O backend isolado é `pxfqmnhqodqyaaqeyjgr` (Supabase gratuito). O site público
 
 Código e revisão: [PR 4, em rascunho](https://github.com/roldnei/chalezinho-ville/pull/4). [Preview da branch](https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app).
 
+## Atualização das 10h45 BRT
+
+Pix liquidado e devolvido integralmente no sandbox: reserva **58930206DC**, R$ 8,08 pagos, R$ 3,08 devolvidos na primeira operação e R$ 5,00 na segunda. A consulta final do PagBank informa `CANCELED`, `paid=808`, `refunded=808`; o banco confirma reserva cancelada e pagamento reembolsado. A conciliação aguardou a atualização efetiva dos valores, sem considerar uma resposta HTTP isolada como sucesso.
+
+A troca do cartão da caução foi executada na conta do hóspede da reserva **5F7627F740**. O token, o consentimento `guarantee-v2` e a autorização opcional de renovação ficaram vinculados à reserva, sem pré-autorização antecipada. O novo fluxo de caução tem histórico próprio de autorizações, tratamento de recusa, recuperação de resultado incerto e renovação condicionada ao consentimento e ao prazo real do provedor.
+
+**Estornos de cartão continuam sem confirmação**, com os erros documentados abaixo. A comprovação visual do novo Pix no Portal Dev aguarda novo login do usuário; a sessão expirou. O recebimento e as duas devoluções do Pix foram comprovados por API autenticada, banco e tela do site.
+
 ## Resultados comprovados
 
 | Cenário | Resultado observado |
@@ -18,12 +26,14 @@ Código e revisão: [PR 4, em rascunho](https://github.com/roldnei/chalezinho-vi
 | Captura integral da caução | Reserva 51F976D690: R$ 500 capturados; API, banco e portal confirmaram. Saldo para nova captura zerado. Foto e recibo fictícios anexados manualmente. |
 | Liberação sem danos | Reserva 09AA5303C8: R$ 500 pré-autorizados e depois integralmente liberados, sem captura. API e portal CANCELED/Cancelado; site confirmou R$ 500 liberados. |
 | Saldo não capturado | R$ 320 não foram cobrados. **A liberação desse restante não foi comprovada pelo provedor.** |
-| Pix | Reserva 1002EC1C31: cobrança de R$ 1.342,40 criada, código copia e cola disponível e portal Aguardando. Sem pagamento, expirou; reserva ficou não confirmada e pagamento expirado. **Liquidação Pix ainda não homologada.** |
+| Pix | Reserva 58930206DC: R$ 8,08 pagos e reserva confirmada. Devolução parcial de R$ 3,08 e devolução dos R$ 5,00 restantes confirmadas; total devolvido R$ 8,08 e reserva cancelada. A cobrança anterior de R$ 1.342,40 permaneceu aguardando e expirou conforme a faixa de simulação. |
 | Webhook | Reenvio no Portal Dev passou de HTTP 401 para 200. O sandbox não enviou nenhum dos dois cabeçalhos de assinatura documentados. |
 | Proteção contra aviso forjado | Aviso que declarava falsamente o Pix pago por R$ 0,01 não alterou o saldo nem confirmou a reserva: o servidor consultou o PagBank e manteve o valor real e o estado pendente. Assinatura inválida retornou 401. |
 | Permissões | Com a conta fictícia no papel de hóspede: leitura do próprio financeiro permitida; painel administrativo, estorno da reserva e estorno da caução retornaram 403. O papel administrativo da conta de teste foi restaurado para concluir a homologação. |
 
-## Devoluções: solicitadas, ainda não confirmadas
+O [simulador oficial PagBank](https://developer.pagbank.com.br/docs/simulador) liquida Pix de até R$ 100 automaticamente; valores acima de R$ 400 permanecem aguardando. Para a nova cotação, a tarifa foi reduzida apenas no banco isolado e restaurada antes do pagamento (limpeza do chalé 2: R$ 290; multiplicador da tarifa 3: 11000). Não houve alteração do preço público.
+
+## Devoluções em cartão: solicitadas, ainda não confirmadas
 
 | Operação | Resultado do provedor | Confirmado como devolvido |
 |---|---|---:|
@@ -56,19 +66,28 @@ Os anexos de ambos os testes representam apenas simulações, sem dano real nem 
 - Corrigida a consulta administrativa que falhava por ambiguidade entre duas relações de ocorrências e cauções.
 - Validação do nome do comprador antes de criar a reserva; mensagem de recusa não culpa automaticamente o cartão.
 - Reenvio de estorno somente após recusa temporária explícita, espera mínima, consulta do saldo e liberação atômica da tentativa. A intenção e a chave original são preservadas. Resultado desconhecido não é reenviado.
-- Job a cada cinco minutos consulta pagamentos pendentes e estornos, reconcilia garantias e pré-autoriza cartões vinculados na janela de chegada. Uma operação atômica bloqueia a liberação manual ou automática enquanto existe ocorrência aberta na reserva, inclusive sem vínculo específico com a caução. A liberação automática exige reserva cancelada.
+- Job a cada cinco minutos consulta pagamentos pendentes e estornos, reconcilia garantias e pré-autoriza cartões vinculados na janela de chegada. Uma operação atômica bloqueia a liberação manual ou automática enquanto existe ocorrência aberta na reserva, inclusive sem vínculo específico com a caução. A liberação automática também trata autorização que deixou de ser necessária após remarcação para uma data distante.
 - Avisos sem assinatura são aceitos apenas no backend isolado sandbox como gatilho limitado para consultar cobrança já registrada. Status e valores vêm exclusivamente da API autenticada do PagBank. Assinaturas presentes e inválidas são recusadas.
 - A tela separa valor da reserva, cobrança, caução, captura e estorno. Os controles de parcelas ficam ocultos no Pix.
+- Autorizações de caução têm identidade imutável, vínculo com a reserva/cartão, prazo real e histórico de substituições. Solicitação incerta bloqueia duplicação; recuperação manual confere pedido, cobrança, referência e valor na API.
+- Recusa preserva a reserva paga e permite trocar o cartão. Rejeição definitiva de parâmetros é distinguida de timeout, rate limit e chave em uso. Não há repetição automática da mesma versão de cartão recusada.
+- Pré-autorização começa na janela de 48 horas antes do check-in. Estadias longas admitem renovação explicitamente consentida; a autorização anterior só entra em liberação após confirmação da nova. A interface informa eventual sobreposição de limite.
+- Cancelamento e remarcação acordam o processamento da caução; ocorrências e capturas bloqueiam operações conflitantes. Check-in exige cobertura até a saída configurada ou exceção administrativa justificada e auditada.
+- Troca de cartão usa criptografia do SDK, limpa os campos e mostra confirmação. O servidor recebe somente cartão criptografado e mantém token reservado ao backend.
+- Checkout preserva preço e vencimento da cotação ao avançar sem alterar experiências. Pix recusado sem QR code preserva o identificador da cobrança.
+- Após estorno de cancelamento confirmado, a conta atualiza a reserva e seus botões quando a confirmação ocorre durante o carregamento. Caução que nunca bloqueou limite deixa de mostrar liberação pendente.
 
 ## Verificação técnica e limites
 
-- 111 testes automatizados passaram, incluindo banco local PostgreSQL/PGlite, valores cumulativos, idempotência, imutabilidade e rejeição de operações administrativas.
+- 132 testes automatizados passaram, incluindo banco local PostgreSQL/PGlite, valores cumulativos, idempotência, imutabilidade e rejeição de operações administrativas.
 - 9 testes de interface passaram em celular, notebook e desktop. Esses nove usam respostas simuladas e são distintos das transações sandbox descritas acima.
 - Sintaxe, TypeScript e build do preview passaram.
 - Execução do job no Supabase retornou HTTP 200, consultou os pagamentos e estornos e autorizou a caução esperada.
 - O advisor do Supabase não encontrou erro crítico; sinalizou tabelas internas sem políticas de acesso direto (restrição intencional) e proteção de senhas vazadas desativada. [Orientação Supabase](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
 
-Ainda falta comprovar a liquidação Pix e devoluções efetivas no sandbox. A revisão ampla de experiências, remarcações, casos legados, recuperação de autorização sem identificador após falha de transporte, concorrência com sessões PostgreSQL independentes e habilitação/homologação da conta em produção permanece necessária. Nenhum desses pontos está marcado como concluído por existir um teste local ou uma resposta HTTP 200.
+Permanece NO-GO para produção: devoluções de cartão aguardam solução/confirmação no PagBank; não foi homologado em tempo real um ciclo completo de renovação após vários dias de estadia. Recusas, renovação, mudança de datas, recuperação e conflitos foram cobertos por testes automatizados; esses testes não substituem a habilitação/homologação da conta PF em produção. A concorrência testada com PostgreSQL/PGlite não equivale a carga com sessões PostgreSQL remotas independentes. Os termos de hospedagem/privacidade e a revisão completa dos módulos não financeiros não fazem parte da confirmação dos pagamentos descrita aqui.
+
+O advisor não indicou erros de segurança. Há 28 recomendações informativas de índices em chaves estrangeiras do esquema e índices ainda sem uso neste banco recém-criado; não foram removidos índices com base nesse histórico curto. [Orientação de índices Supabase](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
 
 ## Identificadores para conferência no PagBank
 
@@ -79,7 +98,8 @@ Ainda falta comprovar a liquidação Pix e devoluções efetivas no sandbox. A r
 | Hospedagem 12x com juros | `ORDE_ACA61354-B0A9-45FA-8F26-06BD9FE53902` |
 | Caução da reserva 12x | `ORDE_532E20F2-E46B-4918-B25A-2014724F6170` |
 | Hospedagem 6x sem juros | `ORDE_39F2B1C0-4F95-4670-ACFC-F1E629CA71FF` |
-| Pix | `ORDE_067569AB-43E8-4E20-9353-C70E706E6E6C` |
+| Pix expirado | `ORDE_067569AB-43E8-4E20-9353-C70E706E6E6C` |
+| Pix pago e integralmente devolvido | `ORDE_143C5D9F-DB6D-4EF9-BB15-191F8D9E9892` |
 | Caução liberada sem captura | `ORDE_655835C2-3F6C-4D81-9AF6-4853F4AE9B06` |
 | Hospedagem do cenário de liberação | `ORDE_673A7134-B057-4C99-8FDD-FEBA34799E68` |
 

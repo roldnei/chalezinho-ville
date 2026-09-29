@@ -247,6 +247,12 @@ test('a definitive rejected order is distinct from an uncertain provider result'
     /pagbank_order_rejected/);
   await assert.rejects(createPagBankOrder('sandbox','test-token',order,
     async()=>new Response('{}',{status:503})),/pagbank_order_failed/);
+  for(const code of ['40004','40005','40008','unknown_error']){
+    await assert.rejects(createPagBankOrder('sandbox','test-token',order,
+      async()=>new Response(JSON.stringify({error_messages:[{code}]}),{status:400})),/pagbank_order_failed/);
+  }
+  await assert.rejects(createPagBankOrder('sandbox','test-token',order,
+    async()=>new Response('{}',{status:422})),/pagbank_order_failed/);
 });
 
 test('webhook rejects modified payload or signature',async()=>{
