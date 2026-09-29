@@ -3,7 +3,7 @@ import {confirmedCapture,confirmedRefund,guaranteeState} from './model.ts';
 
 export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway) {
   if(!g.provider_authorization_id)return {...g,financial:guaranteeState(g)};
-  const charge=await gateway.getPayment(g.provider_authorization_id);
+  const charge=await gateway.getPayment(g.provider_authorization_id,g.provider_order_id||undefined);
   if(charge.id!==g.provider_authorization_id||charge.amount?.currency!=='BRL')throw new Error('guarantee_charge_mismatch');
   const update=async(values:any,statuses:string[])=>{
     const {error}=await admin.from('guarantees').update({...values,updated_at:new Date().toISOString()})
@@ -22,7 +22,7 @@ export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway)
     const {error}=await admin.rpc('capture_guarantee_mock_atomic',{p_guarantee_id:g.id,p_actor_user_id:null,p_amount_cents:Number(g.requested_capture_cents)});
     if(error)throw new Error('guarantee_capture_ledger_unavailable');
   }
-  if(['release_requested','release_uncertain'].includes(g.status)&&charge.status==='CANCELED'&&
+  if(['guaranteed','incident_reported','authorizing','authorization_uncertain','release_requested','release_uncertain'].includes(g.status)&&charge.status==='CANCELED'&&
     charge.amount.value===Number(g.amount_cents)&&charge.summary?.paid===0){
     await update({status:'released',provider_last_status:'CANCELED',provider_error_code:null,
       released_amount_cents:Number(g.amount_cents),release_confirmed:true},[g.status]);
@@ -45,7 +45,7 @@ export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway)
 
 export async function requestGuaranteeRefund(admin:any,g:any,gateway:PaymentGateway,input:{actor:string;amount:number;reason:string;key:string}) {
   // Check live money BEFORE reserving or dispatching. Missing summary cannot confirm a refund.
-  const before=await gateway.getPayment(g.provider_authorization_id);
+  const before=await gateway.getPayment(g.provider_authorization_id,g.provider_order_id||undefined);
   if(before.amount?.currency!=='BRL'||before.id!==g.provider_authorization_id||
     !['PAID','CANCELED'].includes(before.status)||before.summary?.paid!==Number(g.captured_amount_cents)||
     before.summary?.refunded!==Number(g.refunded_amount_cents||0))throw new Error('refund_provider_balance_mismatch');

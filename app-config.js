@@ -1,8 +1,8 @@
 window.CHALEZINHO_CONFIG={
-  supabaseUrl:"https://irxsaladqhbzhkoaclxy.supabase.co",
-  supabaseKey:"sb_publishable_O4GwDycyPmTUJAQSp5JrKA_za1-uDhA",
-  bookingEngine:"https://irxsaladqhbzhkoaclxy.supabase.co/functions/v1/booking-engine-financial-preview",
-  refundEngine:"https://irxsaladqhbzhkoaclxy.supabase.co/functions/v1/reservation-refund-preview",
-  guaranteeEngine:"https://irxsaladqhbzhkoaclxy.supabase.co/functions/v1/guarantee-preview",
+  supabaseUrl:"https://pxfqmnhqodqyaaqeyjgr.supabase.co",
+  supabaseKey:"sb_publishable_0LrKl5kbEu7wN_fAhjxesg_eSOSh6SW",
+  bookingEngine:"https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine",
+  refundEngine:"https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine",
+  guaranteeEngine:"https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/guarantee-preview",
   environment:"development"
 };

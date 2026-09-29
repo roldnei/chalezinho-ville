@@ -94,12 +94,14 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   if(!development) return json({ok:false,error:"not_allowed"},403);
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
-  // Store the exact offer before card entry. The charge uses this persisted total;
-  // a provider rejection cannot silently replace the guest's selected price.
+  // Before card entry, show an estimate only. Freeze the provider quote for the
+  // actual BIN before the guest confirms the total and starts payment.
   const {data:settings,error:settingsError}=await admin.from("payment_settings").select("active_provider,pix_enabled,card_enabled").eq("id",1).single();
   if(settingsError)return json({ok:false,error:"payment_settings_unavailable"},503);
   try{assertPaymentMethod(settings,"card")}catch(e){return json({ok:false,error:(e as Error).message},409)}
-  const bin="552100"; // Provider reference quotation; price is frozen below, never recomputed from guest BIN.
+  const actualBin=String(body?.credit_card_bin||"");
+  const indicative=!actualBin;
+  const bin=actualBin||"552100";
   if(!/^\d{6}(\d{2})?$/.test(bin)) return json({ok:false,error:"invalid_card_bin"},400);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
@@ -119,9 +121,10 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   }else return json({ok:false,error:"missing_data"},400);
   try{
     const {terms,plans,feeFallback}=await chargeInstallments(propertyId,amount,1,bin,token);
+    if(indicative)return json({ok:true,offer_id:null,expires_at:expiresAt,base_amount_cents:amount,terms,plans,indicative:true});
     const {data:offer,error}=await admin.from("installment_offers").insert({user_id:user.id,
       quote_option_id:body.quote_option_id||null,post_booking_charge_id:body.post_booking_charge_id||null,
-      base_amount_cents:amount,provider:"pagbank_sandbox",plans,terms,expires_at:expiresAt}).select("id").single();
+      base_amount_cents:amount,provider:"pagbank_sandbox",plans,terms:{...terms,card_bin:actualBin},expires_at:expiresAt}).select("id").single();
     if(error)throw new Error("installment_offer_unavailable");
     return json({ok:true,offer_id:offer.id,expires_at:expiresAt,base_amount_cents:amount,terms,plans,indicative:false,fee_fallback:feeFallback});
   }catch(e){console.error(JSON.stringify({event:"installment_options_failed",code:e instanceof Error?e.message:"unknown"}));return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
@@ -589,7 +592,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(method==="card"){
     try{
       selectedPlan=await loadInstallmentOffer(admin,String(body.installment_offer_id||""),{
-        userId:user.id,quoteOptionId:option.id,baseAmount:Number(option.total_amount_cents),installments:Number(installments)});
+          userId:user.id,quoteOptionId:option.id,baseAmount:Number(option.total_amount_cents),installments:Number(installments),cardBin:String(body.credit_card_bin||"")});
     }catch(e){return json({ok:false,error:e instanceof Error&&e.message==="invalid_installments"?
       "invalid_installments":"installment_plans_unavailable"},409)}
   }
@@ -1754,7 +1757,7 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
   let plan:any=null;
   if(method==="card"){
     try{plan=await loadInstallmentOffer(admin,String(body.installment_offer_id||""),{
-      userId:user.id,chargeId,baseAmount,installments})}
+        userId:user.id,chargeId,baseAmount,installments,cardBin:String(body.credit_card_bin||"")})}
     catch{return json({ok:false,error:"installment_plans_unavailable"},409)}
   }
   const buyerInterest=Number(plan?.buyer_interest_cents||0);
@@ -2014,8 +2017,10 @@ Deno.serve(async(req)=>{
     if(action==="admin_cancellation_policy_action") return await adminCancellationPolicyAction(req,body,development);
     if(action==="reservation_finance"){
       const user=await currentUser(req);
-      if(!development||!user||!(await userIsAdmin(user)))return json({ok:false,error:"admin_required"},403);
-      return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""))});
+      if(!development||!user)return json({ok:false,error:"authentication_required"},403);
+      try{return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""),
+        {userId:user.id,manager:await userIsAdmin(user)})})}
+      catch(e){return json({ok:false,error:(e as Error).message==='reservation_not_found'?'reservation_not_found':'reservation_finance_unavailable'},409)}
     }
     if(action==="admin_hub") return await adminHubData(req,body);
     if(action==="experience_credit") return await experienceCredit(req,body,development);

@@ -49,7 +49,7 @@ export function pagBankOrder(input: {
   }
   const interest = input.buyerInterest;
   if (interest && (method !== "card" || !Number.isSafeInteger(interest.total) || interest.total < 1 ||
-      !Number.isInteger(interest.installments) || interest.installments < 1 || interest.installments >= input.installments! ||
+      !Number.isInteger(interest.installments) || interest.installments < 1 || interest.installments > input.installments! ||
       amountCents <= interest.total)) throw new Error("invalid_buyer_interest");
   const chargeAmount = interest ? { value: amountCents, currency: "BRL",
     fees: { buyer: { interest: interest } } } : { value: amountCents, currency: "BRL" };
@@ -160,7 +160,8 @@ function normalizeCharge(raw: any) {
   const summary=raw?.amount?.summary;
   return {id:raw?.id as string,status:raw?.status as string,
     amount:{value:raw?.amount?.value as number,currency:raw?.amount?.currency as string},
-    captureBefore:raw?.payment_method?.capture_before as string|undefined,
+      captureBefore:raw?.payment_method?.capture_before as string|undefined,
+      cardBrand:raw?.payment_method?.card?.brand as string|undefined,
     summary:summary&&Number.isSafeInteger(summary.paid)&&Number.isSafeInteger(summary.refunded)?
       {...(Number.isSafeInteger(summary.total)?{total:summary.total as number}:{}),
         paid:summary.paid as number,refunded:summary.refunded as number}:undefined,

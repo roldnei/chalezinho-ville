@@ -1766,3 +1766,6 @@ footer{justify-content:space-between!important}
 #reservation-finance-summary ol{padding-left:20px;overflow-wrap:anywhere}
 @media(max-width:440px){.reservation-finance-values{grid-template-columns:minmax(0,1fr)}.reservation-finance-values dd{text-align:left;margin-bottom:8px}}
 @media(max-width:440px){.sandbox-card-row{grid-template-columns:1fr 1fr}.sandbox-card-row label:first-child{grid-column:1 / -1}}
+
+/* Native hidden state must win over layout display declarations. */
+[hidden] { display: none !important; }

@@ -328,19 +328,28 @@ function renderSummary(){
   const optionId=state.rate.quote_option_id;
   const refreshPlans=async()=>{
     $("#installments").disabled=true;
-    try{const quote=await api("installment_options",{quote_option_id:optionId,preview:true});
+    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
+    state.installmentQuote=null;
+    try{const quote=await api("installment_options",{quote_option_id:optionId,credit_card_bin:bin.length===6?bin:undefined});
+      if(bin!==$("#card-number").value.replace(/\D/g,"").slice(0,6))return;
       if(state.rate.quote_option_id!==optionId)return;
-      state.installmentQuote={...quote,optionId};
+      state.installmentQuote={...quote,optionId,cardBin:bin};
       $("#installments").innerHTML=quote.plans.map(p=>`<option value="${p.installments}">${p.installments}x de ${brlC(p.installment_cents)} · total ${brlC(p.total_cents)} · ${p.interest_free?"sem juros":"com juros"}</option>`).join("");
       $("#installments").disabled=false;$("#installments").dispatchEvent(new Event("change"));
     }catch{$("#installment-total").textContent="Parcelas indisponíveis. Tente consultar novamente.";}
   };
   $("#installments").addEventListener("change",()=>{
     const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
-    $("#installment-total").textContent=plan?`Total a cobrar: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
+    $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
   });
   const retryPlans=document.createElement("button");retryPlans.type="button";retryPlans.textContent="Consultar parcelas novamente";retryPlans.onclick=refreshPlans;pay.insertBefore(retryPlans,card);
   if(enabled.card_enabled)refreshPlans();
+  let previousBin="",binTimer;$("#card-number").addEventListener("input",()=>{
+   const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
+   if(bin===previousBin)return;previousBin=bin;state.installmentQuote=null;
+   $("#installments").disabled=true;clearTimeout(binTimer);
+   if(bin.length===6)binTimer=setTimeout(refreshPlans,300);
+  });
   pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=!guarantee&&paymentChoice().method!=="card"));
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
   resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
@@ -370,15 +379,15 @@ async function performStartPayment(choice){
  const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
-  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,8):undefined;
+  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,6):undefined;
   const quoted=state.installmentQuote;
   const plan=quoted?.plans.find(p=>p.installments===installments);
-  if(method==="card"&&(!plan||!quoted.offer_id||quoted.optionId!==state.rate.quote_option_id))
+  if(method==="card"&&(!plan||!quoted.offer_id||quoted.optionId!==state.rate.quote_option_id||quoted.cardBin!==credit_card_bin))
     throw new Error("installment_quote_required");
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#guarantee-card-consent")?.checked)throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee}:{})});
+  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");

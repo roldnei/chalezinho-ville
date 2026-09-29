@@ -74,12 +74,16 @@ async function reconcile(g:any){
 
 // Run by pg_cron through an authenticated server-to-server request. The
 // reservation card was tokenized at checkout; no card details enter this job.
-async function authorizeDueGuarantees(){
+async function authorizeDueGuarantees(guaranteeId?:string){
   if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
   await admin.rpc("purge_unconfirmed_guarantee_tokens");
-  const {data:rows,error}=await admin.from("guarantees")
-    .select("*,reservations(id,user_id,status,check_in,check_out,guest_name,guest_email,guest_phone)")
-    .eq("status","pending").order("created_at").limit(50);
+  const today=new Date().toISOString().slice(0,10),latest=new Date(Date.now()+3*86400000).toISOString().slice(0,10);
+  let query=admin.from("guarantees")
+    .select("*,reservations!inner(id,user_id,status,check_in,check_out,guest_name,guest_email,guest_phone)")
+    .eq("status","pending").eq("reservations.status","confirmed")
+    .gte("reservations.check_out",today).lte("reservations.check_in",latest);
+  if(guaranteeId)query=query.eq("id",guaranteeId);
+  const {data:rows,error}=await query.order("created_at").limit(50);
   if(error)return reply({ok:false,error:"guarantees_unavailable"},503);
   const now=Date.now(),results:{id:string;status:string}[]=[];
   for(const g of rows||[]){
@@ -152,6 +156,13 @@ async function handler(req:Request){
     try{return reply({ok:true,guarantee:await reconcile(g)})}
     catch{return reply({ok:true,guarantee:publicState(g),reconciliation:"unavailable"})}
   }
+  if(action==="authorize_saved"){
+    if(!manager)return reply({ok:false,error:"admin_required"},403);
+    await authorizeDueGuarantees(g.id);
+    const updated=await loadGuarantee(g.id);
+    if(updated.status==="pending")return reply({ok:false,error:updated.provider_error_code||"authorization_window_unavailable"},409);
+    return reply({ok:true,guarantee:publicState(updated)});
+  }
   if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
   if(action==="authorize"){
     if(!owner||g.reservations?.status!=="confirmed"||g.status!=="pending")
@@ -168,6 +179,7 @@ async function handler(req:Request){
     const phone=String(g.reservations.guest_phone||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
     if(!/^\d{10,11}$/.test(phone))return reply({ok:false,error:"phone_required"},409);
     const attempt=Number(g.authorization_attempt||0)+1;
+    if(attempt>3)return reply({ok:false,error:"authorization_attempts_exhausted"},409);
     if(!(await setState(g,"pending",{status:"authorizing",authorization_attempt:attempt,
       provider:"pagbank_sandbox",provider_error_code:null})))
       return reply({ok:false,error:"authorization_in_progress"},409);
@@ -241,6 +253,8 @@ async function handler(req:Request){
     if(incident.evidence.some((x:any)=>x.bucket===evidenceBucket)&&
       !await verifiedEvidence(g.id,incident.evidence))return reply({ok:false,error:"incident_evidence_missing"},409);
     const before=await observe(g);
+    if(['AMEX','AMERICAN_EXPRESS'].includes(String(before?.cardBrand||'').toUpperCase())&&Number(amount)!==Number(g.amount_cents))
+      return reply({ok:false,error:"card_partial_capture_unsupported"},409);
     if(before?.status!=="AUTHORIZED"||Number(before.amount.value)!==Number(g.amount_cents)||
       Date.parse(g.provider_capture_before||"")<=Date.now()+3600000)
       return reply({ok:false,error:"authorization_not_capturable"},409);
