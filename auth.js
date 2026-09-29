@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),DEV_BASE="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app";
+const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),DEV_BASE=location.origin;
 window.ChalezinhoAuth={sb};
 let anonymousId="";
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
