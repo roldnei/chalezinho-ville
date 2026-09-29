@@ -2324,6 +2324,7 @@ Deno.serve(async(req)=>{
        origin==="https://chalezinho-ville-my0vnqxks-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-b1ai8z78g-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-9nrmtmt7w-roldneicosta-4140.vercel.app" ||
+       /^https:\/\/chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(origin) ||
        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
 
     if(action==="identity_status"||action==="complete_identity"){
