@@ -14,7 +14,7 @@ Escopo: Supabase `pxfqmnhqodqyaaqeyjgr`, branch `fix/reservation-finance-lifecyc
 
 ## Evidências registradas
 
-147 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
+150 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
 
 Correções finais: a Área do Hóspede considera checkout registrado e horários configurados; notificações atrasadas do Brevo não apagam entrega confirmada, falhas de persistência retornam resposta repetível e timestamp inválido recebe erro controlado. Webhook v2 publicado e chamada sem credencial recusada (401). Entrega real pelo Brevo ainda não homologada.
 
@@ -45,3 +45,5 @@ A fixture operacional foi inserida diretamente no banco isolado para testar tran
 - UI de adicionais conferida com valores e pagamentos aplicados. Equipe/prestador validados. Bloqueios, tarefas e ocorrências temporários cancelados; produtos de ensaio restaurados a rascunho e upgrade arquivado, preservando histórico.
 - Configurar os três calendários privados Booking antes de declarar cobertura completa; produção já recusa pesquisa sem eles, desenvolvimento permite ensaios sem a integração.
 - Consolidar documentação de lançamento/reversão e avaliação de conteúdo. Não declarar homologação geral ou liberação de produção antes dessas evidências.
+
+Rodada de e-mails: migração phase1_notification_amount_units converte o total da confirmação para centavos e corrige somente snapshots legados ainda na fila; mensagens já enviadas são preservadas. Teste comprova conversão uma única vez. Dispatcher v2 formata datas de hospedagem sem deslocamento para o dia anterior em Brasília. Entrega externa segue pendente do Brevo.

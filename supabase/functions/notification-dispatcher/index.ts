@@ -1,3 +1,4 @@
+import { formatMoney, formatDate } from "../_shared/email-format.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
@@ -17,24 +18,6 @@ const escapeHtml = (value: unknown) => String(value ?? "")
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#039;");
-
-const formatMoney = (cents: unknown) => new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-}).format(Number(cents || 0) / 100);
-
-const formatDate = (value: unknown, includeTime = false) => {
-  if (!value) return "";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  }).format(date);
-};
 
 const render = (template: string, variables: Record<string, unknown>) => template.replace(
   /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
