@@ -669,6 +669,12 @@ async function startPayment(req:Request,body:any,development:boolean){
     }catch{return json({ok:false,error:"pagbank_customer_invalid",payment_id:payment.id},400)}
     try{
       const result=await createPagBankOrder("sandbox",sandboxToken,order);
+      // Persist the provider IDs first. If vaulting fails after a successful
+      // charge, status reconciliation can still find the payment safely.
+      const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
+        metadata:{development:true,environment:"sandbox",order_id:result.orderId,
+          base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}}).eq("id",payment.id);
+      if(saveError) throw new Error("pagbank_payment_save_failed");
       if(needsGuarantee&&method==="card"){
         if(!result.cardToken||!/^CARD_[A-Za-z0-9-]+$/.test(result.cardToken))
           throw new Error("guarantee_token_missing");
@@ -676,10 +682,6 @@ async function startPayment(req:Request,body:any,development:boolean){
           user_id:user.id,card_token:result.cardToken,consented_at:new Date().toISOString()});
         if(error)throw new Error("guarantee_token_save_failed");
       }
-      const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
-        metadata:{development:true,environment:"sandbox",order_id:result.orderId,
-          base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}}).eq("id",payment.id);
-      if(saveError) throw new Error("pagbank_payment_save_failed");
       if(result.status!=="WAITING") {
         try { await reconcileSandboxCharge(payment.id,result.chargeId,sandboxToken,result.orderId); }
         catch { console.error(JSON.stringify({event:"pagbank_sandbox_reconcile_deferred",payment_id:payment.id})); }

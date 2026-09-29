@@ -124,7 +124,10 @@ async function authorizeDueGuarantees(){
       now<checkin-48*3600000||now>checkout||checkout>now+5*86400000)continue;
     const {data:saved}=await admin.from("guarantee_card_tokens").select("card_token,user_id")
       .eq("reservation_id",r.id).maybeSingle();
-    if(!saved||saved.user_id!==r.user_id){results.push({id:g.id,status:"card_token_missing"});continue}
+    if(!saved||saved.user_id!==r.user_id){
+      await admin.from("guarantees").update({provider_error_code:"card_token_missing"}).eq("id",g.id).eq("status","pending");
+      results.push({id:g.id,status:"card_token_missing"});continue;
+    }
     const {data:identity}=await admin.rpc("guest_payment_identity",{p_user_id:r.user_id});
     const holder=Array.isArray(identity)?identity[0]:identity;
     const phone=String(r.guest_phone||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
