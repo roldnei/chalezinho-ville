@@ -27,6 +27,21 @@ test('declined guarantee is not an authorization merely because a charge ID exis
  const g=guaranteeState({amount_cents:50000,status:'pending',provider_authorization_id:'CHAR_DECLINED'});
  assert.equal(g.authorized_cents,0);assert.equal(g.required_cents,50000);assert.equal(g.available_cents,0);
 });
+test('capture availability requires an identified authorization and the server expiry margin',()=>{
+ const g={amount_cents:50000,status:'guaranteed',provider_authorization_id:'CHAR_VALID'};
+ for(const expiry of [undefined,null,'invalid']){
+  const state=guaranteeState({...g,provider_capture_before:expiry});
+  assert.equal(state.available_cents,0);assert.equal(state.status,'processing');
+ }
+ const future=new Date(Date.now()+7200000).toISOString();
+ assert.equal(guaranteeState({...g,provider_capture_before:future}).available_cents,50000);
+ assert.equal(guaranteeState({...g,provider_authorization_id:null,provider_capture_before:future}).available_cents,0);
+ assert.equal(guaranteeState({...g,provider_capture_before:new Date(Date.now()+1800000).toISOString()}).available_cents,0);
+ const expired=guaranteeState({...g,provider_capture_before:new Date(Date.now()-1000).toISOString()});
+ assert.equal(expired.available_cents,0);assert.equal(expired.status,'expired');
+ assert.equal(expired.released_cents,0,'expiry alone does not prove the bank released the limit');
+});
+
 test('damage refund never exceeds capture and changes the canonical state',()=>{
  const g={amount_cents:50000,captured_amount_cents:18000,status:'captured',provider_authorization_id:'CHAR_TEST'};
  assert.equal(guaranteeState({...g,refunded_amount_cents:3000}).status,'partially_refunded');

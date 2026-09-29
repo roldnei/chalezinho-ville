@@ -44,6 +44,15 @@ test('reservation opens guarantee and financial history through actual buttons',
  assert.ok(w.document.querySelector('[data-guarantee-action="report_incident"]'));
  dom.window.close();
 });
+test('admin cannot dispatch capture inside the provider expiry safety margin',async()=>{
+ const {w,dom,calls}=await setup(false,false,{guarantees:[{id:gid,reservation_id:rid,provider_authorization_id:'CHAR_QA',amount_cents:50000,captured_amount_cents:0,status:'incident_reported',provider_capture_before:new Date(Date.now()+1800000).toISOString(),incidents:[{id:'incident-test',decision:'approved',status:'open',requested_capture_cents:18000,description:'Dano de teste'}]}]});
+ w.document.querySelector('#reservation-detail [data-guarantee]').click();
+  assert.match(w.document.querySelector('#admin-modal-content').textContent,/Captura indisponível/);
+ assert.equal(w.document.querySelector('[data-guarantee-action="capture"]').disabled,true);
+ assert.equal(calls.some(c=>c.action==='capture'),false);
+ dom.window.close();
+});
+
 test('reservation without a guarantee still records an occurrence and does not call a payment endpoint',async()=>{
  const {w,dom,calls}=await setup(false,true);
  w.document.querySelector('#new-reservation-incident').click();

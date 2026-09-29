@@ -24,10 +24,15 @@ export function guaranteeState(g:any) {
     ({pending:'pending_authorization',guaranteed:'authorized',incident_reported:'authorized',authorizing:'processing',
       authorization_uncertain:'processing',release_requested:'processing',release_uncertain:'processing',
       capture_requested:'processing',capture_uncertain:'processing'} as Record<string,string>)[g.status]||g.status;
-  return {status,required_cents:authorized,authorized_cents:confirmedAuthorization?authorized:0,captured_cents:captured,
+  const active=['guaranteed','incident_reported'].includes(g.status);
+  const expiry=Date.parse(g.provider_capture_before||'');
+  const verified=confirmedAuthorization&&Number.isFinite(expiry);
+  const displayStatus=active&&captured===0?(!verified?'processing':expiry<=Date.now()?'expired':status):status;
+  return {status:displayStatus,required_cents:authorized,authorized_cents:confirmedAuthorization?authorized:0,captured_cents:captured,
     refunded_cents:refunded,
-    available_cents:['guaranteed','incident_reported'].includes(g.status)&&
-      (!g.provider_capture_before||Date.parse(g.provider_capture_before)>Date.now())?authorized-captured:0,
+    // Match the server capture guard: an identified, dated authorization with
+    // at least one hour left. Missing dates must never imply unlimited validity.
+    available_cents:active&&verified&&expiry>Date.now()+3600000?authorized-captured:0,
     released_cents:g.status==='released'?authorized:money(g.released_amount_cents||0),
     uncaptured_cents:authorized-captured,
     release_confirmed:g.status==='released'||g.release_confirmed===true};

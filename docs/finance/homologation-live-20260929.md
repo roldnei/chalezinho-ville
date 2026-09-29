@@ -116,3 +116,8 @@ O teste antecipou somente o disparo das duas tentativas, usando o código real d
 Nova consulta da captura parcial confirmou total=50000, paid=18000, refunded=0, incremented=0, sem campo que comprove a liberação dos R$ 320. O sistema mantém essa liberação não confirmada. Não houve pedido de cancelamento de R$ 320 nem estorno dos R$ 180 neste teste.
 
 Detalhes e pergunta pronta para o suporte (não enviada): [evidência da renovação e saldo restante](guarantee-renewal-live-20260929.md).
+
+
+## Revisão final após os prints do usuário
+
+Renovação confirmada também visualmente no Portal Dev. Corrigidas validade ausente/margem de captura e origem do preview fixo. 135 testes automatizados e 9 testes de interface aprovados; testes remotos de permissões e execução periódica aprovados. Revisão detalhada: final-review-20260929.md; minuta funcional: operating-copy-draft.md. Acompanhamento real programado para 02/10 às 11h20 BRT. Produção continua bloqueada pelas pendências documentadas.

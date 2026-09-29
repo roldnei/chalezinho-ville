@@ -5,9 +5,10 @@ import {JSDOM} from 'jsdom';
 const html=await readFile(new URL('../conta.html',import.meta.url),'utf8');
 const js=await readFile(new URL('../account.js',import.meta.url),'utf8');
 const rid='10000000-0000-4000-8000-000000000001',gid='20000000-0000-4000-8000-000000000001';
-async function setup({settledCancellation=false}={}){
+async function setup({settledCancellation=false,guaranteeOverride={}}={}){
  const dom=new JSDOM(html,{url:'https://example.test/conta.html',runScripts:'outside-only'}),w=dom.window,calls=[];
  const reservation={id:rid,confirmation_code:'QA-CAUCAO',user_id:rid,status:'confirmed',check_in:'2099-10-01',check_out:'2099-10-10',created_at:'2026-09-29',guests:2,total_amount:1000,stay_amount:1000,properties:{name:'Chalé QA'},payments:[],guarantees:[{id:gid,status:'pending',amount_cents:50000,captured_amount_cents:0,attention_code:'authorization_declined'}]};
+ Object.assign(reservation.guarantees[0],guaranteeOverride);
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://example.test',supabaseKey:'fixture',bookingEngine:'/engine',guaranteeEngine:'/guarantee'};
  let reservationReads=0;
  const dataFor=t=>t==='profiles'?{id:rid,full_name:'Hospede Teste',role:'guest'}:t==='reservations'?[structuredClone({...reservation,status:settledCancellation&&++reservationReads>1?'cancelled':'confirmed'})]:[];
@@ -27,6 +28,11 @@ async function setup({settledCancellation=false}={}){
 test('guest sees declined guarantee independently from confirmed reservation',async()=>{
  const {dom,w}=await setup();assert.match(w.document.body.textContent,/banco recusou a caução/);assert.match(w.document.body.textContent,/Sua reserva continua confirmada/);
  assert.ok(w.document.querySelector('[data-guarantee-card]'));dom.window.close();
+});
+
+test('guest is not shown an authorization deadline when the provider date is absent',async()=>{
+ const {dom,w}=await setup({guaranteeOverride:{status:'guaranteed',attention_code:null,provider_capture_before:null}});
+ try{assert.match(w.document.body.textContent,/prazo da autorização ainda não foi confirmado/);assert.doesNotMatch(w.document.body.textContent,/Valor autorizado até/);}finally{dom.window.close()}
 });
 
 test('a cancellation settled during page load refreshes reservation actions and badges once',async()=>{

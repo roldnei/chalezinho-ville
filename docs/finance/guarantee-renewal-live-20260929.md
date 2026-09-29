@@ -28,7 +28,7 @@ Isso comprova a sequência de substituição no provedor, **não uma estadia de 
 
 Uma chamada posterior ao disparador normal não criou uma terceira autorização: permaneceram duas tentativas e a data futura de avaliação. A função temporária foi encerrada, substituída por resposta `410 qa_closed` e JWT obrigatório; uma nova chamada autenticada confirmou o bloqueio. A garantia renovada permanece vinculada à reserva fictícia. Nenhum desvio de teste foi adicionado ao código do aplicativo.
 
-A sessão do Portal Dev no computador está expirada. Estes dois novos pedidos foram conferidos na API autenticada e no histórico do banco; não foram conferidos visualmente no portal.
+Atualização às 11h35: os prints enviados pelo usuário confirmam também no Portal Dev a autorização anterior Cancelada e a nova Autorizada, ambas de R$ 500. A evidência visual complementa as consultas autenticadas e o histórico do banco.
 
 ## 3. R$ 320 restantes: liberação ainda não comprovada
 
