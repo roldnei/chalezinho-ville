@@ -883,8 +883,8 @@ async function mockPayment(req:Request,body:any,development:boolean){
 
 async function userIsAdmin(user:any){
   if(!user) return false;
-  const {data}=await admin.from("profiles").select("role").eq("id",user.id).maybeSingle();
-  return data?.role==="admin";
+  const {data}=await admin.from("profiles").select("role,pms_access_status").eq("id",user.id).maybeSingle();
+  return data?.role==="admin" && data.pms_access_status==="active";
 }
 
 async function requestModification(req:Request,body:any,development:boolean){
