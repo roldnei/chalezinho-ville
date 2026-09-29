@@ -1,6 +1,6 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans } from "./pagbank.ts";
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, getPagBankCardPublicKey, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, tokenizePagBankCard } from "./pagbank.ts";
 import { calculateCancellationRefund } from "./refund-policy.ts";
 
 const corsHeaders = {
@@ -545,6 +545,13 @@ async function startPayment(req:Request,body:any,development:boolean){
     .select("id,quote_id,cancellation_policy_id,total_amount_cents,quotes(property_id)")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
+  const {data:property}=await admin.from("properties").select("guarantee_amount_cents")
+    .eq("id",(option.quotes as any)?.property_id).single();
+  if(!property)return json({ok:false,error:"property_unavailable"},503);
+  const needsGuarantee=Number(property.guarantee_amount_cents)>0;
+  if(needsGuarantee&&(!body?.guarantee_card_consent||typeof body?.encrypted_card!=="string"||
+     body.encrypted_card.length<20||body.encrypted_card.length>10000))
+    return json({ok:false,error:"guarantee_card_required"},400);
   if(method==="card"&&Number(option.total_amount_cents)/Number(installments)<500)
     return json({ok:false,error:"installment_below_minimum"},400);
   let selectedPlan:any=null;
@@ -565,6 +572,14 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
     return json({ok:false,error:"policy_acceptance_required"},400);
 
+  // PIX still needs a card for the guarantee. Tokenize before creating any hold;
+  // if PagBank cannot vault it, no reservation or PIX payment is started.
+  let guaranteeToken:string|undefined;
+  if(needsGuarantee&&method==="pix"){
+    try{guaranteeToken=await tokenizePagBankCard(sandboxToken,body.encrypted_card)}
+    catch{return json({ok:false,error:"guarantee_card_unavailable"},503)}
+  }
+
   const {data:rpc,error:rpcErr}=await admin.rpc("start_payment_hold",{
     p_quote_id:quote_id,p_quote_option_id:quote_option_id,p_user_id:user.id,
     p_guest_name:guest_name,p_guest_email:guest_email,p_guest_phone:guest_phone,p_guests:Number(guests||2)
@@ -577,6 +592,12 @@ async function startPayment(req:Request,body:any,development:boolean){
   }
   const hold=Array.isArray(rpc)?rpc[0]:rpc;
   const reservationId=hold.reservation_id;
+
+  if(guaranteeToken){
+    const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
+      user_id:user.id,card_token:guaranteeToken,consented_at:new Date().toISOString()});
+    if(error)return json({ok:false,error:"guarantee_token_save_failed"},503);
+  }
 
   await admin.from("reservations").update({travel_purpose_code:travel_purpose_code||null}).eq("id",reservationId);
 
@@ -641,12 +662,20 @@ async function startPayment(req:Request,body:any,development:boolean){
       order=pagBankOrder({referenceId:payment.id.replace(/-/g,""),amountCents:chargedAmount,
         customer:{name:guest_name,email:guest_email,taxId:sandboxIdentity.document_number,
           phone:{area:phone.slice(0,2),number:phone.slice(2)}},method,
-        expiresAt:expiry,encryptedCard:body?.encrypted_card,installments:Number(installments),
+        expiresAt:expiry,encryptedCard:method==="card"?body?.encrypted_card:undefined,
+        storeCard:needsGuarantee&&method==="card",installments:Number(installments),
         buyerInterest:buyerInterest?{total:buyerInterest,installments:Number(selectedPlan.buyer_interest_installments)}:undefined,
         notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
     }catch{return json({ok:false,error:"pagbank_customer_invalid",payment_id:payment.id},400)}
     try{
       const result=await createPagBankOrder("sandbox",sandboxToken,order);
+      if(needsGuarantee&&method==="card"){
+        if(!result.cardToken||!/^CARD_[A-Za-z0-9-]+$/.test(result.cardToken))
+          throw new Error("guarantee_token_missing");
+        const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
+          user_id:user.id,card_token:result.cardToken,consented_at:new Date().toISOString()});
+        if(error)throw new Error("guarantee_token_save_failed");
+      }
       const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
         metadata:{development:true,environment:"sandbox",order_id:result.orderId,
           base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}}).eq("id",payment.id);

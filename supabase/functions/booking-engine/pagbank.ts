@@ -20,6 +20,8 @@ export function pagBankOrder(input: {
   method: "pix" | "card";
   expiresAt?: Date;
   encryptedCard?: string;
+  cardToken?: string;
+  storeCard?: boolean;
   installments?: number;
   buyerInterest?: { total: number; installments: number };
   preAuthorize?: boolean;
@@ -39,11 +41,11 @@ export function pagBankOrder(input: {
       throw new Error("invalid_pix_expiry");
     paymentMethod = { type: "PIX", pix: { expiration_date: input.expiresAt.toISOString() } };
   } else {
-    if (!input.encryptedCard || !Number.isInteger(input.installments) || input.installments! < 1 || input.installments! > 24)
+    if (Boolean(input.encryptedCard) === Boolean(input.cardToken) || !Number.isInteger(input.installments) || input.installments! < 1 || input.installments! > 24)
       throw new Error("invalid_card_data");
     paymentMethod = { type: "CREDIT_CARD", installments: input.installments, capture: !input.preAuthorize,
-      card: { encrypted: input.encryptedCard, store: false,
-        holder: { name: customer.name, tax_id: customer.taxId } } };
+      card: { ...(input.cardToken ? {id:input.cardToken} : {encrypted:input.encryptedCard}),
+        store: Boolean(input.storeCard), holder: { name: customer.name, tax_id: customer.taxId } } };
   }
   const interest = input.buyerInterest;
   if (interest && (method !== "card" || !Number.isSafeInteger(interest.total) || interest.total < 1 ||
@@ -117,8 +119,22 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
       (order.charges[0].payment_method.type === "PIX" && !charge.qr_code?.text))
     throw new Error("pagbank_order_response_invalid");
   return { orderId: body.id as string, chargeId: charge.id as string,
+    cardToken: charge.payment_method?.card?.id as string | undefined,
     status: charge.status as string, pixCode: charge.qr_code?.text as string | undefined,
     qrImageUrl: charge.links?.find((link: {rel:string}) => link.rel === "QRCODE.PNG")?.href as string | undefined };
+}
+
+export async function tokenizePagBankCard(token:string, encrypted:string, fetcher:typeof fetch=fetch){
+  if(!token||typeof encrypted!=="string"||encrypted.length<20||encrypted.length>10000)
+    throw new Error("invalid_card_tokenization");
+  const response=await fetcher(`${bases.sandbox}/tokens/cards`,{method:"POST",
+    headers:{Authorization:`Bearer ${token}`,Accept:"application/json","Content-Type":"application/json"},
+    body:JSON.stringify({encrypted}),signal:AbortSignal.timeout(10000)});
+  if(!response.ok)throw new Error(`pagbank_card_tokenization_http_${response.status}`);
+  const body=await response.json().catch(()=>null);
+  if(typeof body?.id!=="string"||!/^CARD_[A-Za-z0-9-]+$/.test(body.id))
+    throw new Error("pagbank_card_tokenization_invalid");
+  return body.id as string;
 }
 
 export async function getPagBankCharge(token: string, chargeId: string, fetcher: typeof fetch = fetch) {

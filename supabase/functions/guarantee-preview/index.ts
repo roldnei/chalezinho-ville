@@ -107,10 +107,71 @@ async function reconcile(g:any){
   return {...publicState(updated),provider_status:charge?.status};
 }
 
+// Run by pg_cron through an authenticated server-to-server request. The
+// reservation card was tokenized at checkout; no card details enter this job.
+async function authorizeDueGuarantees(){
+  if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  await admin.rpc("purge_unconfirmed_guarantee_tokens");
+  const {data:rows,error}=await admin.from("guarantees")
+    .select("*,reservations(id,user_id,status,check_in,check_out,guest_name,guest_email,guest_phone)")
+    .eq("status","pending").order("created_at").limit(50);
+  if(error)return reply({ok:false,error:"guarantees_unavailable"},503);
+  const now=Date.now(),results:{id:string;status:string}[]=[];
+  for(const g of rows||[]){
+    const r=g.reservations,checkin=brazilTime(r?.check_in||"","15:00"),
+      checkout=brazilTime(r?.check_out||"","11:00");
+    if(r?.status!=="confirmed"||!Number.isFinite(checkin)||!Number.isFinite(checkout)||
+      now<checkin-48*3600000||now>checkout||checkout>now+5*86400000)continue;
+    const {data:saved}=await admin.from("guarantee_card_tokens").select("card_token,user_id")
+      .eq("reservation_id",r.id).maybeSingle();
+    if(!saved||saved.user_id!==r.user_id){results.push({id:g.id,status:"card_token_missing"});continue}
+    const {data:identity}=await admin.rpc("guest_payment_identity",{p_user_id:r.user_id});
+    const holder=Array.isArray(identity)?identity[0]:identity;
+    const phone=String(r.guest_phone||"").replace(/\D/g,"").replace(/^55(?=\d{10,11}$)/,"");
+    if(holder?.document_type!=="cpf"||!/^[0-9]{10,11}$/.test(phone)){
+      results.push({id:g.id,status:"identity_unavailable"});continue;
+    }
+    const attempt=Number(g.authorization_attempt||0)+1;
+    if(attempt>3||!(await setState(g,"pending",{status:"authorizing",authorization_attempt:attempt,
+      provider:"pagbank_sandbox",provider_error_code:null})))continue;
+    try{
+      const referenceId=g.id.replaceAll("-","")+"a"+attempt;
+      const order=pagBankOrder({referenceId,amountCents:Number(g.amount_cents),method:"card",
+        cardToken:saved.card_token,installments:1,preAuthorize:true,
+        customer:{name:r.guest_name,email:r.guest_email,taxId:holder.document_number,
+          phone:{area:phone.slice(0,2),number:phone.slice(2)}},
+        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
+      order.items[0].name="Caucao Chalezinho Ville";
+      order.charges[0].description="Caucao Chalezinho Ville";
+      const created=await createPagBankOrder("sandbox",token,order);
+      const {data:savedOrder,error:saveError}=await admin.from("guarantees").update({
+        provider_order_id:created.orderId,provider_authorization_id:created.chargeId,
+        provider_last_status:created.status,status:"authorization_uncertain",updated_at:new Date().toISOString()})
+        .eq("id",g.id).eq("status","authorizing").select("id").maybeSingle();
+      if(saveError||!savedOrder)throw new Error("authorization_persistence_uncertain");
+      const state=await reconcile(await loadGuarantee(g.id));
+      results.push({id:g.id,status:state.status});
+    }catch{
+      // The provider may have created an authorization. Never retry the
+      // payment blindly; an uncertain result requires reconciliation.
+      await setState(g,"authorizing",{status:"authorization_uncertain",
+        provider_error_code:"provider_result_unknown"});
+      results.push({id:g.id,status:"authorization_uncertain"});
+    }
+  }
+  return reply({ok:true,results});
+}
+
 async function handler(req:Request){
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers});
   if(req.method!=="POST"||req.headers.get("x-chalezinho-env")!=="development")
     return reply({ok:false,error:"development_only"},403);
+  const dispatchSecret=req.headers.get("x-guarantee-dispatch-secret");
+  if(dispatchSecret){
+    const {data, error}=await admin.rpc("verify_guarantee_dispatch_secret",{p_secret:dispatchSecret});
+    if(error||data!==true)return reply({ok:false,error:"dispatch_forbidden"},403);
+    return authorizeDueGuarantees();
+  }
   const user=await caller(req);
   if(!user)return reply({ok:false,error:"authentication_required"},401);
   const body=await req.json().catch(()=>null),action=String(body?.action||"");

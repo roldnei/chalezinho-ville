@@ -306,7 +306,7 @@ function renderSummary(){
  const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
  $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
  const guarantee=Number(state.property.guarantee_amount_cents||0);
- $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · SIMULAÇÃO</small><h4>'+brlC(guarantee)+'</h4><p>A garantia prevista para esta hospedagem é de '+brlC(guarantee)+'. <strong>Neste ambiente não há pré-autorização nem cobrança real.</strong> O procedimento de garantia e sua liberação serão informados antes de uma reserva real.</p></div>':"";
+ $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · PAGBANK SANDBOX</small><h4>'+brlC(guarantee)+'</h4><p>Informe o cartão neste pagamento para a caução. O PagBank guarda os dados do cartão; o site guarda apenas um token vinculado à reserva. A pré-autorização será solicitada perto do check-in e reservará temporariamente '+brlC(guarantee)+' do limite, sem cobrança. Uma ocorrência comprovada poderá gerar captura parcial; sem dano, a autorização será liberada.</p><label><input id="guarantee-card-consent" type="checkbox"> Autorizo o uso deste cartão exclusivamente para a caução desta reserva, conforme as regras acima.</label></div>':"";
  const doc=state.rate.cancellation_policy;
  const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
@@ -317,7 +317,7 @@ function renderSummary(){
  pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão">'+Array.from({length:max},(_,i)=>'<option value="'+(i+1)+'" '+(i+1>free?'disabled':'')+'>'+(i+1)+'x de '+(i+1<=free?brlC(Math.round(total/(i+1)))+' · sem juros':'consulte o valor após informar o cartão')+'</option>').join("")+'</select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
  if(pagbankSandbox){
   pay.querySelector(".dev-note").textContent="PagBank sandbox: use somente cartões de teste. Nenhuma cobrança real será feita.";
-  const card=document.createElement("div");card.id="sandbox-card-fields";card.hidden=true;
+  const card=document.createElement("div");card.id="sandbox-card-fields";card.hidden=!guarantee;
   card.innerHTML='<label>Nome no cartão<input id="card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="sandbox-card-row"><label>Mês<input id="card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div>';
   pay.appendChild(card);
   let planTimer;
@@ -352,7 +352,7 @@ function renderSummary(){
     const plan=exact||previewPlans?.find(p=>p.installments===Number($("#installments").value));
     $("#installment-total").textContent=plan?(exact?'Total a cobrar: ':'Simulação antes do cartão: ')+brlC(plan.total_cents)+(plan.interest_free?' · sem juros.':' · juros do comprador: '+brlC(plan.buyer_interest_cents)+'.')+(exact?'':' Valor final pode variar conforme o cartão e será confirmado antes de pagar.'):'Consultando parcelas no PagBank…';
   });
-  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=paymentChoice().method!=="card"));
+  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=!guarantee&&paymentChoice().method!=="card"));
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
   resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
   resume.onclick=async()=>{resume.disabled=true;
@@ -386,8 +386,10 @@ async function performStartPayment(choice){
   const plan=quoted?.plans.find(p=>p.installments===installments);
   if(method==="card"&&(!plan||quoted.bin!==credit_card_bin||quoted.optionId!==state.rate.quote_option_id))
     throw new Error("installment_quote_required");
-  const encrypted_card=pagbankSandbox&&method==="card"?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
+  if(hasGuarantee&&!$("#guarantee-card-consent")?.checked)throw new Error("guarantee_consent_required");
+  const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
+  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
@@ -397,7 +399,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  const box=$("#mock-payment"),pix=d.payment.pix_code;

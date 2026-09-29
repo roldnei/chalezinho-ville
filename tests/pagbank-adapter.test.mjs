@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
-import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, extractPagBankWebhookChargeId, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, extractPagBankWebhookChargeId, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, tokenizePagBankCard, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
@@ -29,6 +29,29 @@ test('card sends encrypted payload, no raw card number, and captures 100 percent
   assert.equal(order.charges[0].payment_method.card.encrypted,'encrypted-only');
   assert.equal(order.charges[0].payment_method.installments,2);
   assert.equal(JSON.stringify(order).includes('4242424242424242'),false);
+});
+
+test('vaults a checkout card and uses only its token for a later uncharged guarantee',async()=>{
+  const encrypted='encrypted-card-payload';
+  const stored=await tokenizePagBankCard('sandbox-token',encrypted,async(url,options)=>{
+    assert.equal(url,'https://sandbox.api.pagseguro.com/tokens/cards');
+    assert.deepEqual(JSON.parse(options.body),{encrypted});
+    return new Response(JSON.stringify({id:'CARD_test-123'}));
+  });
+  const order=pagBankOrder({...input,method:'card',cardToken:stored,installments:1,preAuthorize:true});
+  assert.equal(order.charges[0].payment_method.capture,false);
+  assert.equal(order.charges[0].payment_method.card.id,'CARD_test-123');
+  assert.equal(JSON.stringify(order).includes(encrypted),false);
+  assert.throws(()=>pagBankOrder({...input,method:'card',cardToken:stored,encryptedCard:encrypted,installments:1}));
+});
+
+test('checkout card response includes the provider token when storage was requested',async()=>{
+  const order=pagBankOrder({...input,method:'card',encryptedCard:'encrypted-only',storeCard:true,installments:1});
+  assert.equal(order.charges[0].payment_method.card.store,true);
+  const result=await createPagBankOrder('sandbox','sandbox-token',order,async()=>new Response(JSON.stringify({
+    id:'ORDE_test',charges:[{id:'CHAR_test',status:'PAID',amount:{value:input.amountCents,currency:'BRL'},
+      payment_method:{card:{id:'CARD_test-123'}}}]}),{status:201}));
+  assert.equal(result.cardToken,'CARD_test-123');
 });
 
 test('one and six installments charge the same booking total without a buyer fee',()=>{

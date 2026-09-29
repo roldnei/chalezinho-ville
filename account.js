@@ -302,7 +302,6 @@ function renderReservations(reservations){
   art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-badge-stack"><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span>'+paymentBadge+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>RESERVA · '+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p>'+paymentPanel+'<div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>'+initialLodgingLabel+initialLodgingDetails+'</span><strong>'+brl(lodging)+'</strong></div>'+expRows+revisionRow+buyerFeeRow+'<div class="reservation-breakdown-total"><span>'+(paid?"TOTAL PAGO":payment?.status==="paid"?"VALOR RECEBIDO · EM CONCILIAÇÃO":"VALOR DA TENTATIVA")+'</span><strong>'+brl(r.total_amount)+'</strong></div></div>'+experiencePaymentHistory+modificationPaymentHistory+'<span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee,r)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';
   box.appendChild(art);
  });
-  box.querySelectorAll("[data-guarantee-authorize]").forEach(b=>b.addEventListener("click",()=>openGuaranteeAuthorization(b.dataset.guaranteeAuthorize)));
   box.querySelectorAll("[data-guarantee-status]").forEach(b=>b.addEventListener("click",async()=>{b.disabled=true;try{await guaranteeApi("status",{guarantee_id:b.dataset.guaranteeStatus});location.reload()}catch{b.disabled=false}}));
   box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
  box.querySelectorAll("[data-download-reservation-policy]").forEach(b=>b.addEventListener("click",()=>downloadReservationPolicy(b.dataset.downloadReservationPolicy,b)));
@@ -554,34 +553,9 @@ async function cancelPendingCharge(chargeId,btn){
 function renderGuarantee(g,r){
  if(!g)return "";
  const amount=brlC(g.amount_cents),captured=Number(g.captured_amount_cents||0);
- const now=Date.now(),checkin=Date.parse(r.check_in+'T15:00:00-03:00'),checkout=Date.parse(r.check_out+'T11:00:00-03:00');
- const eligible=g.status==="pending"&&r.status==="confirmed"&&now>=checkin-48*3600000&&now<checkout&&checkout<=now+5*86400000;
- const text=g.status==="released"?"Garantia liberada.":g.status==="captured"?"Foi utilizado "+brlC(captured)+" em uma ocorrência registrada.":g.status==="guaranteed"?"Valor autorizado no cartão até "+fmtDateTime(g.provider_capture_before)+".":g.status==="pending"?"O cartão será solicitado perto do check-in.":"Aguardando confirmação do PagBank.";
- const action=eligible?'<button type="button" data-guarantee-authorize="'+esc(g.id)+'">Autorizar caução no cartão</button>':!["pending","released","captured","guaranteed"].includes(g.status)?'<button type="button" data-guarantee-status="'+esc(g.id)+'">Consultar caução</button>':"";
+ const text=g.status==="released"?"Garantia liberada.":g.status==="captured"?"Foi utilizado "+brlC(captured)+" em uma ocorrência registrada.":g.status==="guaranteed"?"Valor autorizado no cartão até "+fmtDateTime(g.provider_capture_before)+".":g.status==="pending"?"Pré-autorização programada para perto do check-in com o cartão informado na reserva.":"Aguardando confirmação do PagBank.";
+ const action=!["pending","released","captured","guaranteed"].includes(g.status)?'<button type="button" data-guarantee-status="'+esc(g.id)+'">Consultar caução</button>':"";
  return '<div class="guest-guarantee"><small>GARANTIA DA HOSPEDAGEM · SANDBOX</small><strong>'+amount+'</strong><p>'+text+' A autorização reserva temporariamente o limite do cartão; não é cobrada na reserva. Danos comprovados podem gerar captura parcial. Sem danos, a autorização é liberada.</p>'+action+'</div>';
-}
-function openGuaranteeAuthorization(guaranteeId){
- const g=reservationsCache.flatMap(r=>r.guarantees||[]).find(x=>x.id===guaranteeId);
- if(!g)return;
- const modal=$("#post-payment-modal"),content=$("#post-payment-content");
- content.innerHTML='<small>CAUÇÃO · PAGBANK SANDBOX</small><h2>Autorizar '+brlC(g.amount_cents)+'</h2><p>Este valor ficará reservado no limite do cartão. A autorização só será usada para uma ocorrência comprovada, até o limite informado.</p><form id="guarantee-card-form" class="account-form"><label>Nome no cartão<input id="guarantee-holder" autocomplete="cc-name" required></label><label>Número<input id="guarantee-card-number" inputmode="numeric" autocomplete="cc-number" required></label><div class="modify-dates"><label>Mês<input id="guarantee-card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month" required></label><label>Ano<input id="guarantee-card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year" required></label></div><label>CVV<input id="guarantee-card-cvv" inputmode="numeric" maxlength="4" autocomplete="cc-csc" required></label><button class="primary-action">Autorizar no sandbox</button><p id="guarantee-card-message" role="status"></p></form>';
- modal.hidden=false;
- $("#guarantee-card-form").onsubmit=async e=>{
-  e.preventDefault();const button=e.currentTarget.querySelector('button'),message=$("#guarantee-card-message");
-  button.disabled=true;message.textContent="Criptografando cartão e solicitando autorização…";
-  try{
-   const key=await api("pagbank_sandbox_card_key");await loadPagBankCardSdk();
-   const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:$("#guarantee-holder").value.trim(),
-    number:$("#guarantee-card-number").value.replace(/\D/g,""),expMonth:$("#guarantee-card-month").value,
-    expYear:$("#guarantee-card-year").value,securityCode:$("#guarantee-card-cvv").value});
-   if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_card");
-   ["#guarantee-card-number","#guarantee-card-month","#guarantee-card-year","#guarantee-card-cvv"].forEach(s=>$(s).value="");
-   const result=await guaranteeApi("authorize",{guarantee_id:guaranteeId,encrypted_card:card.encryptedCard});
-   message.textContent=result.guarantee?.status==="guaranteed"?"Caução autorizada no sandbox.":"Solicitação enviada. Consulte o estado antes do check-in.";
-   if(result.guarantee?.status==="guaranteed")setTimeout(()=>location.reload(),1200);
-  }catch(error){message.textContent=error.message==="authorization_window_unavailable"?"A caução pode ser autorizada perto do check-in para não vencer durante a estadia.":"Autorização não confirmada. Consulte a reserva antes de tentar novamente."}
-  finally{button.disabled=false}
- };
 }
 function renderModification(m){
  const target=properties.find(p=>Number(p.id)===Number(m.requested_property_id))?.name||"propriedade solicitada";
