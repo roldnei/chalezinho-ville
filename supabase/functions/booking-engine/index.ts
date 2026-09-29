@@ -712,7 +712,12 @@ async function startPayment(req:Request,body:any,development:boolean){
         hold_expires_at:hold.hold_expires_at,payment:{...payment,provider:"pagbank_sandbox",
           provider_payment_id:result.chargeId,status:"processing",
           pix_code:result.pixCode,qr_image_url:result.qrImageUrl}});
-    }catch{
+    }catch(error){
+      if(error instanceof Error&&error.message==="pagbank_order_rejected"){
+        const {error:cancelError}=await admin.rpc("cancel_pending_payment_mock_atomic",{
+          p_payment_id:payment.id,p_user_id:user.id});
+        if(!cancelError)return json({ok:false,error:"pagbank_card_rejected"},409);
+      }
       console.error(JSON.stringify({event:"pagbank_sandbox_start_failed",payment_id:payment.id}));
       return json({ok:false,error:"pagbank_start_uncertain",payment_id:payment.id},503);
     }

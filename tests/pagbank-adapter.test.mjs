@@ -212,6 +212,15 @@ test('provider request carries the bearer token and stable idempotency key',asyn
   assert.equal(captured.options.headers.Authorization,'Bearer test-token');
 });
 
+test('a definitive rejected order is distinct from an uncertain provider result',async()=>{
+  const order=pagBankOrder({...input,method:'card',encryptedCard:'encrypted-only',installments:1});
+  await assert.rejects(createPagBankOrder('sandbox','test-token',order,
+    async()=>new Response(JSON.stringify({error_messages:[{error:'ENCRYPTED CARD ALREADY USED'}]}),{status:400})),
+    /pagbank_order_rejected/);
+  await assert.rejects(createPagBankOrder('sandbox','test-token',order,
+    async()=>new Response('{}',{status:503})),/pagbank_order_failed/);
+});
+
 test('webhook rejects modified payload or signature',async()=>{
   const token='test-token',raw='{"id":"CHAR_1","status":"PAID"}';
   const signature=createHash('sha256').update(token+'-'+raw).digest('hex');

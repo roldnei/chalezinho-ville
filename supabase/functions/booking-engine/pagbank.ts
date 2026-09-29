@@ -115,7 +115,11 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
     body: JSON.stringify(order), signal: AbortSignal.timeout(10000),
   });
   const body = await response.json().catch(() => null);
-  if (!response.ok || !body?.id || !body?.charges?.[0]?.id) throw new Error("pagbank_order_failed");
+  if (!response.ok) {
+    if (response.status === 400 || response.status === 422) throw new Error("pagbank_order_rejected");
+    throw new Error("pagbank_order_failed");
+  }
+  if (!body?.id || !body?.charges?.[0]?.id) throw new Error("pagbank_order_failed");
   const charge = body.charges[0];
   if (charge.amount?.currency !== "BRL" || Number(charge.amount?.value) !== order.charges[0].amount.value ||
       !["WAITING", "PAID", "IN_ANALYSIS", "AUTHORIZED", "DECLINED"].includes(charge.status) ||
