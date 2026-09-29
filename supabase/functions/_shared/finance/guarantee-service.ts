@@ -76,3 +76,20 @@ export async function requestGuaranteeRefund(admin:any,g:any,gateway:PaymentGate
   if(readError)throw new Error('refund_status_unavailable');
   return {guarantee,refund:current};
 }
+
+export async function retryGuaranteeRefund(admin:any,g:any,gateway:PaymentGateway,actor:string,refundId:string) {
+  const current=await reconcileGuarantee(admin,g,gateway);
+  const {data:refund,error}=await admin.from('guarantee_refunds').select('*')
+    .eq('id',refundId).eq('guarantee_id',g.id).single();
+  if(error||!refund)throw new Error('refund_not_found');
+  if(refund.state==='confirmed')return {guarantee:current,refund};
+  const observation=current.provider_observation;
+  if(!observation||!['PAID','CANCELED'].includes(observation.status))throw new Error('refund_provider_balance_mismatch');
+  const {data:ready,error:retryError}=await admin.rpc('retry_transient_refund',{
+    p_kind:'guarantee',p_refund_id:refund.id,p_actor:actor,
+    p_paid:observation.paid_cents,p_refunded:observation.refunded_cents});
+  if(retryError||ready!==true)throw new Error('refund_retry_not_ready');
+  // Preserve the intent, actor and provider idempotency key of the original request.
+  return requestGuaranteeRefund(admin,current,gateway,{actor:refund.actor_user_id,
+    amount:Number(refund.requested_cents),reason:refund.reason,key:refund.operation_key});
+}

@@ -115,7 +115,7 @@ async function openFlow(id){
   if(e.message==="minimum_stay"){
     const min=Number(e.data?.min_stay||state.property?.min_stay||1);
     setFlowError("Para estas datas, o mínimo de estadia deste chalé é de "+min+" "+(min===1?"noite":"noites")+". Faça uma nova busca com o período mínimo.");
-  }else setFlowError("Não foi possível preparar as tarifas. Faça uma nova busca.");
+  }else setFlowError(e.message==="cancellation_policy_unavailable"?"As regras desta tarifa ainda não estão configuradas. Entre em contato para reservar.":"Não foi possível preparar as tarifas. Faça uma nova busca.");
 }
 }
 function showStep(n){
@@ -314,7 +314,7 @@ function renderSummary(){
  const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
  const free=terms.interest_payer==="merchant"?max:Math.min(Number(terms.no_interest_installments),max);
  state.installmentQuote=null;
- pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão"><option value="">Consultando parcelas…</option></select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p id="installment-warning" role="status"></p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
+ pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label id="installment-field">Parcelamento<select id="installments" aria-label="Parcelas no cartão"><option value="">Consultando parcelas…</option></select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p id="installment-warning" role="status"></p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
  if(pagbankSandbox){
   const enabled=state.config.payment_settings;
   const methods=[...pay.querySelectorAll('input[name="pay-method"]')];
@@ -339,6 +339,7 @@ function renderSummary(){
     }catch{$("#installment-total").textContent="Parcelas indisponíveis. Tente consultar novamente.";}
   };
   $("#installments").addEventListener("change",()=>{
+    if(paymentChoice().method!=="card"){$("#installment-total").textContent="Total no Pix: "+brlC(total)+".";return;}
     const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
     $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
   });
@@ -350,7 +351,10 @@ function renderSummary(){
    $("#installments").disabled=true;clearTimeout(binTimer);
    if(bin.length===6)binTimer=setTimeout(refreshPlans,300);
   });
-  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=!guarantee&&paymentChoice().method!=="card"));
+  const updateMethod=()=>{const isCard=paymentChoice().method==="card";
+    card.hidden=!guarantee&&!isCard;$("#installment-field").hidden=!isCard;retryPlans.hidden=!isCard;
+    $("#installments").dispatchEvent(new Event("change"));};
+  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",updateMethod));updateMethod();
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
   resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
   resume.onclick=async()=>{resume.disabled=true;
@@ -397,7 +401,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados do cartão de teste. Digite o cartão novamente e tente outra reserva.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  const box=$("#mock-payment"),pix=d.payment.pix_code;

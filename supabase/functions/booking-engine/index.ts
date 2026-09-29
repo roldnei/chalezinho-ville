@@ -9,7 +9,7 @@ import {paymentTerms,assertPaymentMethod,validatePaymentSettings} from "../_shar
 import {guaranteeState} from "../_shared/finance/model.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getPagBankCardPublicKey, pagBankInstallmentPlans, tokenizePagBankCard } from "./pagbank.ts";
+import { getPagBankCardPublicKey, pagBankInstallmentPlans, tokenizePagBankCard, validPagBankCustomerName } from "./pagbank.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -565,7 +565,8 @@ async function startPayment(req:Request,body:any,development:boolean){
     if(method==="card" && typeof body?.encrypted_card!=="string") return json({ok:false,error:"encrypted_card_required"},400);
     const digits=String(guest_phone).replace(/\D/g,"");
     const phone=digits.startsWith("55")&&digits.length>=12?digits.slice(2):digits;
-    if(!/^\d{2}\d{8,9}$/.test(phone)||!guest_name.trim()||
+    if(!validPagBankCustomerName(guest_name))return json({ok:false,error:"pagbank_customer_name_invalid"},400);
+    if(!/^\d{2}\d{8,9}$/.test(phone)||
        String(guest_email).toLowerCase()!==String(user.email).toLowerCase())
       return json({ok:false,error:"pagbank_customer_invalid"},400);
   }
@@ -1067,7 +1068,7 @@ async function opsData(req:Request){
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}] = await Promise.all([
     admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name))").order("created_at",{ascending:false}).limit(50),
-    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents(*)").order("created_at",{ascending:false}).limit(50),
+    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents!incidents_guarantee_id_fkey(*),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").order("created_at",{ascending:false}).limit(50),
     admin.from("payments").select("id,reservation_id,provider,method,installments,amount_cents,status,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("post_booking_charges").select("id,reservation_id,kind,description,amount_cents,status,expires_at,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("payment_settings").select("*").eq("id",1).single(),
@@ -1115,7 +1116,7 @@ async function adminHubData(req:Request,body:any){
     admin.from("experience_orders").select("id,reservation_id,status,created_at,experience_order_items(id,product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,created_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,description,snapshot,expires_at,applied_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,status,admin_additional_amount_cents,estimated_additional_amount_cents,admin_note,payment_due_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
-    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents!incidents_guarantee_id_fkey(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("reservation_notes").select("id,reservation_id,author_user_id,note,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("financial_entries").select("id,reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents,currency,description,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false})
   ]) : [{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty}];

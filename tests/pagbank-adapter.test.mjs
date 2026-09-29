@@ -7,6 +7,13 @@ const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'1234567890
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
   notificationUrl:'https://example.com/functions/v1/pagbank-webhook'};
 
+test('customer name rejects provider-forbidden symbols but keeps accented and compound names',()=>{
+  for(const name of ['[DEV] Finance QA','Nome;teste','Nome@example'])
+    assert.throws(()=>pagBankOrder({...input,customer:{...customer,name},method:'card',encryptedCard:'test',installments:1}),/invalid_customer_data/);
+  for(const name of ["João D'Ávila",'Ana-Maria Costa'])
+    assert.equal(pagBankOrder({...input,customer:{...customer,name},method:'card',encryptedCard:'test',installments:1}).customer.name,name);
+});
+
 test('Orders webhook selects the charge rather than the top-level order ID',()=>{
   assert.equal(extractPagBankWebhookChargeId({id:'ORDE_123',charges:[{id:'CHAR_abc-123'}]}),'CHAR_abc-123');
   assert.equal(extractPagBankWebhookChargeId({id:'CHAR_legacy'}),'CHAR_legacy');

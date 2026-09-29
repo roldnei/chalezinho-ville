@@ -108,7 +108,8 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
         x.calculation={reason:"voluntary_refund",refund_cents:x.refund_cents};
         remaining-=x.refund_cents;
       }
-      if(remaining!==0) return json({ok:false,error:"refund_exceeds_captured"},409);
+      if(remaining!==0) return json({ok:false,error:(allRefunds||[]).some((x:any)=>
+        ["prepared","dispatching","uncertain"].includes(x.state))?"previous_refund_pending":"refund_exceeds_captured"},409);
     }
     const refundDue=allocations.reduce((sum,x)=>sum+x.refund_cents,0);
     const {data:created,error:createError}=await admin.rpc("prepare_reservation_refund_case",{p_actor:user.id,p_case:{
@@ -136,15 +137,17 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
       .not("error_code","is",null).order("observed_at",{ascending:false}):
     {data:[],error:null};
   if(providerFailuresError) return json({ok:false,error:"refund_history_unavailable",cancellation_id:cancellation.id},503);
-  const providerIssue=(refunds||[]).filter((x:any)=>x.state!=="confirmed")
+  const latestIssues=(refunds||[]).filter((x:any)=>x.state!=="confirmed")
     .map((x:any)=>(providerFailures||[]).find((o:any)=>o.refund_id===x.id))
-    .find((o:any)=>o?.error_code==="40008")?"pagbank_refund_temporarily_unavailable":null;
+    .filter(Boolean);
+  let providerIssue=latestIssues.some((o:any)=>o.error_code==="40005")?"pagbank_refund_key_in_use":
+    latestIssues.some((o:any)=>o.error_code==="40008")?"pagbank_refund_temporarily_unavailable":null;
   if(operation==="prepare"||operation==="status") return json({ok:true,cancellation_id:cancellation.id,kind:cancellation.kind,
     status:cancellation.status,accepted_version:cancellation.accepted_version,calculation:cancellation.calculation,
     refund_due_cents:due,confirmed_cents:(refunds||[]).reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0),
     provider_issue:providerIssue,
     refunds:(refunds||[]).map((x:any)=>({payment_id:x.payment_id,requested_cents:x.requested_cents,confirmed_cents:x.confirmed_cents,state:x.state}))});
-  if(!["approve","reconcile","preflight"].includes(operation)) return json({ok:false,error:"invalid_operation"},400);
+  if(!["approve","reconcile","preflight","retry"].includes(operation)) return json({ok:false,error:"invalid_operation"},400);
   if(operation==="preflight"&&due===0&&cancellation.kind==="policy_cancellation")
     return json({ok:true,ready:true,checks:[],refund_due_cents:0});
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
@@ -175,6 +178,26 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
       const orderId=String(payment?.metadata?.order_id||"");
       const charge=await gateway.getRefund(refund.charge_id,orderId||undefined);
       return {charge,source:charge.readSource||'charge'};
+  }
+  if(operation==="retry"){
+    // Reconcile first: the original request may already have succeeded.
+    for(const refund of refunds||[]){
+      if(refund.state!=="uncertain")continue;
+      const {charge,source}=await readRefundCharge(refund);
+      const {data:payment,error}=await admin.from("payments")
+        .select("id,amount_cents,provider_payment_id").eq("id",refund.payment_id).single();
+      if(error||!payment)return json({ok:false,error:"refund_payment_unavailable"},503);
+      await reconcileReservationRefunds(admin,payment,charge,source);
+      if(!['PAID','CANCELED'].includes(charge.status)||!charge.summary)
+        return json({ok:false,error:"refund_provider_balance_mismatch"},409);
+      const {error:retryError}=await admin.rpc("retry_transient_refund",{
+        p_kind:"reservation",p_refund_id:refund.id,p_actor:user.id,
+        p_paid:charge.summary.paid,p_refunded:charge.summary.refunded});
+      if(retryError)return json({ok:false,error:"refund_retry_not_ready"},409);
+    }
+    const {data:pending}=await admin.from("reservation_refunds").select("state").eq("cancellation_id",cancellation.id);
+    return reservationRefundAction(req,{...body,case_id:cancellation.id,
+      operation:pending?.some((x:any)=>x.state==="prepared")?"approve":"status"},development);
   }
   if(operation==="preflight"){
     const checks:any[]=[];
@@ -249,6 +272,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           if(dispatchError) throw new Error("dispatch_not_recorded");
           precheckPassed=true;
           const receipt=await gateway.refund(row.charge_id,Number(row.requested_cents),row.idempotency_key);
+          providerIssue=null;
           if(receipt.amountCents!==Number(originalPayment.amount_cents)) throw new Error("provider_response_amount_mismatch");
           await recordRefundObservation(refund,"post","charge",{
             status:receipt.status,amount:{value:receipt.amountCents},summary:receipt.summary},
@@ -270,6 +294,8 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           }
           const diagnostic=String((error as Error)?.message||"");
           const providerError=error as Error&{httpStatus?:number;errorCode?:string};
+          providerIssue=providerError.errorCode==='40005'?'pagbank_refund_key_in_use':
+            providerError.errorCode==='40008'?'pagbank_refund_temporarily_unavailable':null;
           if(Number.isInteger(providerError?.httpStatus)){
             try{await recordRefundObservation(refund,"post","charge",null,
               {httpStatus:providerError.httpStatus,errorCode:providerError.errorCode})}catch{/* the request stays uncertain */}

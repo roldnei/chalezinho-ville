@@ -2,7 +2,8 @@ import {createClient} from "npm:@supabase/supabase-js@2";
 
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
-import {reconcileGuarantee,requestGuaranteeRefund} from "../_shared/finance/guarantee-service.ts";
+import {reconcileReservationRefunds} from "../_shared/finance/refund-reconciliation.ts";
+import {reconcileGuarantee,requestGuaranteeRefund,retryGuaranteeRefund} from "../_shared/finance/guarantee-service.ts";
 
 const projectUrl=Deno.env.get("SUPABASE_URL")!;
 const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
@@ -63,7 +64,7 @@ async function setState(g:any,expected:string,values:Record<string,unknown>){
 }
 async function observe(g:any){
   if(!token||!g.provider_authorization_id)return null;
-  const charge=await paymentGateway("pagbank_sandbox",token).getPayment(g.provider_authorization_id);
+  const charge=await paymentGateway("pagbank_sandbox",token).getPayment(g.provider_authorization_id,g.provider_order_id||undefined);
   if(charge.id!==g.provider_authorization_id||charge.amount?.currency!=="BRL")
     throw new Error("guarantee_charge_mismatch");
   return charge;
@@ -132,6 +133,70 @@ async function authorizeDueGuarantees(guaranteeId?:string){
   return reply({ok:true,results});
 }
 
+// Provider reads recover missed notifications. All writes use the same atomic
+// reconciliation functions as checkout and webhooks; this job never invents money.
+async function maintainFinance(){
+  if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  const gateway=paymentGateway("pagbank_sandbox",token),results:{id:string;status:string}[]=[];
+  const {data:payments,error:paymentError}=await admin.from('payments')
+    .select('id,amount_cents,metadata,provider_payment_id,status')
+    .eq('provider','pagbank_sandbox').in('status',['awaiting_payment','processing','under_review','expired'])
+    .not('provider_payment_id','is',null).gte('created_at',new Date(Date.now()-48*3600000).toISOString())
+    .order('updated_at').limit(50);
+  if(paymentError)return reply({ok:false,error:'payments_unavailable'},503);
+  const {data:openRefunds,error:refundError}=await admin.from('reservation_refunds').select('payment_id')
+    .in('state',['dispatching','uncertain']).order('created_at').limit(50);
+  if(refundError)return reply({ok:false,error:'refunds_unavailable'},503);
+  const {data:refundPayments,error:refundPaymentError}=openRefunds?.length?
+    await admin.from('payments').select('id,amount_cents,metadata,provider_payment_id,status')
+      .eq('provider','pagbank_sandbox').in('id',openRefunds.map(x=>x.payment_id)):{data:[],error:null};
+  if(refundPaymentError)return reply({ok:false,error:'refunds_unavailable'},503);
+  const paymentBatch=[...new Map([...(payments||[]),...(refundPayments||[])].map(p=>[p.id,p])).values()];
+  for(const p of paymentBatch){
+    try{
+      const charge=await gateway.getPayment(p.provider_payment_id,p.metadata?.order_id);
+      if(charge.id!==p.provider_payment_id||charge.amount?.currency!=='BRL'||charge.amount.value!==Number(p.amount_cents))
+        throw new Error('charge_mismatch');
+      const {error}=await admin.rpc(p.metadata?.kind==='post_booking_charge'?'reconcile_pagbank_post_booking_payment':'reconcile_pagbank_sandbox_payment',{
+        p_payment_id:p.id,p_charge_id:charge.id,p_status:charge.status,p_amount_cents:charge.amount.value});
+      if(error)throw error;
+      await reconcileReservationRefunds(admin,p,charge,charge.readSource||'charge');
+      results.push({id:p.id,status:charge.status});
+    }catch{results.push({id:p.id,status:'reconciliation_pending'});}
+  }
+  const {data:rows,error}=await admin.from('guarantees')
+    .select('*,reservations(id,user_id,status,check_in,check_out)')
+    .eq('provider','pagbank_sandbox').not('provider_authorization_id','is',null)
+    .in('status',['authorizing','authorization_uncertain','guaranteed','incident_reported','capture_requested','capture_uncertain','release_requested','release_uncertain'])
+    .order('updated_at').limit(50);
+  if(error)return reply({ok:false,error:'guarantees_unavailable'},503);
+  const {data:openGuaranteeRefunds,error:guaranteeRefundError}=await admin.from('guarantee_refunds').select('guarantee_id')
+    .in('state',['dispatching','uncertain']).order('created_at').limit(50);
+  if(guaranteeRefundError)return reply({ok:false,error:'refunds_unavailable'},503);
+  const refundGuarantees=[];
+  for(const id of new Set<string>((openGuaranteeRefunds||[]).map((x:any)=>String(x.guarantee_id))))refundGuarantees.push(await loadGuarantee(id));
+  const guaranteeBatch=[...new Map([...(rows||[]),...refundGuarantees.filter(Boolean)].map(g=>[g.id,g])).values()];
+  for(const g of guaranteeBatch){
+    try{
+      const current=await reconcile(g);
+      // Only cancelled bookings with no incident can release automatically.
+      if(g.reservations?.status==='cancelled'&&current.status==='guaranteed'){
+        const before=await observe(current);
+        if(before?.status==='AUTHORIZED'&&before.amount.value===Number(g.amount_cents)&&
+          await setState(current,'guaranteed',{status:'release_requested'})){
+          await gateway.cancelAuthorization(g.provider_authorization_id,Number(g.amount_cents),g.id.replaceAll('-','')+'release');
+          await reconcile(await loadGuarantee(g.id));
+        }
+      }
+      results.push({id:g.id,status:current.status});
+    }catch{results.push({id:g.id,status:'reconciliation_pending'});}
+  }
+  const authorization=await authorizeDueGuarantees();
+  if(!authorization.ok)return authorization;
+  const due=await authorization.json();
+  return reply({ok:true,observed:results,authorizations:due.results});
+}
+
 async function handler(req:Request){
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers});
   try{assertFinanceDevelopment(projectUrl,Deno.env.get("FINANCE_ENVIRONMENT"))}
@@ -142,7 +207,7 @@ async function handler(req:Request){
   if(dispatchSecret){
     const {data, error}=await admin.rpc("verify_guarantee_dispatch_secret",{p_secret:dispatchSecret});
     if(error||data!==true)return reply({ok:false,error:"dispatch_forbidden"},403);
-    return authorizeDueGuarantees();
+    return maintainFinance();
   }
   const user=await caller(req);
   if(!user)return reply({ok:false,error:"authentication_required"},401);
@@ -158,7 +223,8 @@ async function handler(req:Request){
   }
   if(action==="authorize_saved"){
     if(!manager)return reply({ok:false,error:"admin_required"},403);
-    await authorizeDueGuarantees(g.id);
+    const result=await authorizeDueGuarantees(g.id);
+    if(!result.ok)return result;
     const updated=await loadGuarantee(g.id);
     if(updated.status==="pending")return reply({ok:false,error:updated.provider_error_code||"authorization_window_unavailable"},409);
     return reply({ok:true,guarantee:publicState(updated)});
@@ -205,6 +271,10 @@ async function handler(req:Request){
     }
   }
   if(!manager)return reply({ok:false,error:"admin_required"},403);
+  if(action==="retry_refund"){
+    if(!id(body.refund_id))return reply({ok:false,error:"invalid_refund_request"},400);
+    return reply({ok:true,...await retryGuaranteeRefund(admin,g,paymentGateway("pagbank_sandbox",token),user.id,body.refund_id)});
+  }
   if(action==="refund"){
     if(!id(body.operation_key)||!asMoney(body.amount_cents)||String(body.reason||"").trim().length<5)
       return reply({ok:false,error:"invalid_refund_request"},400);

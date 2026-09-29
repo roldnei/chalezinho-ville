@@ -13,6 +13,11 @@ export type PagBankCustomer = {
   phone: { area: string; number: string };
 };
 
+export function validPagBankCustomerName(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 &&
+    !/[!@#$%¨*()"”\\|{}\[\]<>;]/.test(value);
+}
+
 export function pagBankOrder(input: {
   referenceId: string;
   amountCents: number;
@@ -31,7 +36,7 @@ export function pagBankOrder(input: {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(referenceId) || !Number.isSafeInteger(amountCents) || amountCents < 1)
     throw new Error("invalid_payment_data");
   if (!/^https:\/\//.test(notificationUrl)) throw new Error("invalid_notification_url");
-  if (!customer.name.trim() || !/^\S+@\S+\.\S+$/.test(customer.email) ||
+  if (!validPagBankCustomerName(customer.name) || !/^\S+@\S+\.\S+$/.test(customer.email) ||
       !/^\d{11,14}$/.test(customer.taxId) || !/^\d{2}$/.test(customer.phone.area) ||
       !/^\d{8,9}$/.test(customer.phone.number)) throw new Error("invalid_customer_data");
 
