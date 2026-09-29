@@ -288,7 +288,7 @@ function openReservation(id){
   $("#reservation-note-form").onsubmit=e=>addNote(e,r.id);const ci=$("[data-checkin]"),co=$("[data-checkout]"),ca=$("[data-cancel-reservation]");if(ci)ci.onclick=()=>reservationAction(r.id,"check_in");if(co)co.onclick=()=>reservationAction(r.id,"check_out");if(ca)ca.onclick=()=>cancelReservation(r.id);
   const voluntary=$("[data-voluntary-refund]");if(voluntary)voluntary.onclick=()=>voluntaryRefund(r.id);
   $$("[data-review-cancel]").forEach(b=>b.onclick=()=>cancelReservation(r.id,b.dataset.reviewCancel));
-  $("#reservation-detail [data-guarantee]").forEach(b=>b.onclick=()=>openGuarantee(b.dataset.guarantee));
+  document.querySelectorAll("#reservation-detail [data-guarantee]").forEach(b=>b.addEventListener("click",()=>openGuarantee(b.dataset.guarantee)));
   loadRefundHistory(r.id);
 }
 async function loadRefundHistory(id){
