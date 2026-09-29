@@ -265,7 +265,10 @@ function renderModificationPaymentHistory(r){
  return entries.length?'<section class="experience-payment-history" aria-label="Pagamentos das alterações"><h4>Pagamentos das alterações</h4>'+entries.map(e=>e.html).join("")+'</section>':"";
 }
 function renderReservations(reservations){
- const box=$("#reservation-list");box.innerHTML="";
+ const box=$("#reservation-list");
+ const hadReservations=Boolean(box.querySelector('.reservation-accordion'));
+ const openReservations=new Set([...box.querySelectorAll('.reservation-accordion[open]')].map(x=>x.dataset.reservationId));
+ box.innerHTML="";
  if(!reservations.length){box.innerHTML='<div class="empty-state">Você ainda não tem reservas vinculadas a esta conta.</div>';return}
  const sorted=[...reservations].sort((a,b)=>
    Date.parse(b.created_at||0)-Date.parse(a.created_at||0)
@@ -287,7 +290,8 @@ function renderReservations(reservations){
   const paid=["paid","refunded"].includes(payment?.status)&&r.status==="confirmed";
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);
   const art=document.createElement("details");art.className="account-reservation reservation-accordion";art.dataset.status=ux.tone;
-  if(String(r.id)===String(defaultOpen))art.open=true;
+  art.dataset.reservationId=String(r.id);
+  art.open=hadReservations?openReservations.has(String(r.id)):String(r.id)===String(defaultOpen);
   const expRows=expItems.map(i=>'<div class="reservation-breakdown-row"><span>'+esc(i.product_name_snapshot)+'</span><strong>'+brlC(Number(i.unit_price_cents))+'</strong></div>').join("");
   const revisionRow=appliedRevision>0?'<div class="reservation-breakdown-row tariff-revision"><span>Revisão de tarifa da alteração</span><strong>+'+brlC(appliedRevision)+'</strong></div>':"";
   const buyerFees=(r.payments||[]).filter(p=>["paid","refunded","partially_refunded"].includes(p.status))
@@ -329,7 +333,7 @@ function renderReservations(reservations){
   art.addEventListener('toggle',()=>{if(art.open)loadFinance()});if(art.open)loadFinance();
  });
   box.querySelectorAll("[data-guarantee-card]").forEach(b=>b.addEventListener("click",()=>openGuaranteeCard(b.dataset.guaranteeCard)));
-  box.querySelectorAll("[data-guarantee-status]").forEach(b=>b.addEventListener("click",async()=>{b.disabled=true;try{await guaranteeApi("status",{guarantee_id:b.dataset.guaranteeStatus});location.reload()}catch{b.disabled=false}}));
+  box.querySelectorAll("[data-guarantee-status]").forEach(b=>b.addEventListener("click",async()=>{b.disabled=true;try{await guaranteeApi("status",{guarantee_id:b.dataset.guaranteeStatus});await boot()}catch{b.disabled=false}}));
   box.querySelectorAll("[data-modify]").forEach(b=>b.addEventListener("click",()=>openModification(b.dataset.modify,b.dataset.property,b.dataset.in,b.dataset.out)));
  box.querySelectorAll("[data-download-reservation-policy]").forEach(b=>b.addEventListener("click",()=>downloadReservationPolicy(b.dataset.downloadReservationPolicy,b)));
  box.querySelectorAll("[data-accept-mod]").forEach(b=>b.addEventListener("click",()=>acceptModification(b.dataset.acceptMod,b)));

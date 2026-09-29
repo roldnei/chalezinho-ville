@@ -120,4 +120,7 @@ Detalhes e pergunta pronta para o suporte (não enviada): [evidência da renova�
 
 ## Revisão final após os prints do usuário
 
-Renovação confirmada também visualmente no Portal Dev. Corrigidas validade ausente/margem de captura e origem do preview fixo. 135 testes automatizados e 9 testes de interface aprovados; testes remotos de permissões e execução periódica aprovados. Revisão detalhada: final-review-20260929.md; minuta funcional: operating-copy-draft.md. Acompanhamento real programado para 02/10 às 11h20 BRT. Produção continua bloqueada pelas pendências documentadas.
+Renovação confirmada também visualmente no Portal Dev. Corrigidas validade ausente/margem de captura e origem do preview fixo. 136 testes automatizados e 9 testes de interface aprovados; testes remotos de permissões e execução periódica aprovados. Revisão detalhada: final-review-20260929.md; minuta funcional: operating-copy-draft.md. Acompanhamento real programado para 02/10 às 11h20 BRT. Produção continua bloqueada pelas pendências documentadas.
+
+
+Na conferência da tela, “Consultar caução” voltava à primeira reserva. Corrigido para atualizar os dados mantendo a reserva selecionada; regressão com duas reservas aprovada.

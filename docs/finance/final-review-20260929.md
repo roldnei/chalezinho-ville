@@ -11,7 +11,7 @@ Ambiente: somente desenvolvimento, Supabase gratuito `pxfqmnhqodqyaaqeyjgr`, Pag
 
 ## Validação
 
-- 135 testes automatizados aprovados, incluindo três regressões para validade ausente, vencimento/margem de captura e mensagem ao hóspede.
+- 136 testes automatizados aprovados, incluindo quatro regressões para validade ausente, vencimento/margem de captura e mensagem ao hóspede.
 - 9 testes de interface aprovados em celular, notebook e desktop, com respostas simuladas.
 - Sintaxe de JavaScript, TypeScript e build de preview aprovados.
 - API real, conta fictícia temporariamente como hóspede: painel administrativo, captura, estorno, disparo manual de pré-autorização e tabela de tokens negados com HTTP 403; próprio resumo financeiro permitido com HTTP 200, sem eventos internos. Papel administrativo restaurado ao final.
@@ -38,3 +38,6 @@ Verificação única neste chat criada para **02/10/2026 às 11h20 de São Paulo
 - Integração/homologação de produção e teste real controlado após autorização; a implementação atual é deliberadamente sandbox. Não basta promover o preview.
 
 Minuta funcional preparada em `textos-e-operacao-financeira-para-aprovacao.md`, sem publicação. Esta revisão cobre os fluxos financeiros descritos; não equivale a auditoria independente de segurança nem revisão integral de todos os módulos do site.
+
+
+Na conferência da tela, “Consultar caução” voltava à primeira reserva. Corrigido para atualizar os dados mantendo a reserva selecionada; regressão com duas reservas aprovada.

@@ -5,13 +5,13 @@ import {JSDOM} from 'jsdom';
 const html=await readFile(new URL('../conta.html',import.meta.url),'utf8');
 const js=await readFile(new URL('../account.js',import.meta.url),'utf8');
 const rid='10000000-0000-4000-8000-000000000001',gid='20000000-0000-4000-8000-000000000001';
-async function setup({settledCancellation=false,guaranteeOverride={}}={}){
+async function setup({settledCancellation=false,guaranteeOverride={},extraReservation=false}={}){
  const dom=new JSDOM(html,{url:'https://example.test/conta.html',runScripts:'outside-only'}),w=dom.window,calls=[];
  const reservation={id:rid,confirmation_code:'QA-CAUCAO',user_id:rid,status:'confirmed',check_in:'2099-10-01',check_out:'2099-10-10',created_at:'2026-09-29',guests:2,total_amount:1000,stay_amount:1000,properties:{name:'Chalé QA'},payments:[],guarantees:[{id:gid,status:'pending',amount_cents:50000,captured_amount_cents:0,attention_code:'authorization_declined'}]};
  Object.assign(reservation.guarantees[0],guaranteeOverride);
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://example.test',supabaseKey:'fixture',bookingEngine:'/engine',guaranteeEngine:'/guarantee'};
  let reservationReads=0;
- const dataFor=t=>t==='profiles'?{id:rid,full_name:'Hospede Teste',role:'guest'}:t==='reservations'?[structuredClone({...reservation,status:settledCancellation&&++reservationReads>1?'cancelled':'confirmed'})]:[];
+ const dataFor=t=>t==='profiles'?{id:rid,full_name:'Hospede Teste',role:'guest'}:t==='reservations'?[...(extraReservation?[{...reservation,id:'10000000-0000-4000-8000-000000000002',created_at:'2026-09-30',guarantees:[]}]:[]),structuredClone({...reservation,status:settledCancellation&&++reservationReads>1?'cancelled':'confirmed'})]:[];
  w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'fixture',user:{id:rid,email:'qa@example.test'}}}})},from:t=>{
   const q={};for(const name of ['select','eq','order','in','limit'])q[name]=()=>q;
   q.then=resolve=>Promise.resolve({data:dataFor(t)}).then(resolve);q.maybeSingle=()=>Promise.resolve({data:dataFor(t)});return q;
@@ -33,6 +33,19 @@ test('guest sees declined guarantee independently from confirmed reservation',as
 test('guest is not shown an authorization deadline when the provider date is absent',async()=>{
  const {dom,w}=await setup({guaranteeOverride:{status:'guaranteed',attention_code:null,provider_capture_before:null}});
  try{assert.match(w.document.body.textContent,/prazo da autorização ainda não foi confirmado/);assert.doesNotMatch(w.document.body.textContent,/Valor autorizado até/);}finally{dom.window.close()}
+});
+
+test('consulting a guarantee preserves the selected reservation instead of reopening the first',async()=>{
+ const {dom,w,calls}=await setup({extraReservation:true});
+ try{
+  const old=[...w.document.querySelectorAll('.reservation-accordion')];
+  old[0].open=false;old[1].open=true;
+  old[1].querySelector('[data-guarantee-status]').click();
+  for(let i=0;i<100&&w.document.contains(old[1]);i++)await new Promise(r=>setTimeout(r,5));
+  const current=[...w.document.querySelectorAll('.reservation-accordion')];
+  assert.ok(calls.some(c=>c.action==='status'));assert.equal(w.document.contains(old[1]),false);
+  assert.equal(current[0].open,false);assert.equal(current[1].open,true);assert.equal(current[1].dataset.reservationId,rid);
+ }finally{dom.window.close()}
 });
 
 test('a cancellation settled during page load refreshes reservation actions and badges once',async()=>{
