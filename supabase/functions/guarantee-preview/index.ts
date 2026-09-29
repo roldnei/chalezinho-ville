@@ -1,5 +1,8 @@
 import {createClient} from "npm:@supabase/supabase-js@2";
-import {changePagBankCharge,createPagBankOrder,getPagBankCharge,pagBankOrder} from "../booking-engine/pagbank.ts";
+
+import {paymentGateway} from "../_shared/finance/gateway.ts";
+import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
+import {reconcileGuarantee,requestGuaranteeRefund} from "../_shared/finance/guarantee-service.ts";
 
 const projectUrl=Deno.env.get("SUPABASE_URL")!;
 const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
@@ -60,51 +63,13 @@ async function setState(g:any,expected:string,values:Record<string,unknown>){
 }
 async function observe(g:any){
   if(!token||!g.provider_authorization_id)return null;
-  const charge=await getPagBankCharge(token,g.provider_authorization_id);
+  const charge=await paymentGateway("pagbank_sandbox",token).getPayment(g.provider_authorization_id);
   if(charge.id!==g.provider_authorization_id||charge.amount?.currency!=="BRL")
     throw new Error("guarantee_charge_mismatch");
   return charge;
 }
 async function reconcile(g:any){
-  if(!g.provider_authorization_id)return publicState(g);
-  const charge=await observe(g);
-  const initial=Number(g.amount_cents),captured=Number(g.requested_capture_cents||0);
-  if(["authorizing","authorization_uncertain"].includes(g.status)){
-    if(charge?.status==="AUTHORIZED"&&Number(charge.amount.value)===initial){
-      const expiry=Date.parse(charge.captureBefore||g.provider_capture_before||"");
-      const checkout=brazilTime(g.reservations.check_out,"11:00");
-      if(!Number.isFinite(expiry)||expiry<checkout+3600000)
-        return { ...publicState(g),provider_status:"AUTHORIZED",error:"authorization_expires_before_checkout"};
-      await setState(g,g.status,{status:"guaranteed",provider:"pagbank_sandbox",
-        provider_capture_before:new Date(expiry).toISOString(),provider_last_status:"AUTHORIZED",provider_error_code:null});
-    }else if(charge?.status==="DECLINED"){
-      await setState(g,g.status,{status:"pending",provider_last_status:"DECLINED",provider_error_code:"authorization_declined"});
-    }
-  }
-  if(g.status==="capture_requested"||g.status==="capture_uncertain"){
-    if(charge?.status==="PAID"&&captured>0&&(
-      (Number(charge.amount.value)===captured&&(!charge.summary||charge.summary.paid===captured))||
-      (Number(charge.amount.value)===initial&&charge.summary?.paid===captured))){
-      const {error}=await admin.rpc("capture_guarantee_mock_atomic",{
-        p_guarantee_id:g.id,p_actor_user_id:null,p_amount_cents:captured});
-      if(error)throw new Error("guarantee_capture_ledger_unavailable");
-      const {error:statusError}=await admin.from("guarantees").update({provider_last_status:"PAID",
-        provider_error_code:null,updated_at:new Date().toISOString()}).eq("id",g.id).eq("status","captured");
-      if(statusError)throw new Error("guarantee_capture_status_unavailable");
-    }
-  }
-  if(g.status==="captured"&&charge?.status==="PAID"&&captured>0&&(
-    (Number(charge.amount.value)===captured&&(!charge.summary||charge.summary.paid===captured))||
-    (Number(charge.amount.value)===initial&&charge.summary?.paid===captured))){
-    const {error}=await admin.from("guarantees").update({provider_last_status:"PAID",
-      provider_error_code:null,updated_at:new Date().toISOString()}).eq("id",g.id).eq("status","captured");
-    if(error)throw new Error("guarantee_capture_status_unavailable");
-  }
-  if(["release_requested","release_uncertain"].includes(g.status)&&charge?.status==="CANCELED"){
-    await setState(g,g.status,{status:"released",provider_last_status:"CANCELED",provider_error_code:null});
-  }
-  const updated=await loadGuarantee(g.id);
-  return {...publicState(updated),provider_status:charge?.status};
+  return reconcileGuarantee(admin,g,paymentGateway("pagbank_sandbox",token));
 }
 
 // Run by pg_cron through an authenticated server-to-server request. The
@@ -139,14 +104,12 @@ async function authorizeDueGuarantees(){
       provider:"pagbank_sandbox",provider_error_code:null})))continue;
     try{
       const referenceId=g.id.replaceAll("-","")+"a"+attempt;
-      const order=pagBankOrder({referenceId,amountCents:Number(g.amount_cents),method:"card",
+      const orderInput={referenceId,amountCents:Number(g.amount_cents),method:"card" as const,
         cardToken:saved.card_token,installments:1,preAuthorize:true,
         customer:{name:r.guest_name,email:r.guest_email,taxId:holder.document_number,
           phone:{area:phone.slice(0,2),number:phone.slice(2)}},
-        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
-      order.items[0].name="Caucao Chalezinho Ville";
-      order.charges[0].description="Caucao Chalezinho Ville";
-      const created=await createPagBankOrder("sandbox",token,order);
+        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook",description:"Caucao Chalezinho Ville"};
+      const created=await paymentGateway("pagbank_sandbox",token).authorizeCard(orderInput);
       const {data:savedOrder,error:saveError}=await admin.from("guarantees").update({
         provider_order_id:created.orderId,provider_authorization_id:created.chargeId,
         provider_last_status:created.status,status:"authorization_uncertain",updated_at:new Date().toISOString()})
@@ -167,6 +130,8 @@ async function authorizeDueGuarantees(){
 
 async function handler(req:Request){
   if(req.method==="OPTIONS")return new Response(null,{status:204,headers});
+  try{assertFinanceDevelopment(projectUrl,Deno.env.get("FINANCE_ENVIRONMENT"))}
+  catch{return reply({ok:false,error:"isolated_finance_environment_required"},503)}
   if(req.method!=="POST"||req.headers.get("x-chalezinho-env")!=="development")
     return reply({ok:false,error:"development_only"},403);
   const dispatchSecret=req.headers.get("x-guarantee-dispatch-secret");
@@ -208,14 +173,12 @@ async function handler(req:Request){
       return reply({ok:false,error:"authorization_in_progress"},409);
     const referenceId=g.id.replaceAll("-","")+"a"+attempt;
     try{
-      const order=pagBankOrder({referenceId,amountCents:Number(g.amount_cents),method:"card",
+      const orderInput={referenceId,amountCents:Number(g.amount_cents),method:"card" as const,
         encryptedCard:encrypted,installments:1,preAuthorize:true,
         customer:{name:g.reservations.guest_name,email:g.reservations.guest_email,
           taxId:identity[0].document_number,phone:{area:phone.slice(0,2),number:phone.slice(2)}},
-        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"});
-      order.items[0].name="Caucao Chalezinho Ville";
-      order.charges[0].description="Caucao Chalezinho Ville";
-      const created=await createPagBankOrder("sandbox",token,order);
+        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook",description:"Caucao Chalezinho Ville"};
+      const created=await paymentGateway("pagbank_sandbox",token).authorizeCard(orderInput);
       const {data:saved,error:saveError}=await admin.from("guarantees").update({provider_order_id:created.orderId,
         provider_authorization_id:created.chargeId,provider_last_status:created.status,
         status:"authorization_uncertain",updated_at:new Date().toISOString()})
@@ -230,20 +193,40 @@ async function handler(req:Request){
     }
   }
   if(!manager)return reply({ok:false,error:"admin_required"},403);
+  if(action==="refund"){
+    if(!id(body.operation_key)||!asMoney(body.amount_cents)||String(body.reason||"").trim().length<5)
+      return reply({ok:false,error:"invalid_refund_request"},400);
+    return reply({ok:true,...await requestGuaranteeRefund(admin,g,paymentGateway("pagbank_sandbox",token),{
+      actor:user.id,amount:Number(body.amount_cents),reason:String(body.reason).trim().slice(0,1000),key:body.operation_key})});
+  }
   if(action==="report_incident"){
-    if(g.status!=="guaranteed"||!g.provider_authorization_id)return reply({ok:false,error:"authorization_required"},409);
-    const description=String(body?.description||"").trim().slice(0,1000);
-    const evidence=await verifiedEvidence(g.id,body?.evidence);
-    if(description.length<5||!evidence||!asMoney(body?.amount_cents)||Number(body.amount_cents)>Number(g.amount_cents))
-      return reply({ok:false,error:"incident_evidence_required"},400);
-    if(!(await setState(g,"guaranteed",{status:"incident_reported"})))
-      return reply({ok:false,error:"guarantee_state_changed"},409);
-    const {data:incident,error}=await admin.from("incidents").insert({guarantee_id:g.id,
-      description,requested_capture_cents:Number(body.amount_cents),evidence,status:"open"})
-      .select("id").single();
-    if(error){await setState(g,"incident_reported",{status:"guaranteed"});
-      return reply({ok:false,error:"incident_create_failed"},503)}
-    return reply({ok:true,incident_id:incident.id});
+    const description=String(body.description||"").trim().slice(0,1000);
+    const evidence=body.evidence?.length?await verifiedEvidence(g.id,body.evidence):[];
+    if(!id(body.operation_key)||!evidence||description.length<5||!Number.isSafeInteger(body.amount_cents)||body.amount_cents<0)
+      return reply({ok:false,error:"invalid_incident"},400);
+    const {data,error}=await admin.rpc("record_reservation_incident",{p_reservation:g.reservation_id,p_guarantee:g.id,
+      p_actor:user.id,p_category:body.category||"damage",p_description:description,p_amount:body.amount_cents,
+      p_evidence:evidence,p_key:body.operation_key});
+    if(error)throw error;
+    return reply({ok:true,incident:data});
+  }
+  if(action==="attach_incident_evidence"){
+    if(!id(body.incident_id))return reply({ok:false,error:"invalid_incident"},400);
+    const evidence=await verifiedEvidence(g.id,body.evidence);
+    if(!evidence)return reply({ok:false,error:"incident_evidence_missing"},409);
+    const {data,error}=await admin.from("incidents").update({evidence}).eq("id",body.incident_id)
+      .eq("guarantee_id",g.id).eq("decision","pending").eq("status","open").select("id").maybeSingle();
+    if(error||!data)return reply({ok:false,error:"incident_already_decided"},409);
+    return reply({ok:true,incident_id:data.id});
+  }
+  if(action==="decide_incident"){
+    if(!id(body.incident_id)||!["approved","no_charge"].includes(body.decision))return reply({ok:false,error:"invalid_incident_decision"},400);
+    const {data:incident}=await admin.from("incidents").select("*").eq("id",body.incident_id).eq("guarantee_id",g.id).maybeSingle();
+    if(!incident)return reply({ok:false,error:"incident_not_found"},404);
+    if(body.decision==="approved"&&!await verifiedEvidence(g.id,incident.evidence))return reply({ok:false,error:"incident_evidence_missing"},409);
+    const {data,error}=await admin.rpc("decide_reservation_incident",{p_incident:incident.id,p_actor:user.id,p_decision:body.decision});
+    if(error)throw error;
+    return reply({ok:true,decision:data});
   }
   if(!["capture","release"].includes(action))return reply({ok:false,error:"invalid_action"},400);
   if(!g.provider_authorization_id)return reply({ok:false,error:"authorization_required"},409);
@@ -252,7 +235,7 @@ async function handler(req:Request){
     if(!asMoney(amount)||Number(amount)>Number(g.amount_cents))return reply({ok:false,error:"capture_exceeds_guarantee"},400);
     if(g.status!=="incident_reported")return reply({ok:false,error:"incident_required"},409);
     const {data:incident}=await admin.from("incidents").select("id,requested_capture_cents,evidence")
-      .eq("guarantee_id",g.id).eq("status","open").order("created_at",{ascending:false}).limit(1).maybeSingle();
+      .eq("id",g.capture_incident_id).eq("guarantee_id",g.id).eq("decision","approved").eq("status","open").maybeSingle();
     if(!incident?.evidence?.length||Number(incident.requested_capture_cents)!==Number(amount))
       return reply({ok:false,error:"incident_amount_mismatch"},409);
     if(incident.evidence.some((x:any)=>x.bucket===evidenceBucket)&&
@@ -263,7 +246,7 @@ async function handler(req:Request){
       return reply({ok:false,error:"authorization_not_capturable"},409);
     if(!(await setState(g,"incident_reported",{status:"capture_requested",requested_capture_cents:Number(amount)})))
       return reply({ok:false,error:"guarantee_state_changed"},409);
-    try{await changePagBankCharge(token,g.provider_authorization_id,"capture",Number(amount),
+    try{await paymentGateway("pagbank_sandbox",token).captureAuthorization(g.provider_authorization_id,Number(amount),
       g.id.replaceAll("-","")+"capture");}
     catch{return reply({ok:false,error:"capture_result_uncertain"},503)}
     try{return reply({ok:true,guarantee:await reconcile(await loadGuarantee(g.id))})}
@@ -275,7 +258,7 @@ async function handler(req:Request){
     return reply({ok:false,error:"authorization_not_releasable"},409);
   if(!(await setState(g,"guaranteed",{status:"release_requested"})))
     return reply({ok:false,error:"guarantee_state_changed"},409);
-  try{await changePagBankCharge(token,g.provider_authorization_id,"cancel",Number(g.amount_cents),
+  try{await paymentGateway("pagbank_sandbox",token).cancelAuthorization(g.provider_authorization_id,Number(g.amount_cents),
     g.id.replaceAll("-","")+"release");}
   catch{return reply({ok:false,error:"release_result_uncertain"},503)}
   try{return reply({ok:true,guarantee:await reconcile(await loadGuarantee(g.id))})}
@@ -284,5 +267,7 @@ async function handler(req:Request){
 
 Deno.serve(async req=>{try{return await handler(req)}catch(error){
   console.error(JSON.stringify({event:"guarantee_preview_error",code:String((error as Error).message).slice(0,80)}));
-  return reply({ok:false,error:"guarantee_unavailable"},503);
+  const known=["refund_exceeds_captured","previous_refund_pending","idempotency_conflict","incident_not_chargeable","incident_already_decided","refund_provider_balance_mismatch"];
+  const code=known.find(c=>String((error as Error).message).includes(c));
+  return reply({ok:false,error:code||"guarantee_unavailable"},code?409:503);
 }});

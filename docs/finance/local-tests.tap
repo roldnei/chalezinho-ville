@@ -1,0 +1,460 @@
+TAP version 13
+# Subtest: installment offer is immutable and requires exactly one payable source
+ok 1 - installment offer is immutable and requires exactly one payable source
+  ---
+  duration_ms: 2737.467996
+  type: 'test'
+  ...
+# Subtest: financial settings migration preserves configured property terms and enables explicit sandbox provider
+ok 2 - financial settings migration preserves configured property terms and enables explicit sandbox provider
+  ---
+  duration_ms: 1.926631
+  type: 'test'
+  ...
+# Subtest: an existing financial record cannot be moved to another reservation
+ok 3 - an existing financial record cannot be moved to another reservation
+  ---
+  duration_ms: 9.283541
+  type: 'test'
+  ...
+# Subtest: migration installs append-only events and records reservation baseline
+ok 4 - migration installs append-only events and records reservation baseline
+  ---
+  duration_ms: 3.447245
+  type: 'test'
+  ...
+# Subtest: financial event payload excludes customer identity, card data and provider secrets
+ok 5 - financial event payload excludes customer identity, card data and provider secrets
+  ---
+  duration_ms: 1.956411
+  type: 'test'
+  ...
+# Subtest: legacy ledger cannot be rewritten or detached from reservation
+ok 6 - legacy ledger cannot be rewritten or detached from reservation
+  ---
+  duration_ms: 4.637823
+  type: 'test'
+  ...
+# Subtest: total guarantee refund confirms once and survives duplicate callback
+ok 7 - total guarantee refund confirms once and survives duplicate callback
+  ---
+  duration_ms: 19.87324
+  type: 'test'
+  ...
+# Subtest: multiple partial guarantee refunds enforce cumulative provider receipt
+ok 8 - multiple partial guarantee refunds enforce cumulative provider receipt
+  ---
+  duration_ms: 21.917285
+  type: 'test'
+  ...
+# Subtest: concurrent refund preparation never overcommits a capture
+ok 9 - concurrent refund preparation never overcommits a capture
+  ---
+  duration_ms: 6.51461
+  type: 'test'
+  ...
+# Subtest: repeat request is same refund; changed amount is conflict
+ok 10 - repeat request is same refund; changed amount is conflict
+  ---
+  duration_ms: 10.005515
+  type: 'test'
+  ...
+# Subtest: unknown provider outcome keeps funds reserved
+ok 11 - unknown provider outcome keeps funds reserved
+  ---
+  duration_ms: 8.618415
+  type: 'test'
+  ...
+# Subtest: guest cannot request admin refunds or incidents
+ok 12 - guest cannot request admin refunds or incidents
+  ---
+  duration_ms: 4.219192
+  type: 'test'
+  ...
+# Subtest: occurrence without authorization or collection is allowed
+ok 13 - occurrence without authorization or collection is allowed
+  ---
+  duration_ms: 16.175943
+  type: 'test'
+  ...
+# Subtest: occurrence without guarantee belongs directly to reservation
+ok 14 - occurrence without guarantee belongs directly to reservation
+  ---
+  duration_ms: 3.995076
+  type: 'test'
+  ...
+# Subtest: partial capture requires financial decision and resolves only selected occurrence
+ok 15 - partial capture requires financial decision and resolves only selected occurrence
+  ---
+  duration_ms: 19.083368
+  type: 'test'
+  ...
+# Subtest: capture cannot bypass decision or exceed requested amount
+ok 16 - capture cannot bypass decision or exceed requested amount
+  ---
+  duration_ms: 7.329192
+  type: 'test'
+  ...
+# Subtest: event projection preserves paid amount through pending refund
+ok 17 - event projection preserves paid amount through pending refund
+  ---
+  duration_ms: 4.713648
+  type: 'test'
+  ...
+# Subtest: RLS prevents guest reading the financial event stream directly
+ok 18 - RLS prevents guest reading the financial event stream directly
+  ---
+  duration_ms: 1.700295
+  type: 'test'
+  ...
+# Subtest: development build cannot target the shared database or enable production
+ok 19 - development build cannot target the shared database or enable production
+  ---
+  duration_ms: 5.004153
+  type: 'test'
+  ...
+# Subtest: money rejects negative, fractional, unsafe or coerced values
+ok 20 - money rejects negative, fractional, unsafe or coerced values
+  ---
+  duration_ms: 0.35663
+  type: 'test'
+  ...
+# Subtest: canonical state WAITING
+ok 21 - canonical state WAITING
+  ---
+  duration_ms: 1.006902
+  type: 'test'
+  ...
+# Subtest: canonical state PAID
+ok 22 - canonical state PAID
+  ---
+  duration_ms: 0.153915
+  type: 'test'
+  ...
+# Subtest: canonical state DECLINED
+ok 23 - canonical state DECLINED
+  ---
+  duration_ms: 0.10635
+  type: 'test'
+  ...
+# Subtest: canonical state IN_ANALYSIS
+ok 24 - canonical state IN_ANALYSIS
+  ---
+  duration_ms: 0.116738
+  type: 'test'
+  ...
+# Subtest: canonical state AUTHORIZED
+ok 25 - canonical state AUTHORIZED
+  ---
+  duration_ms: 2.107497
+  type: 'test'
+  ...
+# Subtest: canonical state expired
+ok 26 - canonical state expired
+  ---
+  duration_ms: 0.095256
+  type: 'test'
+  ...
+# Subtest: partial and full refunds derive from confirmed money
+ok 27 - partial and full refunds derive from confirmed money
+  ---
+  duration_ms: 0.471714
+  type: 'test'
+  ...
+# Subtest: 500 authorized and 189 paid is partial capture; unreconciled remainder is never labeled released
+ok 28 - 500 authorized and 189 paid is partial capture; unreconciled remainder is never labeled released
+  ---
+  duration_ms: 0.302694
+  type: 'test'
+  ...
+# Subtest: capture verifies paid summary when original authorization value is retained
+ok 29 - capture verifies paid summary when original authorization value is retained
+  ---
+  duration_ms: 0.192709
+  type: 'test'
+  ...
+# Subtest: refund requested or cancelled status alone is never refund confirmation
+ok 30 - refund requested or cancelled status alone is never refund confirmation
+  ---
+  duration_ms: 15.576269
+  type: 'test'
+  ...
+# Subtest: installment total before card is same immutable total selected for charging
+ok 31 - installment total before card is same immutable total selected for charging
+  ---
+  duration_ms: 0.300352
+  type: 'test'
+  ...
+# Subtest: offer prevents cross-account, cross-reservation, repricing and expiry
+ok 32 - offer prevents cross-account, cross-reservation, repricing and expiry
+  ---
+  duration_ms: 0.275324
+  type: 'test'
+  ...
+# Subtest: gateway selection cannot activate production from a browser parameter
+ok 33 - gateway selection cannot activate production from a browser parameter
+  ---
+  duration_ms: 0.22573
+  type: 'test'
+  ...
+# Subtest: gateway partial refund preserves exact request amount and operation id
+ok 34 - gateway partial refund preserves exact request amount and operation id
+  ---
+  duration_ms: 3.537884
+  type: 'test'
+  ...
+# Subtest: projection replays repeated payment snapshots without doubling paid revenue
+ok 35 - projection replays repeated payment snapshots without doubling paid revenue
+  ---
+  duration_ms: 0.516664
+  type: 'test'
+  ...
+# Subtest: ledger reconstructs additional debt, settled change, approved credit and damage without counting authorization as cash
+ok 36 - ledger reconstructs additional debt, settled change, approved credit and damage without counting authorization as cash
+  ---
+  duration_ms: 1.02117
+  type: 'test'
+  ...
+# Subtest: expired unpaid reservation does not remain collectible in the financial balance
+ok 37 - expired unpaid reservation does not remain collectible in the financial balance
+  ---
+  duration_ms: 0.195733
+  type: 'test'
+  ...
+# Subtest: webhook and manual reconciliation share exact cumulative refund confirmation
+ok 38 - webhook and manual reconciliation share exact cumulative refund confirmation
+  ---
+  duration_ms: 12.770223
+  type: 'test'
+  ...
+# Subtest: provider status paid or cancelled without refunded amount cannot invent refund
+ok 39 - provider status paid or cancelled without refunded amount cannot invent refund
+  ---
+  duration_ms: 0.369205
+  type: 'test'
+  ...
+# Subtest: wrong amount and another charge cannot confirm the reservation refund
+ok 40 - wrong amount and another charge cannot confirm the reservation refund
+  ---
+  duration_ms: 9.094983
+  type: 'test'
+  ...
+# Subtest: method disabled administratively cannot create payment even if browser sends it
+ok 41 - method disabled administratively cannot create payment even if browser sends it
+  ---
+  duration_ms: 1.20307
+  type: 'test'
+  ...
+# Subtest: settings reject fractions and invalid provider instead of silently coercing money rules
+ok 42 - settings reject fractions and invalid provider instead of silently coercing money rules
+  ---
+  duration_ms: 10.582431
+  type: 'test'
+  ...
+# Subtest: installment policy comes from property configuration with explicit interest payer
+ok 43 - installment policy comes from property configuration with explicit interest payer
+  ---
+  duration_ms: 0.390871
+  type: 'test'
+  ...
+# Subtest: reservation opens guarantee and financial history through actual buttons
+ok 44 - reservation opens guarantee and financial history through actual buttons
+  ---
+  duration_ms: 260.716457
+  type: 'test'
+  ...
+# Subtest: reservation without a guarantee still records an occurrence and does not call a payment endpoint
+ok 45 - reservation without a guarantee still records an occurrence and does not call a payment endpoint
+  ---
+  duration_ms: 146.315398
+  type: 'test'
+  ...
+# Subtest: occurrence is recorded independently without capture request
+ok 46 - occurrence is recorded independently without capture request
+  ---
+  duration_ms: 152.420681
+  type: 'test'
+  ...
+# Subtest: captured guarantee offers refund with bounded amount and does not claim unknown refund succeeded
+ok 47 - captured guarantee offers refund with bounded amount and does not claim unknown refund succeeded
+  ---
+  duration_ms: 176.99112
+  type: 'test'
+  ...
+# Subtest: administrative payment settings submit explicit methods, gateway and deadlines
+ok 48 - administrative payment settings submit explicit methods, gateway and deadlines
+  ---
+  duration_ms: 104.136776
+  type: 'test'
+  ...
+# Subtest: Orders webhook selects the charge rather than the top-level order ID
+ok 49 - Orders webhook selects the charge rather than the top-level order ID
+  ---
+  duration_ms: 3.043008
+  type: 'test'
+  ...
+# Subtest: Pix uses exact server amount and 15 minute expiration
+ok 50 - Pix uses exact server amount and 15 minute expiration
+  ---
+  duration_ms: 1.436002
+  type: 'test'
+  ...
+# Subtest: card sends encrypted payload, no raw card number, and captures 100 percent
+ok 51 - card sends encrypted payload, no raw card number, and captures 100 percent
+  ---
+  duration_ms: 0.866341
+  type: 'test'
+  ...
+# Subtest: vaults a checkout card and uses only its token for a later uncharged guarantee
+ok 52 - vaults a checkout card and uses only its token for a later uncharged guarantee
+  ---
+  duration_ms: 6.471308
+  type: 'test'
+  ...
+# Subtest: checkout card response includes the provider token when storage was requested
+ok 53 - checkout card response includes the provider token when storage was requested
+  ---
+  duration_ms: 1.409253
+  type: 'test'
+  ...
+# Subtest: one and six installments charge the same booking total without a buyer fee
+ok 54 - one and six installments charge the same booking total without a buyer fee
+  ---
+  duration_ms: 1.663723
+  type: 'test'
+  ...
+# Subtest: buyer interest comes from the provider plan and keeps the item at the base price
+ok 55 - buyer interest comes from the provider plan and keeps the item at the base price
+  ---
+  duration_ms: 0.444024
+  type: 'test'
+  ...
+# Subtest: fees API returns exact buyer total for a card BIN and rejects inconsistent plans
+ok 56 - fees API returns exact buyer total for a card BIN and rejects inconsistent plans
+  ---
+  duration_ms: 10.537903
+  type: 'test'
+  ...
+# Subtest: fees API exposes only sanitized error codes for provider diagnostics
+ok 57 - fees API exposes only sanitized error codes for provider diagnostics
+  ---
+  duration_ms: 5.779209
+  type: 'test'
+  ...
+# Subtest: damage authorization is requested without immediate capture
+ok 58 - damage authorization is requested without immediate capture
+  ---
+  duration_ms: 4.505248
+  type: 'test'
+  ...
+# Subtest: guarantee lookup preserves the provider capture deadline
+ok 59 - guarantee lookup preserves the provider capture deadline
+  ---
+  duration_ms: 0.966213
+  type: 'test'
+  ...
+# Subtest: partial refund and capture preserve amount, sandbox URL and idempotency key
+ok 60 - partial refund and capture preserve amount, sandbox URL and idempotency key
+  ---
+  duration_ms: 1.284574
+  type: 'test'
+  ...
+# Subtest: uncertain refund response cannot confirm a refund
+ok 61 - uncertain refund response cannot confirm a refund
+  ---
+  duration_ms: 1.181011
+  type: 'test'
+  ...
+# Subtest: cancel response keeps only charge receipt and cumulative refund amount
+ok 62 - cancel response keeps only charge receipt and cumulative refund amount
+  ---
+  duration_ms: 0.39055
+  type: 'test'
+  ...
+# Subtest: direct charge consultation omits unsupported Accept header and retains refund summary
+ok 63 - direct charge consultation omits unsupported Accept header and retains refund summary
+  ---
+  duration_ms: 0.257179
+  type: 'test'
+  ...
+# Subtest: POST receipt retains the exact cumulative amount even when later GET omits summary
+ok 64 - POST receipt retains the exact cumulative amount even when later GET omits summary
+  ---
+  duration_ms: 0.452956
+  type: 'test'
+  ...
+# Subtest: first refund may be requested without summary but cannot be confirmed from PAID alone
+ok 65 - first refund may be requested without summary but cannot be confirmed from PAID alone
+  ---
+  duration_ms: 0.320209
+  type: 'test'
+  ...
+# Subtest: invalid amounts and expired Pix cannot produce an order
+ok 66 - invalid amounts and expired Pix cannot produce an order
+  ---
+  duration_ms: 0.159577
+  type: 'test'
+  ...
+# Subtest: provider request carries the bearer token and stable idempotency key
+ok 67 - provider request carries the bearer token and stable idempotency key
+  ---
+  duration_ms: 1.760586
+  type: 'test'
+  ...
+# Subtest: a definitive rejected order is distinct from an uncertain provider result
+ok 68 - a definitive rejected order is distinct from an uncertain provider result
+  ---
+  duration_ms: 1.36102
+  type: 'test'
+  ...
+# Subtest: webhook rejects modified payload or signature
+ok 69 - webhook rejects modified payload or signature
+  ---
+  duration_ms: 55.339215
+  type: 'test'
+  ...
+# Subtest: order lookup requires the exact charge and reads nested refund amount
+ok 70 - order lookup requires the exact charge and reads nested refund amount
+  ---
+  duration_ms: 0.756243
+  type: 'test'
+  ...
+# Subtest: new webhook signature accepts only matching ECDSA payload
+ok 71 - new webhook signature accepts only matching ECDSA payload
+  ---
+  duration_ms: 7.357209
+  type: 'test'
+  ...
+# Subtest: seven day boundary is inclusive for both plans
+ok 72 - seven day boundary is inclusive for both plans
+  ---
+  duration_ms: 1.498629
+  type: 'test'
+  ...
+# Subtest: after withdrawal: full early refund, partial late refund, cleaning and unprovided package intact
+ok 73 - after withdrawal: full early refund, partial late refund, cleaning and unprovided package intact
+  ---
+  duration_ms: 0.181755
+  type: 'test'
+  ...
+# Subtest: non-refundable after withdrawal returns only cleaning and unprovided experience
+ok 74 - non-refundable after withdrawal returns only cleaning and unprovided experience
+  ---
+  duration_ms: 3.999864
+  type: 'test'
+  ...
+# Subtest: started stay requires review and cannot produce automatic amount
+ok 75 - started stay requires review and cannot produce automatic amount
+  ---
+  duration_ms: 0.227465
+  type: 'test'
+  ...
+1..75
+# tests 75
+# suites 0
+# pass 75
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3234.094951

@@ -1,0 +1,8 @@
+node_modules/
+.finance-test-db/
+.env
+.env.*
+*.log
+supabase/.temp/
+test-results/
+playwright-report/
