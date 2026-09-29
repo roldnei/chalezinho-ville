@@ -12,7 +12,7 @@ Pix liquidado e devolvido integralmente no sandbox: reserva **58930206DC**, R$ 8
 
 A troca do cartão da caução foi executada na conta do hóspede da reserva **5F7627F740**. O token, o consentimento `guarantee-v2` e a autorização opcional de renovação ficaram vinculados à reserva, sem pré-autorização antecipada. O novo fluxo de caução tem histórico próprio de autorizações, tratamento de recusa, recuperação de resultado incerto e renovação condicionada ao consentimento e ao prazo real do provedor.
 
-**Estornos de cartão continuam sem confirmação**, com os erros documentados abaixo. A comprovação visual do novo Pix no Portal Dev aguarda novo login do usuário; a sessão expirou. O recebimento e as duas devoluções do Pix foram comprovados por API autenticada, banco e tela do site.
+**Estornos de cartão continuam sem confirmação**, com os erros documentados abaixo. O print enviado pelo usuário às 11h01 confirma no Portal Dev o pedido ORDE_143C5D9F-DB6D-4EF9-BB15-191F8D9E9892, Pix de R$ 8,08, com status Cancelado. O recebimento e as duas devoluções foram comprovados por API autenticada e banco; a tela do site e o print do portal confirmam o estado final. O portal não discrimina neste print os valores das duas devoluções.
 
 ## Resultados comprovados
 
@@ -85,7 +85,7 @@ Os anexos de ambos os testes representam apenas simulações, sem dano real nem 
 - Execução do job no Supabase retornou HTTP 200, consultou os pagamentos e estornos e autorizou a caução esperada.
 - O advisor do Supabase não encontrou erro crítico; sinalizou tabelas internas sem políticas de acesso direto (restrição intencional) e proteção de senhas vazadas desativada. [Orientação Supabase](https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection).
 
-Permanece NO-GO para produção: devoluções de cartão aguardam solução/confirmação no PagBank; não foi homologado em tempo real um ciclo completo de renovação após vários dias de estadia. Recusas, renovação, mudança de datas, recuperação e conflitos foram cobertos por testes automatizados; esses testes não substituem a habilitação/homologação da conta PF em produção. A concorrência testada com PostgreSQL/PGlite não equivale a carga com sessões PostgreSQL remotas independentes. Os termos de hospedagem/privacidade e a revisão completa dos módulos não financeiros não fazem parte da confirmação dos pagamentos descrita aqui.
+Permanece NO-GO para produção: devoluções de cartão aguardam solução/confirmação no PagBank; a troca de autorização foi confirmada no sandbox com disparo antecipado de teste, mas não transcorreu uma estadia de vários dias. A liberação dos R$ 320 restantes da captura parcial continua sem comprovação do PagBank. Recusas, renovação, mudança de datas, recuperação e conflitos foram cobertos por testes automatizados; esses testes não substituem a habilitação/homologação da conta PF em produção. A concorrência testada com PostgreSQL/PGlite não equivale a carga com sessões PostgreSQL remotas independentes. Os termos de hospedagem/privacidade e a revisão completa dos módulos não financeiros não fazem parte da confirmação dos pagamentos descrita aqui.
 
 O advisor não indicou erros de segurança. Há 28 recomendações informativas de índices em chaves estrangeiras do esquema e índices ainda sem uso neste banco recém-criado; não foram removidos índices com base nesse histórico curto. [Orientação de índices Supabase](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys).
 
@@ -104,3 +104,15 @@ O advisor não indicou erros de segurança. Há 28 recomendações informativas 
 | Hospedagem do cenário de liberação | `ORDE_673A7134-B057-4C99-8FDD-FEBA34799E68` |
 
 Esses identificadores permitem investigar com o suporte do provedor sem compartilhar tokens, senhas ou dados de cartão.
+
+
+
+## Atualização das 11h16 BRT: renovação e saldo restante
+
+A reserva fictícia 5F7627F740 teve uma nova autorização de R$ 500 confirmada antes de cancelar a anterior. Consultas independentes retornaram anterior CANCELED/paid=0 e nova AUTHORIZED/paid=0. O histórico preservou as duas operações e a sequência de despacho. Próxima avaliação pelo sistema: 02/10 às 11:12:22 BRT; validade real recebida: 04/10 às 11:12:22 BRT, ainda anterior à saída de 05/10.
+
+O teste antecipou somente o disparo das duas tentativas, usando o código real de autorização e conciliação; não alterou prazo nem resposta do provedor. Portanto comprova a substituição no sandbox, não uma estadia longa transcorrida. O instrumento temporário foi encerrado e verificado com HTTP 410. O disparador normal não criou terceira autorização. Foram reexecutados 19 testes de caução/liberação, todos aprovados. Os novos pedidos foram conferidos na API e no banco; a sessão do portal no computador está expirada.
+
+Nova consulta da captura parcial confirmou total=50000, paid=18000, refunded=0, incremented=0, sem campo que comprove a liberação dos R$ 320. O sistema mantém essa liberação não confirmada. Não houve pedido de cancelamento de R$ 320 nem estorno dos R$ 180 neste teste.
+
+Detalhes e pergunta pronta para o suporte (não enviada): [evidência da renovação e saldo restante](guarantee-renewal-live-20260929.md).
