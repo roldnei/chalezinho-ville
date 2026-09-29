@@ -78,9 +78,12 @@ export async function pagBankInstallmentPlans(token: string, value: number, max:
   });
   if (!response.ok) {
     const errorBody = await response.json().catch(() => null);
-    const codes = Array.isArray(errorBody?.error_messages) ? errorBody.error_messages
-      .map((item: any) => String(item?.code || "").replace(/[^a-zA-Z0-9_]/g, "").slice(0, 40))
-      .filter(Boolean).slice(0, 4) : [];
+    const messages = Array.isArray(errorBody?.error_messages) ? errorBody.error_messages :
+      Array.isArray(errorBody?.errors) ? errorBody.errors : [];
+    const codes = messages.map((item: any) => String(item?.code || "")
+      .replace(/[^a-zA-Z0-9_]/g, "").slice(0, 40)).filter(Boolean).slice(0, 4);
+    if (!codes.length && typeof errorBody?.code === "string")
+      codes.push(errorBody.code.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 40));
     throw new Error(`pagbank_fees_http_${response.status}${codes.length ? "_code_" + codes.join("_") : ""}`);
   }
   const body = await response.json().catch(() => null);

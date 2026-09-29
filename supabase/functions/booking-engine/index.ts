@@ -62,6 +62,14 @@ async function chargeInstallments(propertyId:number,amountCents:number,installme
     plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
       terms.no_interest_installments,bin);
   }catch(error){
+    if(bin.length===8&&error instanceof Error&&error.message.startsWith("pagbank_fees_http_400")){
+      try{plans=await pagBankInstallmentPlans(token,amountCents,terms.max_installments,
+        terms.no_interest_installments,bin.slice(0,6));}
+      catch(retryError){error=retryError;}
+    }
+    if(plans){const plan=plans.find(p=>p.installments===installments);
+      if(!plan)throw new Error("installment_unavailable");
+      return {plan,terms,plans,feeFallback:false};}
     // Some sandbox card BINs are rejected by the fee simulator. Never invent
     // buyer interest; the merchant-funded installments still use the exact
     // reservation total and can be presented safely.

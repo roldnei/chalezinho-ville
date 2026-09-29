@@ -336,13 +336,13 @@ function renderSummary(){
   $("#card-number").addEventListener("input",()=>{
     clearTimeout(planTimer);state.installmentQuote=null;
     $("#installment-warning").textContent="";
-    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
-    if(bin.length!==6){$("#installments").dispatchEvent(new Event("change"));return}
+    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,8);
+    if(bin.length!==8){$("#installments").dispatchEvent(new Event("change"));return}
     const optionId=state.rate.quote_option_id;
     planTimer=setTimeout(async()=>{
       try{
         const quote=await api("installment_options",{quote_option_id:optionId,credit_card_bin:bin});
-        if(state.rate.quote_option_id!==optionId||$("#card-number")?.value.replace(/\D/g,"").slice(0,6)!==bin)return;
+        if(state.rate.quote_option_id!==optionId||$("#card-number")?.value.replace(/\D/g,"").slice(0,8)!==bin)return;
         state.installmentQuote={...quote,bin,optionId};
         showPlans(quote.plans,false);
         $("#installment-warning").textContent=quote.fee_fallback?"O PagBank não calculou juros para este cartão. Escolha uma das parcelas sem juros disponíveis; para parcelar com juros, use outro cartão de teste.":"";
@@ -383,7 +383,7 @@ async function performStartPayment(choice){
  const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
-  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,6):undefined;
+  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,8):undefined;
   const quoted=state.installmentQuote;
   const plan=quoted?.plans.find(p=>p.installments===installments);
   if(method==="card"&&(!plan||quoted.bin!==credit_card_bin||quoted.optionId!==state.rate.quote_option_id))

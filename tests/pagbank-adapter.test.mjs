@@ -95,6 +95,9 @@ test('fees API exposes only sanitized error codes for provider diagnostics',asyn
   await assert.rejects(pagBankInstallmentPlans('token',10000,12,6,'453962',
     async()=>new Response(JSON.stringify({error_messages:[{code:'40001',message:'sensitive text'}]}),{status:400})),
     error=>error.message==='pagbank_fees_http_400_code_40001');
+  await assert.rejects(pagBankInstallmentPlans('token',10000,12,6,'45396206',
+    async()=>new Response(JSON.stringify({errors:[{code:'fees_not_configured',message:'private account details'}]}),{status:400})),
+    error=>error.message==='pagbank_fees_http_400_code_fees_not_configured');
 });
 
 test('damage authorization is requested without immediate capture',()=>{
