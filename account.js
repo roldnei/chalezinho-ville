@@ -590,7 +590,7 @@ function renderGuarantee(g,r){
  const attention=guaranteeAttention(g.attention_code||g.provider_error_code);
  const text=g.status==="released"?"Garantia liberada.":g.status==="captured"?"Foi utilizado "+brlC(captured)+" em uma ocorrência registrada.":
   attention|| (g.status==="guaranteed"?(expiry<=Date.now()?"A autorização venceu; a caução precisa ser regularizada.":"Valor autorizado até "+fmtDateTime(g.provider_capture_before)+"."+(expiry<departure+3600000?" O prazo atual não cobre o fim da estadia; será necessária renovação ou avaliação da equipe.":"")):
-  g.status==="pending"?"Pré-autorização programada para perto do check-in com o cartão desta reserva.":"Aguardando confirmação do PagBank.");
+  g.status==="pending"?(r.status!=="confirmed"||departure<=Date.now()?"Não há pré-autorização ativa para esta estadia.":"Pré-autorização programada para perto do check-in com o cartão desta reserva."):"Aguardando confirmação do PagBank.");
  const canUpdate=r.status==="confirmed"&&departure>Date.now()&&["pending","guaranteed"].includes(g.status);
  return '<div class="guest-guarantee"><small>GARANTIA DA HOSPEDAGEM · SANDBOX</small><strong>'+amount+'</strong><p>'+text+'</p><p>A autorização reserva temporariamente o limite do cartão. Danos comprovados podem gerar captura parcial ou integral. O valor da hospedagem é tratado separadamente.</p>'+
   (canUpdate?'<button type="button" data-guarantee-card="'+esc(g.id)+'">Atualizar cartão da caução</button>':"")+
@@ -609,7 +609,9 @@ function openGuaranteeCard(id){
    if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_card");
    ["number","month","year","cvv"].forEach(n=>fields[n].value="");
    await guaranteeApi("replace_card",{guarantee_id:id,operation_key:crypto.randomUUID(),encrypted_card:card.encryptedCard,consent:fields.consent.checked,renewal_consent:fields.renewal.checked});
-   message.textContent="Cartão atualizado. Consultando a caução…";await boot();modal.remove();
+   message.textContent="Cartão atualizado. A caução usará este cartão na próxima solicitação necessária.";
+   Array.from(fields).forEach(field=>field.disabled=true);btn.disabled=false;btn.type="button";btn.textContent="Concluir";btn.onclick=()=>modal.remove();
+   await boot();
   }catch(error){message.textContent=error.message==="invalid_card"?"Confira os dados do cartão.":error.message==="card_update_unavailable"?"Há uma operação em andamento ou uma tentativa recente. Aguarde um minuto e consulte a caução.":"O cartão não foi atualizado. A reserva continua válida. Consulte a caução ou tente novamente mais tarde.";btn.disabled=false;}
  };
 }

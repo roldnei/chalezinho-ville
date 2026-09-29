@@ -128,7 +128,7 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
   const charge = body.charges[0];
   if (charge.amount?.currency !== "BRL" || Number(charge.amount?.value) !== order.charges[0].amount.value ||
       !["WAITING", "PAID", "IN_ANALYSIS", "AUTHORIZED", "DECLINED"].includes(charge.status) ||
-      (order.charges[0].payment_method.type === "PIX" && !charge.qr_code?.text))
+      (order.charges[0].payment_method.type === "PIX" && charge.status!=="DECLINED" && !charge.qr_code?.text))
     throw new Error("pagbank_order_response_invalid");
   return { orderId: body.id as string, chargeId: charge.id as string,
     cardToken: charge.payment_method?.card?.id as string | undefined,

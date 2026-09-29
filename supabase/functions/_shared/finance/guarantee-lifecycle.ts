@@ -102,7 +102,12 @@ export async function authorizeGuarantee(admin:any,guaranteeId:string,gateway:Pa
     if(persistError)throw new Error('authorization_persistence_uncertain');
     const updated=await reconcileGuaranteeAuthorizations(admin,g.id,gateway);
     return {id:g.id,status:updated.status};
-  }catch {
+  }catch(error) {
+    const code=error instanceof Error?error.message:'';
+    if(['pagbank_order_rejected','card_version_changed'].includes(code)){
+      const {data:rejected,error:rejectError}=await admin.rpc('reject_guarantee_authorization_request',{p_id:a.id,p_error:code});
+      if(!rejectError&&rejected===true)return {id:g.id,status:'authorization_declined'};
+    }
     await admin.from('guarantee_authorizations').update({state:'uncertain',provider_error_code:'provider_result_unknown'})
       .eq('id',a.id).eq('state','requested');
     await admin.from('guarantees').update({attention_code:'authorization_result_uncertain'})

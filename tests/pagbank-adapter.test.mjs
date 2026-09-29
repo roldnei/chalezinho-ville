@@ -21,6 +21,13 @@ const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'1234567890
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
   notificationUrl:'https://example.com/functions/v1/pagbank-webhook'};
 
+test('declined Pix preserves its provider identity even when no QR code is issued',async()=>{
+ const order=pagBankOrder({...input,method:'pix',expiresAt:new Date(Date.now()+900000)});
+ const result=await createPagBankOrder('sandbox','test-token',order,async()=>new Response(JSON.stringify({id:'ORDE_DECLINED',charges:[{
+  id:'CHAR_DECLINED',status:'DECLINED',amount:{value:input.amountCents,currency:'BRL'},payment_method:{type:'PIX'}}]}),{status:201}));
+ assert.equal(result.status,'DECLINED');assert.equal(result.chargeId,'CHAR_DECLINED');assert.equal(result.pixCode,undefined);
+});
+
 test('customer name rejects provider-forbidden symbols but keeps accented and compound names',()=>{
   for(const name of ['[DEV] Finance QA','Nome;teste','Nome@example'])
     assert.throws(()=>pagBankOrder({...input,customer:{...customer,name},method:'card',encryptedCard:'test',installments:1}),/invalid_customer_data/);

@@ -127,7 +127,7 @@ function showStep(n){
 async function generateQuote(withExperiences){
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
  const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen});
- state.quote=q;startCountdown(q.expires_at);return q;
+ q.selected_variant_ids=chosen.map(String).sort();state.quote=q;startCountdown(q.expires_at);return q;
 }
 function renderRates(){
  const box=$("#rate-options");box.innerHTML="";const ref=state.quote.rate_options.find(x=>x.code==="reference");
@@ -257,6 +257,7 @@ async function maybeOfferUpsell(){
      const targetProduct=(state.config.experience_products||[]).find(p=>String(p.id)===String(candidate.to_product_id));
      const targetVariant=targetProduct?primaryVariant(targetProduct):null;
      if(targetVariant)state.selectedByProduct[candidate.to_product_id]=targetVariant.id;
+     state.quote.selected_variant_ids=Object.values(state.selectedByProduct).map(String).sort();
 
      renderSummary();
      track("experience_upgraded",{property_id:state.property?.id||null,metadata:{from_product_id:candidate.from_product_id,to_product_id:candidate.to_product_id,difference_cents:Number(candidate.difference_cents||0)}});
@@ -275,6 +276,12 @@ async function maybeOfferUpsell(){
  };
 }
 async function refreshQuoteAfterExperiences(){
+ const chosen=Object.values(state.selectedByProduct).map(String).sort();
+ const previous=state.quote?.selected_variant_ids||((state.quote?.experiences||[]).length===0?[]:null);
+ if(previous&&JSON.stringify(previous)===JSON.stringify(chosen)){
+  if(Date.parse(state.quote.expires_at)<=Date.now())throw new Error("quote_expired");
+  return;
+ }
  const code=state.rateCode;setFlowError("Atualizando o pacote com suas escolhas…");
  await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;state.upsellHandled=false;setFlowError("");
 }

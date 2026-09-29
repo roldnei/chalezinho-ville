@@ -18,6 +18,7 @@ before(async()=>{
  create table audit_events(id bigint generated always as identity,actor_user_id uuid,action text,entity_type text,entity_id text,new_value jsonb);
  `);
  await db.exec(await readFile(new URL('../supabase/migrations/20260929130207_finance_guarantee_authorization_history.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20260929133500_finance_authorization_rejection_and_checkout.sql',import.meta.url),'utf8'));
  for(const [id,role] of [[guest,'guest'],[manager,'admin']]){await db.query('insert into auth.users values($1)',[id]);await db.query('insert into profiles values($1,$2)',[id,role]);}
 });
 after(async()=>db?.close());
@@ -124,4 +125,26 @@ test('authorization identities and service operations cannot be rewritten by gue
  await db.exec('set role authenticated');
  try{await assert.rejects(claim(f.g),/permission denied/);await assert.rejects(db.query('select * from guarantee_authorizations'),/permission denied/);}
  finally{await db.exec('reset role')}
+});
+
+test('definite rejection unlocks card replacement but cannot erase an uncertain or identified charge',async()=>{
+ const f=await fixture(),a=await claim(f.g);
+ assert.equal((await one("select reject_guarantee_authorization_request($1,'pagbank_order_rejected') ready",[a.id])).ready,true);
+ assert.equal((await one('select status from guarantees where id=$1',[f.g])).status,'pending');
+ await db.query('update guarantees set next_action_at=now() where id=$1',[f.g]);assert.equal((await claim(f.g)).id,null);
+ const key=randomUUID();await one('select claim_guarantee_card_update($1,$2,$3)',[f.g,guest,key]);
+ await one("select save_guarantee_card($1,$2,$3,'CARD_NEW',false)",[f.g,guest,key]);const b=await claim(f.g);assert.ok(b.id);
+ await db.query("update guarantee_authorizations set state='uncertain' where id=$1",[b.id]);
+ assert.equal((await one("select reject_guarantee_authorization_request($1,'pagbank_order_rejected') ready",[b.id])).ready,false);
+ await assert.rejects(one("select reject_guarantee_authorization_request($1,'timeout')",[b.id]),/not_a_definite_rejection/);
+});
+test('check-in uses the configured checkout time and requires coverage through its inspection margin',async()=>{
+ const f=await fixture(),a=await claim(f.g);await observe(a);
+ await db.query("update properties set check_out_time='18:00' where id=1");
+ try{
+  await db.query("update guarantees set provider_capture_before=((current_date+2)+time '15:00') at time zone 'America/Sao_Paulo' where id=$1",[f.g]);
+  await assert.rejects(one('select check_in_with_guarantee($1,$2,null)',[f.r,manager]),/guarantee_check_in_exception_required/);
+  await db.query("update guarantees set provider_capture_before=((current_date+2)+time '19:00') at time zone 'America/Sao_Paulo' where id=$1",[f.g]);
+  await one('select check_in_with_guarantee($1,$2,null)',[f.r,manager]);
+ }finally{await db.query("update properties set check_out_time='11:00' where id=1")}
 });
