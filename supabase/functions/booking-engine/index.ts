@@ -174,10 +174,10 @@ async function adminCalendarAction(req:Request,body:any){
  }else if(operation==="save"){
   const provider=String(body.provider),enabled=body.enabled!==false;
   if(!["booking","airbnb"].includes(provider))return json({ok:false,error:"invalid_provider"},400);
-  let url:string|null=null;
-  try{if(body.feed_url)url=calendarUrl(String(body.feed_url).trim(),provider);if(enabled&&!url)throw Error();if(enabled)await fetchCalendar(url!,provider)}
+  let url:string|null=null;let periods:any[]=[];
+  try{if(body.feed_url)url=calendarUrl(String(body.feed_url).trim(),provider);if(enabled&&!url)throw Error();if(enabled)periods=await fetchCalendar(url!,provider)}
   catch{return json({ok:false,error:"calendar_validation_failed"},400)}
-  const {error}=await admin.from("property_calendar_sources").upsert({property_id:propertyId,provider,label:String(body.label||provider).slice(0,120),feed_url:url,enabled,last_error:null,last_checked_at:null,updated_at:new Date().toISOString()},{onConflict:"property_id,provider"});
+  const {error}=await admin.from("property_calendar_sources").upsert({property_id:propertyId,provider,label:String(body.label||provider).slice(0,120),feed_url:url,enabled,last_error:null,last_checked_at:enabled?new Date().toISOString():null,last_success_at:enabled?new Date().toISOString():null,event_count:enabled?periods.length:null,updated_at:new Date().toISOString()},{onConflict:"property_id,provider"});
   if(error)return json({ok:false,error:"calendar_save_failed"},500);
  }else if(operation==="test"){
   const provider=String(body.provider);if(!["booking","airbnb"].includes(provider))return json({ok:false,error:"invalid_provider"},400);
