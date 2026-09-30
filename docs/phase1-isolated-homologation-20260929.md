@@ -4,7 +4,7 @@ Escopo: Supabase `pxfqmnhqodqyaaqeyjgr`, branch `fix/reservation-finance-lifecyc
 
 ## Correções desta rodada
 
-- Publicados os módulos PMS e notificações que ainda não existiam no ambiente isolado. Envio transacional permanece desativado enquanto faltarem provedor/credenciais.
+- Publicados os módulos PMS e notificações que ainda não existiam no ambiente isolado. Brevo configurado no ambiente isolado, com envio restrito ao destinatário autorizado.
 - PMS verifica imóvel e permissão em tarefas, ocorrências, anexos, modelos e bloqueios; prestadores só executam tarefas atribuídas a eles. Evidências são filtradas antes da assinatura das URLs. Valores financeiros, inclusive valores aninhados nas experiências, não são entregues à equipe sem permissão.
 - Somente administradores gerenciam equipe e acessam notificações globais. Administradores suspensos não passam pela autorização administrativa do motor de reservas.
 - Check-in do PMS usa a mesma rotina transacional da central, preservando suas validações e auditoria. Liberação de tarefa exige etapa de vistoria e checklist completo. Não comparecimento não pode ser lançado antes da chegada ou depois do check-in.
@@ -14,9 +14,9 @@ Escopo: Supabase `pxfqmnhqodqyaaqeyjgr`, branch `fix/reservation-finance-lifecyc
 
 ## Evidências registradas
 
-150 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
+151 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
 
-Correções finais: a Área do Hóspede considera checkout registrado e horários configurados; notificações atrasadas do Brevo não apagam entrega confirmada, falhas de persistência retornam resposta repetível e timestamp inválido recebe erro controlado. Webhook v2 publicado e chamada sem credencial recusada (401). Entrega real pelo Brevo ainda não homologada.
+Correções finais: a Área do Hóspede considera checkout registrado e horários configurados; notificações atrasadas do Brevo não apagam entrega confirmada, falhas de persistência retornam resposta repetível e timestamp inválido recebe erro controlado. Webhook v2 publicado e chamada sem credencial recusada (401). Entrega real por SMTP e API Brevo comprovada em 29/09; webhook e agendamento também confirmados.
 
 Reserva de ensaio `DEDFD40744` / `7823e966-dc9b-4591-9601-0d9c5f03f696`: base criada manualmente como fixture, vinculada à conta QA. A hospedagem desta fixture NÃO foi vendida no gateway. Os adicionais abaixo foram transações reais de sandbox, sem simulação de status pago no banco:
 
@@ -41,9 +41,22 @@ A fixture operacional foi inserida diretamente no banco isolado para testar tran
 
 ## Ainda em execução
 
-- Configurar Brevo, comprovar mensagens operacionais e concluir recuperação de senha.
+- Confirmar com o usuário o login usando a senha que ele alterou. SMTP, API, webhook e cron já comprovados.
 - UI de adicionais conferida com valores e pagamentos aplicados. Equipe/prestador validados. Bloqueios, tarefas e ocorrências temporários cancelados; produtos de ensaio restaurados a rascunho e upgrade arquivado, preservando histórico.
 - Configurar os três calendários privados Booking antes de declarar cobertura completa; produção já recusa pesquisa sem eles, desenvolvimento permite ensaios sem a integração.
 - Consolidar documentação de lançamento/reversão e avaliação de conteúdo. Não declarar homologação geral ou liberação de produção antes dessas evidências.
 
-Rodada de e-mails: migração phase1_notification_amount_units converte o total da confirmação para centavos e corrige somente snapshots legados ainda na fila; mensagens já enviadas são preservadas. Teste comprova conversão uma única vez. Dispatcher v2 formata datas de hospedagem sem deslocamento para o dia anterior em Brasília. Entrega externa segue pendente do Brevo.
+Rodada de e-mails: migração phase1_notification_amount_units converte o total da confirmação para centavos e corrige somente snapshots legados ainda na fila; mensagens já enviadas são preservadas. Teste comprova conversão uma única vez. Dispatcher v2 formata datas de hospedagem sem deslocamento para o dia anterior em Brasília. Entrega externa comprovada, conforme registros abaixo.
+
+## Brevo — entrega comprovada em 29/09, 21:29–21:57 BRT
+
+As configurações preexistentes da conta foram preservadas. Duas credenciais exclusivas foram criadas com autorização do proprietário, válidas até 29/10/2026; renovar antes dessa data se o ambiente continuar em uso. SMTP do Auth e API operacional usam o remetente verificado reservas@notificacoes.chalezinhoville.com.br. Chaves foram armazenadas somente na configuração segura do Supabase.
+
+- Recuperação de senha: HTTP 200; Brevo registrou envio, entrega e abertura às 21:29.
+- API operacional: outbox c330fa33-1372-49bf-879b-be92868fc1a2, uma tentativa, entrega confirmada no portal às 21:43.
+- Webhook autenticado: outbox a5059ba8-86ce-4cf5-ad7d-f36e7daae547, delivered no banco às 00:52:02 UTC de 30/09.
+- Cron real, sem invocação manual: outbox 1765c141-4c33-4457-9cbd-2be2b95335fc, uma tentativa, delivered às 00:57:05 UTC. Agendador executa a cada minuto, com JWT e segredo dedicado obtidos do Vault; não contém segredos na definição do job.
+- No ambiente development, EMAIL_TEST_RECIPIENT é obrigatório e a reivindicação da fila só seleciona o endereço autorizado. O destinatário é conferido novamente antes do envio; a fila fictícia não é redirecionada.
+- Teste adicional em PGlite confirma seleção por destinatário e preservação dos demais registros. Regressão: 151/151; TypeScript do dispatcher sem erros.
+
+Homologação geral ainda depende dos feeds Booking e da confirmação do login com a senha nova. Estorno/caução permanecem excluídos.

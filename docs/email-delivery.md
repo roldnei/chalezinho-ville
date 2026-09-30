@@ -41,3 +41,11 @@ Confirmação de conta e recuperação de senha continuam gerenciadas pelo Supab
 - `sent`: aceito pelo provedor.
 - `delivery_status=delivered`: confirmado pelo webhook.
 - hard bounce, bloqueio e spam ficam registrados para auditoria.
+
+## Ambiente de homologação
+
+Em FINANCE_ENVIRONMENT=development, EMAIL_TEST_RECIPIENT é obrigatório. O claim filtra esse destinatário no banco e o dispatcher verifica novamente antes de enviar, processando uma mensagem por execução. Não se deve usar essa configuração para redirecionar mensagens de hóspedes reais.
+
+O cron notification-dispatcher chama dispatch_notification_outbox a cada minuto. Provisionar separadamente no Vault finance_project_url, notification_dispatch_secret e notification_anon_jwt. O JWT é a chave pública anon do projeto, e o segredo dedicado continua obrigatório no handler. A função de agendamento não é executável por anon/authenticated. Sem configuração, não envia requisição. Credenciais não são incluídas em migrações nem na definição do job.
+
+Na instância isolada, SMTP/API, entrega via webhook e execução real pelo cron foram comprovados em 29/09/2026. Chaves Brevo exclusivas de testes expiram em 29/10/2026; renovação precisa preservar o escopo autorizado.

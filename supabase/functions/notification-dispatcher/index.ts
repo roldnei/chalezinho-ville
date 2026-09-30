@@ -53,6 +53,9 @@ Deno.serve(async (request) => {
   const fromName = Deno.env.get("EMAIL_FROM_NAME") || "Chalezinho Ville";
   const replyToEmail = Deno.env.get("EMAIL_REPLY_TO") || fromEmail;
   const siteUrl = (Deno.env.get("EMAIL_SITE_URL") || "https://chalezinhoville.com.br").replace(/\/$/, "");
+  const development = Deno.env.get("FINANCE_ENVIRONMENT") === "development";
+  const testRecipient = (Deno.env.get("EMAIL_TEST_RECIPIENT") || "").trim().toLowerCase();
+  if (development && !testRecipient) return json({ ok: false, error: "email_test_recipient_required" }, 503);
 
   if (!supabaseUrl || !serviceRoleKey || !fromEmail) {
     return json({ ok: false, error: "email_runtime_not_configured" }, 503);
@@ -68,7 +71,7 @@ Deno.serve(async (request) => {
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: claimed, error: claimError } = await admin.rpc("claim_notification_outbox", { p_limit: 20 });
+  const { data: claimed, error: claimError } = await admin.rpc("claim_notification_outbox_for_delivery", { p_limit: development ? 1 : 20, p_recipient_email: development ? testRecipient : null });
   if (claimError) return json({ ok: false, error: "outbox_claim_failed" }, 500);
 
   const results: Array<Record<string, unknown>> = [];
@@ -91,6 +94,7 @@ Deno.serve(async (request) => {
         recipientName = String(data?.user?.user_metadata?.full_name || "");
       }
       if (!recipientEmail) throw new EmailProviderError("recipient_email_missing", false);
+      if (development && recipientEmail.trim().toLowerCase() !== testRecipient) throw new EmailProviderError("test_recipient_changed", false);
 
       const payload = item.payload || {};
       const variables: Record<string, unknown> = {
