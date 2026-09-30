@@ -1,23 +1,11 @@
-import {test} from 'node:test';
-import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
-import ts from 'typescript';
-const full=await readFile(new URL('../supabase/functions/booking-engine/index.ts',import.meta.url),'utf8');
-const source=full.slice(full.indexOf('const bookingFeeds='),full.indexOf('async function searchData('));
-const compiled=ts.transpileModule(source,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None}}).outputText;
-function fixture(fetch){return new Function('fetch','Deno','validDate',compiled+';return {readIcalFeed,bookingCalendarData};')(fetch,{env:{get:()=> 'https://calendar.example.test/private'}},s=>/^\d{4}-\d{2}-\d{2}$/.test(s)&&new Date(s).toISOString().slice(0,10)===s);}
-const calendar=e=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'+e+'END:VCALENDAR\r\n';
-test('Booking valid empty feeds remain valid; occupied dates preserve exclusive checkout',async()=>{
- const f=fixture(async()=>new Response(calendar('BEGIN:VEVENT\r\nDTSTART;VALUE=DATE:20270310\r\nDTEND;VALUE=DATE:20270312\r\nEND:VEVENT\r\n')));
- assert.deepEqual(await f.readIcalFeed('fixture'),[{start:'2027-03-10',end:'2027-03-12'}]);
- assert.deepEqual(await fixture(async()=>new Response(calendar(''))).readIcalFeed('fixture'),[]);
-});
-test('Booking HTML, malformed event and HTTP failure are not treated as empty calendars',async()=>{
- for(const response of [new Response('<html>Error</html>'),new Response(calendar('BEGIN:VEVENT\r\nDTSTART:20270310\r\nEND:VEVENT\r\n')),new Response('Unavailable',{status:503})]){
-  await assert.rejects(fixture(async()=>response).readIcalFeed('fixture'),/feed_/);
- }
-});
-test('Booking failure marks each configured listing unhealthy instead of available',async()=>{
- const r=await fixture(async()=>{throw new Error('network');}).bookingCalendarData();
- assert.equal(r.configured,true); assert.equal(r.ok,false);assert.equal(r.listings.length,3);assert.ok(r.listings.every(x=>x.ok===false));
-});
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import ts from 'typescript';
+const code=ts.transpileModule(await readFile(new URL('../supabase/functions/_shared/calendars.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
+const {parseCalendar,calendarUrl,calendarText,calendarService}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const wrap=body=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'+body+'END:VCALENDAR\r\n';
+const event='BEGIN:VEVENT\r\nUID:external\r\nDTSTART;VALUE=DATE:20270310\r\nDTEND;VALUE=DATE:20270312\r\nEND:VEVENT\r\n';
+test('valid empty calendar and exclusive checkout parse correctly',()=>{assert.deepEqual(parseCalendar(wrap('')),[]);assert.deepEqual(parseCalendar(wrap(event)),[{start:'2027-03-10',end:'2027-03-12'}]);});
+test('invalid pages, missing dates, impossible dates and recurrence fail closed',()=>{for(const raw of ['<html>error</html>',wrap('BEGIN:VEVENT\r\nEND:VEVENT\r\n'),wrap(event.replace('20270310','20270230')),wrap(event.replace('UID:external','RRULE:FREQ=DAILY'))])assert.throws(()=>parseCalendar(raw),/calendar/);});
+test('cancelled events and own exported events are not reimported',()=>{assert.deepEqual(parseCalendar(wrap(event.replace('UID:external','UID:reservation-123@chalezinho-site'))),[]);assert.deepEqual(parseCalendar(wrap(event.replace('UID:external','STATUS:CANCELLED'))),[]);});
+test('private network, unexpected hosts, redirects targets and credentials cannot become import URLs',()=>{for(const url of ['http://ical.booking.com/v1/export','https://127.0.0.1/v1/export','https://ical.booking.com.evil.test/v1/export','https://user:pass@ical.booking.com/v1/export','https://ical.booking.com:444/v1/export','https://ical.booking.com/v1/export#x'])assert.throws(()=>calendarUrl(url,'booking'));assert.ok(calendarUrl('https://ical.booking.com/v1/export?t=test','booking'));assert.ok(calendarUrl('https://www.airbnb.com/calendar/ical/example.ics?s=test','airbnb'));});
+test('export is valid iCalendar with stable UID, exclusive checkout and no personal fields',()=>{const row={uid:'reservation-123',start:'2027-03-10',end:'2027-03-12',updated:'2026-09-30T01:00:00Z',guest_name:'PRIVATE',email:'private@example.test',total_amount:900};const text=calendarText([row]);assert.match(text,/UID:reservation-123@chalezinho-site/);assert.match(text,/DTEND;VALUE=DATE:20270312/);assert.ok(text.endsWith('\r\n'));assert.ok(!text.includes('PRIVATE')&&!text.includes('private@')&&!text.includes('900'));assert.equal(text,calendarText([row]));});
+test('wrong export token never queries reservation data',async()=>{const tables=[];const service=calendarService({from:t=>{tables.push(t);return {select(){return this},eq(){return this},maybeSingle:async()=>({data:null})}}},'https://example.test');assert.equal((await service.exportFeed('wrong')).status,404);assert.deepEqual(tables,[]);assert.equal((await service.exportFeed('a'.repeat(64))).status,404);assert.deepEqual(tables,['property_calendar_exports']);});

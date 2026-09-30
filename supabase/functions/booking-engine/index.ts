@@ -1,3 +1,4 @@
+import {calendarService,calendarUrl,fetchCalendar} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
@@ -148,41 +149,43 @@ async function prodJson(path:string){
   return d;
 }
 
-const bookingFeeds=[
-  {name:"Ville Signature",env:"ICAL_BOOKING_CH1"},
-  {name:"Ville Essenza",env:"ICAL_BOOKING_CH2"},
-  {name:"Ville Amore",env:"ICAL_BOOKING_CH3"}
-];
-function bookingIcalConfigured(){
-  return bookingFeeds.every(x=>Boolean(Deno.env.get(x.env)));
+const calendars=calendarService(admin,projectUrl);
+async function bookingCalendarData(){return calendars.channels("booking")}
+async function airbnbCalendarData(){
+ const data=await calendars.channels("airbnb");
+ // Transitional compatibility for existing Airbnb channels; newly entered links always win.
+ if(!data.listings.some((x:any)=>x.error==="calendar_not_configured"))return data;
+ const legacy=await prodJson("/api/ical-airbnb-all").catch(()=>({listings:[]}));
+ const listings=data.listings.map((x:any)=>x.error==="calendar_not_configured"?({...x,...((legacy.listings||[]).find((y:any)=>y.name===x.name)||{}),migration_pending:true}):x);
+ return {...data,listings,ok:listings.every((x:any)=>x.ok)};
 }
-function unfoldIcal(s:string){return s.replace(/\r?\n[ \t]/g,"");}
-function icalDate(v:string){
-  const m=String(v||"").match(/^(\d{4})(\d{2})(\d{2})/);
-  return m?m[1]+"-"+m[2]+"-"+m[3]:null;
-}
-async function readIcalFeed(url:string){
-  const r=await fetch(url,{headers:{"User-Agent":"ChalezinhoVille/1.0"},signal:AbortSignal.timeout(8000)});
-  if(!r.ok) throw new Error("feed_unreachable");
-  const raw=unfoldIcal(await r.text());
-  if(!/^BEGIN:VCALENDAR\s*$/m.test(raw)||!/^END:VCALENDAR\s*$/m.test(raw)) throw new Error("feed_invalid");
-  return raw.split("BEGIN:VEVENT").slice(1).map(x=>x.split("END:VEVENT")[0]).map(e=>{
-    const s=e.match(/DTSTART(?:;[^:]*)?:(\d{8})/);
-    const d=e.match(/DTEND(?:;[^:]*)?:(\d{8})/);
-    const start=s?icalDate(s[1]):null,end=d?icalDate(d[1]):null;
-    if(!start||!end||!validDate(start)||!validDate(end)||end<=start) throw new Error("feed_invalid_event");
-    return {start,end};
-  }).filter(Boolean);
-}
-async function bookingCalendarData(){
-  const configured=bookingIcalConfigured();
-  if(!configured) return {configured:false,ok:true,listings:bookingFeeds.map(x=>({name:x.name,ok:true,periods:[]}))};
-  const listings=await Promise.all(bookingFeeds.map(async x=>{
-    const url=Deno.env.get(x.env)||"";
-    try{return {name:x.name,ok:true,periods:await readIcalFeed(url)}}
-    catch{return {name:x.name,ok:false,periods:[]}}
-  }));
-  return {configured:true,ok:listings.every(x=>x.ok),listings};
+async function adminCalendarAction(req:Request,body:any){
+ const user=await currentUser(req);
+ if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+ const operation=String(body.operation||"list");
+ if(operation==="list")return json({ok:true,...await calendars.configuration()});
+ const propertyId=Number(body.property_id);
+ const {data:property,error:propertyError}=await admin.from("properties").select("id").eq("id",propertyId).maybeSingle();
+ if(propertyError||!property)return json({ok:false,error:"property_not_found"},404);
+ if(operation==="rotate"){
+  const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),v=>v.toString(16).padStart(2,"0")).join("");
+  const {error}=await admin.from("property_calendar_exports").update({token}).eq("property_id",propertyId);
+  if(error)return json({ok:false,error:"calendar_save_failed"},500);
+ }else if(operation==="save"){
+  const provider=String(body.provider),enabled=body.enabled!==false;
+  if(!["booking","airbnb"].includes(provider))return json({ok:false,error:"invalid_provider"},400);
+  let url:string|null=null;
+  try{if(body.feed_url)url=calendarUrl(String(body.feed_url).trim(),provider);if(enabled&&!url)throw Error();if(enabled)await fetchCalendar(url!,provider)}
+  catch{return json({ok:false,error:"calendar_validation_failed"},400)}
+  const {error}=await admin.from("property_calendar_sources").upsert({property_id:propertyId,provider,label:String(body.label||provider).slice(0,120),feed_url:url,enabled,last_error:null,last_checked_at:null,updated_at:new Date().toISOString()},{onConflict:"property_id,provider"});
+  if(error)return json({ok:false,error:"calendar_save_failed"},500);
+ }else if(operation==="test"){
+  const provider=String(body.provider);if(!["booking","airbnb"].includes(provider))return json({ok:false,error:"invalid_provider"},400);
+  const results=await calendars.channels(provider);const result=results.listings.find((x:any)=>x.property_id===propertyId);
+  return json({ok:true,result:{healthy:result?.ok===true,error:result?.error||null,events:result?.periods.length||0}});
+ }else return json({ok:false,error:"invalid_operation"},400);
+ await admin.from("audit_events").insert({actor_user_id:user.id,action:"calendar_"+operation,entity_type:"property",entity_id:String(propertyId),new_value:{provider:body.provider||null}});
+ return json({ok:true,...await calendars.configuration()});
 }
 
 async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false){
@@ -199,7 +202,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
       .lt("target_check_in",end).gt("target_check_out",start).gt("expires_at",new Date().toISOString())),
     retryDb("search_operational_blocks",()=>admin.from("pms_calendar_blocks").select("id,property_id,start_date,end_date")
       .eq("status","active").lt("start_date",end).gt("end_date",start)),
-    prodJson("/api/ical-airbnb-all"),
+    airbnbCalendarData(),
     bookingCalendarData(),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
@@ -1079,7 +1082,7 @@ async function opsData(req:Request){
     admin.from("property_integrations").select("property_id,provider,environment_key,external_listing_id,active").order("provider"),
     admin.from("notification_outbox").select("id,template_code,status,send_after,attempt_count,max_attempts,last_error,created_at,reservations(confirmation_code)").order("created_at",{ascending:false}).limit(50)
   ]);
-  const bookingConfigured=bookingFeeds.map(x=>({name:x.name,environment_key:x.env,configured:Boolean(Deno.env.get(x.env))}));
+  const bookingConfigured=(await calendars.channels("booking")).listings.map((x:any)=>({name:x.name,configured:x.ok}));
   return json({ok:true,modifications:mods||[],guarantees:guarantees||[],payments:payments||[],charges:charges||[],settings:settings||null,properties:properties||[],integrations:integrations||[],booking_configured:bookingConfigured,notifications:notifications||[]});
 }
 
@@ -1102,8 +1105,8 @@ async function adminHubData(req:Request,body:any){
     admin.from("property_integrations").select("id,property_id,provider,external_listing_id,pms,environment_key,active,updated_at").order("provider"),
     admin.from("payment_settings").select("*").eq("id",1).single(),
     admin.from("pms_calendar_blocks").select("*").gte("end_date",start).lte("start_date",end).order("start_date"),
-    prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
-    bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
+    airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
+    bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
   ]);
   if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error)
     return json({ok:false,error:"admin_hub_unavailable"},500);
@@ -1193,8 +1196,8 @@ async function adminReservationAction(req:Request,body:any){
       admin.from("reservations").select("id").eq("property_id",propertyId).in("status",["hold","pending_payment","confirmed"]).lt("check_in",checkOut).gt("check_out",checkIn).limit(1),
       admin.from("post_booking_charges").select("id").eq("kind","modification").eq("target_property_id",propertyId).in("status",["awaiting_payment","processing","paid"]).gt("expires_at",new Date().toISOString()).lt("target_check_in",checkOut).gt("target_check_out",checkIn).limit(1),
       admin.from("pms_calendar_blocks").select("id").eq("property_id",propertyId).eq("status","active").lt("start_date",checkOut).gt("end_date",checkIn).limit(1),
-      prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
-      bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
+      airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
+      bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
     ]);
     if(!property||!property.active) return json({ok:false,error:"property_not_found"},404);
     if(guests>Number(property.max_guests)) return json({ok:false,error:"capacity"},409);
@@ -1917,6 +1920,11 @@ Deno.serve(async(req)=>{
     let body:any={};
     if(req.method==="POST") body=await req.json().catch(()=>({}));
     const action=url.searchParams.get("action")||body.action||"config";
+    if(action==="calendar_export"){
+      if(req.method!=="GET")return json({ok:false,error:"method_not_allowed"},405);
+      return await calendars.exportFeed(url.searchParams.get("token")||"");
+    }
+    if(action==="admin_calendar")return await adminCalendarAction(req,body);
     const origin=req.headers.get("origin")||"";
     const development=req.headers.get("x-chalezinho-env")==="development" &&
       (origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
@@ -1971,7 +1979,7 @@ Deno.serve(async(req)=>{
         payment_settings:settingsQ.data||{},
         policy_documents:docsQ.data||[],
         experience_products:productsQ.data||[],
-        availability_coverage:{direct:true,airbnb:true,booking:bookingIcalConfigured()}
+        availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
     if(action==="property_media"){
