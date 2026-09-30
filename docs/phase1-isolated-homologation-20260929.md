@@ -14,7 +14,7 @@ Escopo: Supabase `pxfqmnhqodqyaaqeyjgr`, branch `fix/reservation-finance-lifecyc
 
 ## Evidências registradas
 
-151 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
+154 testes automatizados aprovados; TypeScript dos módulos alterados e sintaxe do PMS aprovados. Nove testes de interface com fixtures aprovados na rodada anterior.
 
 Correções finais: a Área do Hóspede considera checkout registrado e horários configurados; notificações atrasadas do Brevo não apagam entrega confirmada, falhas de persistência retornam resposta repetível e timestamp inválido recebe erro controlado. Webhook v2 publicado e chamada sem credencial recusada (401). Entrega real por SMTP e API Brevo comprovada em 29/09; webhook e agendamento também confirmados.
 
@@ -41,9 +41,9 @@ A fixture operacional foi inserida diretamente no banco isolado para testar tran
 
 ## Ainda em execução
 
-- Confirmar com o usuário o login usando a senha que ele alterou. SMTP, API, webhook e cron já comprovados.
+- Login com a senha alterada confirmado pelo usuário. SMTP, API, webhook e cron comprovados.
 - UI de adicionais conferida com valores e pagamentos aplicados. Equipe/prestador validados. Bloqueios, tarefas e ocorrências temporários cancelados; produtos de ensaio restaurados a rascunho e upgrade arquivado, preservando histórico.
-- Configurar os três calendários privados Booking antes de declarar cobertura completa; produção já recusa pesquisa sem eles, desenvolvimento permite ensaios sem a integração.
+- Três calendários Booking configurados e validados em 30/09; detalhes e limites de evidência abaixo.
 - Consolidar documentação de lançamento/reversão e avaliação de conteúdo. Não declarar homologação geral ou liberação de produção antes dessas evidências.
 
 Rodada de e-mails: migração phase1_notification_amount_units converte o total da confirmação para centavos e corrige somente snapshots legados ainda na fila; mensagens já enviadas são preservadas. Teste comprova conversão uma única vez. Dispatcher v2 formata datas de hospedagem sem deslocamento para o dia anterior em Brasília. Entrega externa comprovada, conforme registros abaixo.
@@ -59,4 +59,14 @@ As configurações preexistentes da conta foram preservadas. Duas credenciais ex
 - No ambiente development, EMAIL_TEST_RECIPIENT é obrigatório e a reivindicação da fila só seleciona o endereço autorizado. O destinatário é conferido novamente antes do envio; a fila fictícia não é redirecionada.
 - Teste adicional em PGlite confirma seleção por destinatário e preservação dos demais registros. Regressão: 151/151; TypeScript do dispatcher sem erros.
 
-Homologação geral ainda depende dos feeds Booking e da confirmação do login com a senha nova. Estorno/caução permanecem excluídos.
+As pendências de configuração Booking e confirmação do login foram resolvidas em 30/09. Estorno/caução permanecem excluídos; não há liberação de produção.
+
+## Fechamento Booking — 30/09/2026
+
+Links fornecidos pelo proprietário armazenados exclusivamente nos secrets do projeto isolado, correspondendo CH1 a Ville Signature, CH2 a Ville Essenza e CH3 a Ville Amore. Todos retornaram HTTP 200 e VCALENDAR válido. CH1 contém quatro eventos; CH2 e CH3 estão vazios. Nenhum link privado foi incluído no repositório.
+
+Admin hub confirmou booking_configured=true e booking=true. Busca real de 10–12/03/2027 bloqueou CH1 e disponibilizou CH2/CH3. Buscas de 16–18/11/2026 e 08–10/12/2026 disponibilizaram os três imóveis. CH2/CH3 não permitem demonstrar ocupação real neste momento; falha, evento e calendário vazio foram cobertos por testes automatizados comuns aos três feeds.
+
+Corrigido parser para rejeitar resposta não iCal e evento sem datas válidas, evitando tratar erro como ausência de reservas. Falhas de HTTP/rede tornam o feed não saudável e impedem disponibilidade. Booking-engine v17 publicado; buscas repetidas com resultado esperado. Regressão completa: 154/154 aprovados.
+
+Rodada de desenvolvimento concluída dentro do escopo e das limitações documentadas. Estorno, caução, promoção para produção e revisão jurídica não fazem parte desta aprovação técnica. iCal é uma consulta de calendário, não inventário transacional compartilhado com a Booking; alterações externas concorrentes continuam dependentes da atualização do feed.

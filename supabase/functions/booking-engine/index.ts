@@ -165,11 +165,13 @@ async function readIcalFeed(url:string){
   const r=await fetch(url,{headers:{"User-Agent":"ChalezinhoVille/1.0"},signal:AbortSignal.timeout(8000)});
   if(!r.ok) throw new Error("feed_unreachable");
   const raw=unfoldIcal(await r.text());
+  if(!/^BEGIN:VCALENDAR\s*$/m.test(raw)||!/^END:VCALENDAR\s*$/m.test(raw)) throw new Error("feed_invalid");
   return raw.split("BEGIN:VEVENT").slice(1).map(x=>x.split("END:VEVENT")[0]).map(e=>{
     const s=e.match(/DTSTART(?:;[^:]*)?:(\d{8})/);
     const d=e.match(/DTEND(?:;[^:]*)?:(\d{8})/);
     const start=s?icalDate(s[1]):null,end=d?icalDate(d[1]):null;
-    return start&&end?{start,end}:null;
+    if(!start||!end||!validDate(start)||!validDate(end)||end<=start) throw new Error("feed_invalid_event");
+    return {start,end};
   }).filter(Boolean);
 }
 async function bookingCalendarData(){
