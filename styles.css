@@ -116,7 +116,7 @@
 }
 
 /* Chalet collection: clearer product architecture */
-.collection-head{max-width:920px;margin:0 auto;text-align:center}.collection-summary{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:34px auto 0}.collection-summary span{border:1px solid rgba(215,192,165,.28);padding:11px 15px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#c9b9a8}.collection-summary b{font:500 18px "Playfair Display",serif;color:#fff;margin-right:5px}.chalet-photo{position:relative;overflow:hidden}.chalet-photo>strong{position:absolute;top:18px;left:18px;width:38px;height:38px;display:grid;place-items:center;background:rgba(20,16,13,.72);border:1px solid rgba(255,255,255,.35);font:500 14px "Playfair Display",serif;color:#fff;backdrop-filter:blur(8px)}.type-badge{position:absolute!important;left:18px;bottom:18px!important;padding:10px 12px;background:rgba(20,16,13,.78);border:1px solid rgba(255,255,255,.25);color:#fff!important;font-size:9px!important;letter-spacing:1.2px!important;backdrop-filter:blur(8px)}.amenities{list-style:none;padding:18px 0 0;margin:20px 0 0;border-top:1px solid rgba(215,192,165,.16);display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}.amenities li{font-size:10px;line-height:1.35;color:#d2c6bb}.amenities li:before{content:"✓";margin-right:7px;color:#b6926d}
+.collection-head{max-width:920px;margin:0 auto;text-align:center}.collection-summary{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin:34px auto 0}.collection-summary span{border:1px solid rgba(215,192,165,.28);padding:11px 15px;font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:#c9b9a8}.collection-summary b{font:500 18px "Playfair Display",serif;color:#fff;margin-right:5px}.chalet-photo{position:relative;overflow:hidden}.chalet-photo>strong{position:absolute;top:18px;left:18px;width:38px;height:38px;display:grid;place-items:center;background:rgba(20,16,13,.72);border:1px solid rgba(255,255,255,.35);font:500 14px "Playfair Display",serif;color:#fff;backdrop-filter:blur(8px)}.type-badge{position:absolute!important;left:18px;bottom:18px!important;padding:10px 12px;background:rgba(20,16,13,.78);border:1px solid rgba(255,255,255,.25);color:#fff!important;font-size:9px!important;letter-spacing:1.2px!important;backdrop-filter:blur(8px)}.amenities{list-style:none;padding:18px 0 0;margin:20px 0 0;border-top:1px solid rgba(215,192,165,.16);display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}.amenities li{font-size:10px;line-height:1.35;color:#d2c6bb}.amenities li:before{content:"âœ“";margin-right:7px;color:#b6926d}
 @media(max-width:800px){.collection{padding-left:0!important;padding-right:0!important}.collection-head{padding:0 24px}.collection .cards{gap:0}.collection .cards article{margin:0 0 34px;background:#201b17}.collection .cards article>div:not(.chalet-photo){padding:26px 24px 30px}.collection .cards img{width:100vw!important;height:auto!important;aspect-ratio:4/3!important;object-fit:cover!important}.collection-summary{display:grid;grid-template-columns:1fr 1fr;gap:8px}.collection-summary span{display:flex;align-items:center;justify-content:center;min-height:52px;padding:8px;text-align:center;line-height:1.3}.collection-summary b{font-size:20px}.type-badge{bottom:16px!important}.amenities{grid-template-columns:1fr 1fr}}
 
 /* Prevent horizontal page drift on touch devices */
@@ -334,7 +334,7 @@ img{max-width:100%;height:auto}
  opacity:1!important;
 }
 
-/* Amenities refinement — cleaner premium grouping */
+/* Amenities refinement â€” cleaner premium grouping */
 .collection .amenities{
  display:grid!important;
  grid-template-columns:repeat(2,minmax(0,1fr))!important;
@@ -354,7 +354,7 @@ img{max-width:100%;height:auto}
  color:#aaa099!important;
 }
 .collection .amenities li::before{
- content:"✓"!important;
+ content:"âœ“"!important;
  position:absolute!important;
  left:0!important;
  top:0!important;
@@ -375,7 +375,7 @@ img{max-width:100%;height:auto}
  }
 }
 
-/* Compact amenities — editorial tags instead of a long list */
+/* Compact amenities â€” editorial tags instead of a long list */
 .collection .amenity-cloud{
  display:flex;
  flex-wrap:wrap;
@@ -402,7 +402,7 @@ img{max-width:100%;height:auto}
  .collection .amenity-cloud span{min-height:28px;padding:5px 9px;font-size:11.5px}
 }
 
-/* Amenities — simple editorial separators */
+/* Amenities â€” simple editorial separators */
 .collection .amenity-cloud{
  display:flex!important;
  flex-wrap:wrap!important;
@@ -460,7 +460,7 @@ img{max-width:100%;height:auto}
  .trust-strip i{height:12px}
 }
 
-/* Guest recognition — compact Airbnb-inspired award treatment */
+/* Guest recognition â€” compact Airbnb-inspired award treatment */
 .trust-strip{
  display:flex!important;align-items:center!important;justify-content:center!important;flex-wrap:nowrap!important;
  gap:30px!important;padding:22px 24px!important;background:#17120d!important;color:#eee6dc!important;
@@ -484,7 +484,7 @@ img{max-width:100%;height:auto}
  .trust-host strong{font-size:14px}
 }
 
-/* Trust strip v3 — Airbnb-style three-column layout */
+/* Trust strip v3 â€” Airbnb-style three-column layout */
 .trust-strip{
  display:grid!important;
  grid-template-columns:auto 1px auto 1px auto!important;
@@ -674,7 +674,7 @@ img{max-width:100%;height:auto}
  }
 }
 
-/* Availability CTA v4 — integrated editorial tab below image */
+/* Availability CTA v4 â€” integrated editorial tab below image */
 .collection article>.availability-box{
  display:block!important;width:100%!important;margin:0!important;padding:0!important;background:#050403!important;
 }
@@ -698,7 +698,7 @@ img{max-width:100%;height:auto}
  .collection article>.availability-box .availability-form{width:100%!important;margin:0!important;padding:14px 16px 18px!important}
 }
 
-/* Availability CTA v5 — small floating tab bridging image and content */
+/* Availability CTA v5 â€” small floating tab bridging image and content */
 .collection article>.availability-box{
  position:relative!important;display:block!important;width:100%!important;height:0!important;
  margin:0!important;padding:0!important;background:transparent!important;z-index:25!important;
@@ -732,7 +732,7 @@ img{max-width:100%;height:auto}
  .collection article>.availability-box .availability-form{width:calc(100% - 28px)!important;margin:0 14px 12px!important}
 }
 
-/* Availability CTA v6 — compact CONSULTAR beside chalet title */
+/* Availability CTA v6 â€” compact CONSULTAR beside chalet title */
 .collection article{position:relative!important}
 .collection article>.availability-box{
  position:absolute!important;
@@ -770,7 +770,7 @@ img{max-width:100%;height:auto}
  .collection article>.availability-box.open{left:40px!important;right:40px!important;transform:translateY(61px)!important}
 }
 
-/* CONSULTAR — stronger warm-gold CTA, separated from chalet title */
+/* CONSULTAR â€” stronger warm-gold CTA, separated from chalet title */
 .collection article>.availability-box{
  right:40px!important;
  transform:translateY(76px)!important;
@@ -809,7 +809,7 @@ img{max-width:100%;height:auto}
  }
 }
 
-/* CONSULTAR v7 — own row below photo, roomy and separated from title */
+/* CONSULTAR v7 â€” own row below photo, roomy and separated from title */
 .collection article>.availability-box{
  position:relative!important;
  left:auto!important;right:auto!important;top:auto!important;
@@ -859,7 +859,7 @@ img{max-width:100%;height:auto}
  }
 }
 
-/* CONSULTAR v8 — overlay on photo, styled like feature label but roomier */
+/* CONSULTAR v8 â€” overlay on photo, styled like feature label but roomier */
 .collection article>.availability-box{
  position:absolute!important;
  left:auto!important;right:24px!important;top:0!important;
@@ -908,7 +908,7 @@ img{max-width:100%;height:auto}
  }
 }
 
-/* CONSULTAR v9 — right of chalet eyebrow, where indicated */
+/* CONSULTAR v9 â€” right of chalet eyebrow, where indicated */
 .collection article>.availability-box{
  position:absolute!important;
  left:auto!important;right:40px!important;top:auto!important;
@@ -945,7 +945,7 @@ img{max-width:100%;height:auto}
  }
 }
 
-/* CONSULTAR v10 — reserve a real header row; no absolute overlap with title */
+/* CONSULTAR v10 â€” reserve a real header row; no absolute overlap with title */
 .collection article>.availability-box{
  position:relative!important;
  left:auto!important;right:auto!important;top:auto!important;
@@ -1133,7 +1133,7 @@ footer{justify-content:space-between!important}
  .collection .cards>article>.availability-box.open>.availability-toggle{left:auto!important;transform:none!important;margin:0 auto!important}
 }
 
-/* Secondary chalet detail CTA — preserve existing consultation layout */
+/* Secondary chalet detail CTA â€” preserve existing consultation layout */
 .collection .cards>article>.chalet-explore{display:flex!important;align-items:center!important;justify-content:space-between!important;box-sizing:border-box!important;margin:0 40px 18px!important;padding:12px 0!important;border-top:1px solid rgba(198,166,136,.16)!important;border-bottom:1px solid rgba(198,166,136,.16)!important;color:#b9a898!important;font-size:9px!important;font-weight:500!important;letter-spacing:.15em!important;text-transform:uppercase!important;text-decoration:none!important}
 .collection .cards>article>.chalet-explore span{font-size:16px!important;color:#d5a86f!important;transition:transform .2s ease}
 .collection .cards>article>.chalet-explore:hover{color:#eadbc9!important}.collection .cards>article>.chalet-explore:hover span{transform:translateX(4px)}
@@ -1303,7 +1303,7 @@ footer{justify-content:space-between!important}
 }
 
 
-/* Landscape mobile/tablet final alignment — applies to taller browser viewports too */
+/* Landscape mobile/tablet final alignment â€” applies to taller browser viewports too */
 @media (orientation:landscape) and (max-width:1600px){
  .collection .cards>article{text-align:center!important}
  .collection .cards>article .chalet-photo{width:100%!important;margin:0 auto!important;text-align:center!important}
@@ -1799,3 +1799,5 @@ footer{justify-content:space-between!important}
  .booking-page .booking-property>div{min-width:0}
  .booking-page .booking-gallery{width:100%!important}
 }
+
+.collection .cards>article:has(>.availability-box.open){grid-template-rows:auto auto auto 1fr!important}
