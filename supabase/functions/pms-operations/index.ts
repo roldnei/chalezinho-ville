@@ -1,3 +1,4 @@
+import {taskPhotos} from "./photos.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
@@ -173,7 +174,7 @@ async function taskAction(body:any,actor:any){
     if(status==="inspection")update.submitted_at=now;
     if(status==="ready")update.completed_at=now;
     const {data,error}=await admin.from("pms_tasks").update(update).eq("id",id).select().single();
-    if(error)return json({ok:false,error:"task_update_failed"},500);
+    if(error)return json({ok:false,error:error.message.includes("cleaning_photos_incomplete")?"cleaning_photos_incomplete":"task_update_failed"},409);
     await admin.from("pms_activity_events").insert({task_id:id,actor_user_id:actor.id,event_type:"status_changed",details:{from:task.status,to:status}});
     if(task.reservation_id&&task.task_type==="turnover"&&status==="in_progress")await admin.from("reservations").update({operational_status:"preparing",updated_at:now}).eq("id",task.reservation_id);
     if(task.reservation_id&&task.task_type==="turnover"&&status==="ready")await admin.from("reservations").update({operational_status:"ready",updated_at:now}).eq("id",task.reservation_id);
@@ -395,6 +396,7 @@ Deno.serve(async request=>{
   const actor=await operator(request);if(!actor)return json({ok:false,error:"operator_required"},403);
   const body=await request.json().catch(()=>({}));
   if(body.action==="hub")return hub(actor);
+  if(body.action==="task_photos")return taskPhotos(body,actor,admin,json);
   if(body.action==="task_action")return taskAction(body,actor);
   if(body.action==="block_action")return blockAction(body,actor);
   if(body.action==="reservation_action")return reservationAction(body,actor);
