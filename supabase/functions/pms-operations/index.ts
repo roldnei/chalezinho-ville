@@ -163,6 +163,7 @@ async function taskAction(body:any,actor:any){
   }
   if(op==="set_status"){
     const status=clip(body.status,30);if(!["todo","in_progress","inspection","ready","blocked","cancelled"].includes(status))return json({ok:false,error:"invalid_status"},400);
+    if(task.task_type==="turnover"&&["inspection","ready"].includes(task.status)&&status!==task.status&&!canManage(actor))return json({ok:false,error:"manager_required"},403);
     if(status==="ready"&&!canManage(actor))return json({ok:false,error:"manager_required"},403);
     if(status==="ready"&&task.status!=="inspection")return json({ok:false,error:"inspection_required"},409);
     if(["inspection","ready"].includes(status)){
