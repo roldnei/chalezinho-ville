@@ -1,4 +1,4 @@
-import {calendarService,calendarUrl,fetchCalendar} from "../_shared/calendars.ts";
+import {calendarService,calendarUrl,calendarProvider,fetchCalendar} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
@@ -156,7 +156,7 @@ async function airbnbCalendarData(){
  // Transitional compatibility for existing Airbnb channels; newly entered links always win.
  if(!data.listings.some((x:any)=>x.error==="calendar_not_configured"))return data;
  const legacy=await prodJson("/api/ical-airbnb-all").catch(()=>({listings:[]}));
- const listings=data.listings.map((x:any)=>x.error==="calendar_not_configured"?({...x,...((legacy.listings||[]).find((y:any)=>y.name===x.name)||{}),migration_pending:true}):x);
+ const listings=data.listings.map((x:any)=>x.error==="calendar_not_configured"?(()=>{const old=(legacy.listings||[]).find((y:any)=>y.name===x.name);return {...x,...(old||{}),periods:[...x.periods,...(old?.periods||[])],migration_pending:true}})():x);
  return {...data,listings,ok:listings.every((x:any)=>x.ok)};
 }
 async function adminCalendarAction(req:Request,body:any){
@@ -171,20 +171,36 @@ async function adminCalendarAction(req:Request,body:any){
   const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),v=>v.toString(16).padStart(2,"0")).join("");
   const {error}=await admin.from("property_calendar_exports").update({token}).eq("property_id",propertyId);
   if(error)return json({ok:false,error:"calendar_save_failed"},500);
- }else if(operation==="save"){
-  const provider=String(body.provider),enabled=body.enabled!==false;
-  if(!["booking","airbnb"].includes(provider))return json({ok:false,error:"invalid_provider"},400);
-  let url:string|null=null;let periods:any[]=[];
-  try{if(body.feed_url)url=calendarUrl(String(body.feed_url).trim(),provider);if(enabled&&!url)throw Error();if(enabled)periods=await fetchCalendar(url!,provider)}
-  catch{return json({ok:false,error:"calendar_validation_failed"},400)}
-  const {error}=await admin.from("property_calendar_sources").upsert({property_id:propertyId,provider,label:String(body.label||provider).slice(0,120),feed_url:url,enabled,last_error:null,last_checked_at:enabled?new Date().toISOString():null,last_success_at:enabled?new Date().toISOString():null,event_count:enabled?periods.length:null,updated_at:new Date().toISOString()},{onConflict:"property_id,provider"});
-  if(error)return json({ok:false,error:"calendar_save_failed"},500);
- }else if(operation==="test"){
-  const provider=String(body.provider);if(!["booking","airbnb"].includes(provider))return json({ok:false,error:"invalid_provider"},400);
-  const results=await calendars.channels(provider);const result=results.listings.find((x:any)=>x.property_id===propertyId);
-  return json({ok:true,result:{healthy:result?.ok===true,error:result?.error||null,events:result?.periods.length||0}});
+ }else if(["save","test","delete"].includes(operation)){
+  const sourceId=body.source_id?String(body.source_id):null;
+  let existing:any=null;
+  if(sourceId){const result=await admin.from("property_calendar_sources").select("*").eq("id",sourceId).eq("property_id",propertyId).is("deleted_at",null).maybeSingle();if(result.error||!result.data)return json({ok:false,error:"calendar_not_found"},404);existing=result.data}
+  if(operation==="delete"){
+   if(!existing)return json({ok:false,error:"calendar_not_found"},404);
+   const now=new Date().toISOString();const {error}=await admin.from("property_calendar_sources").update({deleted_at:now,enabled:false,updated_at:now}).eq("id",sourceId).eq("property_id",propertyId);
+   if(error)return json({ok:false,error:"calendar_save_failed"},500);
+  }else if(operation==="test"){
+   if(!existing?.feed_url)return json({ok:false,error:"calendar_not_configured"},400);
+   let events=0,failure=null;
+   try{events=(await fetchCalendar(existing.feed_url,existing.provider)).length}catch{failure="calendar_validation_failed"}
+   const now=new Date().toISOString();await admin.from("property_calendar_sources").update({last_checked_at:now,last_error:failure,...(!failure?{last_success_at:now,event_count:events}:{})}).eq("id",sourceId).eq("updated_at",existing.updated_at);
+   return json({ok:true,result:{healthy:!failure,events}});
+  }else{
+   const label=String(body.label||"").trim().slice(0,120),enabled=body.enabled!==false;
+   if(!label)return json({ok:false,error:"calendar_name_required"},400);
+   const {count,error:countError}=await admin.from("property_calendar_sources").select("id",{count:"exact",head:true}).eq("property_id",propertyId).is("deleted_at",null);
+   if(countError)return json({ok:false,error:"calendar_save_failed"},500);
+   if(!existing&&Number(count)>=20)return json({ok:false,error:"calendar_limit"},400);
+   let url:string,provider:string,periods:any[]=[];
+   try{url=calendarUrl(String(body.feed_url||"").trim());provider=calendarProvider(url);if(enabled)periods=await fetchCalendar(url,provider)}catch(e){return json({ok:false,error:"calendar_validation_failed"},400)}
+   // Prevent importing this site's own feed into itself.
+   if(new URL(url).origin===projectUrl&&new URL(url).searchParams.get("action")==="calendar_export")return json({ok:false,error:"calendar_self_import"},400);
+   const now=new Date().toISOString(),values={property_id:propertyId,provider,label,feed_url:url,enabled,last_error:null,last_checked_at:enabled?now:null,last_success_at:enabled?now:null,event_count:enabled?periods.length:null,updated_at:now};
+   const {error}=existing?await admin.from("property_calendar_sources").update(values).eq("id",sourceId).eq("property_id",propertyId):await admin.from("property_calendar_sources").insert(values);
+   if(error)return json({ok:false,error:error.code==="23505"?"calendar_duplicate":"calendar_save_failed"},error.code==="23505"?409:500);
+  }
  }else return json({ok:false,error:"invalid_operation"},400);
- await admin.from("audit_events").insert({actor_user_id:user.id,action:"calendar_"+operation,entity_type:"property",entity_id:String(propertyId),new_value:{provider:body.provider||null}});
+ await admin.from("audit_events").insert({actor_user_id:user.id,action:"calendar_"+operation,entity_type:"property",entity_id:String(propertyId),new_value:{source_id:body.source_id||null}});
  return json({ok:true,...await calendars.configuration()});
 }
 
@@ -1136,13 +1152,13 @@ async function adminHubData(req:Request,body:any){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:`airbnb:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"airbnb",start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:`airbnb:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"airbnb",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
   for(const listing of booking?.listings||[]){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:`booking:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"booking",start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:`booking:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:period.source||"booking",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
 
   return json({
