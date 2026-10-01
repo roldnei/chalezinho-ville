@@ -39,8 +39,23 @@ async function init(){
  $("#checkout-close").addEventListener("click",closeCheckout);$("#upsell-close")?.addEventListener("click",()=>$("#upsell-modal").hidden=true);
  $("#step-back").addEventListener("click",()=>showStep(Math.max(1,Number($("#checkout-panel").dataset.step||1)-1)));
  $("#step-next").addEventListener("click",next);
+ await initChaletFilter();
  renderDevBanner();
  await restoreResume();
+}
+async function initChaletFilter(){
+ const select=$("#book-chalet"),requested=new URLSearchParams(location.search).get("chalet")||"";
+ try{
+  const data=await api("property_media");
+  for(const p of data.properties){const option=document.createElement("option");option.value=p.code;option.textContent=p.name;select.appendChild(option)}
+ }catch{
+  if(requested){const option=document.createElement("option");option.value=requested;option.textContent="Chalé "+requested.slice(0,40);select.appendChild(option)}
+ }
+ select.value=[...select.options].some(o=>o.value===requested)?requested:"";
+ select.addEventListener("change",()=>{
+  const url=new URL(location.href);if(select.value)url.searchParams.set("chalet",select.value);else url.searchParams.delete("chalet");history.replaceState(null,"",url);
+  if(state.search)renderResults(state.search);
+ });
 }
 async function closeCheckout(){
  const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
@@ -86,9 +101,12 @@ async function search(){
  }catch(e){if(sequence===searchSequence)error("Não foi possível consultar agora. Tente novamente.");}
 }
 function renderResults(list){
+ const code=$("#book-chalet").value;
+ if(code)list=list.filter(p=>p.code===code);
  const box=$("#booking-list");box.innerHTML="";$("#booking-results").classList.remove("booking-results-hidden");
- const available=list.filter(x=>x.available).length;$("#availability-count").textContent=available+" opções disponíveis";
+ const available=list.filter(x=>x.available).length;$("#availability-count").textContent=available+(available===1?" opção disponível":" opções disponíveis");
  $("#booking-period").textContent=$("#book-in").value.split("-").reverse().join("/")+" → "+$("#book-out").value.split("-").reverse().join("/");
+ if(!list.length)box.innerHTML='<p>Este chalé não está disponível para consulta. Selecione “Todos os chalés” para ver outras opções.</p>';
  list.forEach(p=>{
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
   const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+esc(x)+"</span>").join("");

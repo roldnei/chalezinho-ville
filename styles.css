@@ -1801,3 +1801,22 @@ footer{justify-content:space-between!important}
 }
 
 .collection .cards>article:has(>.availability-box.open){grid-template-rows:auto auto auto 1fr!important}
+
+/* Direct booking: one primary action, with secondary links kept distinct. */
+.collection .cards>article:has(>.chalet-booking-actions){grid-template-rows:auto auto auto 1fr!important}
+.collection .cards>article:has(>.chalet-booking-actions)>.chalet-heading{height:auto!important;min-height:0!important;padding:28px 18px 20px!important;gap:14px!important}
+.collection .cards>article:has(>.chalet-booking-actions)>.chalet-heading>h3{height:auto!important;min-height:0!important;margin:0!important}
+.collection .cards>article>.chalet-booking-actions{display:flex!important;flex-direction:column;align-items:center;gap:18px;padding:0 24px 32px!important;min-width:0;box-sizing:border-box}
+.chalet-booking-actions .booking-cta{display:flex;align-items:center;justify-content:center;gap:14px;width:100%;max-width:340px;min-height:54px;padding:15px 18px;box-sizing:border-box;background:#a96d08;border:1px solid #c78b22;border-radius:8px;color:#fff;font-size:13px;font-weight:600;line-height:1.5;text-align:center;text-decoration:none}
+.chalet-booking-actions .chalet-learn{color:#ddbf9b;font-size:13px;text-decoration:underline;text-underline-offset:5px}
+.booking-cta:hover,.detail-consult:hover{background:#885807}
+.booking-cta:focus-visible,.chalet-learn:focus-visible,.detail-consult:focus-visible{outline:2px solid #edcfab;outline-offset:4px}
+.chalet-page .detail-book{display:flex;flex-direction:column;align-items:center;gap:0}
+.chalet-page .detail-book>p{max-width:620px;font-size:15px;line-height:1.7;color:#c8bcb0}
+.chalet-page .detail-consult{box-sizing:border-box;max-width:100%;white-space:normal;line-height:1.6;text-align:center;color:#fff;text-decoration:none;border-radius:8px;font-size:12px;letter-spacing:.04em}
+.chalet-page .detail-book>.detail-consult{width:100%;max-width:360px;align-self:center}
+.chalet-page .detail-book>.booking-help{margin:22px 0 0;font-size:13px}
+.booking-help a{color:#e5c49f;text-decoration:underline;text-underline-offset:4px}
+.chalet-page .detail-book>.airbnb-detail-link{margin-top:22px;line-height:1.5}
+.booking-chalet-filter{display:flex;flex-direction:column;gap:8px;max-width:360px;margin-bottom:20px;color:#5f4d3e;font-size:13px}
+.booking-chalet-filter select{width:100%;min-height:48px;padding:12px;background:#fff;color:#29251f;border:1px solid #cfc1b1;font:inherit;border-radius:4px}
