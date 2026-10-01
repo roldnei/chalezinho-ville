@@ -1,3 +1,4 @@
+import { formatMoney, formatDate } from "../_shared/email-format.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 import {
@@ -17,24 +18,6 @@ const escapeHtml = (value: unknown) => String(value ?? "")
   .replaceAll(">", "&gt;")
   .replaceAll('"', "&quot;")
   .replaceAll("'", "&#039;");
-
-const formatMoney = (cents: unknown) => new Intl.NumberFormat("pt-BR", {
-  style: "currency",
-  currency: "BRL",
-}).format(Number(cents || 0) / 100);
-
-const formatDate = (value: unknown, includeTime = false) => {
-  if (!value) return "";
-  const date = new Date(String(value));
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    ...(includeTime ? { hour: "2-digit", minute: "2-digit" } : {}),
-  }).format(date);
-};
 
 const render = (template: string, variables: Record<string, unknown>) => template.replace(
   /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g,
@@ -70,6 +53,9 @@ Deno.serve(async (request) => {
   const fromName = Deno.env.get("EMAIL_FROM_NAME") || "Chalezinho Ville";
   const replyToEmail = Deno.env.get("EMAIL_REPLY_TO") || fromEmail;
   const siteUrl = (Deno.env.get("EMAIL_SITE_URL") || "https://chalezinhoville.com.br").replace(/\/$/, "");
+  const development = Deno.env.get("FINANCE_ENVIRONMENT") === "development";
+  const testRecipient = (Deno.env.get("EMAIL_TEST_RECIPIENT") || "").trim().toLowerCase();
+  if (development && !testRecipient) return json({ ok: false, error: "email_test_recipient_required" }, 503);
 
   if (!supabaseUrl || !serviceRoleKey || !fromEmail) {
     return json({ ok: false, error: "email_runtime_not_configured" }, 503);
@@ -85,7 +71,7 @@ Deno.serve(async (request) => {
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: claimed, error: claimError } = await admin.rpc("claim_notification_outbox", { p_limit: 20 });
+  const { data: claimed, error: claimError } = await admin.rpc("claim_notification_outbox_for_delivery", { p_limit: development ? 1 : 20, p_recipient_email: development ? testRecipient : null });
   if (claimError) return json({ ok: false, error: "outbox_claim_failed" }, 500);
 
   const results: Array<Record<string, unknown>> = [];
@@ -108,6 +94,7 @@ Deno.serve(async (request) => {
         recipientName = String(data?.user?.user_metadata?.full_name || "");
       }
       if (!recipientEmail) throw new EmailProviderError("recipient_email_missing", false);
+      if (development && recipientEmail.trim().toLowerCase() !== testRecipient) throw new EmailProviderError("test_recipient_changed", false);
 
       const payload = item.payload || {};
       const variables: Record<string, unknown> = {

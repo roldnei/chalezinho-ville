@@ -23,6 +23,31 @@ test('partial and full refunds derive from confirmed money',()=>{
  assert.equal(paymentState('paid',10000,10000),'refunded');
  assert.throws(()=>paymentState('paid',10000,10001));
 });
+test('declined guarantee is not an authorization merely because a charge ID exists',()=>{
+ const g=guaranteeState({amount_cents:50000,status:'pending',provider_authorization_id:'CHAR_DECLINED'});
+ assert.equal(g.authorized_cents,0);assert.equal(g.required_cents,50000);assert.equal(g.available_cents,0);
+});
+test('capture availability requires an identified authorization and the server expiry margin',()=>{
+ const g={amount_cents:50000,status:'guaranteed',provider_authorization_id:'CHAR_VALID'};
+ for(const expiry of [undefined,null,'invalid']){
+  const state=guaranteeState({...g,provider_capture_before:expiry});
+  assert.equal(state.available_cents,0);assert.equal(state.status,'processing');
+ }
+ const future=new Date(Date.now()+7200000).toISOString();
+ assert.equal(guaranteeState({...g,provider_capture_before:future}).available_cents,50000);
+ assert.equal(guaranteeState({...g,provider_authorization_id:null,provider_capture_before:future}).available_cents,0);
+ assert.equal(guaranteeState({...g,provider_capture_before:new Date(Date.now()+1800000).toISOString()}).available_cents,0);
+ const expired=guaranteeState({...g,provider_capture_before:new Date(Date.now()-1000).toISOString()});
+ assert.equal(expired.available_cents,0);assert.equal(expired.status,'expired');
+ assert.equal(expired.released_cents,0,'expiry alone does not prove the bank released the limit');
+});
+
+test('damage refund never exceeds capture and changes the canonical state',()=>{
+ const g={amount_cents:50000,captured_amount_cents:18000,status:'captured',provider_authorization_id:'CHAR_TEST'};
+ assert.equal(guaranteeState({...g,refunded_amount_cents:3000}).status,'partially_refunded');
+ assert.equal(guaranteeState({...g,refunded_amount_cents:18000}).status,'refunded');
+ assert.throws(()=>guaranteeState({...g,refunded_amount_cents:18001}),/refund_exceeds/);
+});
 test('500 authorized and 189 paid is partial capture; unreconciled remainder is never labeled released',()=>{
  const g=guaranteeState({amount_cents:50000,captured_amount_cents:18900,status:'captured',provider_authorization_id:'CHAR_X'});
  assert.equal(g.status,'partially_captured');assert.equal(g.captured_cents,18900);assert.equal(g.uncaptured_cents,31100);assert.equal(g.available_cents,0);assert.equal(g.released_cents,0);
@@ -45,6 +70,13 @@ test('installment total before card is same immutable total selected for chargin
 test('offer prevents cross-account, cross-reservation, repricing and expiry',()=>{
  const input={userId:'guest',quoteOptionId:'option',baseAmount:100000,installments:7};
  for(const override of [{userId:'other'},{quoteOptionId:'other'},{baseAmount:1},{now:Date.parse('2100-01-01')},{installments:12}])assert.throws(()=>selectInstallmentOffer(offer,{...input,...override}));
+});
+test('confirmed installment offer cannot be reused after changing the card BIN',()=>{
+ const input={userId:'guest',quoteOptionId:'option',baseAmount:100000,installments:7,cardBin:'552100'};
+ const actual={...offer,terms:{card_bin:'552100'}};
+ assert.equal(selectInstallmentOffer(actual,input).total_cents,106000);
+ assert.throws(()=>selectInstallmentOffer(actual,{...input,cardBin:'411111'}),/card_changed/);
+ assert.throws(()=>selectInstallmentOffer(offer,input),/card_changed/);
 });
 test('gateway selection cannot activate production from a browser parameter',()=>assert.throws(()=>paymentGateway('production','test')));
 test('gateway partial refund preserves exact request amount and operation id',async()=>{

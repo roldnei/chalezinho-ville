@@ -2,10 +2,38 @@ import assert from 'node:assert/strict';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { test } from 'node:test';
 import { changePagBankCharge, createPagBankOrder, evaluateRefundPrecheck, extractPagBankWebhookChargeId, getPagBankCharge, getPagBankOrderCharge, pagBankOrder, pagBankInstallmentPlans, tokenizePagBankCard, verifyPagBankNotification, verifyPagBankSignedNotification } from '../supabase/functions/booking-engine/pagbank.ts';
+test('refund diagnostics retain only a fixed sandbox hint and never raw provider text',async()=>{
+  const logged=[],warn=console.warn;console.warn=x=>logged.push(x);
+  try{
+    for(const [description,hint] of [['Transaction is not found.','transaction_not_found'],['Private customer details must not leak',null]]){
+      await assert.rejects(changePagBankCharge('private-token','CHAR_test','cancel',100,'diagnostic-test-0001',
+        async()=>new Response(JSON.stringify({error_messages:[{code:'40008',description}]}),{status:400})),
+        error=>error.errorCode==='40008'&&error.errorHint===hint&&!error.message.includes(description));
+    }
+    assert.equal(JSON.parse(logged[0]).hint,'transaction_not_found');
+    assert.equal(JSON.parse(logged[1]).hint,null);
+    assert.ok(!JSON.stringify(logged).includes('Private customer'));
+    assert.ok(!JSON.stringify(logged).includes('private-token'));
+  }finally{console.warn=warn;}
+});
 
 const customer={name:'Hospede Teste',email:'teste@example.com',taxId:'12345678909',phone:{area:'27',number:'999999999'}};
 const input={referenceId:'1234567890abcdef',amountCents:199250,customer,
   notificationUrl:'https://example.com/functions/v1/pagbank-webhook'};
+
+test('declined Pix preserves its provider identity even when no QR code is issued',async()=>{
+ const order=pagBankOrder({...input,method:'pix',expiresAt:new Date(Date.now()+900000)});
+ const result=await createPagBankOrder('sandbox','test-token',order,async()=>new Response(JSON.stringify({id:'ORDE_DECLINED',charges:[{
+  id:'CHAR_DECLINED',status:'DECLINED',amount:{value:input.amountCents,currency:'BRL'},payment_method:{type:'PIX'}}]}),{status:201}));
+ assert.equal(result.status,'DECLINED');assert.equal(result.chargeId,'CHAR_DECLINED');assert.equal(result.pixCode,undefined);
+});
+
+test('customer name rejects provider-forbidden symbols but keeps accented and compound names',()=>{
+  for(const name of ['[DEV] Finance QA','Nome;teste','Nome@example'])
+    assert.throws(()=>pagBankOrder({...input,customer:{...customer,name},method:'card',encryptedCard:'test',installments:1}),/invalid_customer_data/);
+  for(const name of ["João D'Ávila",'Ana-Maria Costa'])
+    assert.equal(pagBankOrder({...input,customer:{...customer,name},method:'card',encryptedCard:'test',installments:1}).customer.name,name);
+});
 
 test('Orders webhook selects the charge rather than the top-level order ID',()=>{
   assert.equal(extractPagBankWebhookChargeId({id:'ORDE_123',charges:[{id:'CHAR_abc-123'}]}),'CHAR_abc-123');
@@ -219,6 +247,12 @@ test('a definitive rejected order is distinct from an uncertain provider result'
     /pagbank_order_rejected/);
   await assert.rejects(createPagBankOrder('sandbox','test-token',order,
     async()=>new Response('{}',{status:503})),/pagbank_order_failed/);
+  for(const code of ['40004','40005','40008','unknown_error']){
+    await assert.rejects(createPagBankOrder('sandbox','test-token',order,
+      async()=>new Response(JSON.stringify({error_messages:[{code}]}),{status:400})),/pagbank_order_failed/);
+  }
+  await assert.rejects(createPagBankOrder('sandbox','test-token',order,
+    async()=>new Response('{}',{status:422})),/pagbank_order_failed/);
 });
 
 test('webhook rejects modified payload or signature',async()=>{

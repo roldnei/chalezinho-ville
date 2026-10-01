@@ -33,18 +33,19 @@ Deno.serve(async (request) => {
 
   const providerMessageId = String(payload["message-id"] || payload.messageId || "");
   const eventType = String(payload.event || "unknown").toLowerCase();
-  const occurredAt = payload.ts_event
-    ? new Date(Number(payload.ts_event) * 1000).toISOString()
-    : new Date().toISOString();
+  const eventDate = payload.ts_event == null ? new Date() : new Date(Number(payload.ts_event) * 1000);
+  if (!Number.isFinite(eventDate.getTime())) return json({ ok: false, error: "invalid_event_timestamp" }, 400);
+  const occurredAt = eventDate.toISOString();
   if (!providerMessageId) return json({ ok: false, error: "message_id_missing" }, 400);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const admin = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false, autoRefreshToken: false } });
   const eventHash = await sha256(`brevo:${providerMessageId}:${eventType}:${occurredAt}`);
-  const { data: outbox } = await admin.from("notification_outbox").select("id").eq("provider", "brevo").eq("provider_message_id", providerMessageId).maybeSingle();
+  const { data: outbox, error: lookupError } = await admin.from("notification_outbox").select("id").eq("provider", "brevo").eq("provider_message_id", providerMessageId).maybeSingle();
+  if (lookupError) return json({ ok: false, error: "delivery_lookup_failed" }, 503);
 
-  await admin.from("notification_delivery_events").upsert({
+  const { error: eventError } = await admin.from("notification_delivery_events").upsert({
     outbox_id: outbox?.id || null,
     provider: "brevo",
     provider_message_id: providerMessageId,
@@ -56,6 +57,7 @@ Deno.serve(async (request) => {
       tag: Array.isArray(payload.tag) ? payload.tag.slice(0, 10) : null,
     },
   }, { onConflict: "event_hash", ignoreDuplicates: true });
+  if (eventError) return json({ ok: false, error: "delivery_event_store_failed" }, 503);
 
   if (outbox?.id) {
     const delivered = ["delivered", "opened", "click"].includes(eventType);
@@ -64,7 +66,12 @@ Deno.serve(async (request) => {
       delivery_status: delivered ? "delivered" : failed ? "failed" : eventType,
     };
     if (delivered) update.delivered_at = occurredAt;
-    await admin.from("notification_outbox").update(update).eq("id", outbox.id);
+    // A delayed request/sent/bounce must not erase an already confirmed delivery.
+    // The database predicate also protects against concurrent webhook requests.
+    let mutation = admin.from("notification_outbox").update(update).eq("id", outbox.id).is("delivered_at", null);
+    if (!delivered && !failed) mutation = mutation.neq("delivery_status", "failed");
+    const { error: updateError } = await mutation;
+    if (updateError) return json({ ok: false, error: "delivery_status_store_failed" }, 503);
   }
 
   return json({ ok: true });

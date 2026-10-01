@@ -13,6 +13,11 @@ export type PagBankCustomer = {
   phone: { area: string; number: string };
 };
 
+export function validPagBankCustomerName(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0 &&
+    !/[!@#$%¨*()"”\\|{}\[\]<>;]/.test(value);
+}
+
 export function pagBankOrder(input: {
   referenceId: string;
   amountCents: number;
@@ -31,7 +36,7 @@ export function pagBankOrder(input: {
   if (!/^[a-zA-Z0-9_-]{1,64}$/.test(referenceId) || !Number.isSafeInteger(amountCents) || amountCents < 1)
     throw new Error("invalid_payment_data");
   if (!/^https:\/\//.test(notificationUrl)) throw new Error("invalid_notification_url");
-  if (!customer.name.trim() || !/^\S+@\S+\.\S+$/.test(customer.email) ||
+  if (!validPagBankCustomerName(customer.name) || !/^\S+@\S+\.\S+$/.test(customer.email) ||
       !/^\d{11,14}$/.test(customer.taxId) || !/^\d{2}$/.test(customer.phone.area) ||
       !/^\d{8,9}$/.test(customer.phone.number)) throw new Error("invalid_customer_data");
 
@@ -49,7 +54,7 @@ export function pagBankOrder(input: {
   }
   const interest = input.buyerInterest;
   if (interest && (method !== "card" || !Number.isSafeInteger(interest.total) || interest.total < 1 ||
-      !Number.isInteger(interest.installments) || interest.installments < 1 || interest.installments >= input.installments! ||
+      !Number.isInteger(interest.installments) || interest.installments < 1 || interest.installments > input.installments! ||
       amountCents <= interest.total)) throw new Error("invalid_buyer_interest");
   const chargeAmount = interest ? { value: amountCents, currency: "BRL",
     fees: { buyer: { interest: interest } } } : { value: amountCents, currency: "BRL" };
@@ -116,14 +121,18 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    if (response.status === 400 || response.status === 422) throw new Error("pagbank_order_rejected");
+    const definiteErrors=new Set(['40001','40002','40003','40010','40011','required_parameter','invalid_parameter','parameter_unknow','parameter_required_missing','parameter_required_empty','ENCRYPTED CARD ALREADY USED']);
+    const errors=Array.isArray(body?.error_messages)?body.error_messages:[];
+    if ([400,422].includes(response.status)&&!body?.id&&!body?.charges?.length&&errors.length>0&&
+        errors.every((error:any)=>definiteErrors.has(String(error.code||error.error||''))))
+      throw new Error("pagbank_order_rejected");
     throw new Error("pagbank_order_failed");
   }
   if (!body?.id || !body?.charges?.[0]?.id) throw new Error("pagbank_order_failed");
   const charge = body.charges[0];
   if (charge.amount?.currency !== "BRL" || Number(charge.amount?.value) !== order.charges[0].amount.value ||
       !["WAITING", "PAID", "IN_ANALYSIS", "AUTHORIZED", "DECLINED"].includes(charge.status) ||
-      (order.charges[0].payment_method.type === "PIX" && !charge.qr_code?.text))
+      (order.charges[0].payment_method.type === "PIX" && charge.status!=="DECLINED" && !charge.qr_code?.text))
     throw new Error("pagbank_order_response_invalid");
   return { orderId: body.id as string, chargeId: charge.id as string,
     cardToken: charge.payment_method?.card?.id as string | undefined,
@@ -159,8 +168,11 @@ export async function getPagBankCharge(token: string, chargeId: string, fetcher:
 function normalizeCharge(raw: any) {
   const summary=raw?.amount?.summary;
   return {id:raw?.id as string,status:raw?.status as string,
+    referenceId:raw?.reference_id as string|undefined,
+    declineCode:typeof raw?.payment_response?.code==='string'&&/^\d{1,5}$/.test(raw.payment_response.code)?raw.payment_response.code:undefined,
     amount:{value:raw?.amount?.value as number,currency:raw?.amount?.currency as string},
-    captureBefore:raw?.payment_method?.capture_before as string|undefined,
+      captureBefore:raw?.payment_method?.capture_before as string|undefined,
+      cardBrand:raw?.payment_method?.card?.brand as string|undefined,
     summary:summary&&Number.isSafeInteger(summary.paid)&&Number.isSafeInteger(summary.refunded)?
       {...(Number.isSafeInteger(summary.total)?{total:summary.total as number}:{}),
         paid:summary.paid as number,refunded:summary.refunded as number}:undefined,
@@ -214,12 +226,16 @@ export async function changePagBankCharge(
   });
   const body = await response.json().catch(() => null);
   if (!response.ok) {
-    // Only the provider's machine-readable error code is safe to retain.
-    // Descriptions and the rest of the response may contain customer data.
+    // Never retain raw descriptions: they may contain customer data. Recognize
+    // this exact, documented-in-support sandbox symptom as a fixed safe tag.
     const code=String(body?.error_messages?.[0]?.code||body?.error_messages?.[0]?.error||"");
+    const errorHint=code==='40008'&&body?.error_messages?.[0]?.description==='Transaction is not found.'?
+      'transaction_not_found':null;
     const suffix=/^[a-zA-Z0-9_]{1,40}$/.test(code)?`_code_${code}`:"";
+    console.warn(JSON.stringify({event:'pagbank_charge_rejected',operation,http_status:response.status,
+      code:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null,hint:errorHint}));
     throw Object.assign(new Error(`pagbank_charge_operation_http_${response.status}${suffix}`),
-      {httpStatus:response.status,errorCode:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null});
+      {httpStatus:response.status,errorCode:/^[a-zA-Z0-9_]{1,40}$/.test(code)?code:null,errorHint});
   }
   if (body?.id !== chargeId || body?.amount?.currency !== "BRL" ||
       !Number.isSafeInteger(body?.amount?.value) ||

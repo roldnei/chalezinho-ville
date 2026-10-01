@@ -14,14 +14,25 @@ export function paymentState(status:string, paid:number, refunded:number) {
 }
 export function guaranteeState(g:any) {
   const authorized=money(g.amount_cents), captured=money(g.captured_amount_cents||0);
+  const refunded=money(g.refunded_amount_cents||0);
   if(captured>authorized)throw new Error('capture_exceeds_authorized');
-  const status=captured>0?(captured<authorized?'partially_captured':'captured'):
+  if(refunded>captured)throw new Error('refund_exceeds_captured');
+  const confirmedAuthorization=Boolean(g.provider_authorization_id)&&
+    (captured>0||['guaranteed','incident_reported','capture_requested','capture_uncertain',
+      'release_requested','release_uncertain','released','expired'].includes(g.status));
+  const status=refunded>0?(refunded===captured?'refunded':'partially_refunded'):captured>0?(captured<authorized?'partially_captured':'captured'):
     ({pending:'pending_authorization',guaranteed:'authorized',incident_reported:'authorized',authorizing:'processing',
       authorization_uncertain:'processing',release_requested:'processing',release_uncertain:'processing',
       capture_requested:'processing',capture_uncertain:'processing'} as Record<string,string>)[g.status]||g.status;
-  return {status,authorized_cents:g.provider_authorization_id?authorized:0,captured_cents:captured,
-    refunded_cents:money(g.refunded_amount_cents||0),
-    available_cents:['guaranteed','incident_reported'].includes(g.status)?authorized-captured:0,
+  const active=['guaranteed','incident_reported'].includes(g.status);
+  const expiry=Date.parse(g.provider_capture_before||'');
+  const verified=confirmedAuthorization&&Number.isFinite(expiry);
+  const displayStatus=active&&captured===0?(!verified?'processing':expiry<=Date.now()?'expired':status):status;
+  return {status:displayStatus,required_cents:authorized,authorized_cents:confirmedAuthorization?authorized:0,captured_cents:captured,
+    refunded_cents:refunded,
+    // Match the server capture guard: an identified, dated authorization with
+    // at least one hour left. Missing dates must never imply unlimited validity.
+    available_cents:active&&verified&&expiry>Date.now()+3600000?authorized-captured:0,
     released_cents:g.status==='released'?authorized:money(g.released_amount_cents||0),
     uncaptured_cents:authorized-captured,
     release_confirmed:g.status==='released'||g.release_confirmed===true};

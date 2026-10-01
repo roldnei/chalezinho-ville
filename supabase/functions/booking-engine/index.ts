@@ -1,3 +1,4 @@
+import {calendarService,calendarUrl,calendarProvider,fetchCalendar} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
@@ -6,10 +7,11 @@ import {loadInstallmentOffer} from "../_shared/finance/installments.ts";
 import {reservationFinance} from "../_shared/finance/reservation-report.ts";
 import {reservationIncident} from "../_shared/finance/incidents.ts";
 import {paymentTerms,assertPaymentMethod,validatePaymentSettings} from "../_shared/finance/settings.ts";
+import {guaranteeCoverage} from "../_shared/finance/guarantee-lifecycle.ts";
 import {guaranteeState} from "../_shared/finance/model.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getPagBankCardPublicKey, pagBankInstallmentPlans, tokenizePagBankCard } from "./pagbank.ts";
+import { getPagBankCardPublicKey, pagBankInstallmentPlans, tokenizePagBankCard, validPagBankCustomerName } from "./pagbank.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -94,12 +96,14 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   if(!development) return json({ok:false,error:"not_allowed"},403);
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
-  // Store the exact offer before card entry. The charge uses this persisted total;
-  // a provider rejection cannot silently replace the guest's selected price.
+  // Before card entry, show an estimate only. Freeze the provider quote for the
+  // actual BIN before the guest confirms the total and starts payment.
   const {data:settings,error:settingsError}=await admin.from("payment_settings").select("active_provider,pix_enabled,card_enabled").eq("id",1).single();
   if(settingsError)return json({ok:false,error:"payment_settings_unavailable"},503);
   try{assertPaymentMethod(settings,"card")}catch(e){return json({ok:false,error:(e as Error).message},409)}
-  const bin="552100"; // Provider reference quotation; price is frozen below, never recomputed from guest BIN.
+  const actualBin=String(body?.credit_card_bin||"");
+  const indicative=!actualBin;
+  const bin=actualBin||"552100";
   if(!/^\d{6}(\d{2})?$/.test(bin)) return json({ok:false,error:"invalid_card_bin"},400);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
@@ -119,9 +123,10 @@ async function installmentOptions(req:Request,body:any,development:boolean){
   }else return json({ok:false,error:"missing_data"},400);
   try{
     const {terms,plans,feeFallback}=await chargeInstallments(propertyId,amount,1,bin,token);
+    if(indicative)return json({ok:true,offer_id:null,expires_at:expiresAt,base_amount_cents:amount,terms,plans,indicative:true});
     const {data:offer,error}=await admin.from("installment_offers").insert({user_id:user.id,
       quote_option_id:body.quote_option_id||null,post_booking_charge_id:body.post_booking_charge_id||null,
-      base_amount_cents:amount,provider:"pagbank_sandbox",plans,terms,expires_at:expiresAt}).select("id").single();
+      base_amount_cents:amount,provider:"pagbank_sandbox",plans,terms:{...terms,card_bin:actualBin},expires_at:expiresAt}).select("id").single();
     if(error)throw new Error("installment_offer_unavailable");
     return json({ok:true,offer_id:offer.id,expires_at:expiresAt,base_amount_cents:amount,terms,plans,indicative:false,fee_fallback:feeFallback});
   }catch(e){console.error(JSON.stringify({event:"installment_options_failed",code:e instanceof Error?e.message:"unknown"}));return json({ok:false,error:e instanceof Error&&e.message==="invalid_payment_terms"?
@@ -144,39 +149,59 @@ async function prodJson(path:string){
   return d;
 }
 
-const bookingFeeds=[
-  {name:"Ville Signature",env:"ICAL_BOOKING_CH1"},
-  {name:"Ville Essenza",env:"ICAL_BOOKING_CH2"},
-  {name:"Ville Amore",env:"ICAL_BOOKING_CH3"}
-];
-function bookingIcalConfigured(){
-  return bookingFeeds.every(x=>Boolean(Deno.env.get(x.env)));
+const calendars=calendarService(admin,projectUrl);
+async function bookingCalendarData(){return calendars.channels("booking")}
+async function airbnbCalendarData(){
+ const data=await calendars.channels("airbnb");
+ // Transitional compatibility for existing Airbnb channels; newly entered links always win.
+ if(!data.listings.some((x:any)=>x.error==="calendar_not_configured"))return data;
+ const legacy=await prodJson("/api/ical-airbnb-all").catch(()=>({listings:[]}));
+ const listings=data.listings.map((x:any)=>x.error==="calendar_not_configured"?(()=>{const old=(legacy.listings||[]).find((y:any)=>y.name===x.name);return {...x,...(old||{}),periods:[...x.periods,...(old?.periods||[])],migration_pending:true}})():x);
+ return {...data,listings,ok:listings.every((x:any)=>x.ok)};
 }
-function unfoldIcal(s:string){return s.replace(/\r?\n[ \t]/g,"");}
-function icalDate(v:string){
-  const m=String(v||"").match(/^(\d{4})(\d{2})(\d{2})/);
-  return m?m[1]+"-"+m[2]+"-"+m[3]:null;
-}
-async function readIcalFeed(url:string){
-  const r=await fetch(url,{headers:{"User-Agent":"ChalezinhoVille/1.0"},signal:AbortSignal.timeout(8000)});
-  if(!r.ok) throw new Error("feed_unreachable");
-  const raw=unfoldIcal(await r.text());
-  return raw.split("BEGIN:VEVENT").slice(1).map(x=>x.split("END:VEVENT")[0]).map(e=>{
-    const s=e.match(/DTSTART(?:;[^:]*)?:(\d{8})/);
-    const d=e.match(/DTEND(?:;[^:]*)?:(\d{8})/);
-    const start=s?icalDate(s[1]):null,end=d?icalDate(d[1]):null;
-    return start&&end?{start,end}:null;
-  }).filter(Boolean);
-}
-async function bookingCalendarData(){
-  const configured=bookingIcalConfigured();
-  if(!configured) return {configured:false,ok:true,listings:bookingFeeds.map(x=>({name:x.name,ok:true,periods:[]}))};
-  const listings=await Promise.all(bookingFeeds.map(async x=>{
-    const url=Deno.env.get(x.env)||"";
-    try{return {name:x.name,ok:true,periods:await readIcalFeed(url)}}
-    catch{return {name:x.name,ok:false,periods:[]}}
-  }));
-  return {configured:true,ok:listings.every(x=>x.ok),listings};
+async function adminCalendarAction(req:Request,body:any){
+ const user=await currentUser(req);
+ if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+ const operation=String(body.operation||"list");
+ if(operation==="list")return json({ok:true,...await calendars.configuration()});
+ const propertyId=Number(body.property_id);
+ const {data:property,error:propertyError}=await admin.from("properties").select("id").eq("id",propertyId).maybeSingle();
+ if(propertyError||!property)return json({ok:false,error:"property_not_found"},404);
+ if(operation==="rotate"){
+  const token=Array.from(crypto.getRandomValues(new Uint8Array(32)),v=>v.toString(16).padStart(2,"0")).join("");
+  const {error}=await admin.from("property_calendar_exports").update({token}).eq("property_id",propertyId);
+  if(error)return json({ok:false,error:"calendar_save_failed"},500);
+ }else if(["save","test","delete"].includes(operation)){
+  const sourceId=body.source_id?String(body.source_id):null;
+  let existing:any=null;
+  if(sourceId){const result=await admin.from("property_calendar_sources").select("*").eq("id",sourceId).eq("property_id",propertyId).is("deleted_at",null).maybeSingle();if(result.error||!result.data)return json({ok:false,error:"calendar_not_found"},404);existing=result.data}
+  if(operation==="delete"){
+   if(!existing)return json({ok:false,error:"calendar_not_found"},404);
+   const now=new Date().toISOString();const {error}=await admin.from("property_calendar_sources").update({deleted_at:now,enabled:false,updated_at:now}).eq("id",sourceId).eq("property_id",propertyId);
+   if(error)return json({ok:false,error:"calendar_save_failed"},500);
+  }else if(operation==="test"){
+   if(!existing?.feed_url)return json({ok:false,error:"calendar_not_configured"},400);
+   let events=0,failure=null;
+   try{events=(await fetchCalendar(existing.feed_url,existing.provider)).length}catch{failure="calendar_validation_failed"}
+   const now=new Date().toISOString();await admin.from("property_calendar_sources").update({last_checked_at:now,last_error:failure,...(!failure?{last_success_at:now,event_count:events}:{})}).eq("id",sourceId).eq("updated_at",existing.updated_at);
+   return json({ok:true,result:{healthy:!failure,events}});
+  }else{
+   const label=String(body.label||"").trim().slice(0,120),enabled=body.enabled!==false;
+   if(!label)return json({ok:false,error:"calendar_name_required"},400);
+   const {count,error:countError}=await admin.from("property_calendar_sources").select("id",{count:"exact",head:true}).eq("property_id",propertyId).is("deleted_at",null);
+   if(countError)return json({ok:false,error:"calendar_save_failed"},500);
+   if(!existing&&Number(count)>=20)return json({ok:false,error:"calendar_limit"},400);
+   let url:string,provider:string,periods:any[]=[];
+   try{url=calendarUrl(String(body.feed_url||"").trim());provider=calendarProvider(url);if(enabled)periods=await fetchCalendar(url,provider)}catch(e){return json({ok:false,error:"calendar_validation_failed"},400)}
+   // Prevent importing this site's own feed into itself.
+   if(new URL(url).origin===projectUrl&&new URL(url).searchParams.get("action")==="calendar_export")return json({ok:false,error:"calendar_self_import"},400);
+   const now=new Date().toISOString(),values={property_id:propertyId,provider,label,feed_url:url,enabled,last_error:null,last_checked_at:enabled?now:null,last_success_at:enabled?now:null,event_count:enabled?periods.length:null,updated_at:now};
+   const {error}=existing?await admin.from("property_calendar_sources").update(values).eq("id",sourceId).eq("property_id",propertyId):await admin.from("property_calendar_sources").insert(values);
+   if(error)return json({ok:false,error:error.code==="23505"?"calendar_duplicate":"calendar_save_failed"},error.code==="23505"?409:500);
+  }
+ }else return json({ok:false,error:"invalid_operation"},400);
+ await admin.from("audit_events").insert({actor_user_id:user.id,action:"calendar_"+operation,entity_type:"property",entity_id:String(propertyId),new_value:{source_id:body.source_id||null}});
+ return json({ok:true,...await calendars.configuration()});
 }
 
 async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false){
@@ -193,7 +218,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
       .lt("target_check_in",end).gt("target_check_out",start).gt("expires_at",new Date().toISOString())),
     retryDb("search_operational_blocks",()=>admin.from("pms_calendar_blocks").select("id,property_id,start_date,end_date")
       .eq("status","active").lt("start_date",end).gt("end_date",start)),
-    prodJson("/api/ical-airbnb-all"),
+    airbnbCalendarData(),
     bookingCalendarData(),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
@@ -562,7 +587,8 @@ async function startPayment(req:Request,body:any,development:boolean){
     if(method==="card" && typeof body?.encrypted_card!=="string") return json({ok:false,error:"encrypted_card_required"},400);
     const digits=String(guest_phone).replace(/\D/g,"");
     const phone=digits.startsWith("55")&&digits.length>=12?digits.slice(2):digits;
-    if(!/^\d{2}\d{8,9}$/.test(phone)||!guest_name.trim()||
+    if(!validPagBankCustomerName(guest_name))return json({ok:false,error:"pagbank_customer_name_invalid"},400);
+    if(!/^\d{2}\d{8,9}$/.test(phone)||
        String(guest_email).toLowerCase()!==String(user.email).toLowerCase())
       return json({ok:false,error:"pagbank_customer_invalid"},400);
   }
@@ -589,7 +615,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(method==="card"){
     try{
       selectedPlan=await loadInstallmentOffer(admin,String(body.installment_offer_id||""),{
-        userId:user.id,quoteOptionId:option.id,baseAmount:Number(option.total_amount_cents),installments:Number(installments)});
+          userId:user.id,quoteOptionId:option.id,baseAmount:Number(option.total_amount_cents),installments:Number(installments),cardBin:String(body.credit_card_bin||"")});
     }catch(e){return json({ok:false,error:e instanceof Error&&e.message==="invalid_installments"?
       "invalid_installments":"installment_plans_unavailable"},409)}
   }
@@ -626,7 +652,7 @@ async function startPayment(req:Request,body:any,development:boolean){
 
   if(guaranteeToken){
     const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
-      user_id:user.id,card_token:guaranteeToken,consented_at:new Date().toISOString()});
+      user_id:user.id,card_token:guaranteeToken,consented_at:new Date().toISOString(),consent_version:body.guarantee_consent_version==="guarantee-v2"?"guarantee-v2":"guarantee-v1",renewal_consent:body.guarantee_consent_version==="guarantee-v2"&&body.guarantee_renewal_consent===true});
     if(error)return json({ok:false,error:"guarantee_token_save_failed"},503);
   }
 
@@ -712,7 +738,7 @@ async function startPayment(req:Request,body:any,development:boolean){
         if(!result.cardToken||!/^CARD_[A-Za-z0-9-]+$/.test(result.cardToken))
           throw new Error("guarantee_token_missing");
         const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
-          user_id:user.id,card_token:result.cardToken,consented_at:new Date().toISOString()});
+          user_id:user.id,card_token:result.cardToken,consented_at:new Date().toISOString(),consent_version:body.guarantee_consent_version==="guarantee-v2"?"guarantee-v2":"guarantee-v1",renewal_consent:body.guarantee_consent_version==="guarantee-v2"&&body.guarantee_renewal_consent===true});
         if(error)throw new Error("guarantee_token_save_failed");
       }
       if(result.status!=="WAITING") {
@@ -878,8 +904,8 @@ async function mockPayment(req:Request,body:any,development:boolean){
 
 async function userIsAdmin(user:any){
   if(!user) return false;
-  const {data}=await admin.from("profiles").select("role").eq("id",user.id).maybeSingle();
-  return data?.role==="admin";
+  const {data}=await admin.from("profiles").select("role,pms_access_status").eq("id",user.id).maybeSingle();
+  return data?.role==="admin" && data.pms_access_status==="active";
 }
 
 async function requestModification(req:Request,body:any,development:boolean){
@@ -1064,7 +1090,7 @@ async function opsData(req:Request){
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}] = await Promise.all([
     admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name))").order("created_at",{ascending:false}).limit(50),
-    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents(*)").order("created_at",{ascending:false}).limit(50),
+    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents!incidents_guarantee_id_fkey(*),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").order("created_at",{ascending:false}).limit(50),
     admin.from("payments").select("id,reservation_id,provider,method,installments,amount_cents,status,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("post_booking_charges").select("id,reservation_id,kind,description,amount_cents,status,expires_at,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("payment_settings").select("*").eq("id",1).single(),
@@ -1072,7 +1098,7 @@ async function opsData(req:Request){
     admin.from("property_integrations").select("property_id,provider,environment_key,external_listing_id,active").order("provider"),
     admin.from("notification_outbox").select("id,template_code,status,send_after,attempt_count,max_attempts,last_error,created_at,reservations(confirmation_code)").order("created_at",{ascending:false}).limit(50)
   ]);
-  const bookingConfigured=bookingFeeds.map(x=>({name:x.name,environment_key:x.env,configured:Boolean(Deno.env.get(x.env))}));
+  const bookingConfigured=(await calendars.channels("booking")).listings.map((x:any)=>({name:x.name,configured:x.ok}));
   return json({ok:true,modifications:mods||[],guarantees:guarantees||[],payments:payments||[],charges:charges||[],settings:settings||null,properties:properties||[],integrations:integrations||[],booking_configured:bookingConfigured,notifications:notifications||[]});
 }
 
@@ -1095,8 +1121,8 @@ async function adminHubData(req:Request,body:any){
     admin.from("property_integrations").select("id,property_id,provider,external_listing_id,pms,environment_key,active,updated_at").order("provider"),
     admin.from("payment_settings").select("*").eq("id",1).single(),
     admin.from("pms_calendar_blocks").select("*").gte("end_date",start).lte("start_date",end).order("start_date"),
-    prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
-    bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
+    airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
+    bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
   ]);
   if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error)
     return json({ok:false,error:"admin_hub_unavailable"},500);
@@ -1112,7 +1138,7 @@ async function adminHubData(req:Request,body:any){
     admin.from("experience_orders").select("id,reservation_id,status,created_at,experience_order_items(id,product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,created_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,description,snapshot,expires_at,applied_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,status,admin_additional_amount_cents,estimated_additional_amount_cents,admin_note,payment_due_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
-    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,attention_code,provider_error_code,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents!incidents_guarantee_id_fkey(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("reservation_notes").select("id,reservation_id,author_user_id,note,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("financial_entries").select("id,reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents,currency,description,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false})
   ]) : [{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty}];
@@ -1126,13 +1152,13 @@ async function adminHubData(req:Request,body:any){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:`airbnb:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"airbnb",start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:`airbnb:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"airbnb",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
   for(const listing of booking?.listings||[]){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:`booking:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"booking",start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:`booking:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:period.source||"booking",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
 
   return json({
@@ -1186,8 +1212,8 @@ async function adminReservationAction(req:Request,body:any){
       admin.from("reservations").select("id").eq("property_id",propertyId).in("status",["hold","pending_payment","confirmed"]).lt("check_in",checkOut).gt("check_out",checkIn).limit(1),
       admin.from("post_booking_charges").select("id").eq("kind","modification").eq("target_property_id",propertyId).in("status",["awaiting_payment","processing","paid"]).gt("expires_at",new Date().toISOString()).lt("target_check_in",checkOut).gt("target_check_out",checkIn).limit(1),
       admin.from("pms_calendar_blocks").select("id").eq("property_id",propertyId).eq("status","active").lt("start_date",checkOut).gt("end_date",checkIn).limit(1),
-      prodJson("/api/ical-airbnb-all").catch(()=>({ok:false,listings:[]})),
-      bookingCalendarData().catch(()=>({configured:bookingIcalConfigured(),ok:false,listings:[]}))
+      airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
+      bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
     ]);
     if(!property||!property.active) return json({ok:false,error:"property_not_found"},404);
     if(guests>Number(property.max_guests)) return json({ok:false,error:"capacity"},409);
@@ -1228,9 +1254,10 @@ async function adminReservationAction(req:Request,body:any){
   if(operation==="check_in"){
     if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
     if(reservation.check_in>todayInBrazil||reservation.check_out<todayInBrazil||reservation.checked_in_at) return json({ok:false,error:"check_in_not_allowed"},409);
-    const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_in",checked_in_at:reservation.checked_in_at||now,updated_at:now}).eq("id",reservation.id).select().single();
-    if(updateError) return json({ok:false,error:"check_in_failed"},500);
-    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_in",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_in_at:data.checked_in_at}});
+    const {data,error:updateError}=await admin.rpc("check_in_with_guarantee",{p_reservation:reservation.id,
+      p_actor:user.id,p_exception_reason:body.guarantee_exception_reason||null});
+    if(updateError)return json({ok:false,error:String(updateError.message).includes("guarantee_check_in_exception_required")?
+      "guarantee_check_in_exception_required":"check_in_failed"},409);
     return json({ok:true,reservation:data});
   }
   if(operation==="check_out"){
@@ -1754,7 +1781,7 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
   let plan:any=null;
   if(method==="card"){
     try{plan=await loadInstallmentOffer(admin,String(body.installment_offer_id||""),{
-      userId:user.id,chargeId,baseAmount,installments})}
+        userId:user.id,chargeId,baseAmount,installments,cardBin:String(body.credit_card_bin||"")})}
     catch{return json({ok:false,error:"installment_plans_unavailable"},409)}
   }
   const buyerInterest=Number(plan?.buyer_interest_cents||0);
@@ -1909,9 +1936,15 @@ Deno.serve(async(req)=>{
     let body:any={};
     if(req.method==="POST") body=await req.json().catch(()=>({}));
     const action=url.searchParams.get("action")||body.action||"config";
+    if(action==="calendar_export"){
+      if(req.method!=="GET")return json({ok:false,error:"method_not_allowed"},405);
+      return await calendars.exportFeed(url.searchParams.get("token")||"");
+    }
+    if(action==="admin_calendar")return await adminCalendarAction(req,body);
     const origin=req.headers.get("origin")||"";
     const development=req.headers.get("x-chalezinho-env")==="development" &&
       (origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-8q4qwux69-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-g7cqw9cxg-roldneicosta-4140.vercel.app" ||
@@ -1962,7 +1995,7 @@ Deno.serve(async(req)=>{
         payment_settings:settingsQ.data||{},
         policy_documents:docsQ.data||[],
         experience_products:productsQ.data||[],
-        availability_coverage:{direct:true,airbnb:true,booking:bookingIcalConfigured()}
+        availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
     if(action==="property_media"){
@@ -2014,8 +2047,10 @@ Deno.serve(async(req)=>{
     if(action==="admin_cancellation_policy_action") return await adminCancellationPolicyAction(req,body,development);
     if(action==="reservation_finance"){
       const user=await currentUser(req);
-      if(!development||!user||!(await userIsAdmin(user)))return json({ok:false,error:"admin_required"},403);
-      return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""))});
+      if(!development||!user)return json({ok:false,error:"authentication_required"},403);
+      try{return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""),
+        {userId:user.id,manager:await userIsAdmin(user)})})}
+      catch(e){return json({ok:false,error:(e as Error).message==='reservation_not_found'?'reservation_not_found':'reservation_finance_unavailable'},409)}
     }
     if(action==="admin_hub") return await adminHubData(req,body);
     if(action==="experience_credit") return await experienceCredit(req,body,development);

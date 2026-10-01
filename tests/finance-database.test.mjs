@@ -30,6 +30,8 @@ before(async()=>{
  await db.exec(await readFile(new URL('../supabase/migrations/20260929023043_reservation_finance_ledger.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20260929024034_finance_installment_offers.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20260929030240_finance_payment_configuration.sql',import.meta.url),'utf8'));
+ await db.exec(`insert into properties values(2,'["Hidromassagem",{"payment_terms":{"max_installments":12,"no_interest_installments":6,"interest_payer":"guest"}}]');`);
+ await db.exec(await readFile(new URL('../supabase/migrations/20260929044440_normalize_finance_property_configuration.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 async function reservation(){return (await one('insert into reservations default values returning id')).id;}
@@ -136,4 +138,8 @@ test('event projection preserves paid amount through pending refund',async()=>{
 });
 test('RLS prevents guest reading the financial event stream directly',async()=>{
  await db.exec('set role authenticated');try{await assert.rejects(db.query('select * from finance_events'),/permission denied/);}finally{await db.exec('reset role');}
+});
+
+test('legacy amenity arrays become an object without losing amenities or installment configuration',async()=>{
+ const {features}=await one('select features from properties where id=2');assert.deepEqual(features.amenities,['Hidromassagem']);assert.equal(features.payment_terms.max_installments,12);
 });

@@ -39,8 +39,23 @@ async function init(){
  $("#checkout-close").addEventListener("click",closeCheckout);$("#upsell-close")?.addEventListener("click",()=>$("#upsell-modal").hidden=true);
  $("#step-back").addEventListener("click",()=>showStep(Math.max(1,Number($("#checkout-panel").dataset.step||1)-1)));
  $("#step-next").addEventListener("click",next);
+ await initChaletFilter();
  renderDevBanner();
  await restoreResume();
+}
+async function initChaletFilter(){
+ const select=$("#book-chalet"),requested=new URLSearchParams(location.search).get("chalet")||"";
+ try{
+  const data=await api("property_media");
+  for(const p of data.properties){const option=document.createElement("option");option.value=p.code;option.textContent=p.name;select.appendChild(option)}
+ }catch{
+  if(requested){const option=document.createElement("option");option.value=requested;option.textContent="Chalé "+requested.slice(0,40);select.appendChild(option)}
+ }
+ select.value=[...select.options].some(o=>o.value===requested)?requested:"";
+ select.addEventListener("change",()=>{
+  const url=new URL(location.href);if(select.value)url.searchParams.set("chalet",select.value);else url.searchParams.delete("chalet");history.replaceState(null,"",url);
+  if(state.search)renderResults(state.search);
+ });
 }
 async function closeCheckout(){
  const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
@@ -86,18 +101,22 @@ async function search(){
  }catch(e){if(sequence===searchSequence)error("Não foi possível consultar agora. Tente novamente.");}
 }
 function renderResults(list){
+ const code=$("#book-chalet").value;
+ if(code)list=list.filter(p=>p.code===code);
  const box=$("#booking-list");box.innerHTML="";$("#booking-results").classList.remove("booking-results-hidden");
- const available=list.filter(x=>x.available).length;$("#availability-count").textContent=available+" opções disponíveis";
+ const available=list.filter(x=>x.available).length;$("#availability-count").textContent=available+(available===1?" opção disponível":" opções disponíveis");
  $("#booking-period").textContent=$("#book-in").value.split("-").reverse().join("/")+" → "+$("#book-out").value.split("-").reverse().join("/");
+ if(!list.length)box.innerHTML='<p>Este chalé não está disponível para consulta. Selecione “Todos os chalés” para ver outras opções.</p>';
  list.forEach(p=>{
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
-  const feats=(p.features||[]).map(x=>"<span>"+x+"</span>").join("");
+  const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+esc(x)+"</span>").join("");
   const status=p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível";
   const minNotice=p.unavailable_reason==="minimum_stay"?'<div class="minimum-stay-alert"><small>MÍNIMO DE ESTADIA</small><strong>'+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'</strong><span>Para estas datas, este chalé exige no mínimo '+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'.</span></div>':"";
   const total=p.from_stay_price!=null?Number(p.from_stay_price):null;
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
   const price=p.available?'<small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">pacote · '+perNight+' por noite</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
   a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(String(p.property_type).toUpperCase())+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available?"":"disabled")+' data-id="'+p.id+'">'+(p.available?"Ver tarifas":"Indisponível")+'</button></div>';
+  VilleImages.set(a.querySelector(".booking-gallery img"),p.cover_image,{sizes:"(max-width: 800px) 100vw, 240px"});
   box.appendChild(a);
  });
  box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>openFlow(Number(b.dataset.id))));
@@ -115,7 +134,7 @@ async function openFlow(id){
   if(e.message==="minimum_stay"){
     const min=Number(e.data?.min_stay||state.property?.min_stay||1);
     setFlowError("Para estas datas, o mínimo de estadia deste chalé é de "+min+" "+(min===1?"noite":"noites")+". Faça uma nova busca com o período mínimo.");
-  }else setFlowError("Não foi possível preparar as tarifas. Faça uma nova busca.");
+  }else setFlowError(e.message==="cancellation_policy_unavailable"?"As regras desta tarifa ainda não estão configuradas. Entre em contato para reservar.":"Não foi possível preparar as tarifas. Faça uma nova busca.");
 }
 }
 function showStep(n){
@@ -127,7 +146,7 @@ function showStep(n){
 async function generateQuote(withExperiences){
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
  const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen});
- state.quote=q;startCountdown(q.expires_at);return q;
+ q.selected_variant_ids=chosen.map(String).sort();state.quote=q;startCountdown(q.expires_at);return q;
 }
 function renderRates(){
  const box=$("#rate-options");box.innerHTML="";const ref=state.quote.rate_options.find(x=>x.code==="reference");
@@ -257,6 +276,7 @@ async function maybeOfferUpsell(){
      const targetProduct=(state.config.experience_products||[]).find(p=>String(p.id)===String(candidate.to_product_id));
      const targetVariant=targetProduct?primaryVariant(targetProduct):null;
      if(targetVariant)state.selectedByProduct[candidate.to_product_id]=targetVariant.id;
+     state.quote.selected_variant_ids=Object.values(state.selectedByProduct).map(String).sort();
 
      renderSummary();
      track("experience_upgraded",{property_id:state.property?.id||null,metadata:{from_product_id:candidate.from_product_id,to_product_id:candidate.to_product_id,difference_cents:Number(candidate.difference_cents||0)}});
@@ -275,6 +295,12 @@ async function maybeOfferUpsell(){
  };
 }
 async function refreshQuoteAfterExperiences(){
+ const chosen=Object.values(state.selectedByProduct).map(String).sort();
+ const previous=state.quote?.selected_variant_ids||((state.quote?.experiences||[]).length===0?[]:null);
+ if(previous&&JSON.stringify(previous)===JSON.stringify(chosen)){
+  if(Date.parse(state.quote.expires_at)<=Date.now())throw new Error("quote_expired");
+  return;
+ }
  const code=state.rateCode;setFlowError("Atualizando o pacote com suas escolhas…");
  await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;state.upsellHandled=false;setFlowError("");
 }
@@ -306,7 +332,7 @@ function renderSummary(){
  const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
  $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
  const guarantee=Number(state.property.guarantee_amount_cents||0);
- $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · PAGBANK SANDBOX</small><h4>'+brlC(guarantee)+'</h4><p>Informe o cartão neste pagamento para a caução. O PagBank guarda os dados do cartão; o site guarda apenas um token vinculado à reserva. A pré-autorização será solicitada perto do check-in e reservará temporariamente '+brlC(guarantee)+' do limite, sem cobrança. Uma ocorrência comprovada poderá gerar captura parcial; sem dano, a autorização será liberada.</p><label><input id="guarantee-card-consent" type="checkbox"> Autorizo o uso deste cartão exclusivamente para a caução desta reserva, conforme as regras acima.</label></div>':"";
+ $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · PAGBANK SANDBOX</small><h4>'+brlC(guarantee)+'</h4><p>Informe o cartão neste pagamento para a caução. O PagBank guarda os dados do cartão; o site guarda apenas um token vinculado à reserva. A pré-autorização será solicitada perto do check-in e reservará temporariamente '+brlC(guarantee)+' do limite, sem cobrança. Uma ocorrência comprovada poderá gerar captura parcial; sem dano, a autorização será liberada. Em estadias longas, cada autorização tem prazo próprio. A renovação abaixo é opcional e pode bloquear temporariamente até duas vezes o valor da caução, até a liberação da autorização anterior.</p><label><input id="guarantee-card-consent" type="checkbox"> Autorizo o uso deste cartão exclusivamente para a caução desta reserva, conforme as regras acima.</label><label><input id="guarantee-renewal-consent" type="checkbox"> Autorizo renovações da caução durante esta estadia. Estou ciente da possível sobreposição temporária dos limites bloqueados.</label></div>':"";
  const doc=state.rate.cancellation_policy;
  const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
@@ -314,7 +340,7 @@ function renderSummary(){
  const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
  const free=terms.interest_payer==="merchant"?max:Math.min(Number(terms.no_interest_installments),max);
  state.installmentQuote=null;
- pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label>Parcelamento<select id="installments" aria-label="Parcelas no cartão"><option value="">Consultando parcelas…</option></select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p id="installment-warning" role="status"></p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
+ pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label id="installment-field">Parcelamento<select id="installments" aria-label="Parcelas no cartão"><option value="">Consultando parcelas…</option></select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p id="installment-warning" role="status"></p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
  if(pagbankSandbox){
   const enabled=state.config.payment_settings;
   const methods=[...pay.querySelectorAll('input[name="pay-method"]')];
@@ -328,20 +354,33 @@ function renderSummary(){
   const optionId=state.rate.quote_option_id;
   const refreshPlans=async()=>{
     $("#installments").disabled=true;
-    try{const quote=await api("installment_options",{quote_option_id:optionId,preview:true});
+    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
+    state.installmentQuote=null;
+    try{const quote=await api("installment_options",{quote_option_id:optionId,credit_card_bin:bin.length===6?bin:undefined});
+      if(bin!==$("#card-number").value.replace(/\D/g,"").slice(0,6))return;
       if(state.rate.quote_option_id!==optionId)return;
-      state.installmentQuote={...quote,optionId};
+      state.installmentQuote={...quote,optionId,cardBin:bin};
       $("#installments").innerHTML=quote.plans.map(p=>`<option value="${p.installments}">${p.installments}x de ${brlC(p.installment_cents)} · total ${brlC(p.total_cents)} · ${p.interest_free?"sem juros":"com juros"}</option>`).join("");
       $("#installments").disabled=false;$("#installments").dispatchEvent(new Event("change"));
     }catch{$("#installment-total").textContent="Parcelas indisponíveis. Tente consultar novamente.";}
   };
   $("#installments").addEventListener("change",()=>{
+    if(paymentChoice().method!=="card"){$("#installment-total").textContent="Total no Pix: "+brlC(total)+".";return;}
     const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
-    $("#installment-total").textContent=plan?`Total a cobrar: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
+    $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
   });
   const retryPlans=document.createElement("button");retryPlans.type="button";retryPlans.textContent="Consultar parcelas novamente";retryPlans.onclick=refreshPlans;pay.insertBefore(retryPlans,card);
   if(enabled.card_enabled)refreshPlans();
-  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",()=>card.hidden=!guarantee&&paymentChoice().method!=="card"));
+  let previousBin="",binTimer;$("#card-number").addEventListener("input",()=>{
+   const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
+   if(bin===previousBin)return;previousBin=bin;state.installmentQuote=null;
+   $("#installments").disabled=true;clearTimeout(binTimer);
+   if(bin.length===6)binTimer=setTimeout(refreshPlans,300);
+  });
+  const updateMethod=()=>{const isCard=paymentChoice().method==="card";
+    card.hidden=!guarantee&&!isCard;$("#installment-field").hidden=!isCard;retryPlans.hidden=!isCard;
+    $("#installments").dispatchEvent(new Event("change"));};
+  pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",updateMethod));updateMethod();
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
   resume.textContent="Consultar minha última cobrança de teste";pay.appendChild(resume);
   resume.onclick=async()=>{resume.disabled=true;
@@ -370,15 +409,15 @@ async function performStartPayment(choice){
  const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
-  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,8):undefined;
+  const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,6):undefined;
   const quoted=state.installmentQuote;
   const plan=quoted?.plans.find(p=>p.installments===installments);
-  if(method==="card"&&(!plan||!quoted.offer_id||quoted.optionId!==state.rate.quote_option_id))
+  if(method==="card"&&(!plan||!quoted.offer_id||quoted.optionId!==state.rate.quote_option_id||quoted.cardBin!==credit_card_bin))
     throw new Error("installment_quote_required");
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#guarantee-card-consent")?.checked)throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee}:{})});
+  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
@@ -388,9 +427,11 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados do cartão de teste. Digite o cartão novamente e tente outra reserva.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
+ clearInterval(window.__quoteTimer);
+ $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
  box.innerHTML='<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
   (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>O cartão de teste foi enviado. Consultando o resultado…</p>')+
@@ -399,7 +440,7 @@ function renderSandboxPayment(d){
  const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
   try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
    if(s.manual_review){$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
-   if(s.reservation_status==="confirmed"){$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
+   if(s.reservation_status==="confirmed"){$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
    if(["refused","cancelled","expired"].includes(s.payment_status)){$("#sandbox-payment-result").textContent="Pagamento não aprovado. Faça uma nova consulta para tentar outra reserva.";clearInterval(window.__pagbankPoll)}
   }catch{ /* The provider may still be processing; the webhook is authoritative. */ }};
  clearInterval(window.__pagbankPoll);tick();window.__pagbankPoll=setInterval(tick,5000);

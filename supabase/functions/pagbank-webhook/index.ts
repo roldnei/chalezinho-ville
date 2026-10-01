@@ -6,14 +6,15 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { extractPagBankWebhookChargeId, verifyPagBankNotification, verifyPagBankSignedNotification } from "../booking-engine/pagbank.ts";
 
 // Public endpoint: verify_jwt is off because PagBank does not send a Supabase JWT.
-// Every notification is authenticated using the PagBank signature and then
-// reconciled against a fresh GET from PagBank; the payload alone is not trusted.
+// Signed notifications are verified. The isolated sandbox also sends unsigned
+// hints: only an authenticated GET of an already registered charge can update money.
 Deno.serve(async (request) => {
   try{assertFinanceDevelopment(Deno.env.get("SUPABASE_URL")||"",Deno.env.get("FINANCE_ENVIRONMENT"))}
   catch{return new Response("Isolated development environment required",{status:503})}
   if (request.method !== "POST") return new Response("Method not allowed", {status:405});
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   const raw=await request.text();
+  if(raw.length>65536)return new Response("Body too large",{status:413});
   const signature=request.headers.get("x-authenticity-token")||"";
   const signed=request.headers.get("x-payload-signature")||"";
   let authenticated=await verifyPagBankNotification(token,raw,signature);
@@ -24,7 +25,10 @@ Deno.serve(async (request) => {
   // The PagBank sandbox can omit both documented signature headers. An
   // unsigned message is only a hint: never trust its status, amount or user.
   // Reconcile exclusively from the server-authenticated PagBank lookup below.
-  if(!authenticated&&(signature||signed||Deno.env.get("ALLOW_UNSIGNED_SANDBOX_WEBHOOK")!=="true")) return new Response("Invalid signature",{status:401});
+  if(!authenticated&&(signature||signed)) {
+    console.warn(JSON.stringify({event:"pagbank_webhook_signature_rejected",legacy_header_present:Boolean(signature),ecdsa_header_present:Boolean(signed)}));
+    return new Response("Invalid signature",{status:401});
+  }
   let payload:any;
   try { payload=JSON.parse(raw); } catch { return new Response("Invalid body",{status:400}); }
   const chargeId=extractPagBankWebhookChargeId(payload);
@@ -32,15 +36,24 @@ Deno.serve(async (request) => {
   try {
     const admin=createClient(Deno.env.get("SUPABASE_URL")!,Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
       {auth:{persistSession:false,autoRefreshToken:false}});
+    if(!authenticated){
+      const {data:claimed,error}=await admin.rpc('claim_provider_reconciliation',{p_charge_id:chargeId});
+      if(error)return new Response('Retry later',{status:503});
+      if(claimed!==true)return new Response('No lookup scheduled',{status:202});
+    }
     const {data:payment,error:findError}=await admin.from("payments")
       .select("id,amount_cents,metadata,provider_payment_id").eq("provider","pagbank_sandbox")
       .eq("provider_payment_id",chargeId).single();
     // A webhook can arrive before the order ID is saved. A non-2xx response
     // lets PagBank retry; the guest can also reconcile via status polling.
     if(findError||!payment){
-      const {data:guarantee}=await admin.from("guarantees")
+      const {data:authorization}=await admin.from("guarantee_authorizations").select("guarantee_id")
+        .eq("provider_charge_id",chargeId).maybeSingle();
+      let query=admin.from("guarantees")
         .select("*,reservations(check_out)")
-        .eq("provider","pagbank_sandbox").eq("provider_authorization_id",chargeId).maybeSingle();
+        .eq("provider","pagbank_sandbox");
+      query=authorization?query.eq("id",authorization.guarantee_id):query.eq("provider_authorization_id",chargeId);
+      const {data:guarantee}=await query.maybeSingle();
       if(!guarantee)return new Response("Charge not registered yet",{status:503});
       await reconcileGuarantee(admin,guarantee,paymentGateway("pagbank_sandbox",token));
       return new Response("ok",{status:200});

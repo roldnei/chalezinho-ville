@@ -1,5 +1,8 @@
+import {taskPhotos} from "./photos.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+
+import {canUseProperty,canManage,hasPermission,canUseTask,canUseIssue,canEditTemplate,scopeHub} from "./access.ts";
 
 const url=Deno.env.get("SUPABASE_URL")||"";
 const service=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")||"";
@@ -25,22 +28,27 @@ async function operator(request:Request){
   return {id:user.id,email:user.email||null,role:profile.role,name:profile.full_name||user.email||"Equipe",position:profile.pms_position||null,property_ids:profile.pms_property_ids||[],permissions:profile.pms_permissions||{}};
 }
 
-const canManage=(actor:any)=>actor.role==="admin"||actor.role==="host";
-const canUseProperty=(actor:any,propertyId:number)=>actor.role==="admin"||actor.property_ids?.includes(propertyId);
+
 const validRoles=["admin","host","staff","service_provider"];
 const permissionKeys=["reservations","housekeeping","maintenance","finance","manage_team"];
 const roleDefaults=(role:string)=>role==="admin"?Object.fromEntries(permissionKeys.map(k=>[k,true])):role==="host"?{reservations:true,housekeeping:true,maintenance:true,finance:false,manage_team:false}:role==="staff"?{reservations:false,housekeeping:true,maintenance:false,finance:false,manage_team:false}:{reservations:false,housekeeping:false,maintenance:true,finance:false,manage_team:false};
 const cleanPermissions=(value:any,role:string)=>{const defaults=roleDefaults(role);for(const key of permissionKeys)if(typeof value?.[key]==="boolean")defaults[key]=value[key];return defaults};
 const cleanPropertyIds=(value:any,available:number[])=>[...new Set((Array.isArray(value)?value:[]).map(Number).filter((id:number)=>available.includes(id)))];
 
-async function syncTurnovers(actorId:string){
+async function syncTurnovers(actor:any){
+  const actorId=actor.id;
   const start=new Date(Date.now()-2*86400000).toISOString().slice(0,10),end=new Date(Date.now()+45*86400000).toISOString().slice(0,10);
   const {data:reservations}=await admin.from("reservations").select("id,property_id,check_in,check_out,guest_name,status,properties(name,check_in_time,check_out_time),experience_orders(status,experience_order_items(product_name_snapshot,variant_name_snapshot,quantity,status))").eq("status","confirmed").gte("check_out",start).lte("check_out",end);
   for(const r of reservations||[]){
+    if(!canUseProperty(actor,Number(r.property_id)))continue;
     const property=Array.isArray(r.properties)?r.properties[0]:r.properties;
     const scheduled=`${r.check_out}T${String(property?.check_out_time||"11:00").slice(0,5)}:00-03:00`;
     const due=`${r.check_out}T14:30:00-03:00`;
-    const {data:existing}=await admin.from("pms_tasks").select("id").eq("reservation_id",r.id).eq("task_type","turnover").maybeSingle();
+    const {data:existing}=await admin.from("pms_tasks").select("id,property_id,scheduled_for,due_at").eq("reservation_id",r.id).eq("task_type","turnover").maybeSingle();
+    if(existing&&(Number(existing.property_id)!==Number(r.property_id)||Date.parse(existing.scheduled_for)!==Date.parse(scheduled)||Date.parse(existing.due_at)!==Date.parse(due))){
+      await admin.from("pms_tasks").update({property_id:r.property_id,title:`Preparar ${property?.name||"imóvel"}`,scheduled_for:scheduled,due_at:due,updated_at:new Date().toISOString()}).eq("id",existing.id);
+      await admin.from("pms_activity_events").insert({task_id:existing.id,actor_user_id:actorId,event_type:"reservation_schedule_changed",details:{from:existing.scheduled_for,to:scheduled}});
+    }
     if(!existing){
       const {data:task}=await admin.from("pms_tasks").insert({property_id:r.property_id,reservation_id:r.id,task_type:"turnover",title:`Preparar ${property?.name||"imóvel"}`,description:`Saída de ${r.guest_name||"hóspede"}. Limpeza e vistoria antes da próxima entrada.`,scheduled_for:scheduled,due_at:due,created_by:actorId}).select("id").single();
       if(task?.id){
@@ -54,20 +62,37 @@ async function syncTurnovers(actorId:string){
     }
     const experiences=(r.experience_orders||[]).filter((o:any)=>o.status==="active").flatMap((o:any)=>o.experience_order_items||[]).filter((x:any)=>x.status==="active");
     if(experiences.length){
-      const {data:setupExists}=await admin.from("pms_tasks").select("id").eq("reservation_id",r.id).eq("task_type","setup").maybeSingle();
+      const {data:setupExists}=await admin.from("pms_tasks").select("id,status,property_id,scheduled_for,due_at,pms_task_checklist_items(id,label,completed)").eq("reservation_id",r.id).eq("task_type","setup").maybeSingle();
       if(!setupExists){
         const checkInAt=new Date(`${r.check_in}T${String(property?.check_in_time||"15:00").slice(0,5)}:00-03:00`);
         const scheduledAt=new Date(checkInAt.getTime()-24*60*60*1000).toISOString(),dueAt=new Date(checkInAt.getTime()-60*60*1000).toISOString();
         const summary=experiences.map((x:any)=>`${Number(x.quantity||1)}x ${x.product_name_snapshot}${x.variant_name_snapshot?` · ${x.variant_name_snapshot}`:""}`).join(", ");
         const {data:setup}=await admin.from("pms_tasks").insert({property_id:r.property_id,reservation_id:r.id,task_type:"setup",title:`Preparar experiências · ${property?.name||"imóvel"}`,description:`Itens confirmados para ${r.guest_name||"hóspede"}: ${summary}`,scheduled_for:scheduledAt,due_at:dueAt,priority:"high",created_by:actorId}).select("id").single();
         if(setup?.id)await admin.from("pms_task_checklist_items").insert(experiences.map((x:any,index:number)=>({task_id:setup.id,label:`Separar ${Number(x.quantity||1)}x ${x.product_name_snapshot}${x.variant_name_snapshot?` · ${x.variant_name_snapshot}`:""}`,display_order:index})));
+      }else{
+        const arrival=new Date(`${r.check_in}T${String(property?.check_in_time||"15:00").slice(0,5)}:00-03:00`).getTime();
+        if(Number(setupExists.property_id)!==Number(r.property_id)||Date.parse(setupExists.due_at)!==arrival-3600000){
+          await admin.from("pms_tasks").update({property_id:r.property_id,scheduled_for:new Date(arrival-86400000).toISOString(),due_at:new Date(arrival-3600000).toISOString(),updated_at:new Date().toISOString()}).eq("id",setupExists.id);
+          await admin.from("pms_activity_events").insert({task_id:setupExists.id,actor_user_id:actorId,event_type:"reservation_schedule_changed",details:{from:setupExists.due_at,to:new Date(arrival-3600000).toISOString()}});
+        }
+        const expected=experiences.map((x:any)=>`Separar ${Number(x.quantity||1)}x ${x.product_name_snapshot}${x.variant_name_snapshot?` · ${x.variant_name_snapshot}`:""}`);
+        const existing=setupExists.pms_task_checklist_items||[];
+        const added=expected.filter((label:string)=>!existing.some((x:any)=>x.label===label));
+        const removed=existing.filter((x:any)=>!expected.includes(x.label));
+        if(added.length||removed.length){
+          // A paid upgrade changes what must be prepared. Reopen the task and retain the change in its audit.
+          await admin.from("pms_tasks").update({status:"todo",completed_at:null,submitted_at:null,description:expected.join(", "),updated_at:new Date().toISOString()}).eq("id",setupExists.id);
+          await admin.from("pms_activity_events").insert({task_id:setupExists.id,actor_user_id:actorId,event_type:"paid_experiences_changed",details:{added,removed:removed.map((x:any)=>({label:x.label,completed:x.completed}))}});
+          if(removed.length)await admin.from("pms_task_checklist_items").delete().in("id",removed.map((x:any)=>x.id));
+          if(added.length)await admin.from("pms_task_checklist_items").insert(added.map((label:string,index:number)=>({task_id:setupExists.id,label,display_order:expected.indexOf(label)})));
+        }
       }
     }
   }
 }
 
 async function hub(actor:any){
-  if(canManage(actor))await syncTurnovers(actor.id);
+  if(canManage(actor))await syncTurnovers(actor);
   const start=new Date(Date.now()-365*86400000).toISOString(),end=new Date(Date.now()+730*86400000).toISOString();
   const [properties,tasks,issues,reservations,team,templates,attachments,blocks,notifications,activity]=await Promise.all([
     admin.from("properties").select("id,code,name,cover_image,active,check_in_time,check_out_time").eq("active",true).order("id"),
@@ -82,7 +107,8 @@ async function hub(actor:any){
     admin.from("pms_activity_events").select("*").order("created_at",{ascending:false}).limit(250)
   ]);
   if(properties.error||tasks.error||issues.error||reservations.error||team.error||templates.error||attachments.error||blocks.error||notifications.error||activity.error)return json({ok:false,error:"pms_unavailable"},500);
-  const evidence=await Promise.all((attachments.data||[]).map(async (x:any)=>{const {data}=await admin.storage.from("pms-evidence").createSignedUrl(x.storage_path,900);return {...x,signed_url:data?.signedUrl||null}}));
+  const scoped=scopeHub(actor,{tasks:tasks.data,issues:issues.data,reservations:reservations.data,attachments:attachments.data,activity:activity.data,templates:templates.data,notifications:notifications.data});
+  const evidence=await Promise.all(scoped.attachments.map(async (x:any)=>{const {data}=await admin.storage.from("pms-evidence").createSignedUrl(x.storage_path,900);return {...x,signed_url:data?.signedUrl||null}}));
   const visibleProperties=(properties.data||[]).filter((p:any)=>canUseProperty(actor,Number(p.id)));
   const propertyIds=new Set(visibleProperties.map((p:any)=>Number(p.id)));
   const visibleReservations=(reservations.data||[]).filter((r:any)=>propertyIds.has(Number(r.property_id)));
@@ -94,11 +120,11 @@ async function hub(actor:any){
     admin.from("reservation_notes").select("id,reservation_id,note,author_user_id,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
     admin.from("audit_events").select("id,actor_user_id,action,entity_type,entity_id,old_value,new_value,created_at").in("entity_id",reservationIds).order("created_at",{ascending:false}).limit(250)
   ]):[{data:[]},{data:[]},{data:[]},{data:[]},{data:[]}];
-  const visibleTasks=(tasks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))&&(!["staff","service_provider"].includes(actor.role)||!x.assigned_user_id||x.assigned_user_id===actor.id));
-  const canSeeGuests=actor.role==="admin"||actor.permissions?.reservations===true;
-  const safeReservations=visibleReservations.map((r:any)=>canSeeGuests?r:{...r,guest_email:null,guest_phone:null,stay_amount:null,experience_amount:null,total_amount:null});
+  const visibleTasks=scoped.tasks;
+  const canSeeGuests=hasPermission(actor,"reservations");
+  const safeReservations=scoped.reservations;
   let teamRows:any[]=[];let invitations:any[]=[];
-  if(actor.role==="admin"||actor.permissions?.manage_team===true){
+  if(actor.role==="admin"){
     await admin.from("pms_team_invitations").update({status:"expired",updated_at:new Date().toISOString()}).eq("status","pending").lt("expires_at",new Date().toISOString());
     const users=await Promise.all((team.data||[]).map(async (member:any)=>{const {data}=await admin.auth.admin.getUserById(member.id);return {...member,email:data.user?.email||null,email_confirmed_at:data.user?.email_confirmed_at||null}}));
     teamRows=users;
@@ -106,27 +132,30 @@ async function hub(actor:any){
     invitations=invites||[];
   }else teamRows=(team.data||[]).filter((member:any)=>member.id===actor.id).map((member:any)=>({...member,email:null,pms_permissions:{}}));
   const financial=actor.role==="admin"||actor.permissions?.finance===true;
-  return json({ok:true,server_now:new Date().toISOString(),properties:visibleProperties,tasks:visibleTasks,issues:(issues.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),reservations:safeReservations,team:teamRows,invitations,templates:templates.data||[],attachments:evidence,blocks:(blocks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),notifications:notifications.data||[],activity:activity.data||[],payments:financial?payments.data||[]:[],charges:financial?charges.data||[]:[],guarantees:financial?guarantees.data||[]:[],notes:canSeeGuests?notes.data||[]:[],audit:actor.role==="admin"?audit.data||[]:[],operator:actor});
+  return json({ok:true,server_now:new Date().toISOString(),properties:visibleProperties,tasks:visibleTasks,issues:scoped.issues,reservations:safeReservations,team:teamRows,invitations,templates:scoped.templates,attachments:evidence,blocks:(blocks.data||[]).filter((x:any)=>propertyIds.has(Number(x.property_id))),notifications:scoped.notifications,activity:scoped.activity,payments:financial?payments.data||[]:[],charges:financial?charges.data||[]:[],guarantees:financial?guarantees.data||[]:[],notes:canSeeGuests?notes.data||[]:[],audit:actor.role==="admin"?audit.data||[]:[],operator:actor});
 }
 
 async function taskAction(body:any,actor:any){
   const op=clip(body.operation,30);
   if(op==="create"){
+    if(!canManage(actor))return json({ok:false,error:"manager_required"},403);
     const assignedUser=clip(body.assigned_user_id,80)||null;
     const payload={property_id:Number(body.property_id),reservation_id:body.reservation_id||null,task_type:["turnover","inspection","maintenance","setup","guest_request"].includes(body.task_type)?body.task_type:"setup",title:clip(body.title,180),description:clip(body.description,2000)||null,status:"todo",priority:["low","normal","high","urgent"].includes(body.priority)?body.priority:"normal",scheduled_for:new Date(body.scheduled_for).toISOString(),due_at:body.due_at?new Date(body.due_at).toISOString():null,assigned_user_id:assignedUser,assigned_name:clip(body.assigned_name,160)||null,created_by:actor.id};
-    if(!payload.property_id||!payload.title||!canUseProperty(actor,payload.property_id))return json({ok:false,error:"invalid_task"},400);
+    if(!payload.property_id||!payload.title||!canUseProperty(actor,payload.property_id)||!hasPermission(actor,payload.task_type==="maintenance"?"maintenance":"housekeeping"))return json({ok:false,error:"invalid_task"},400);
+    if(payload.reservation_id){const {data:r}=await admin.from("reservations").select("property_id").eq("id",payload.reservation_id).maybeSingle();if(!r||Number(r.property_id)!==payload.property_id)return json({ok:false,error:"invalid_reservation"},400);}
+    if(assignedUser){const {data:m}=await admin.from("profiles").select("full_name,role,pms_property_ids,pms_access_status").eq("id",assignedUser).maybeSingle();if(!m||!validRoles.includes(m.role)||m.pms_access_status!=="active"||!canUseProperty({role:m.role,property_ids:m.pms_property_ids},payload.property_id))return json({ok:false,error:"member_not_found"},404);payload.assigned_name=m.full_name||"Equipe";}
     const {data,error}=await admin.from("pms_tasks").insert(payload).select().single();
     if(error)return json({ok:false,error:"task_create_failed"},500);
     await admin.from("pms_activity_events").insert({task_id:data.id,actor_user_id:actor.id,event_type:"created"});
     return json({ok:true,task:data});
   }
   const id=clip(body.task_id,80);const {data:task}=await admin.from("pms_tasks").select("*").eq("id",id).maybeSingle();
-  if(!task||!canUseProperty(actor,Number(task.property_id))||(actor.role==="staff"&&task.assigned_user_id&&task.assigned_user_id!==actor.id))return json({ok:false,error:"task_not_found"},404);
+  if(!task||!canUseTask(actor,task))return json({ok:false,error:"task_not_found"},404);
   if(op==="assign"){
     if(!canManage(actor))return json({ok:false,error:"manager_required"},403);
     const assignedUser=clip(body.assigned_user_id,80)||null;
     let assignedName:string|null=null;
-    if(assignedUser){const {data:person}=await admin.from("profiles").select("id,full_name,role").eq("id",assignedUser).in("role",["admin","host","staff"]).maybeSingle();if(!person)return json({ok:false,error:"member_not_found"},404);assignedName=person.full_name||"Equipe";}
+    if(assignedUser){const {data:person}=await admin.from("profiles").select("id,full_name,role,pms_property_ids,pms_access_status").eq("id",assignedUser).in("role",["admin","host","staff","service_provider"]).maybeSingle();if(!person||person.pms_access_status!=="active"||!canUseProperty({role:person.role,property_ids:person.pms_property_ids},Number(task.property_id)))return json({ok:false,error:"member_not_found"},404);assignedName=person.full_name||"Equipe";}
     const {data,error}=await admin.from("pms_tasks").update({assigned_user_id:assignedUser,assigned_name:assignedName,updated_at:new Date().toISOString()}).eq("id",id).select().single();
     if(error)return json({ok:false,error:"task_assign_failed"},500);
     await admin.from("pms_activity_events").insert({task_id:id,actor_user_id:actor.id,event_type:"assigned",details:{assigned_user_id:assignedUser,assigned_name:assignedName}});
@@ -134,7 +163,9 @@ async function taskAction(body:any,actor:any){
   }
   if(op==="set_status"){
     const status=clip(body.status,30);if(!["todo","in_progress","inspection","ready","blocked","cancelled"].includes(status))return json({ok:false,error:"invalid_status"},400);
+    if(task.task_type==="turnover"&&["inspection","ready"].includes(task.status)&&status!==task.status&&!canManage(actor))return json({ok:false,error:"manager_required"},403);
     if(status==="ready"&&!canManage(actor))return json({ok:false,error:"manager_required"},403);
+    if(status==="ready"&&task.status!=="inspection")return json({ok:false,error:"inspection_required"},409);
     if(["inspection","ready"].includes(status)){
       const {count}=await admin.from("pms_task_checklist_items").select("id",{count:"exact",head:true}).eq("task_id",id).eq("completed",false);
       if(Number(count||0)>0)return json({ok:false,error:"checklist_incomplete"},409);
@@ -144,7 +175,7 @@ async function taskAction(body:any,actor:any){
     if(status==="inspection")update.submitted_at=now;
     if(status==="ready")update.completed_at=now;
     const {data,error}=await admin.from("pms_tasks").update(update).eq("id",id).select().single();
-    if(error)return json({ok:false,error:"task_update_failed"},500);
+    if(error)return json({ok:false,error:error.message.includes("cleaning_photos_incomplete")?"cleaning_photos_incomplete":"task_update_failed"},409);
     await admin.from("pms_activity_events").insert({task_id:id,actor_user_id:actor.id,event_type:"status_changed",details:{from:task.status,to:status}});
     if(task.reservation_id&&task.task_type==="turnover"&&status==="in_progress")await admin.from("reservations").update({operational_status:"preparing",updated_at:now}).eq("id",task.reservation_id);
     if(task.reservation_id&&task.task_type==="turnover"&&status==="ready")await admin.from("reservations").update({operational_status:"ready",updated_at:now}).eq("id",task.reservation_id);
@@ -165,6 +196,7 @@ async function blockAction(body:any,actor:any){
   const operation=clip(body.operation,30);
   if(operation==="create"){
     const propertyId=Number(body.property_id),start=clip(body.start_date,10),end=clip(body.end_date,10),reason=clip(body.reason,500);
+    if(!canUseProperty(actor,propertyId))return json({ok:false,error:"property_not_found"},404);
     const blockType=["maintenance","owner_use","operational","other"].includes(body.block_type)?body.block_type:"operational";
     if(!propertyId||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(start)||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(end)||end<=start||reason.length<2)return json({ok:false,error:"invalid_block"},400);
     const [{data:property},{data:reservation},{data:block}]=await Promise.all([
@@ -181,6 +213,8 @@ async function blockAction(body:any,actor:any){
   }
   if(operation==="cancel"){
     const id=clip(body.block_id,80),now=new Date().toISOString();
+    const {data:before}=await admin.from("pms_calendar_blocks").select("property_id").eq("id",id).maybeSingle();
+    if(!before||!canUseProperty(actor,Number(before.property_id)))return json({ok:false,error:"block_not_found"},404);
     const {data,error}=await admin.from("pms_calendar_blocks").update({status:"cancelled",cancelled_by:actor.id,cancelled_at:now,updated_at:now}).eq("id",id).eq("status","active").select().maybeSingle();
     if(error||!data)return json({ok:false,error:"block_not_found"},404);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_calendar_block_cancelled",entity_type:"pms_calendar_block",entity_id:id,old_value:{status:"active"},new_value:{status:"cancelled"}});
@@ -190,7 +224,7 @@ async function blockAction(body:any,actor:any){
 }
 
 async function reservationAction(body:any,actor:any){
-  if(!canManage(actor)&&actor.permissions?.reservations!==true)return json({ok:false,error:"permission_required"},403);
+  if(!hasPermission(actor,"reservations"))return json({ok:false,error:"permission_required"},403);
   const reservationId=clip(body.reservation_id,80),operation=clip(body.operation,30);
   const {data:reservation}=await admin.from("reservations").select("*").eq("id",reservationId).maybeSingle();
   if(!reservation||!canUseProperty(actor,Number(reservation.property_id)))return json({ok:false,error:"reservation_not_found"},404);
@@ -204,9 +238,9 @@ async function reservationAction(body:any,actor:any){
   if(operation==="check_in"){
     if(reservation.status!=="confirmed")return json({ok:false,error:"reservation_not_confirmed"},409);
     if(reservation.check_in>todayInBrazil||reservation.check_out<todayInBrazil||reservation.checked_in_at)return json({ok:false,error:"check_in_not_allowed"},409);
-    const {data,error}=await admin.from("reservations").update({operational_status:"checked_in",checked_in_at:reservation.checked_in_at||now,updated_at:now}).eq("id",reservationId).select().single();
-    if(error)return json({ok:false,error:"check_in_failed"},500);
-    await admin.from("audit_events").insert({actor_user_id:actor.id,action:"reservation_check_in",entity_type:"reservation",entity_id:reservationId,new_value:{checked_in_at:data.checked_in_at}});
+    if(actor.role!=="admin")return json({ok:false,error:"admin_required"},403);
+    const {data,error}=await admin.rpc("check_in_with_guarantee",{p_reservation:reservationId,p_actor:actor.id,p_exception_reason:body.guarantee_exception_reason||null});
+    if(error)return json({ok:false,error:String(error.message).includes("guarantee_check_in_exception_required")?"guarantee_check_in_exception_required":"check_in_failed"},409);
     return json({ok:true,reservation:data});
   }
   if(operation==="check_out"){
@@ -215,10 +249,11 @@ async function reservationAction(body:any,actor:any){
     const {data,error}=await admin.from("reservations").update({operational_status:"preparing",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservationId).select().single();
     if(error)return json({ok:false,error:"check_out_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservationId,new_value:{checked_out_at:data.checked_out_at,operational_status:"preparing"}});
-    await syncTurnovers(actor.id);
+    await syncTurnovers(actor);
     return json({ok:true,reservation:data});
   }
   if(operation==="no_show"){
+    if(reservation.check_in>todayInBrazil||reservation.checked_in_at)return json({ok:false,error:"no_show_not_allowed"},409);
     if(reservation.status!=="confirmed")return json({ok:false,error:"reservation_not_confirmed"},409);
     const {data,error}=await admin.from("reservations").update({status:"no_show",no_show_at:now,cancellation_actor:"admin",cancellation_reason:clip(body.reason,1000)||"Não comparecimento registrado pela operação",updated_at:now}).eq("id",reservationId).select().single();
     if(error)return json({ok:false,error:"no_show_failed"},500);
@@ -229,24 +264,29 @@ async function reservationAction(body:any,actor:any){
 }
 
 async function issueAction(body:any,actor:any){
+  if(!hasPermission(actor,"maintenance"))return json({ok:false,error:"permission_required"},403);
   const op=clip(body.operation,30);
   if(op==="create"){
     const payload={property_id:Number(body.property_id),reservation_id:body.reservation_id||null,title:clip(body.title,180),description:clip(body.description,2000)||null,area:clip(body.area,100)||null,severity:["low","normal","high","critical"].includes(body.severity)?body.severity:"normal",status:"open",assigned_user_id:clip(body.assigned_user_id,80)||null,assigned_name:clip(body.assigned_name,160)||null,due_at:body.due_at?new Date(body.due_at).toISOString():null,created_by:actor.id};
     if(!payload.property_id||!payload.title||!canUseProperty(actor,payload.property_id))return json({ok:false,error:"invalid_issue"},400);
+    if(!canManage(actor)){payload.assigned_user_id=actor.id;payload.assigned_name=actor.name;}
+    if(payload.reservation_id){const {data:r}=await admin.from("reservations").select("property_id").eq("id",payload.reservation_id).maybeSingle();if(!r||Number(r.property_id)!==payload.property_id)return json({ok:false,error:"invalid_reservation"},400);}
     const {data,error}=await admin.from("pms_issues").insert(payload).select().single();if(error)return json({ok:false,error:"issue_create_failed"},500);
     await admin.from("pms_activity_events").insert({issue_id:data.id,actor_user_id:actor.id,event_type:"created"});return json({ok:true,issue:data});
   }
   const id=clip(body.issue_id,80),status=clip(body.status,30);if(!["open","scheduled","in_progress","resolved","cancelled"].includes(status))return json({ok:false,error:"invalid_status"},400);
-  const {data:before}=await admin.from("pms_issues").select("status,property_id").eq("id",id).maybeSingle();if(!before||!canUseProperty(actor,Number(before.property_id)))return json({ok:false,error:"issue_not_found"},404);
+  const {data:before}=await admin.from("pms_issues").select("status,property_id,assigned_user_id,created_by").eq("id",id).maybeSingle();if(!before||!canUseIssue(actor,before))return json({ok:false,error:"issue_not_found"},404);
   const {data,error}=await admin.from("pms_issues").update({status,resolved_at:status==="resolved"?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq("id",id).select().single();if(error)return json({ok:false,error:"issue_update_failed"},500);
   await admin.from("pms_activity_events").insert({issue_id:id,actor_user_id:actor.id,event_type:"status_changed",details:{from:before.status,to:status}});return json({ok:true,issue:data});
 }
 
-async function templateAction(body:any,actor:{id:string,role?:string}){
+async function templateAction(body:any,actor:any){
   if(actor.role!=="admin"&&actor.role!=="host")return json({ok:false,error:"manager_required"},403);
   const op=clip(body.operation,30);
+  if(body.template_id){const {data:t}=await admin.from("pms_checklist_templates").select("property_id,task_type").eq("id",clip(body.template_id,80)).maybeSingle();if(!t||!canEditTemplate(actor,t))return json({ok:false,error:"template_not_found"},404);}
   if(op==="save"){
     const taskType=clip(body.task_type,30),name=clip(body.name,120),propertyId=body.property_id?Number(body.property_id):null;
+    if(!canEditTemplate(actor,{property_id:propertyId,task_type:taskType}))return json({ok:false,error:"permission_required"},403);
     const items=Array.isArray(body.items)?body.items.map((x:any)=>clip(x,180)).filter(Boolean).slice(0,50):[];
     if(!["turnover","inspection","maintenance","setup","guest_request"].includes(taskType)||!name||!items.length)return json({ok:false,error:"invalid_template"},400);
     const id=clip(body.template_id,80);
@@ -270,7 +310,7 @@ async function templateAction(body:any,actor:{id:string,role?:string}){
   return json({ok:false,error:"invalid_operation"},400);
 }
 
-async function teamAction(body:any,actor:{id:string,role?:string}){
+async function teamAction(body:any,actor:any){
   if(actor.role!=="admin")return json({ok:false,error:"admin_required"},403);
   const operation=clip(body.operation,30);
   const {data:propertyRows}=await admin.from("properties").select("id").eq("active",true);
@@ -335,10 +375,10 @@ async function teamAction(body:any,actor:{id:string,role?:string}){
   return json({ok:true,member:data});
 }
 
-async function attachmentAction(body:any,actor:{id:string}){
+async function attachmentAction(body:any,actor:any){
   const issueId=clip(body.issue_id,80),fileName=clip(body.file_name,180),contentType=clip(body.content_type,80);
   if(!issueId||!fileName||!["image/jpeg","image/png","image/webp"].includes(contentType))return json({ok:false,error:"invalid_attachment"},400);
-  const {data:issue}=await admin.from("pms_issues").select("id").eq("id",issueId).maybeSingle();if(!issue)return json({ok:false,error:"issue_not_found"},404);
+  const {data:issue}=await admin.from("pms_issues").select("id,property_id,assigned_user_id,created_by").eq("id",issueId).maybeSingle();if(!issue||!canUseIssue(actor,issue))return json({ok:false,error:"issue_not_found"},404);
   const raw=String(body.base64||"").replace(/^data:[^;]+;base64,/,"");
   if(!raw||raw.length>7_000_000)return json({ok:false,error:"attachment_too_large"},413);
   let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(raw),c=>c.charCodeAt(0))}catch{return json({ok:false,error:"invalid_attachment"},400)}
@@ -357,6 +397,7 @@ Deno.serve(async request=>{
   const actor=await operator(request);if(!actor)return json({ok:false,error:"operator_required"},403);
   const body=await request.json().catch(()=>({}));
   if(body.action==="hub")return hub(actor);
+  if(body.action==="task_photos")return taskPhotos(body,actor,admin,json);
   if(body.action==="task_action")return taskAction(body,actor);
   if(body.action==="block_action")return blockAction(body,actor);
   if(body.action==="reservation_action")return reservationAction(body,actor);

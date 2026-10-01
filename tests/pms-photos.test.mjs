@@ -1,0 +1,6 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {taskPhotos,validPhoto,photoPoints} from '../supabase/functions/pms-operations/photos.ts';
+test('cleaning points cover seven distinct required areas',()=>{assert.equal(photoPoints.length,7);assert.equal(new Set(photoPoints.map(p=>p.key)).size,7)});
+test('rejects MIME spoofing, SVG and oversized photo payloads',()=>{assert.equal(validPhoto(new TextEncoder().encode('<svg>not a photograph</svg>'),'image/jpeg'),false);assert.equal(validPhoto(new Uint8Array(524289),'image/webp'),false);assert.equal(validPhoto(new Uint8Array(12),'image/png'),false);assert.equal(validPhoto(Uint8Array.from([255,216,255,...Array(9).fill(0)]),'image/jpeg'),true)});
+test('photo URLs cannot be requested for another property or unassigned task',async()=>{for(const actor of [{id:'x',role:'host',property_ids:[2],permissions:{housekeeping:true}},{id:'x',role:'staff',property_ids:[1],permissions:{housekeeping:true}}]){const task={id:'t',property_id:1,task_type:'turnover',assigned_user_id:'other'};const db={from:()=>({select:()=>({eq:()=>({maybeSingle:async()=>({data:task})})})})};const result=await taskPhotos({task_id:'t',operation:'list'},actor,db,(body,status)=>({body,status}));assert.equal(result.status,404)}});

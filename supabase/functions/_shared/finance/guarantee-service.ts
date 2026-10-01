@@ -1,9 +1,11 @@
 import type {PaymentGateway} from './gateway.ts';
 import {confirmedCapture,confirmedRefund,guaranteeState} from './model.ts';
+import {reconcileGuaranteeAuthorizations,guaranteeCoverage} from './guarantee-lifecycle.ts';
 
 export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway) {
+  g=await reconcileGuaranteeAuthorizations(admin,g.id,gateway);
   if(!g.provider_authorization_id)return {...g,financial:guaranteeState(g)};
-  const charge=await gateway.getPayment(g.provider_authorization_id);
+  const charge=await gateway.getPayment(g.provider_authorization_id,g.provider_order_id||undefined);
   if(charge.id!==g.provider_authorization_id||charge.amount?.currency!=='BRL')throw new Error('guarantee_charge_mismatch');
   const update=async(values:any,statuses:string[])=>{
     const {error}=await admin.from('guarantees').update({...values,updated_at:new Date().toISOString()})
@@ -13,7 +15,7 @@ export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway)
   if(['authorizing','authorization_uncertain'].includes(g.status)&&charge.status==='AUTHORIZED'&&charge.amount.value===Number(g.amount_cents)){
     const expiry=Date.parse(charge.captureBefore||g.provider_capture_before||'');
     const checkout=Date.parse(`${g.reservations.check_out}T11:00:00-03:00`);
-    if(!Number.isFinite(expiry)||expiry<checkout+3600000)throw new Error('authorization_expires_before_checkout');
+    if(!Number.isFinite(expiry)||expiry<=Date.now())throw new Error('authorization_expired');
     await update({status:'guaranteed',provider_last_status:'AUTHORIZED',provider_error_code:null,provider_capture_before:new Date(expiry).toISOString()},[g.status]);
   }
   if(['authorizing','authorization_uncertain'].includes(g.status)&&charge.status==='DECLINED')
@@ -21,8 +23,9 @@ export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway)
   if(['capture_requested','capture_uncertain'].includes(g.status)&&confirmedCapture(charge,Number(g.amount_cents),Number(g.requested_capture_cents))){
     const {error}=await admin.rpc('capture_guarantee_mock_atomic',{p_guarantee_id:g.id,p_actor_user_id:null,p_amount_cents:Number(g.requested_capture_cents)});
     if(error)throw new Error('guarantee_capture_ledger_unavailable');
+    if(g.active_authorization_id)await admin.from('guarantee_authorizations').update({state:'captured'}).eq('id',g.active_authorization_id);
   }
-  if(['release_requested','release_uncertain'].includes(g.status)&&charge.status==='CANCELED'&&
+  if(['guaranteed','incident_reported','authorizing','authorization_uncertain','release_requested','release_uncertain'].includes(g.status)&&charge.status==='CANCELED'&&
     charge.amount.value===Number(g.amount_cents)&&charge.summary?.paid===0){
     await update({status:'released',provider_last_status:'CANCELED',provider_error_code:null,
       released_amount_cents:Number(g.amount_cents),release_confirmed:true},[g.status]);
@@ -38,14 +41,14 @@ export async function reconcileGuarantee(admin:any,g:any,gateway:PaymentGateway)
   }
   const {data:updated,error}=await admin.from('guarantees').select('*').eq('id',g.id).single();
   if(error)throw new Error('guarantee_unavailable');
-  return {...updated,financial:guaranteeState(updated),provider_observation:{charge_id:charge.id,status:charge.status,
+  return {...updated,coverage:guaranteeCoverage(updated,g.reservations),financial:guaranteeState(updated),provider_observation:{charge_id:charge.id,status:charge.status,
     total_cents:charge.amount.value,paid_cents:charge.summary?.paid??null,refunded_cents:charge.summary?.refunded??null,
     observed_at:new Date().toISOString()}};
 }
 
 export async function requestGuaranteeRefund(admin:any,g:any,gateway:PaymentGateway,input:{actor:string;amount:number;reason:string;key:string}) {
   // Check live money BEFORE reserving or dispatching. Missing summary cannot confirm a refund.
-  const before=await gateway.getPayment(g.provider_authorization_id);
+  const before=await gateway.getPayment(g.provider_authorization_id,g.provider_order_id||undefined);
   if(before.amount?.currency!=='BRL'||before.id!==g.provider_authorization_id||
     !['PAID','CANCELED'].includes(before.status)||before.summary?.paid!==Number(g.captured_amount_cents)||
     before.summary?.refunded!==Number(g.refunded_amount_cents||0))throw new Error('refund_provider_balance_mismatch');
@@ -75,4 +78,21 @@ export async function requestGuaranteeRefund(admin:any,g:any,gateway:PaymentGate
   const {data:current,error:readError}=await admin.from('guarantee_refunds').select('*').eq('id',refund.id).single();
   if(readError)throw new Error('refund_status_unavailable');
   return {guarantee,refund:current};
+}
+
+export async function retryGuaranteeRefund(admin:any,g:any,gateway:PaymentGateway,actor:string,refundId:string) {
+  const current=await reconcileGuarantee(admin,g,gateway);
+  const {data:refund,error}=await admin.from('guarantee_refunds').select('*')
+    .eq('id',refundId).eq('guarantee_id',g.id).single();
+  if(error||!refund)throw new Error('refund_not_found');
+  if(refund.state==='confirmed')return {guarantee:current,refund};
+  const observation=current.provider_observation;
+  if(!observation||!['PAID','CANCELED'].includes(observation.status))throw new Error('refund_provider_balance_mismatch');
+  const {data:ready,error:retryError}=await admin.rpc('retry_transient_refund',{
+    p_kind:'guarantee',p_refund_id:refund.id,p_actor:actor,
+    p_paid:observation.paid_cents,p_refunded:observation.refunded_cents});
+  if(retryError||ready!==true)throw new Error('refund_retry_not_ready');
+  // Preserve the intent, actor and provider idempotency key of the original request.
+  return requestGuaranteeRefund(admin,current,gateway,{actor:refund.actor_user_id,
+    amount:Number(refund.requested_cents),reason:refund.reason,key:refund.operation_key});
 }
