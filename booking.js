@@ -116,6 +116,7 @@ function renderResults(list){
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
   const price=p.available?'<small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">pacote · '+perNight+' por noite</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
   a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(String(p.property_type).toUpperCase())+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available?"":"disabled")+' data-id="'+p.id+'">'+(p.available?"Ver tarifas":"Indisponível")+'</button></div>';
+  VilleImages.set(a.querySelector(".booking-gallery img"),p.cover_image,{sizes:"(max-width: 800px) 100vw, 240px"});
   box.appendChild(a);
  });
  box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>openFlow(Number(b.dataset.id))));
