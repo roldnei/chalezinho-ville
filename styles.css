@@ -1772,3 +1772,30 @@ footer{justify-content:space-between!important}
 
 /* Per-property calendar connectors */
 .calendar-settings{display:grid;gap:12px;min-width:0}.calendar-settings p{color:#c4b4a6;line-height:1.6;margin:4px 0 12px}.calendar-settings label{display:grid;gap:8px;min-width:0}.calendar-settings input[type=text],.calendar-settings input[type=url]{width:100%;min-width:0;box-sizing:border-box;background:#1c130e;color:#f4eadf;border:1px solid #70503c;padding:12px;font:inherit}.calendar-settings button{border:1px solid #805238;background:#2a180f;color:#f4eadf;padding:12px 16px;cursor:pointer;text-align:left;font:inherit}.calendar-settings button:hover{background:#3b2519}.calendar-settings button:disabled{opacity:.5;cursor:wait}.calendar-source-form{border-top:1px solid #61402c;padding-top:20px;margin-top:12px}.calendar-settings h3{margin:8px 0}.calendar-settings small{color:#c99b78;letter-spacing:.1em}
+
+/* Keep expanded enquiries in normal card flow, without wrapping into a new column. */
+.collection .cards>article>.availability-box.open{
+ height:auto!important;min-height:132px!important;flex-wrap:nowrap!important;
+ display:flex!important;flex-direction:column!important;align-items:center!important;
+ padding:0 18px 24px!important;
+}
+.collection .cards>article>.availability-box>.availability-form{
+ position:static!important;inset:auto!important;transform:none!important;
+ width:100%!important;max-width:100%!important;min-width:0!important;
+ margin:14px 0 0!important;box-sizing:border-box!important;
+ grid-template-columns:repeat(2,minmax(0,1fr));
+}
+.collection .availability-form label,.collection .availability-form input{min-width:0;max-width:100%}
+.collection .availability-form .whatsapp-check{white-space:normal;overflow-wrap:anywhere}
+/* The result list is one full-width row, not one cell of the legacy three-card grid. */
+.booking-page .booking-results{grid-template-columns:minmax(0,1fr)}
+.booking-page .booking-list{grid-column:1/-1;min-width:0;width:100%}
+.booking-page .booking-results-head{width:100%;min-width:0}
+.booking-page .booking-results-head p{color:#686056}
+.booking-page .availability-summary strong{color:#29251f}
+.booking-page .availability-summary span{color:#806344}
+@media(min-width:951px){
+ .booking-page .booking-property{grid-template-columns:minmax(180px,240px) minmax(0,1fr) minmax(210px,280px)!important}
+ .booking-page .booking-property>div{min-width:0}
+ .booking-page .booking-gallery{width:100%!important}
+}
