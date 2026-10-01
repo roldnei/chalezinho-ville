@@ -1,7 +1,7 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const validViews=new Set(["today","calendar","reservations","notifications","changes","finance","properties","settings"]);
+const validViews=new Set(["today","calendar","reservations","notifications","changes","finance","access","properties","settings"]);
 const requestedView=new URLSearchParams(location.search).get("view")==="guarantees"?"reservations":new URLSearchParams(location.search).get("view");
 let propertyGallery=[], propertyCover="";
 let session=null,state=null,currentView=validViews.has(requestedView)?requestedView:"today",calendarMonth=new Date().toISOString().slice(0,7),filters={search:"",status:"all",property:"all"};
@@ -67,9 +67,24 @@ function showView(view){
   currentView=view;$$('#admin-nav [data-view]').forEach(x=>x.classList.toggle("active",x.dataset.view===view));
   const nextUrl=view==="today"?"admin.html":`admin.html?view=${encodeURIComponent(view)}`;
   history.replaceState(null,"",nextUrl);
-  const names={today:["OPERAÇÃO DE HOJE","Visão geral"],calendar:["AGENDA UNIFICADA","Calendário"],reservations:["TODAS AS ESTADIAS","Reservas"],notifications:["CENTRAL DE ATENÇÃO","Notificações"],changes:["PEDIDOS DOS HÓSPEDES","Alterações de reserva"],finance:["MOVIMENTAÇÃO","Financeiro"],properties:["PORTFÓLIO","Imóveis"],settings:["REGRAS DA OPERAÇÃO","Configurações"]};
+  const names={access:["AUDIÊNCIA DO SITE","Acessos"],today:["OPERAÇÃO DE HOJE","Visão geral"],calendar:["AGENDA UNIFICADA","Calendário"],reservations:["TODAS AS ESTADIAS","Reservas"],notifications:["CENTRAL DE ATENÇÃO","Notificações"],changes:["PEDIDOS DOS HÓSPEDES","Alterações de reserva"],finance:["MOVIMENTAÇÃO","Financeiro"],properties:["PORTFÓLIO","Imóveis"],settings:["REGRAS DA OPERAÇÃO","Configurações"]};
   $("#admin-context").textContent=names[view][0];$("#admin-title").textContent=names[view][1];
-  ({today:renderToday,calendar:renderCalendar,reservations:renderReservations,notifications:renderNotifications,changes:renderChanges,finance:renderFinance,properties:renderProperties,settings:renderSettings}[view]||renderToday)();
+  ({access:renderAccess,today:renderToday,calendar:renderCalendar,reservations:renderReservations,notifications:renderNotifications,changes:renderChanges,finance:renderFinance,properties:renderProperties,settings:renderSettings}[view]||renderToday)();
+}
+let accessDays=30,accessRequest=0;
+async function renderAccess(){
+ const request=++accessRequest;
+ $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-section-head"><h2>Acessos ao site e aos chalés</h2><label>Período <select id="access-period">${[7,30,90].map(d=>`<option value="${d}" ${d===accessDays?"selected":""}>Últimos ${d} dias</option>`).join("")}</select></label></div><p>Visualizações contam aberturas de páginas, incluindo recargas. Sessões são visitas neste navegador/aba, renovadas após 30 minutos sem abrir uma página; não representam pessoas únicas.</p><div id="access-results" role="status">Carregando acessos…</div></section>`;
+ $("#access-period").onchange=e=>{accessDays=Number(e.target.value);renderAccess()};
+ try{
+  const d=await api("admin_access_metrics",{days:accessDays});
+  if(currentView!=="access"||request!==accessRequest)return;
+  const top=d.ranking.filter(p=>p.views>0&&p.views===d.ranking[0]?.views);
+  const total=d.ranking.reduce((n,p)=>n+p.views,0);
+  $("#access-results").innerHTML=`<div class="admin-kpis">${kpi("Visualizações do site",d.page_views,"Páginas públicas e reserva")}${kpi("Sessões",d.sessions,"Estimativa por navegador/aba")}${kpi("Chalé mais acessado",top.length?esc(top.map(p=>p.name).join(" / ")):"Sem dados",top.length>1?"Empate em visualizações":"Por visitas à página do chalé")}</div><div style="overflow-x:auto"><table style="width:100%;text-align:left"><caption>Ranking de acessos aos chalés</caption><thead><tr><th scope="col">Chalé</th><th scope="col">Visualizações</th><th scope="col">Sessões</th><th scope="col">Participação</th></tr></thead><tbody>${d.ranking.map(p=>`<tr><th scope="row">${esc(p.name)}</th><td>${p.views}</td><td>${p.sessions}</td><td>${total?(100*p.views/total).toLocaleString("pt-BR",{maximumFractionDigits:1}):"0"}%</td></tr>`).join("")}</tbody></table></div><p>${d.page_views?"":"Nenhum acesso registrado neste período. "}A coleta começa com a ativação deste recurso; não recupera visitas anteriores. Preferências de privacidade e bloqueadores podem reduzir a contagem. Acessos de desenvolvimento são testes, não audiência de produção.</p>`;
+ }catch{
+  if(currentView==="access"&&request===accessRequest)$("#access-results").textContent="Não foi possível consultar os acessos. Os números não foram tratados como zero. Tente atualizar ou escolher outro período.";
+ }
 }
 function kpi(label,value,detail,tone="") {return `<article class="admin-kpi ${tone}"><small>${label}</small><strong>${value}</strong><span>${detail}</span></article>`}
 function reservationCard(r,context=""){
