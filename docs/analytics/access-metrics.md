@@ -19,4 +19,13 @@ Reutiliza analytics_events existente, sem nova infraestrutura ou alteração de 
 Entregar frontend e booking-engine + `_shared/access-metrics.ts` juntos no ambiente isolado de desenvolvimento. Publicar somente o frontend deixa a tela indisponível até a atualização da função. Não aplicar o snapshot SQL, não alterar produção, não misturar tráfego de preview com produção. A ativação futura em produção exige configuração separada, revisão da política de privacidade e homologação; esta branch mantém a proteção de desenvolvimento existente.
 
 ## Verificação executada
-5 testes focados em `tests/access-metrics.test.mjs`: identificação e validação; ranking/sessões/zeros; paginação e falhas; privacidade e expiração no navegador simulado; painel admin, filtro e erro sem zeros falsos. Typecheck do projeto, sintaxe de admin.js/access-metrics.js e build de preview aprovados. Não repetida a suíte financeira. Homologação real da Edge Function e verificação visual no navegador ainda pendentes.
+5 testes focados em `tests/access-metrics.test.mjs`: identificação e validação; ranking/sessões/zeros; paginação e falhas; privacidade e expiração no navegador simulado; painel admin, filtro e erro sem zeros falsos. Typecheck do projeto, sintaxe de admin.js/access-metrics.js e build de preview aprovados. Não repetida a suíte financeira. Homologação real da Edge Function e verificação visual desktop concluídas em 01/10/2026.
+
+## Homologação em desenvolvimento — 01/10/2026
+
+- Supabase isolado `pxfqmnhqodqyaaqeyjgr`: booking-engine v27 ativo, preservando os arquivos da versão v26 e acrescentando somente métricas.
+- Preview homologado: https://chalezinho-ville-3x7078dcp-roldneicosta-4140.vercel.app/admin.html?view=access
+- Coleta real via API e navegador: Signature 4 visualizações/2 sessões; Essenza 2/1; Amore 1/1. Total 7 visualizações e 2 sessões, participações 57,1%, 28,6%, 14,3%. Dados exclusivamente de QA, não tráfego real de hóspedes.
+- Painel autenticado conferido com os registros no banco. Filtros 7, 30 e 90 dias carregaram os mesmos totais esperados para os eventos criados hoje; distribuição histórica já coberta por limites da consulta, sem dados antigos artificiais.
+- Consulta administrativa sem autenticação: HTTP 403 admin_required. Evento de página administrativa inválida: HTTP 400 invalid_access_event. Eventos válidos: HTTP 200.
+- Inspeção visual desktop concluída. Não realizada uma homologação específica mobile nesta rodada. Produção não foi modificada.
