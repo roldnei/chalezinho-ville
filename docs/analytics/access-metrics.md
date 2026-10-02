@@ -29,3 +29,11 @@ Entregar frontend e booking-engine + `_shared/access-metrics.ts` juntos no ambie
 - Painel autenticado conferido com os registros no banco. Filtros 7, 30 e 90 dias carregaram os mesmos totais esperados para os eventos criados hoje; distribuição histórica já coberta por limites da consulta, sem dados antigos artificiais.
 - Consulta administrativa sem autenticação: HTTP 403 admin_required. Evento de página administrativa inválida: HTTP 400 invalid_access_event. Eventos válidos: HTTP 200.
 - Inspeção visual desktop concluída. Não realizada uma homologação específica mobile nesta rodada. Produção não foi modificada.
+
+## Conversão por chalé
+
+Reservas confirmadas e com pagamento de hospedagem pago/estornado parcialmente, originadas no site e vinculadas a uma sessão que visitou a página do mesmo chalé antes do início do pagamento, divididas pelas sessões desse chalé no período. A confirmação é lida no servidor, não de evento de sucesso enviado pelo cliente. Canceladas, manuais, mocks, pagamentos pendentes e cobranças apenas de extras não contam. Repetições da atribuição não duplicam reservas. Sem sessões, exibe travessão; com sessões e sem reservas, 0%. Uma sessão pode gerar mais de uma reserva, portanto o indicador é reservas/sessões, não percentual de pessoas únicas.
+
+O vínculo é gravado no servidor ao criar o hold autenticado. A associação utiliza identificador pseudônimo da sessão e ID da reserva (nenhum nome/documento é enviado na métrica). Falhas da coleta não impedem o pagamento. Reservas sem vínculo anterior não são atribuídas retroativamente. Visita e início da reserva precisam estar dentro da janela; confirmações posteriores atualizam o resultado enquanto a visita estiver nessa janela. DNT/GPC continuam respeitados.
+
+Validação adicional: teste de conversão com duplicidade, visita posterior, outro chalé, cancelamento, pagamento pendente, reserva manual, mock, extras e ausência de sessões. Não foi realizada nova compra sandbox nesta alteração.

@@ -1,4 +1,4 @@
-import {accessInput,accessReport} from "../_shared/access-metrics.ts";
+import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
@@ -650,6 +650,8 @@ async function startPayment(req:Request,body:any,development:boolean){
   }
   const hold=Array.isArray(rpc)?rpc[0]:rpc;
   const reservationId=hold.reservation_id;
+  // Analytics is optional and must never change the result of a payment.
+  await recordAccessBooking(admin,reservationId,body.access_session_id);
 
   if(guaranteeToken){
     const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,

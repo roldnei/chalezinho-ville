@@ -27,6 +27,13 @@ async function api(action,body=null){
  if(!r.ok||!d.ok) throw Object.assign(new Error(d.error||"request_failed"),{status:r.status,data:d});
  return d;
 }
+function accessSessionId(){
+ try{
+  if(navigator.globalPrivacyControl||navigator.doNotTrack==="1")return null;
+  const visit=JSON.parse(sessionStorage.getItem("ville-access-session"));
+  return visit&&Date.now()-visit.last<=30*60*1000?visit.id:null;
+ }catch{return null}
+}
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 
 async function init(){
@@ -417,7 +424,7 @@ async function performStartPayment(choice){
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#guarantee-card-consent")?.checked)throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
+  const d=await api("start_payment",{access_session_id:accessSessionId(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");

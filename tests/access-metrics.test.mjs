@@ -18,9 +18,9 @@ test('ranking separates total views from per-chalet sessions and includes zero-a
  assert.deepEqual(r.ranking.map(p=>[p.name,p.views,p.sessions]),[['Essenza',2,2],['Signature',2,1],['Amore',0,0]]);
 });
 test('reports read beyond default 1000 rows and propagate database errors',async()=>{
- const ranges=[];const rows=Array.from({length:1002},(_,id)=>({id,property_id:1,anonymous_id:'a'}));
+ const ranges=[];const rows=Array.from({length:1002},(_,id)=>({id,event_name:'site_page_view',property_id:1,anonymous_id:'a'}));
  const db={from(table){if(table==='properties')return {select:async()=>({data:[{id:1,name:'Signature'}]})};
- const q={select(){return q},eq(){return q},gte(){return q},lt(){return q},order(){return q},async range(a,b){ranges.push([a,b]);return {data:rows.slice(a,b+1)}}};return q}};
+ const q={select(){return q},eq(){return q},in(){return q},gte(){return q},lt(){return q},order(){return q},async range(a,b){ranges.push([a,b]);return {data:rows.slice(a,b+1)}}};return q}};
  assert.equal((await accessReport(db,7)).page_views,1002);assert.equal(ranges.length,2);
  await assert.rejects(()=>accessReport(db,365),/invalid_period/);
  await assert.rejects(()=>accessReport({from:()=>({select:async()=>({error:{}})})},7),/analytics_unavailable/);
@@ -59,4 +59,15 @@ test('admin view renders ranking, changes period, and displays errors without fa
  fail=true;w.document.querySelector('#access-period').dispatchEvent(new w.Event('change'));
  await wait(()=>w.document.querySelector('#access-results').textContent.includes('Não foi possível'));
  assert.equal(w.document.querySelector('#access-results table'),null);w.close();
+});
+
+test('conversion counts only linked paid direct confirmed bookings once, after a visit to the same chalet',()=>{
+ const props=[{id:1,name:'Signature'},{id:2,name:'Amore'},{id:3,name:'Essenza'}];
+ const views=[{property_id:1,anonymous_id:'a',occurred_at:'2026-10-01T10:00:00Z'},{property_id:1,anonymous_id:'b',occurred_at:'2026-10-01T10:00:00Z'},{property_id:1,anonymous_id:'a',occurred_at:'2026-10-01T10:01:00Z'}];
+ const booking=(id,overrides={})=>({id,property_id:1,status:'confirmed',source:'direct',payments:[{status:'paid',provider:'pagbank_sandbox'}],...overrides});
+ const bookings=[booking('ok'),booking('cancelled',{status:'cancelled'}),booking('pending',{payments:[{status:'processing'}]}),booking('manual',{source:'manual'}),booking('wrong',{property_id:2}),booking('early'),booking('unlinked'),booking('mock',{payments:[{status:'paid',provider:'mock'}]}),booking('extra',{payments:[{status:'paid',provider:'pagbank_sandbox',metadata:{kind:'post_booking_charge'}}]})];
+ const links=bookings.filter(b=>b.id!=='unlinked').map(b=>({reservation_id:b.id,anonymous_id:'a',occurred_at:b.id==='early'?'2026-10-01T09:00:00Z':'2026-10-01T11:00:00Z'}));links.push(links[0]);
+ const result=summarizeAccess(views,props,links,bookings);
+ assert.equal(result.ranking[0].confirmed_bookings,1);assert.equal(result.ranking[0].conversion_percent,50);
+ assert.equal(result.ranking.find(p=>p.property_id===3).conversion_percent,null);
 });
