@@ -1,0 +1,27 @@
+/* Request cards do not have the status-dot column used by notification rows. */
+#same-day-queue .notification-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid #684537;
+  border-radius: 8px;
+  margin-top: 12px;
+  white-space: normal;
+  line-height: 1.5;
+}
+#same-day-queue .notification-row > strong,
+#same-day-queue .notification-row > span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#same-day-queue .notification-row > span { color: #d4c1b3; font-size: 14px; }
+#same-day-queue .notification-row:focus-visible { outline: 2px solid #e3b58e; outline-offset: 3px; }
+@media (max-width: 480px) {
+  #same-day-queue { padding: 12px; }
+  #same-day-queue h3 { font-size: 17px; line-height: 1.4; }
+}
