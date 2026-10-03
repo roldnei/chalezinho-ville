@@ -1,6 +1,6 @@
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
-import {calendarService,calendarUrl,calendarProvider,fetchCalendar} from "../_shared/calendars.ts";
+import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
@@ -190,9 +190,6 @@ async function adminCalendarAction(req:Request,body:any){
   }else{
    const label=String(body.label||"").trim().slice(0,120),enabled=body.enabled!==false;
    if(!label)return json({ok:false,error:"calendar_name_required"},400);
-   const {count,error:countError}=await admin.from("property_calendar_sources").select("id",{count:"exact",head:true}).eq("property_id",propertyId).is("deleted_at",null);
-   if(countError)return json({ok:false,error:"calendar_save_failed"},500);
-   if(!existing&&Number(count)>=20)return json({ok:false,error:"calendar_limit"},400);
    let url:string,provider:string,periods:any[]=[];
    try{url=calendarUrl(String(body.feed_url||"").trim());provider=calendarProvider(url);if(enabled)periods=await fetchCalendar(url,provider)}catch(e){return json({ok:false,error:"calendar_validation_failed"},400)}
    // Prevent importing this site's own feed into itself.
@@ -1156,13 +1153,13 @@ async function adminHubData(req:Request,body:any){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:`airbnb:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:"airbnb",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:calendarPeriodKey("airbnb",p.id,period),property_id:p.id,source:"airbnb",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
   for(const listing of booking?.listings||[]){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:`booking:${p.id}:${period.start}:${period.end}`,property_id:p.id,source:period.source||"booking",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:calendarPeriodKey("booking",p.id,period),property_id:p.id,source:period.source||"booking",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
 
   return json({
