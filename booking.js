@@ -117,7 +117,8 @@ function renderResults(list){
  list.forEach(p=>{
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
   const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+esc(x)+"</span>").join("");
-  const status=p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível";
+  const availabilityMessages={maximum_stay:"Estadia acima do máximo permitido",advance_notice:"Antecedência mínima não atendida",same_day_cutoff:"Horário limite para hoje encerrado",availability_window:"Fora do período disponível",checkin_day:"Check-in não permitido neste dia",checkout_day:"Checkout não permitido neste dia",past_date:"Data de entrada já passou"};
+  const status=availabilityMessages[p.unavailable_reason]||(p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível");
   const minNotice=p.unavailable_reason==="minimum_stay"?'<div class="minimum-stay-alert"><small>MÍNIMO DE ESTADIA</small><strong>'+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'</strong><span>Para estas datas, este chalé exige no mínimo '+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'.</span></div>':"";
   const total=p.from_stay_price!=null?Number(p.from_stay_price):null;
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";

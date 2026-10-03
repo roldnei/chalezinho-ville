@@ -1,3 +1,4 @@
+import {availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey} from "../_shared/calendars.ts";
@@ -211,10 +212,10 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices] = await Promise.all([
     retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id")),
     retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
-      .lt("check_in",end).gt("check_out",start).in("status",["hold","pending_payment","confirmed"])),
+      .lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"])),
     retryDb("search_change_holds",()=>admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
       .eq("kind","modification").in("status",["awaiting_payment","processing","paid"])
-      .lt("target_check_in",end).gt("target_check_out",start).gt("expires_at",new Date().toISOString())),
+      .lt("target_check_in",shiftDate(end,7)).gt("target_check_out",shiftDate(start,-7)).gt("expires_at",new Date().toISOString())),
     retryDb("search_operational_blocks",()=>admin.from("pms_calendar_blocks").select("id,property_id,start_date,end_date")
       .eq("status","active").lt("start_date",end).gt("end_date",start)),
     airbnbCalendarData(),
@@ -241,22 +242,25 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     const cal=icalMap[p.name];
     const bookingCal=bookingMap[p.name];
     const pr=priceMap[p.name];
-    const airbnbOccupied=!cal?.ok || (cal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end));
-    const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some((x:any)=>overlaps(x.start,x.end,start,end)));
+    const rules=availabilityRules(p.features?.availability||{});
+    const decision=availabilityDecision(rules,start,end,pr?.min_stay);
+    const occupied=(x:any)=>preparationOverlap(start,end,x.start,x.end,rules.preparation_days);
+    const airbnbOccupied=!cal?.ok || (cal.periods||[]).some(occupied);
+    const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some(occupied));
     const channelOccupied=airbnbOccupied||bookingOccupied;
-    const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id))
-      || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id))
+    const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id)&&occupied({start:x.check_in,end:x.check_out}))
+      || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id)&&occupied({start:x.target_check_in,end:x.target_check_out}))
       || (operationalBlocks||[]).some((x:any)=>Number(x.property_id)===Number(p.id));
-    const minStay=Math.max(1,Number(pr?.min_stay||1));
+    const minStay=decision.min_stay;
     const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
-    const available=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&stay>=minStay&&hasPrice;
+    const available=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&!decision.reason&&hasPrice;
     return {
       ...p,
       cleaning_fee:Number(p.cleaning_fee||0),
       min_stay:minStay,
       base_price:hasPrice?Number(pr.total_price):null,
       available,
-      unavailable_reason: channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : stay<minStay ? "minimum_stay" : !hasPrice ? "rate_unavailable" : null
+      unavailable_reason: channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : null
     };
   });
 }
@@ -627,6 +631,15 @@ async function startPayment(req:Request,body:any,development:boolean){
   const acceptedIds=Array.isArray(accepted_document_ids)?accepted_document_ids.map(String):[];
   if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
     return json({ok:false,error:"policy_acceptance_required"},400);
+
+  const {data:paymentQuote,error:paymentQuoteError}=await admin.from("quotes").select("property_id,check_in,check_out,guests").eq("id",quote_id).single();
+  const {data:existingHold,error:existingHoldError}=await admin.from("reservations").select("id").eq("quote_id",quote_id).in("status",["hold","pending_payment","confirmed"]).limit(1);
+  if(paymentQuoteError||existingHoldError||!paymentQuote)return json({ok:false,error:"availability_unavailable"},503);
+  if(!existingHold?.length){
+    const refreshed=await searchData(paymentQuote.check_in,paymentQuote.check_out,paymentQuote.guests,null,development);
+    const selected=refreshed.find((p:any)=>p.id===paymentQuote.property_id);
+    if(!selected?.available)return json({ok:false,error:selected?.unavailable_reason||"dates_unavailable",min_stay:selected?.min_stay},409);
+  }
 
   // PIX still needs a card for the guarantee. Tokenize before creating any hold;
   // if PagBank cannot vault it, no reservation or PIX payment is started.
@@ -1302,6 +1315,20 @@ async function adminNotificationAction(req:Request,body:any){
     return json({ok:true});
   }
   return json({ok:false,error:"invalid_operation"},400);
+}
+
+async function adminAvailabilityAction(req:Request,body:any){
+ const user=await currentUser(req);if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+ const {data:p,error}=await admin.from("properties").select("id,features,updated_at").eq("id",Number(body.property_id)).single();
+ if(error||!p)return json({ok:false,error:"property_not_found"},404);
+ if(body.operation==="get")return json({ok:true,rules:availabilityRules(p.features?.availability||{}),updated_at:p.updated_at});
+ if(body.operation!=="save")return json({ok:false,error:"invalid_operation"},400);
+ let rules;try{rules=availabilityRules(body.rules)}catch(e){return json({ok:false,error:(e as Error).message},400)}
+ if(body.updated_at!==p.updated_at)return json({ok:false,error:"availability_conflict"},409);
+ const saved=await admin.from("properties").update({features:{...p.features,availability:rules},updated_at:new Date().toISOString()}).eq("id",p.id).eq("updated_at",p.updated_at).select("id").maybeSingle();
+ if(saved.error||!saved.data)return json({ok:false,error:"availability_conflict"},409);
+ await admin.from("audit_events").insert({actor_user_id:user.id,action:"availability_updated",entity_type:"property",entity_id:String(p.id),new_value:rules});
+ return json({ok:true,rules});
 }
 
 async function adminPropertyAction(req:Request,body:any){
@@ -2072,6 +2099,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     if(action==="reservation_cancel_request") return await reservationCancelRequest(req,body,development);
     if(action==="admin_reservation_action") return await adminReservationAction(req,body);
     if(action==="admin_notification_action") return await adminNotificationAction(req,body);
+    if(action==="admin_availability") return await adminAvailabilityAction(req,body);
     if(action==="admin_property_action") return await adminPropertyAction(req,body);
     if(action==="guarantee_action") return await guaranteeAction(req,body);
     if(action==="experience_admin") return await experienceAdminData(req);
@@ -2108,7 +2136,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
     if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
-    const clientErrors=["invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available"];
+    const clientErrors=["past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
 });

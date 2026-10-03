@@ -11,6 +11,7 @@ Validação em 2026-10-03: 12 testes de calendário, 1 fluxo DOM de cadastro/edi
 exclusão com 25 fontes, regressão de 6 testes de hóspedes, typecheck e build.
 Backend publicado somente no Supabase de desenvolvimento, versão 31.
 
-Pendências independentes: migrar URLs antigas do Airbnb guardadas no Vercel para
-os registros sem URL; identificar o evento bruto de corte de vendas às 11h antes
-de criar filtro específico. Nenhum filtro presumido para bloqueios do Airbnb.
+URLs dos três calendários Airbnb migradas para os cadastros em 03/10/2026.
+Os três vínculos de hóspedes foram preservados com os identificadores das fontes.
+Conforme orientação posterior, manter todos os bloqueios do Airbnb e configurar
+regras próprias por imóvel; consultar availability.md.
