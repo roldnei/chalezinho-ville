@@ -312,6 +312,11 @@ async function refreshQuoteAfterExperiences(){
  await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;state.upsellHandled=false;setFlowError("");
 }
 
+const cpfPaymentMessage="Para pagar pelo PagBank, o titular da reserva precisa ter CPF cadastrado. Passaporte é aceito na identificação da hospedagem, mas não substitui o CPF neste pagamento. Fale com nosso atendimento para orientar a atualização do cadastro.";
+async function checkPaymentIdentity(){
+ const identity=await api("identity_status");
+ if(!identity.payment_eligible)throw new Error("pagbank_cpf_required");
+}
 async function next(){
  const step=Number($("#checkout-panel").dataset.step||1);
  if(step===1){if(!state.rate)return setFlowError("Escolha uma tarifa para continuar.");showStep(2);renderExperienceStep();return}
@@ -320,7 +325,7 @@ async function next(){
   try{const identity=await api("identity_status");if(!identity.complete){saveResume();location.href="auth.html?mode=identify&return="+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""));return}}
   catch{setFlowError("Não foi possível conferir seus dados agora. Tente novamente.");return}
   showStep(4);renderGuestStep();return}
- if(step===4){if(!validateGuest())return;showStep(5);renderSummary();return}
+ if(step===4){if(!validateGuest())return;try{await checkPaymentIdentity()}catch(e){setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:"Não foi possível conferir o documento para pagamento. Tente novamente.");return}showStep(5);renderSummary();return}
  if(step===5){await maybeOfferUpsell()}
 }
 async function renderLoginStep(){
@@ -434,7 +439,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  clearInterval(window.__quoteTimer);
