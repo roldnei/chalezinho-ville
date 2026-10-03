@@ -4,7 +4,13 @@ export function listingPatch(body:any,previous:any){
  const section=body.section,features={...(previous.features||{})};let patch:any={};
  if(section==='amenities'){
   if(!Array.isArray(body.amenities)||body.amenities.length>100||body.amenities.some((s:any)=>typeof s!=='string'||!s.trim()||s.length>100))throw Error('invalid_amenities');
-  features.amenities=[...new Set(body.amenities.map((s:string)=>s.trim()))];patch.features=features;
+  features.amenities=[...new Set(body.amenities.map((s:string)=>s.trim()))];
+  const highlighted=body.amenity_highlights??previous.features?.amenity_highlights;
+  if(highlighted!==undefined){if(!Array.isArray(highlighted)||highlighted.length>8||highlighted.some((x:any)=>typeof x!=='string'||!features.amenities.includes(x))||new Set(highlighted).size!==highlighted.length)throw Error('invalid_highlights');features.amenity_highlights=highlighted;}
+  const categories=body.amenity_categories??previous.features?.amenity_categories??{};
+  const allowed=['Banheiro','Quarto e lavanderia','Entretenimento','Climatização','Segurança','Internet e escritório','Cozinha e sala de jantar','Lazer e área externa','Estacionamento e serviços','Outras comodidades'];
+  if(!categories||typeof categories!=='object'||Array.isArray(categories)||Object.values(categories).some(x=>!allowed.includes(String(x))))throw Error('invalid_categories');
+  features.amenity_categories=Object.fromEntries(features.amenities.filter((x:string)=>Object.hasOwn(categories,x)).map((x:string)=>[x,categories[x]]));patch.features=features;
  }else if(section==='space'){
   const name=String(body.name||'').trim(),summary=String(body.summary||'').trim(),tagline=String(body.tagline||'').trim();
   if(name.length<2||name.length>160||summary.length>3000||tagline.length>240)throw Error('invalid_listing');
