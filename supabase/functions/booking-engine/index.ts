@@ -1964,7 +1964,10 @@ Deno.serve(async(req)=>{
       if(action==="identity_status"){
         const {data,error}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
         if(error) return json({ok:false,error:"identity_check_unavailable"},500);
-        return json({ok:true,complete:Boolean(data)});
+        const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
+        if(paymentIdentityError) return json({ok:false,error:"identity_check_unavailable"},500);
+        const identity=Array.isArray(paymentIdentity)?paymentIdentity[0]:paymentIdentity;
+        return json({ok:true,complete:Boolean(data),payment_eligible:identity?.document_type==="cpf"});
       }
       const {data,error}=await admin.rpc("register_guest_identity",{
         p_user_id:user.id,
