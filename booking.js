@@ -27,6 +27,13 @@ async function api(action,body=null){
  if(!r.ok||!d.ok) throw Object.assign(new Error(d.error||"request_failed"),{status:r.status,data:d});
  return d;
 }
+function accessSessionId(){
+ try{
+  if(navigator.globalPrivacyControl||navigator.doNotTrack==="1")return null;
+  const visit=JSON.parse(sessionStorage.getItem("ville-access-session"));
+  return visit&&Date.now()-visit.last<=30*60*1000?visit.id:null;
+ }catch{return null}
+}
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 
 async function init(){
@@ -305,6 +312,11 @@ async function refreshQuoteAfterExperiences(){
  await generateQuote(true);state.rateCode=code;state.rate=state.quote.rate_options.find(x=>x.code===code&&x.selectable)||null;state.upsellHandled=false;setFlowError("");
 }
 
+const cpfPaymentMessage="Para pagar pelo PagBank, o titular da reserva precisa ter CPF cadastrado. Passaporte é aceito na identificação da hospedagem, mas não substitui o CPF neste pagamento. Fale com nosso atendimento para orientar a atualização do cadastro.";
+async function checkPaymentIdentity(){
+ const identity=await api("identity_status");
+ if(!identity.payment_eligible)throw new Error("pagbank_cpf_required");
+}
 async function next(){
  const step=Number($("#checkout-panel").dataset.step||1);
  if(step===1){if(!state.rate)return setFlowError("Escolha uma tarifa para continuar.");showStep(2);renderExperienceStep();return}
@@ -313,7 +325,7 @@ async function next(){
   try{const identity=await api("identity_status");if(!identity.complete){saveResume();location.href="auth.html?mode=identify&return="+encodeURIComponent("reservar.html?resume=1"+(pagbankSandbox?"&pagbank=sandbox":""));return}}
   catch{setFlowError("Não foi possível conferir seus dados agora. Tente novamente.");return}
   showStep(4);renderGuestStep();return}
- if(step===4){if(!validateGuest())return;showStep(5);renderSummary();return}
+ if(step===4){if(!validateGuest())return;try{await checkPaymentIdentity()}catch(e){setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:"Não foi possível conferir o documento para pagamento. Tente novamente.");return}showStep(5);renderSummary();return}
  if(step===5){await maybeOfferUpsell()}
 }
 async function renderLoginStep(){
@@ -417,7 +429,7 @@ async function performStartPayment(choice){
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#guarantee-card-consent")?.checked)throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
+  const d=await api("start_payment",{access_session_id:accessSessionId(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
@@ -427,7 +439,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  clearInterval(window.__quoteTimer);

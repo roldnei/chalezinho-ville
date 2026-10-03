@@ -1,3 +1,4 @@
+import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
@@ -649,6 +650,8 @@ async function startPayment(req:Request,body:any,development:boolean){
   }
   const hold=Array.isArray(rpc)?rpc[0]:rpc;
   const reservationId=hold.reservation_id;
+  // Analytics is optional and must never change the result of a payment.
+  await recordAccessBooking(admin,reservationId,body.access_session_id);
 
   if(guaranteeToken){
     const {error}=await admin.from("guarantee_card_tokens").insert({reservation_id:reservationId,
@@ -1961,7 +1964,10 @@ Deno.serve(async(req)=>{
       if(action==="identity_status"){
         const {data,error}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
         if(error) return json({ok:false,error:"identity_check_unavailable"},500);
-        return json({ok:true,complete:Boolean(data)});
+        const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
+        if(paymentIdentityError) return json({ok:false,error:"identity_check_unavailable"},500);
+        const identity=Array.isArray(paymentIdentity)?paymentIdentity[0]:paymentIdentity;
+        return json({ok:true,complete:Boolean(data),payment_eligible:identity?.document_type==="cpf"});
       }
       const {data,error}=await admin.rpc("register_guest_identity",{
         p_user_id:user.id,
@@ -2067,6 +2073,26 @@ Deno.serve(async(req)=>{
     if(action==="purchase_post_booking_experience") return await purchasePostBookingExperience(req,body,development);
     if(action==="checkout_experience_cart_item") return await checkoutExperienceCartItem(req,body);
     if(action==="remove_experience_cart_item") return await removeExperienceCartItem(req,body);
+    if(action==="track_access"){
+      if(!development)return json({ok:false,error:"not_available"},403);
+      let input;try{input=accessInput(body)}catch{return json({ok:false,error:"invalid_access_event"},400)}
+      let property_id=null;
+      if(input.code){
+        const p=await admin.from("properties").select("id").eq("code",input.code).maybeSingle();
+        if(p.error)return json({ok:false,error:"analytics_unavailable"},503);
+        if(!p.data)return json({ok:false,error:"property_not_found"},400);
+        property_id=p.data.id;
+      }
+      const result=await admin.from("analytics_events").insert({event_name:"site_page_view",anonymous_id:input.session_id,property_id,metadata:{page:input.page}});
+      return result.error?json({ok:false,error:"analytics_unavailable"},503):json({ok:true});
+    }
+    if(action==="admin_access_metrics"){
+      const user=await currentUser(req);
+      if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+      if(![7,30,90].includes(body.days))return json({ok:false,error:"invalid_period"},400);
+      try{return json({ok:true,...await accessReport(admin,body.days)})}
+      catch{return json({ok:false,error:"analytics_unavailable"},503)}
+    }
     if(action==="track") return await trackEvent(req,body);
 
     return json({ok:false,error:"unknown_action"},404);
