@@ -79,7 +79,7 @@ export function parseCalendar(raw:string):CalendarPeriod[]{
 }
 // Temporary, owner-authorized DEV fixture. Expires at midnight in Guarapari.
 export function developmentApprovalCalendar(raw:string,projectUrl:string,sourceId:string,now=new Date()){
- if(projectUrl!=='https://pxfqmnhqodqyaaqeyjgr.supabase.co'||sourceId!=='2de92969-2832-4898-aa3e-0b2f55f4bc69'||now.toISOString()<'2026-10-03T03:00:00.000Z'||now.toISOString()>='2026-10-04T03:00:00.000Z')return raw;
+ if(projectUrl!=='https://pxfqmnhqodqyaaqeyjgr.supabase.co'||sourceId!=='91f67f0c-5b4c-4627-afc0-bb722a333ed8'||now.toISOString()<'2026-10-03T03:00:00.000Z'||now.toISOString()>='2026-10-04T03:00:00.000Z')return raw;
  return raw.replace(/BEGIN:VEVENT[\s\S]*?END:VEVENT/g,event=>{
   const lines=event.replace(/\r/g,'').split('\n');
   return ['DTSTART;VALUE=DATE:20261003','DTEND;VALUE=DATE:20261004','SUMMARY:Airbnb (Not available)','UID:7f662ec65913-56c7709c9d5df3f7460a68f540e05ddd@airbnb.com'].every(line=>lines.includes(line))?'':event;
