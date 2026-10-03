@@ -1,3 +1,4 @@
+import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar} from "../_shared/calendars.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
@@ -1964,7 +1965,7 @@ Deno.serve(async(req)=>{
       if(action==="identity_status"){
         const {data,error}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
         if(error) return json({ok:false,error:"identity_check_unavailable"},500);
-        const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
+const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
         if(paymentIdentityError) return json({ok:false,error:"identity_check_unavailable"},500);
         const identity=Array.isArray(paymentIdentity)?paymentIdentity[0]:paymentIdentity;
         return json({ok:true,complete:Boolean(data),payment_eligible:identity?.document_type==="cpf"});
@@ -2057,6 +2058,15 @@ Deno.serve(async(req)=>{
       try{return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""),
         {userId:user.id,manager:await userIsAdmin(user)})})}
       catch(e){return json({ok:false,error:(e as Error).message==='reservation_not_found'?'reservation_not_found':'reservation_finance_unavailable'},409)}
+    }
+    if(action==="admin_guests"){
+      const user=await currentUser(req);
+      if(!development||!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+      try{return json(await guestDirectory(admin,body,user.id,async()=>{
+        const response=await adminHubData(req,{start:localDate(-365),end:localDate(730)});
+        if(!response.ok)throw Error("guest_directory_unavailable");
+        return (await response.json()).channel_periods||[];
+      }))}catch(e){const code=e instanceof Error?e.message:"guest_directory_unavailable";return json({ok:false,error:code},code.includes("unavailable")?503:400)}
     }
     if(action==="admin_hub") return await adminHubData(req,body);
     if(action==="experience_credit") return await experienceCredit(req,body,development);

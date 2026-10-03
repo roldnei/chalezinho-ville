@@ -1,7 +1,7 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const validViews=new Set(["today","calendar","reservations","notifications","changes","finance","access","properties","settings"]);
+const validViews=new Set(["today","calendar","reservations","notifications","changes","finance","access","guests","properties","settings"]);
 const requestedView=new URLSearchParams(location.search).get("view")==="guarantees"?"reservations":new URLSearchParams(location.search).get("view");
 let propertyGallery=[], propertyCover="";
 let session=null,state=null,currentView=validViews.has(requestedView)?requestedView:"today",calendarMonth=new Date().toISOString().slice(0,7),filters={search:"",status:"all",property:"all"};
@@ -47,11 +47,13 @@ async function load(silent=false){
   if(!silent){$("#admin-loading").hidden=false;$("#admin-content").hidden=true}
   try{
     const start=new Date();start.setMonth(start.getMonth()-2);const end=new Date();end.setMonth(end.getMonth()+12);
-    const [hub,cancelRequestsResult]=await Promise.all([
+    const [hub,cancelRequestsResult,guestResult]=await Promise.all([
       api("admin_hub",{start:start.toISOString().slice(0,10),end:end.toISOString().slice(0,10)}),
-      api("reservation_cancel_request",{operation:"list"}).then(value=>({value}),error=>({error}))
+      api("reservation_cancel_request",{operation:"list"}).then(value=>({value}),error=>({error})),
+      api("admin_guests").then(value=>({value}),error=>({error}))
     ]);
-    state={...hub,cancel_requests:cancelRequestsResult.value?.requests||[]};
+    state={...hub,cancel_requests:cancelRequestsResult.value?.requests||[],guest_contacts:guestResult.value?.contacts||[],guest_links:guestResult.value?.links||[],guest_error:!!guestResult.error};
+    applyGuestContacts();
     updateCounts();showView(currentView);
     $("#admin-loading").hidden=true;$("#admin-content").hidden=false;$("#admin-app").setAttribute("aria-busy","false");
   }catch(e){$("#admin-loading").textContent="Não foi possível carregar a operação. Atualize a página ou tente novamente em instantes."}
@@ -67,10 +69,57 @@ function showView(view){
   currentView=view;$$('#admin-nav [data-view]').forEach(x=>x.classList.toggle("active",x.dataset.view===view));
   const nextUrl=view==="today"?"admin.html":`admin.html?view=${encodeURIComponent(view)}`;
   history.replaceState(null,"",nextUrl);
-  const names={access:["AUDIÊNCIA DO SITE","Acessos"],today:["OPERAÇÃO DE HOJE","Visão geral"],calendar:["AGENDA UNIFICADA","Calendário"],reservations:["TODAS AS ESTADIAS","Reservas"],notifications:["CENTRAL DE ATENÇÃO","Notificações"],changes:["PEDIDOS DOS HÓSPEDES","Alterações de reserva"],finance:["MOVIMENTAÇÃO","Financeiro"],properties:["PORTFÓLIO","Imóveis"],settings:["REGRAS DA OPERAÇÃO","Configurações"]};
+  const names={guests:["CADASTRO E HISTÓRICO","Hóspedes"],access:["AUDIÊNCIA DO SITE","Acessos"],today:["OPERAÇÃO DE HOJE","Visão geral"],calendar:["AGENDA UNIFICADA","Calendário"],reservations:["TODAS AS ESTADIAS","Reservas"],notifications:["CENTRAL DE ATENÇÃO","Notificações"],changes:["PEDIDOS DOS HÓSPEDES","Alterações de reserva"],finance:["MOVIMENTAÇÃO","Financeiro"],properties:["PORTFÓLIO","Imóveis"],settings:["REGRAS DA OPERAÇÃO","Configurações"]};
   $("#admin-context").textContent=names[view][0];$("#admin-title").textContent=names[view][1];
-  ({access:renderAccess,today:renderToday,calendar:renderCalendar,reservations:renderReservations,notifications:renderNotifications,changes:renderChanges,finance:renderFinance,properties:renderProperties,settings:renderSettings}[view]||renderToday)();
+  ({guests:renderGuests,access:renderAccess,today:renderToday,calendar:renderCalendar,reservations:renderReservations,notifications:renderNotifications,changes:renderChanges,finance:renderFinance,properties:renderProperties,settings:renderSettings}[view]||renderToday)();
 }
+function guestError(error){return ({invalid_phone:'Informe DDD e telefone; para números internacionais, use + e o código do país.',invalid_contact:'Informe um nome de 2 a 160 caracteres.',stay_not_found:'O período não está mais disponível no calendário. Atualize e confira as datas.',stay_already_linked:'Esta estadia já possui outro hóspede. Remova o vínculo anterior antes de trocar.',guest_directory_volume_limit:'O cadastro atingiu o limite de consulta. Solicite ampliação antes de continuar.'})[error.message]||'Não foi possível concluir. Atualize a página e tente novamente.';}
+function stayKey(r){return String(r.id).includes(':')?r.id:'reservation:'+r.id;}
+function guestStayRows(){return [...state.reservations.map(r=>({...r,stay_key:stayKey(r)})),...state.channel_periods.filter(r=>r.status!=='integration_error').map(r=>({...r,check_in:r.start,check_out:r.end,stay_key:r.id}))].sort((a,b)=>{const t=today(),au=a.check_out>=t,bu=b.check_out>=t;return au!==bu?(au?-1:1):au?a.check_in.localeCompare(b.check_in):b.check_in.localeCompare(a.check_in)});}
+function stayDescription(r){return `${sourceLabel(r.source)} · ${prop(r.property_id)?.name||'Imóvel'} · ${date(r.check_in||r.start)} a ${date(r.check_out||r.end)}${r.confirmation_code?' · '+r.confirmation_code:''}`;}
+function applyGuestContacts(){
+ for(const r of [...state.reservations,...(state.channel_periods||[])]){
+  const link=state.guest_links.find(l=>l.stay_key===stayKey(r)),guest=state.guest_contacts.find(g=>g.id===link?.guest_id);
+  if(guest){r.guest_name=guest.name;r.guest_phone=guest.phone;r.contact_id=guest.id;}
+ }
+}
+function stayButton(r){return !String(r.id).includes(':')?`data-reservation="${esc(r.id)}"`:['airbnb','booking','ical'].includes(r.source)&&r.status!=='integration_error'?`data-guest-stay="${esc(r.id)}"`:'disabled';}
+let guestSearch='';
+function renderGuests(){
+ $('#admin-content').innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>CONTATOS DA OPERAÇÃO</small><h2>Hóspedes</h2></div><button id="new-guest" ${state.guest_error?'disabled':''}>+ Novo hóspede</button></div><p>Um cadastro pode ser vinculado a várias estadias. Atualize o telefone aqui ou abra uma reserva no calendário.</p>${state.guest_error?'<p role="alert">Não foi possível consultar os hóspedes. Clique em Atualizar para tentar novamente.</p>':'<label class="admin-search">Buscar por nome ou telefone<input id="guest-search" type="search" placeholder="Nome ou telefone"></label><div id="guest-results" class="admin-stack"></div>'}</section>`;
+ $('#new-guest').onclick=()=>openGuest();
+ if(state.guest_error)return;
+ $('#guest-search').value=guestSearch;$('#guest-search').oninput=e=>{guestSearch=e.target.value;renderGuestResults()};renderGuestResults();
+}
+function renderGuestResults(){
+ const q=guestSearch.trim().toLocaleLowerCase('pt-BR'),digits=q.replace(/\D/g,'');
+ const rows=state.guest_contacts.filter(g=>!q||g.name.toLocaleLowerCase('pt-BR').includes(q)||(digits&&g.phone?.includes(digits)));
+ $('#guest-results').innerHTML=rows.map(g=>`<article class="admin-operation-card"><div><h3>${esc(g.name)}</h3><p>${esc(g.phone||'Telefone não informado')}</p><small>${state.guest_links.filter(l=>l.guest_id===g.id).length} estadia(s) vinculada(s)</small></div><button data-edit-guest="${esc(g.id)}">Ver e editar</button></article>`).join('')||empty('Nenhum hóspede encontrado.');
+ $$('[data-edit-guest]').forEach(b=>b.onclick=()=>openGuest(b.dataset.editGuest));
+}
+async function refreshGuestView(){await load(true);if(!$('#reservation-drawer').hidden)closeDrawer();}
+function openGuest(id=null,stay=null){
+ if(state.guest_error){alert('Cadastro indisponível. Atualize a página antes de continuar.');return;}
+ const g=state.guest_contacts.find(g=>g.id===id)||{id:crypto.randomUUID(),name:'',phone:'',notes:''},links=state.guest_links.filter(l=>l.guest_id===g.id);
+ const available=guestStayRows().filter(r=>!state.guest_links.some(l=>l.stay_key===r.stay_key));
+ $('#admin-modal-content').innerHTML=`<small>CADASTRO DE HÓSPEDE</small><h2>${id?'Editar hóspede':'Novo hóspede'}</h2>${stay?`<p>Vincular a ${esc(stayDescription(stay))}</p>`:''}<form id="guest-form" class="admin-form"><label>Nome<input name="name" required minlength="2" maxlength="160" autocomplete="off" value="${esc(g.name)}"></label><label>Telefone<input name="phone" type="tel" maxlength="30" placeholder="(27) 99999-9999" value="${esc(g.phone)}"></label><label>Observações internas<textarea name="notes" maxlength="2000" rows="2">${esc(g.notes)}</textarea></label><p>Este contato é compartilhado por todas as estadias vinculadas.</p><p class="admin-form-message" role="status"></p><button class="admin-primary" type="submit">${stay?'Salvar e vincular':'Salvar hóspede'}</button></form>${id?`<section><h3>Estadias vinculadas</h3>${links.map(l=>{const current=guestStayRows().find(r=>r.stay_key===l.stay_key);return `<article class="guest-linked-stay"><p>${esc(stayDescription(current||l))}</p>${!current?'<small>Período ausente no calendário consultado. Confira se houve alteração de datas.</small>':''}<button type="button" data-unlink-stay="${esc(l.stay_key)}">Desvincular</button></article>`}).join('')||'<p>Nenhuma estadia vinculada.</p>'}<form id="guest-link-form" class="admin-form"><label>Vincular outra estadia<select name="stay_key" required><option value="">Selecione uma estadia</option>${available.map(r=>`<option value="${esc(r.stay_key)}">${esc(stayDescription(r))}</option>`).join('')}</select></label><p role="status"></p><button type="submit" ${available.length?'':'disabled'}>Vincular estadia</button></form><p>Se uma reserva externa mudar de datas, confira e refaça o vínculo com o novo período.</p></section>`:''}`;
+ openModal();const form=$('#guest-form');let saved=false;
+ form.onsubmit=async e=>{e.preventDefault();const b=form.querySelector('button'),m=form.querySelector('[role="status"]');b.disabled=true;m.textContent='Salvando…';
+  try{await api('admin_guests',{operation:'save',id:g.id,name:form.elements.name.value,phone:form.elements.phone.value,notes:form.elements.notes.value});saved=true;if(stay)await linkGuestStay(g.id,stay.stay_key);await refreshGuestView();openGuest(g.id);$('#guest-form [role="status"]').textContent=stay?'Hóspede salvo e vinculado.':'Hóspede salvo.';}
+  catch(err){m.textContent=(saved&&stay?'O contato foi salvo, mas o vínculo não foi concluído. ':'')+guestError(err);b.disabled=false;}
+ };
+ const lf=$('#guest-link-form');if(lf)lf.onsubmit=async e=>{e.preventDefault();const b=lf.querySelector('button');b.disabled=true;try{await linkGuestStay(g.id,lf.elements.stay_key.value);await refreshGuestView();openGuest(g.id);$('#guest-link-form [role="status"]').textContent='Estadia vinculada.';}catch(err){lf.querySelector('[role="status"]').textContent=guestError(err);b.disabled=false;}};
+ $$('[data-unlink-stay]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api('admin_guests',{operation:'unlink',guest_id:g.id,stay_key:b.dataset.unlinkStay});await refreshGuestView();openGuest(g.id);}catch(err){$('#guest-form [role="status"]').textContent=guestError(err);b.disabled=false;}});
+}
+async function linkGuestStay(guestId,key){return api('admin_guests',{operation:'link',guest_id:guestId,...(key.startsWith('reservation:')?{reservation_id:key.slice(12)}:{stay_key:key})});}
+function openStayGuest(key){
+ if(state.guest_error){alert('Cadastro indisponível. Atualize a página antes de continuar.');return;}
+ const stay=guestStayRows().find(r=>r.stay_key===key);if(!stay)return;
+ const link=state.guest_links.find(l=>l.stay_key===key);if(link){openGuest(link.guest_id);return;}
+ $('#admin-modal-content').innerHTML=`<small>HÓSPEDE DA ESTADIA</small><h2>Vincular contato</h2><p>${esc(stayDescription(stay))}</p><form id="stay-guest-form" class="admin-form"><label>Hóspede cadastrado<select name="guest_id" required><option value="">Selecione um hóspede</option>${state.guest_contacts.map(g=>`<option value="${esc(g.id)}">${esc(g.name)} · ${esc(g.phone||'Sem telefone')}</option>`).join('')}</select></label><p role="status"></p><button type="submit" class="admin-primary" ${state.guest_contacts.length?'':'disabled'}>Vincular hóspede</button><button type="button" id="stay-new-guest">Cadastrar novo hóspede</button></form>`;
+ openModal();$('#stay-new-guest').onclick=()=>openGuest(null,stay);const f=$('#stay-guest-form');f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button');b.disabled=true;try{const id=f.elements.guest_id.value;await linkGuestStay(id,key);await refreshGuestView();openGuest(id);$('#guest-form [role="status"]').textContent='Hóspede vinculado.';}catch(err){f.querySelector('[role="status"]').textContent=guestError(err);b.disabled=false;}};
+}
+
 let accessDays=30,accessRequest=0;
 async function renderAccess(){
  const request=++accessRequest;
@@ -124,6 +173,7 @@ function renderAttentionItems(unread,mods,payments){
   return rows.length?rows.join(""):empty("Nenhuma pendência agora.");
 }
 function bindCards(){
+  $$('[data-guest-stay]').forEach(b=>b.onclick=()=>openStayGuest(b.dataset.guestStay));
   $$('[data-reservation]').forEach(b=>b.onclick=e=>{const id=b.dataset.reservation;if(id)openReservation(id);const nid=b.dataset.notification;if(nid)markNotification(nid)});
 }
 
@@ -141,10 +191,10 @@ function changeMonth(delta){const [y,m]=calendarMonth.split("-").map(Number),d=n
 function calendarRow(p,b,direct,external){
   const events=[...direct.filter(r=>Number(r.property_id)===Number(p.id)).map(r=>({...r,start:r.check_in,end:r.check_out,source:r.source||"direct"})),...external.filter(e=>Number(e.property_id)===Number(p.id))];
   const laneEnds=[];events.sort((a,c)=>a.start.localeCompare(c.start));
-  const bars=events.map(e=>{let lane=laneEnds.findIndex(end=>end<=e.start);if(lane<0)lane=laneEnds.length;laneEnds[lane]=e.end;const start=Math.max(1,Math.floor((Date.parse(e.start)-Date.parse(b.start))/86400000)+1),finish=Math.min(b.days+1,Math.floor((Date.parse(e.end)-Date.parse(b.start))/86400000)+1),left=(start-1)/b.days*100,width=Math.max(2,(finish-start)/b.days*100);const label=e.guest_name||e.calendar_label||sourceLabel(e.source);const contact=e.guest_phone||"Telefone não informado";const packages=e.id&&!String(e.id).includes(":")?byReservation(state.experience_orders,e.id).flatMap(o=>o.experience_order_items||[]).filter(x=>x.status==="active").length:0;return `<button class="calendar-event ${esc(e.source)} ${e.status==="pending_payment"||e.status==="hold"?"pending":""}" style="left:${left}%;width:${width}%;top:${8+lane*44}px" ${e.id&&!String(e.id).includes(":")?`data-reservation="${e.id}"`:"disabled"} aria-label="${esc(label)} · ${esc(contact)}" title="${esc(label)} · ${esc(contact)} · ${date(e.start)} a ${date(e.end)}"><strong>${esc(label)}</strong><small class="calendar-guest-phone">${esc(contact)}</small>${packages?`<em>+${packages} pacote${packages>1?"s":""}</em>`:""}</button>`}).join("");
+  const bars=events.map(e=>{let lane=laneEnds.findIndex(end=>end<=e.start);if(lane<0)lane=laneEnds.length;laneEnds[lane]=e.end;const start=Math.max(1,Math.floor((Date.parse(e.start)-Date.parse(b.start))/86400000)+1),finish=Math.min(b.days+1,Math.floor((Date.parse(e.end)-Date.parse(b.start))/86400000)+1),left=(start-1)/b.days*100,width=Math.max(2,(finish-start)/b.days*100);const label=e.guest_name||e.calendar_label||sourceLabel(e.source);const contact=e.guest_phone||"Telefone não informado";const packages=e.id&&!String(e.id).includes(":")?byReservation(state.experience_orders,e.id).flatMap(o=>o.experience_order_items||[]).filter(x=>x.status==="active").length:0;return `<button class="calendar-event ${esc(e.source)} ${e.status==="pending_payment"||e.status==="hold"?"pending":""}" style="left:${left}%;width:${width}%;top:${8+lane*44}px" ${stayButton(e)} aria-label="${esc(label)} · ${esc(contact)}" title="${esc(label)} · ${esc(contact)} · ${date(e.start)} a ${date(e.end)}"><strong>${esc(label)}</strong><small class="calendar-guest-phone">${esc(contact)}</small>${packages?`<em>+${packages} pacote${packages>1?"s":""}</em>`:""}</button>`}).join("");
   return `<div class="calendar-property"><strong>${esc(p.name)}</strong><small>${esc(p.code)}</small></div><div class="calendar-track" style="min-height:${Math.max(150,laneEnds.length*44+16)}px">${Array.from({length:b.days},()=>"<i></i>").join("")}${bars}</div>`;
 }
-function calendarAgendaItem(e){const p=prop(e.property_id);return `<button class="calendar-agenda-item" ${e.id&&!String(e.id).includes(":")?`data-reservation="${e.id}"`:"disabled"}><span class="calendar-source ${esc(e.source)}">${esc(sourceLabel(e.source))}</span><div><strong>${esc(e.guest_name||e.calendar_label||"Hóspede não informado")}</strong><small>${esc(e.guest_phone||"Telefone não informado")}</small><small>${esc(p?.name||"")} · ${date(e.start||e.check_in)} a ${date(e.end||e.check_out)}</small></div></button>`}
+function calendarAgendaItem(e){const p=prop(e.property_id);return `<button class="calendar-agenda-item" ${stayButton(e)}><span class="calendar-source ${esc(e.source)}">${esc(sourceLabel(e.source))}</span><div><strong>${esc(e.guest_name||e.calendar_label||"Hóspede não informado")}</strong><small>${esc(e.guest_phone||"Telefone não informado")}</small><small>${esc(p?.name||"")} · ${date(e.start||e.check_in)} a ${date(e.end||e.check_out)}</small></div></button>`}
 
 function renderReservations(){
   const rows=filteredReservations();
@@ -367,7 +417,7 @@ function openReservation(id){
   const r=state.reservations.find(x=>x.id===id);if(!r)return;const p=prop(r.property_id),payments=byReservation(state.payments,id),orders=byReservation(state.experience_orders,id),charges=byReservation(state.charges,id),mods=byReservation(state.modifications,id),guarantees=byReservation(state.guarantees,id),notes=byReservation(state.notes,id);const items=orders.flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
   $("#reservation-detail").innerHTML=`<small>${esc(r.confirmation_code||sourceLabel(r.source))}</small><h2 id="drawer-title">${esc(r.guest_name||"Hóspede")}</h2><div class="drawer-status"><span class="admin-status ${statusClass(r.status)}">${statusLabel(r.status)}</span><span>${esc(sourceLabel(r.source))}</span></div>
   <section class="drawer-block"><h3>Estadia</h3><div class="drawer-dates"><div><small>CHECK-IN</small><strong>${date(r.check_in)}</strong><span>${esc((p?.check_in_time||"15:00").slice(0,5))}</span></div><div><small>CHECKOUT</small><strong>${date(r.check_out)}</strong><span>${esc((p?.check_out_time||"11:00").slice(0,5))}</span></div></div><p><strong>${esc(p?.name||"Imóvel")}</strong> · ${r.guests} hóspede${r.guests===1?"":"s"}</p></section>
-  <section class="drawer-block"><h3>Contato</h3><p>${esc(r.guest_email||"E-mail não informado")}<br>${esc(r.guest_phone||"Telefone não informado")}</p></section>
+  <section class="drawer-block"><h3>Contato</h3><button type="button" id="reservation-guest">Vincular ou editar hóspede</button><p>${esc(r.guest_email||"E-mail não informado")}<br>${esc(r.guest_phone||"Telefone não informado")}</p></section>
   <section class="drawer-block"><h3>Experiências</h3>${items.length?items.map(i=>`<div class="drawer-line"><span>${esc(i.product_name_snapshot)}${i.variant_name_snapshot?" · "+esc(i.variant_name_snapshot):""}</span><strong>${brl(Number(i.unit_price_cents)*Number(i.quantity||1))}</strong>${r.status==="confirmed"&&!r.checked_in_at?`<button type="button" data-experience-credit="${esc(i.id)}">Retirar e calcular crédito</button>`:""}</div>`).join(""):empty("Nenhuma experiência ativa.")}${charges.filter(c=>c.status==="awaiting_payment").map(c=>`<div class="drawer-alert">Pagamento pendente: ${esc(c.description||c.kind)} · ${brl(c.amount_cents)}</div>`).join("")}</section>
   <section class="drawer-block"><h3>Pagamento</h3>${payments.length?payments.map(x=>`<div class="drawer-line"><span>${statusLabel(x.status)} · ${esc(x.method||x.provider)}${x.method==="card"?` · ${Number(x.installments||1)}x · juros ${brl(x.metadata?.buyer_interest_cents||0)}`:""}</span><strong>${brl(x.amount_cents)}</strong></div>`).join(""):empty("Nenhum pagamento registrado.")}<div class="drawer-total"><span>Total da reserva</span><strong>${brl(Math.round(Number(r.total_amount||0)*100))}</strong></div></section>
   ${mods.length?`<section class="drawer-block"><h3>Alterações</h3>${mods.map(m=>`<div class="drawer-line"><span>${statusLabel(m.status)} · ${date(m.requested_check_in)} a ${date(m.requested_check_out)}</span><strong>${brl(m.admin_additional_amount_cents||0)}</strong></div>`).join("")}</section>`:""}
@@ -379,6 +429,7 @@ function openReservation(id){
   ${(state.cancel_requests||[]).filter(x=>x.reservation_id===r.id).map(x=>`<section class="drawer-block"><h3>Cancelamento solicitado pelo hóspede</h3><p>${esc(x.reason)} · ${dateTime(x.requested_at)}</p><p>Estado: ${esc(x.status)}</p><button data-review-cancel="${esc(x.id)}">Analisar solicitação</button></section>`).join("")}
   <section class="drawer-actions"><button data-checkin ${r.status!=="confirmed"||r.check_in>today()||r.check_out<today()||r.checked_in_at?"disabled":""}>Registrar check-in</button><button data-checkout ${r.status!=="confirmed"||r.check_in>today()||!r.checked_in_at||r.checked_out_at?"disabled":""}>Registrar checkout</button>${r.status==="confirmed"?'<button class="danger" data-cancel-reservation>Cancelar reserva</button><button data-voluntary-refund>Estorno voluntário</button>':""}</section>`;
   $("#reservation-drawer").hidden=false;document.body.classList.add("drawer-open");
+  $("#reservation-guest").onclick=()=>openStayGuest("reservation:"+r.id);
   $("#reservation-note-form").onsubmit=e=>addNote(e,r.id);const ci=$("[data-checkin]"),co=$("[data-checkout]"),ca=$("[data-cancel-reservation]");if(ci)ci.onclick=()=>reservationAction(r.id,"check_in");if(co)co.onclick=()=>reservationAction(r.id,"check_out");if(ca)ca.onclick=()=>cancelReservation(r.id);
   const voluntary=$("[data-voluntary-refund]");if(voluntary)voluntary.onclick=()=>voluntaryRefund(r.id);
   $$("[data-review-cancel]").forEach(b=>b.onclick=()=>cancelReservation(r.id,b.dataset.reviewCancel));
