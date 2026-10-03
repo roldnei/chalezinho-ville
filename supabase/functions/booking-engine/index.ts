@@ -1,4 +1,5 @@
-import {availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
+import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
+import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey} from "../_shared/calendars.ts";
@@ -204,7 +205,7 @@ async function adminCalendarAction(req:Request,body:any){
  return json({ok:true,...await calendars.configuration()});
 }
 
-async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false){
+async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false){
   if(!validDate(start)||!validDate(end)||end<=start) throw new Error("invalid_dates");
   const stay=nights(start,end);
   if(stay<1) throw new Error("invalid_dates");
@@ -243,7 +244,8 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     const bookingCal=bookingMap[p.name];
     const pr=priceMap[p.name];
     const rules=availabilityRules(p.features?.availability||{});
-    const decision=availabilityDecision(rules,start,end,pr?.min_stay);
+    const sameDayApproval=rules.allow_same_day_requests&&start===brazilClock().date;
+    const decision=availabilityDecision(sameDayApproval?{...rules,lead_days:0,same_day_cutoff:"23:59"}:rules,start,end,pr?.min_stay);
     const occupied=(x:any)=>preparationOverlap(start,end,x.start,x.end,rules.preparation_days);
     const airbnbOccupied=!cal?.ok || (cal.periods||[]).some(occupied);
     const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some(occupied));
@@ -253,21 +255,22 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
       || (operationalBlocks||[]).some((x:any)=>Number(x.property_id)===Number(p.id));
     const minStay=decision.min_stay;
     const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
-    const available=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&!decision.reason&&hasPrice;
+    const requestable=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&!decision.reason&&hasPrice;
+    const available=requestable&&(!sameDayApproval||approvedSameDay);
     return {
       ...p,
       cleaning_fee:Number(p.cleaning_fee||0),
       min_stay:minStay,
       base_price:hasPrice?Number(pr.total_price):null,
-      available,
-      unavailable_reason: channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : null
+      available,same_day_approval_required:sameDayApproval,requestable:sameDayApproval&&requestable,
+      unavailable_reason: channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : sameDayApproval&&!approvedSameDay ? "same_day_approval_required" : null
     };
   });
 }
 
-async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null){
+async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null){
   const {property_id,check_in,check_out,guests,experience_variant_ids=[]}=body||{};
-  const list=await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development);
+  const list=await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development,!!approvedRequest);
   const property=list.find((x:any)=>Number(x.id)===Number(property_id));
   if(!property) throw new Error("property_not_found");
   if(!property.available){
@@ -309,7 +312,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     check_in,check_out,guests:Number(guests),
     base_amount_cents:baseCents,
     cleaning_fee_cents:cleaningCents,
-    pricing_snapshot:{source:"pricelabs",base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal},
+    pricing_snapshot:{source:"pricelabs",base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
     rules_version:"2026-09-v1",
     expires_at:expiresAt
   }).select().single();
@@ -632,11 +635,14 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
     return json({ok:false,error:"policy_acceptance_required"},400);
 
-  const {data:paymentQuote,error:paymentQuoteError}=await admin.from("quotes").select("property_id,check_in,check_out,guests").eq("id",quote_id).single();
+  const {data:paymentQuote,error:paymentQuoteError}=await admin.from("quotes").select("property_id,check_in,check_out,guests,pricing_snapshot").eq("id",quote_id).single();
   const {data:existingHold,error:existingHoldError}=await admin.from("reservations").select("id").eq("quote_id",quote_id).in("status",["hold","pending_payment","confirmed"]).limit(1);
   if(paymentQuoteError||existingHoldError||!paymentQuote)return json({ok:false,error:"availability_unavailable"},503);
+  if(paymentQuote.pricing_snapshot?.same_day_user_id&&paymentQuote.pricing_snapshot.same_day_user_id!==user.id)return json({ok:false,error:"same_day_approval_required"},403);
   if(!existingHold?.length){
-    const refreshed=await searchData(paymentQuote.check_in,paymentQuote.check_out,paymentQuote.guests,null,development);
+    const requestId=paymentQuote.pricing_snapshot?.same_day_request_id;
+    if(requestId)await approvedSameDayRequest(admin,requestId,user.id,paymentQuote);
+    const refreshed=await searchData(paymentQuote.check_in,paymentQuote.check_out,paymentQuote.guests,null,development,!!requestId);
     const selected=refreshed.find((p:any)=>p.id===paymentQuote.property_id);
     if(!selected?.available)return json({ok:false,error:selected?.unavailable_reason||"dates_unavailable",min_stay:selected?.min_stay},409);
   }
@@ -661,6 +667,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   }
   const hold=Array.isArray(rpc)?rpc[0]:rpc;
   const reservationId=hold.reservation_id;
+  if(paymentQuote.pricing_snapshot?.same_day_request_id)await admin.from("same_day_requests").update({status:"booked"}).eq("id",paymentQuote.pricing_snapshot.same_day_request_id).eq("user_id",user.id).eq("status","approved");
   // Analytics is optional and must never change the result of a payment.
   await recordAccessBooking(admin,reservationId,body.access_session_id);
 
@@ -1973,6 +1980,7 @@ Deno.serve(async(req)=>{
     const development=req.headers.get("x-chalezinho-env")==="development" &&
       (origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-feature-guest-directory-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-8q4qwux69-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-g7cqw9cxg-roldneicosta-4140.vercel.app" ||
@@ -2044,7 +2052,16 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         return {...rest,from_stay_price:x.base_price!=null?Number(x.base_price)*1.10+Number(x.cleaning_fee||0):null};
       })});
     }
-    if(action==="quote") return json(await createQuote(body,development));
+    if(action==="same_day_request"){
+      const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);
+      try{return json({ok:true,...await sameDayRequests(admin,body,user,await userIsAdmin(user),async(r:any)=>(await searchData(r.check_in,r.check_out,r.guests,null,development,true)).find((p:any)=>Number(p.id)===Number(r.property_id)))})}
+      catch(e){return json({ok:false,error:(e as Error).message},409)}
+    }
+    if(action==="quote"){
+      let approved=null;
+      if(body.same_day_request_id){const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);approved=await approvedSameDayRequest(admin,body.same_day_request_id,user.id,body)}
+      return json(await createQuote(body,development,null,approved));
+    }
     if(action==="reservation_incident"){
       const user=await currentUser(req);
       if(!development||!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
@@ -2136,7 +2153,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
     if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
-    const clientErrors=["past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available"];
+    const clientErrors=["same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
 });

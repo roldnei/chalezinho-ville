@@ -32,7 +32,7 @@ const renderHtml = (body: string, actionUrl: string) => `<!doctype html>
       <tr><td style="padding:30px 30px 12px;color:#c79977;font-size:12px;letter-spacing:3px">CHALEZINHO VILLE</td></tr>
       <tr><td style="padding:8px 30px 24px;font-family:Georgia,serif;font-size:30px;line-height:1.2">Uma estadia pensada nos detalhes.</td></tr>
       <tr><td style="padding:0 30px 26px;color:#ded3ca;font-size:16px;line-height:1.7">${escapeHtml(body)}</td></tr>
-      <tr><td style="padding:0 30px 32px"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;background:#9b2b0d;color:#fff;text-decoration:none;padding:14px 22px">Acessar Área do Hóspede</a></td></tr>
+      <tr><td style="padding:0 30px 32px"><a href="${escapeHtml(actionUrl)}" style="display:inline-block;background:#9b2b0d;color:#fff;text-decoration:none;padding:14px 22px">Acessar pedido ou reserva</a></td></tr>
       <tr><td style="padding:22px 30px;border-top:1px solid #3b271f;color:#9d8e84;font-size:12px;line-height:1.6">Guarapari · Espírito Santo<br>Este é um e-mail transacional relacionado à sua conta ou reserva.</td></tr>
     </table></td></tr>
   </table>
@@ -108,7 +108,7 @@ Deno.serve(async (request) => {
       };
       const subject = render(template.subject, variables);
       const text = render(template.body_text, variables);
-      const actionUrl = `${siteUrl}/conta.html`;
+      const actionUrl = item.template_code === "same_day_requested" ? `https://chalezinho-ville-git-feature-guest-directory-roldneicosta-4140.vercel.app/admin.html?view=notifications&request=${encodeURIComponent(String(payload.request_id||""))}` : `${siteUrl}/conta.html`;
       const message: EmailMessage = {
         to: { email: recipientEmail, name: recipientName || undefined },
         from: { email: fromEmail, name: fromName },

@@ -29,6 +29,14 @@ async function guaranteeApi(action,body={}){const r=await fetch(C.guaranteeEngin
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
 const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+setInterval(()=>{if(session&&!document.hidden)renderSameDayRequests()},30000);
+async function renderSameDayRequests(){
+ let host=$('#same-day-requests');if(!host){host=document.createElement('section');host.id='same-day-requests';host.className='account-section';$('.account-hero').after(host)}
+ try{const {requests}=await api('same_day_request',{operation:'list'});const labels={pending:'Aguardando aprovação',approved:'Aprovado — conclua o pagamento',rejected:'Pedido recusado',expired:'Pedido expirado',booked:'Reserva criada'};
+ host.innerHTML=`<h2>Pedidos de reserva para hoje</h2><button type="button" id="refresh-same-day">Atualizar pedidos</button>${requests.map(r=>`<article class="account-reservation"><h3>${esc(properties.find(p=>Number(p.id)===Number(r.property_id))?.name||'Imóvel')}</h3><p>${esc(r.check_in)} a ${esc(r.check_out)} · ${r.guests} hóspedes</p><strong>${labels[r.status]||esc(r.status)}</strong><p>${esc(r.decision_note||'')}</p>${r.status==='approved'?`<p>Conclua até ${fmtDateTime(r.expires_at)}. Valores e disponibilidade serão consultados novamente.</p><a class="primary-action" href="reservar.html?approved_request=${encodeURIComponent(r.id)}&pagbank=sandbox">Escolher tarifa e pagar</a>`:''}</article>`).join('')||'<p>Nenhum pedido enviado.</p>'}`;$('#refresh-same-day').onclick=renderSameDayRequests;
+ }catch{host.innerHTML='<p>Não foi possível consultar seus pedidos. Atualize a página.</p>'}
+}
+
 async function boot({afterRefundRefresh=false}={}){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
  $("#account-email").textContent=session.user.email||"";
@@ -46,7 +54,7 @@ async function boot({afterRefundRefresh=false}={}){
  if(profile?.role==="admin"){$("#ops-link").hidden=false;$("#experience-admin-link").hidden=false}
  renderExperienceCart(reservationsCache);
  renderPendingPayments(reservationsCache);
- renderReservations(reservationsCache);
+ renderReservations(reservationsCache);renderSameDayRequests();
  showRefundStatuses(reservationsCache,!afterRefundRefresh);
  showCancellationRequests(reservationsCache);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
@@ -135,7 +143,7 @@ async function checkoutCartItem(id,btn){
   const d=await api("checkout_experience_cart_item",{cart_item_id:id});
   cartItems=cartItems.filter(x=>String(x.id)!==String(id));
   const charge={...d.charge,reservation_id:item?.reservation_id};charges.unshift(charge);
-  renderExperienceCart(reservationsCache);renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+  renderExperienceCart(reservationsCache);renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
   openChargePayment(charge);
  }catch(e){btn.disabled=false;alert(e.message==="experience_payment_already_pending"?"Já existe um pagamento pendente para esta categoria.":"Não foi possível iniciar o pagamento agora.")}
 }
@@ -492,7 +500,7 @@ async function startChargePayment(){
    activeCharge.status="processing";
    activeCharge.payment_id=d.payment?.id||activeCharge.payment_id||null;
    activeCharge.payments={...(activeCharge.payments||{}),status:d.payment?.status||"pending",method:d.payment?.method||method,installments:d.payment?.installments||installments};
-   renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+   renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
   }
   $("#post-payment-message").textContent="";
   renderPostBookingPagBankPayment(d.payment);
@@ -552,7 +560,7 @@ async function handlePostPaymentOutcome(paymentId,outcome,box){
    if(activeCharge){
     activeCharge.status=d.charge_status||"processing";
     activeCharge.payments={...(activeCharge.payments||{}),status:"under_review"};
-    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
    }
    $("#post-payment-message").textContent="Pagamento em análise. A alteração/experiência ainda não foi aplicada.";
    box.querySelectorAll("button").forEach(b=>b.disabled=b.dataset.postOutcome==="under_review");

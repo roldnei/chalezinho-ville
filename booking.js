@@ -48,7 +48,7 @@ async function init(){
  $("#step-next").addEventListener("click",next);
  await initChaletFilter();
  renderDevBanner();
- await restoreResume();
+ await restoreResume();await restoreSameDay();
 }
 async function initChaletFilter(){
  const select=$("#book-chalet"),requested=new URLSearchParams(location.search).get("chalet")||"";
@@ -118,17 +118,32 @@ function renderResults(list){
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
   const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+esc(x)+"</span>").join("");
   const availabilityMessages={maximum_stay:"Estadia acima do máximo permitido",advance_notice:"Antecedência mínima não atendida",same_day_cutoff:"Horário limite para hoje encerrado",availability_window:"Fora do período disponível",checkin_day:"Check-in não permitido neste dia",checkout_day:"Checkout não permitido neste dia",past_date:"Data de entrada já passou"};
-  const status=availabilityMessages[p.unavailable_reason]||(p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível");
+  const status=p.requestable?"Sujeito à aprovação":availabilityMessages[p.unavailable_reason]||(p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível");
   const minNotice=p.unavailable_reason==="minimum_stay"?'<div class="minimum-stay-alert"><small>MÍNIMO DE ESTADIA</small><strong>'+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'</strong><span>Para estas datas, este chalé exige no mínimo '+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'.</span></div>':"";
   const total=p.from_stay_price!=null?Number(p.from_stay_price):null;
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
   const price=p.available?'<small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">pacote · '+perNight+' por noite</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
-  a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(String(p.property_type).toUpperCase())+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available?"":"disabled")+' data-id="'+p.id+'">'+(p.available?"Ver tarifas":"Indisponível")+'</button></div>';
+  a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(String(p.property_type).toUpperCase())+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available||p.requestable?"":"disabled")+' data-id="'+p.id+'">'+(p.requestable?"Pedir aprovação":p.available?"Ver tarifas":"Indisponível")+'</button></div>';
   VilleImages.set(a.querySelector(".booking-gallery img"),p.cover_image,{sizes:"(max-width: 800px) 100vw, 240px"});
   box.appendChild(a);
  });
- box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>openFlow(Number(b.dataset.id))));
+ box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>{const p=state.search.find(x=>x.id===Number(b.dataset.id));return p?.requestable?openSameDayRequest(p.id):openFlow(Number(b.dataset.id))}));
  $("#booking-results").scrollIntoView({behavior:"smooth"});
+}
+
+async function openSameDayRequest(propertyId){
+ const p=state.search.find(x=>Number(x.id)===propertyId);if(!p)return;
+ if(!state.session){const ret=new URLSearchParams({request_property:String(propertyId),check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value});location.href='auth.html?mode=login&return='+encodeURIComponent('reservar.html?'+ret);return}
+ let dialog=$('#same-day-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='same-day-dialog';dialog.className='same-day-dialog';document.body.appendChild(dialog)}
+ dialog.innerHTML=`<h2>Pedido de reserva para hoje</h2><p>${esc(p.name)} · ${esc($('#book-in').value)} a ${esc($('#book-out').value)}</p><p><strong>Este pedido passará por aprovação.</strong> Nenhuma cobrança será feita agora. Após a aprovação, você deverá escolher a tarifa e pagar para confirmar. As datas não ficam garantidas enquanto o pagamento não for iniciado.</p><form id="same-day-form"><label>Nome<input name="guest_name" required minlength="2" maxlength="160" autocomplete="name"></label><label>Telefone<input name="guest_phone" required minlength="8" maxlength="30" autocomplete="tel"></label><label>Mensagem e horário previsto de chegada<textarea name="note" maxlength="1000"></textarea></label><p id="same-day-message" role="status"></p><button type="submit">Enviar pedido para aprovação</button><button type="button" id="close-same-day">Voltar</button></form>`;
+ dialog.showModal();$('#close-same-day').onclick=()=>dialog.close();$('#same-day-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,b=f.querySelector('[type=submit]');b.disabled=true;
+ try{await api('same_day_request',{operation:'create',property_id:propertyId,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:Number($('#book-guests').value),guest_name:f.elements.guest_name.value,guest_phone:f.elements.guest_phone.value,note:f.elements.note.value});dialog.innerHTML='<h2>Pedido recebido</h2><p>A equipe foi avisada com prioridade. Acompanhe a aprovação em Minhas reservas.</p><a class="primary-action" href="conta.html">Acompanhar pedido</a><button id="close-same-day" type="button">Fechar</button>';$('#close-same-day').onclick=()=>dialog.close()}
+ catch(e){$('#same-day-message').textContent=e.message==='dates_unavailable'?'Estas datas não estão mais disponíveis para pedido. Consulte novamente.':'Não foi possível enviar o pedido. Confira os dados e tente novamente.';b.disabled=false}};
+}
+async function restoreSameDay(){
+ const q=new URLSearchParams(location.search),id=q.get('approved_request');
+ if(id){try{const {request:r}=await api('same_day_request',{operation:'get',id});if(r.status!=='approved')throw Error('expired');state.approvedRequest=r.id;$('#book-in').value=r.check_in;$('#book-out').value=r.check_out;$('#book-guests').value=r.guests;await search();await openFlow(Number(r.property_id))}catch{error('Este pedido não está aprovado ou expirou. Consulte Minhas reservas.')}return}
+ if(q.has('request_property')){$('#book-in').value=q.get('check_in')||'';$('#book-out').value=q.get('check_out')||'';$('#book-guests').value=q.get('guests')||'2';await search();if(state.search.some(p=>p.requestable&&p.id===Number(q.get('request_property'))))openSameDayRequest(Number(q.get('request_property')))}
 }
 
 async function openFlow(id){
@@ -153,7 +168,7 @@ function showStep(n){
 }
 async function generateQuote(withExperiences){
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
- const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen});
+ const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen,same_day_request_id:state.approvedRequest||undefined});
  q.selected_variant_ids=chosen.map(String).sort();state.quote=q;startCountdown(q.expires_at);return q;
 }
 function renderRates(){

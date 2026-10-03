@@ -27,7 +27,7 @@ async function api(action,body={}){
 
 async function boot(){
   const {data:{session:s}}=await sb.auth.getSession();session=s;
-  if(!session){location.href="auth.html?mode=login&return=admin.html";return}
+  if(!session){location.href="auth.html?mode=login&return="+encodeURIComponent("admin.html"+location.search);return}
   const {data:p}=await sb.from("profiles").select("role,full_name").eq("id",session.user.id).single();
   if(p?.role!=="admin"){$("#admin-loading").textContent="Esta área é restrita à administração.";return}
   $("#admin-user").textContent=p.full_name||session.user.email;
@@ -54,7 +54,7 @@ async function load(silent=false){
     ]);
     state={...hub,cancel_requests:cancelRequestsResult.value?.requests||[],guest_contacts:guestResult.value?.contacts||[],guest_links:guestResult.value?.links||[],guest_error:!!guestResult.error};
     applyGuestContacts();
-    updateCounts();showView(currentView);
+    updateCounts();showView(currentView);pollSameDayPriority();const requestId=new URLSearchParams(location.search).get("request");if(requestId&&!window.sameDayLinkOpened){window.sameDayLinkOpened=true;openSameDayReview(requestId)}
     $("#admin-loading").hidden=true;$("#admin-content").hidden=false;$("#admin-app").setAttribute("aria-busy","false");
   }catch(e){$("#admin-loading").textContent="Não foi possível carregar a operação. Atualize a página ou tente novamente em instantes."}
 }
@@ -174,7 +174,7 @@ function renderAttentionItems(unread,mods,payments){
 }
 function bindCards(){
   $$('[data-guest-stay]').forEach(b=>b.onclick=()=>openStayGuest(b.dataset.guestStay));
-  $$('[data-reservation]').forEach(b=>b.onclick=e=>{const id=b.dataset.reservation;if(id)openReservation(id);const nid=b.dataset.notification;if(nid)markNotification(nid)});
+  $$('[data-reservation]').forEach(b=>b.onclick=e=>{const id=b.dataset.reservation;const notification=state.notifications.find(n=>n.id===b.dataset.notification);if(notification?.entity_type==="same_day_request")openSameDayReview(notification.entity_id);else if(id)openReservation(id);const nid=b.dataset.notification;if(nid)markNotification(nid)});
 }
 
 function monthBounds(value){const [y,m]=value.split("-").map(Number),start=`${y}-${String(m).padStart(2,"0")}-01`,endDate=new Date(Date.UTC(y,m,1)),end=endDate.toISOString().slice(0,10);return {y,m,start,end,days:new Date(Date.UTC(y,m,0)).getUTCDate()}}
@@ -211,10 +211,36 @@ function filteredReservations(){
   })
 }
 
+let sameDayPolling=false;
+async function pollSameDayPriority(){
+ if(!session||!state||document.hidden||sameDayPolling)return;sameDayPolling=true;
+ try{const {requests}=await api('same_day_request',{operation:'list'}),count=requests.filter(r=>r.status==='pending').length;
+ let bar=$('#same-day-priority');if(!bar){bar=document.createElement('button');bar.id='same-day-priority';bar.className='same-day-priority';$('#admin-app').prepend(bar);bar.onclick=()=>showView('notifications')}
+ bar.hidden=count===0;bar.textContent=`URGENTE · ${count} pedido(s) de reserva para hoje — analisar`;
+ if(currentView==='notifications')renderSameDayQueue();
+ }catch{}finally{sameDayPolling=false}
+}
+setInterval(pollSameDayPriority,30000);
+async function renderSameDayQueue(){
+ const host=$('#same-day-queue');if(!host)return;
+ try{const {requests}=await api('same_day_request',{operation:'list'});if(!host.isConnected)return;
+ const pending=requests.filter(r=>r.status==='pending');host.innerHTML=`<h3>Prioridade · Pedidos para hoje (${pending.length})</h3>${pending.map(r=>`<button class="notification-row critical unread" data-same-day="${esc(r.id)}"><strong>${esc(r.guest_name)} · ${esc(prop(r.property_id)?.name||'Imóvel')}</strong><span>${date(r.check_in)} a ${date(r.check_out)} · Analisar pedido</span></button>`).join('')||'<p>Nenhum pedido aguardando aprovação.</p>'}`;
+ host.querySelectorAll('[data-same-day]').forEach(b=>b.onclick=()=>openSameDayReview(b.dataset.sameDay));
+ }catch{if(host.isConnected)host.textContent='Não foi possível consultar os pedidos para hoje.'}
+}
+async function openSameDayReview(id){
+ $('#admin-modal-content').innerHTML='<p>Consultando pedido…</p>';openModal();
+ try{const {request:r}=await api('same_day_request',{operation:'get',id});
+ const labels={pending:'Aguardando aprovação',approved:'Aprovado para pagamento',rejected:'Recusado',expired:'Expirado',booked:'Reserva criada'};
+ $('#admin-modal-content').innerHTML=`<small>URGENTE · RESERVA PARA HOJE</small><h2>${esc(prop(r.property_id)?.name||'Imóvel')}</h2><p><strong>${esc(r.guest_name)}</strong> · ${esc(r.guest_phone)}</p><p>${date(r.check_in)} a ${date(r.check_out)} · ${r.guests} hóspedes</p><p>${esc(r.note)}</p><p>${labels[r.status]||esc(r.status)} · prazo: ${dateTime(r.expires_at)}</p><p>A aprovação libera o checkout por até 1 hora, sem cobrança e sem garantir as datas. A disponibilidade será conferida novamente no pagamento.</p>${r.status==='pending'?'<label>Resposta ao hóspede<textarea id="same-day-decision-note" maxlength="1000"></textarea></label><button id="approve-same-day">Aprovar para pagamento</button><button id="reject-same-day">Recusar pedido</button>':`<p>${esc(r.decision_note||'')}</p>`}<p id="same-day-review-status" role="status"></p>`;
+ for(const [selector,operation] of [['#approve-same-day','approve'],['#reject-same-day','reject']]){const button=$(selector);if(button)button.onclick=async()=>{const buttons=$$('#admin-modal-content button');buttons.forEach(b=>b.disabled=true);try{await api('same_day_request',{operation,id,decision_note:$('#same-day-decision-note').value});await load(true);await openSameDayReview(id)}catch(e){$('#same-day-review-status').textContent=e.message==='dates_unavailable'?'Datas indisponíveis: aprovação não realizada.':'O pedido expirou, já foi analisado ou não pôde ser atualizado. Reabra para conferir.';buttons.forEach(b=>b.disabled=false)}}}
+ }catch{$('#admin-modal-content').innerHTML='<h2>Pedido indisponível</h2><p>O pedido não foi encontrado ou não pôde ser consultado.</p>'}
+}
+
 function renderNotifications(){
-  const rows=state.notifications;
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>AVISOS OPERACIONAIS</small><h2>O que precisa da sua atenção</h2></div><button id="mark-all-read">Marcar todas como lidas</button></div><div class="notification-list">${rows.length?rows.map(n=>`<button class="notification-row ${n.read_at?"read":"unread"} ${n.severity}" data-notification="${n.id}" data-reservation="${n.reservation_id||""}"><i></i><div><small>${esc(n.severity==="critical"?"URGENTE":n.severity==="warning"?"ATENÇÃO":"ATUALIZAÇÃO")}</small><strong>${esc(n.title)}</strong><p>${esc(n.message||"")}</p></div><time>${dateTime(n.created_at)}</time></button>`).join(""):empty("Nenhuma notificação registrada.")}</div></section>`;
-  $("#mark-all-read").onclick=async()=>{await api("admin_notification_action",{operation:"mark_all_read"});state.notifications.forEach(n=>n.read_at=new Date().toISOString());updateCounts();renderNotifications()};bindCards();
+  const rows=[...state.notifications].sort((a,b)=>(b.severity==='critical')-(a.severity==='critical'));
+  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>AVISOS OPERACIONAIS</small><h2>O que precisa da sua atenção</h2></div><button id="mark-all-read">Marcar todas como lidas</button></div><div id="same-day-queue"></div><div class="notification-list">${rows.length?rows.map(n=>`<button class="notification-row ${n.read_at?"read":"unread"} ${n.severity}" data-notification="${n.id}" data-reservation="${n.reservation_id||""}"><i></i><div><small>${esc(n.severity==="critical"?"URGENTE":n.severity==="warning"?"ATENÇÃO":"ATUALIZAÇÃO")}</small><strong>${esc(n.title)}</strong><p>${esc(n.message||"")}</p></div><time>${dateTime(n.created_at)}</time></button>`).join(""):empty("Nenhuma notificação registrada.")}</div></section>`;
+  $("#mark-all-read").onclick=async()=>{await api("admin_notification_action",{operation:"mark_all_read"});state.notifications.forEach(n=>n.read_at=new Date().toISOString());updateCounts();renderNotifications()};bindCards();renderSameDayQueue();
 }
 async function markNotification(id){const n=state.notifications.find(x=>x.id===id);if(!n||n.read_at)return;await api("admin_notification_action",{operation:"mark_read",notification_id:id}).catch(()=>{});n.read_at=new Date().toISOString();updateCounts()}
 
@@ -407,13 +433,13 @@ async function openAvailability(propertyId){
  const number=(name,label,min,max)=>`<label>${label}<input name="${name}" type="number" min="${min}" max="${max}" required value="${r[name]}"></label>`;
  const days=(key,title)=>`<fieldset><legend>${title}</legend>${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((label,i)=>`<label class="admin-checkbox"><input name="${key}" type="checkbox" value="${i}" ${r[key].includes(i)?'checked':''}>${label}</label>`).join('')}</fieldset>`;
  const custom=x=>`<div class="custom-stay-row admin-form-grid"><label>Entrada de<input name="custom_start" type="date" required value="${esc(x.start||'')}"></label><label>Entrada até<input name="custom_end" type="date" required value="${esc(x.end||'')}"></label><label>Mínimo de noites<input name="custom_min" type="number" min="1" max="1125" required value="${x.min_nights||1}"></label><label>Máximo de noites<input name="custom_max" type="number" min="1" max="1125" required value="${x.max_nights||1125}"></label><button type="button" data-remove-duration>Excluir período</button></div>`;
- $('#admin-modal-content').innerHTML=`<small>${esc(prop(propertyId)?.name)}</small><h2>Disponibilidade do imóvel</h2><button type="button" id="back-property-details">Voltar aos dados do imóvel</button><section><h3>Calendário do imóvel</h3><div id="property-availability-calendar"></div></section><h3>Configurações de disponibilidade</h3><form id="availability-form" class="admin-form"><div class="admin-form-grid">${number('min_nights','Mínimo de noites',1,1125)}${number('weekend_min_nights','Mínimo quando inclui sexta ou sábado',1,1125)}${number('max_nights','Máximo de noites',1,1125)}${choice('lead_days','Tempo de antecedência',[[0,'Mesmo dia'],[1,'1 dia'],[2,'2 dias'],[3,'3 dias'],[7,'7 dias']])}${choice('same_day_cutoff','Aviso prévio para o mesmo dia',Array.from({length:24},(_,i)=>{const hour=String(i).padStart(2,'0')+':00';return [hour,hour]}))}${choice('preparation_days','Tempo de preparação',[[0,'Nenhum'],[1,'1 noite antes e depois de cada reserva'],[2,'2 noites antes e depois de cada reserva']])}${choice('window_months','Período de disponibilidade',[3,6,9,12,24,36].map(n=>[n,n+' meses de antecedência']))}</div><p>Horários de Brasília. A janela limita a última noite da estadia. Preparação vale para reservas do site e períodos importados; não cria uma hospedagem.</p>${days('checkin_days','Dias permitidos para check-in')}${days('checkout_days','Dias permitidos para checkout')}<h3>Durações por período de entrada</h3><p>Substituem os mínimos e máximos gerais para entradas no período. Os períodos não podem se sobrepor.</p><div id="custom-stays">${r.custom_stays.map(custom).join('')}</div><button type="button" id="add-custom-stay">Adicionar período</button><label class="admin-checkbox"><input name="use_pricelabs_min" type="checkbox" ${r.use_pricelabs_min?'checked':''}> Respeitar também o mínimo do PriceLabs (vale o maior)</label><p>Reservas Airbnb e outros bloqueios continuam sendo importados. As regras acima controlam novas reservas do site; iCal não altera regras do Airbnb ou Booking.</p><p role="status" id="availability-message"></p><button type="submit">Salvar disponibilidade</button></form><section id="property-calendar-connections"></section>`;
+ $('#admin-modal-content').innerHTML=`<small>${esc(prop(propertyId)?.name)}</small><h2>Disponibilidade do imóvel</h2><button type="button" id="back-property-details">Voltar aos dados do imóvel</button><section><h3>Calendário do imóvel</h3><div id="property-availability-calendar"></div></section><h3>Configurações de disponibilidade</h3><form id="availability-form" class="admin-form"><div class="admin-form-grid">${number('min_nights','Mínimo de noites',1,1125)}${number('weekend_min_nights','Mínimo quando inclui sexta ou sábado',1,1125)}${number('max_nights','Máximo de noites',1,1125)}${choice('lead_days','Tempo de antecedência',[[0,'Mesmo dia'],[1,'1 dia'],[2,'2 dias'],[3,'3 dias'],[7,'7 dias']])}${choice('same_day_cutoff','Aviso prévio para o mesmo dia',Array.from({length:24},(_,i)=>{const hour=String(i).padStart(2,'0')+':00';return [hour,hour]}))}${choice('preparation_days','Tempo de preparação',[[0,'Nenhum'],[1,'1 noite antes e depois de cada reserva'],[2,'2 noites antes e depois de cada reserva']])}${choice('window_months','Período de disponibilidade',[3,6,9,12,24,36].map(n=>[n,n+' meses de antecedência']))}</div><p>Horários de Brasília. A janela limita a última noite da estadia. Preparação vale para reservas do site e períodos importados; não cria uma hospedagem.</p>${days('checkin_days','Dias permitidos para check-in')}${days('checkout_days','Dias permitidos para checkout')}<h3>Durações por período de entrada</h3><p>Substituem os mínimos e máximos gerais para entradas no período. Os períodos não podem se sobrepor.</p><div id="custom-stays">${r.custom_stays.map(custom).join('')}</div><button type="button" id="add-custom-stay">Adicionar período</button><label class="admin-checkbox"><input name="use_pricelabs_min" type="checkbox" ${r.use_pricelabs_min?'checked':''}> Respeitar também o mínimo do PriceLabs (vale o maior)</label><label class="admin-checkbox"><input name="allow_same_day_requests" type="checkbox" ${r.allow_same_day_requests?'checked':''}> Permitir pedidos de reserva para hoje, sujeitos à aprovação</label><p>Reservas Airbnb e outros bloqueios continuam sendo importados. As regras acima controlam novas reservas do site; iCal não altera regras do Airbnb ou Booking.</p><p role="status" id="availability-message"></p><button type="submit">Salvar disponibilidade</button></form><section id="property-calendar-connections"></section>`;
  $('#back-property-details').onclick=()=>openProperty(propertyId);renderPropertyCalendar(propertyId,today().slice(0,7));renderPropertyConnections(propertyId);
  const wire=()=>$$('[data-remove-duration]').forEach(b=>b.onclick=()=>b.closest('.custom-stay-row').remove());wire();
  $('#add-custom-stay').onclick=()=>{if($$('.custom-stay-row').length>=100)return;$('#custom-stays').insertAdjacentHTML('beforeend',custom({}));wire()};
  $('#availability-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,button=f.querySelector('[type=submit]'),message=$('#availability-message');button.disabled=true;message.textContent='Salvando…';
  const rules={};for(const k of ['min_nights','weekend_min_nights','max_nights','lead_days','preparation_days','window_months'])rules[k]=Number(f.elements[k].value);
- rules.same_day_cutoff=f.elements.same_day_cutoff.value;for(const k of ['checkin_days','checkout_days'])rules[k]=[...f.querySelectorAll(`[name="${k}"]:checked`)].map(x=>Number(x.value));for(const k of ['use_pricelabs_min'])rules[k]=f.elements[k].checked;
+ rules.same_day_cutoff=f.elements.same_day_cutoff.value;for(const k of ['checkin_days','checkout_days'])rules[k]=[...f.querySelectorAll(`[name="${k}"]:checked`)].map(x=>Number(x.value));for(const k of ['use_pricelabs_min','allow_same_day_requests'])rules[k]=f.elements[k].checked;
  rules.custom_stays=[...f.querySelectorAll('.custom-stay-row')].map(x=>({start:x.querySelector('[name=custom_start]').value,end:x.querySelector('[name=custom_end]').value,min_nights:Number(x.querySelector('[name=custom_min]').value),max_nights:Number(x.querySelector('[name=custom_max]').value)}));
  try{await api('admin_availability',{operation:'save',property_id:propertyId,updated_at:data.updated_at,rules});await load(true);await openAvailability(propertyId);$('#availability-message').textContent='Disponibilidade salva. Agenda atualizada.'}catch(err){message.textContent=err.message==='availability_conflict'?'Este imóvel foi alterado em outra tela. Feche e abra novamente antes de salvar.':'Confira os limites, os dias selecionados e se há períodos sobrepostos.'}finally{button.disabled=false}};
  }catch{$('#admin-modal-content').innerHTML='<h2>Disponibilidade</h2><p>Não foi possível carregar as regras. Feche e tente novamente.</p>'}
