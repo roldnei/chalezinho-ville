@@ -95,11 +95,22 @@ export function calendarText(events:Array<CalendarPeriod&{uid:string;updated?:st
  lines.push('BEGIN:VEVENT','UID:'+e.uid+'@chalezinho-site','DTSTAMP:'+stamp(e.updated||now.toISOString()),'DTSTART;VALUE=DATE:'+e.start.replaceAll('-',''),'DTEND;VALUE=DATE:'+e.end.replaceAll('-',''),'SUMMARY:Reservado','STATUS:CONFIRMED','TRANSP:OPAQUE','END:VEVENT');}
  lines.push('END:VCALENDAR');return lines.map(line=>line.match(/.{1,73}/g)?.join('\r\n ')||'').join('\r\n')+'\r\n';
 }
+// Source identity prevents two links with the same dates from sharing a guest association.
+export function calendarPeriodKey(provider:string,propertyId:number,period:any){
+ return period.calendar_id?`calendar:${period.calendar_id}:${period.start}:${period.end}`:`${provider}:${propertyId}:${period.start}:${period.end}`;
+}
 export function calendarService(admin:any,projectUrl:string){
  const checked=(r:any)=>{if(r.error)throw new Error('calendar_database_unavailable');return r.data||[]};
+ async function readSources(){
+  const rows:any[]=[];
+  for(let offset=0;;offset+=500){
+   const page=checked(await admin.from('property_calendar_sources').select('*').is('deleted_at',null).order('id').range(offset,offset+499));
+   rows.push(...page);if(page.length<500)return rows;
+  }
+ }
  async function channels(provider:string){
   const properties=checked(await admin.from('properties').select('id,name').eq('active',true));
-  const sources=checked(await admin.from('property_calendar_sources').select('*').is('deleted_at',null)).filter((x:any)=>x.provider===provider||(provider==='booking'&&x.provider==='ical'));
+  const sources=(await readSources()).filter((x:any)=>x.provider===provider||(provider==='booking'&&x.provider==='ical'));
   const listings=await Promise.all(properties.map(async(p:any)=>{
    const selected=sources.filter((x:any)=>x.property_id===p.id&&x.enabled);
    const results=await Promise.all(selected.map(async(s:any)=>{
@@ -113,7 +124,7 @@ export function calendarService(admin:any,projectUrl:string){
   }));return {configured:true,ok:listings.every((x:any)=>x.ok),listings};
  }
  async function configuration(){
-  const sources=checked(await admin.from('property_calendar_sources').select('*').is('deleted_at',null).order('label'));
+  const sources=(await readSources()).sort((a,b)=>a.label.localeCompare(b.label));
   const exports=checked(await admin.from('property_calendar_exports').select('*'));
   return {sources,exports:exports.map((x:any)=>({property_id:x.property_id,enabled:x.enabled,url:projectUrl+'/functions/v1/booking-engine?action=calendar_export&token='+x.token}))};
  }
