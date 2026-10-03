@@ -1,0 +1,9 @@
+(async()=>{
+ const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),host=document.querySelector('#owner-content');
+ const {data:{session}}=await sb.auth.getSession();if(!session){location.href='auth.html?mode=login&return=meus-imoveis.html';return}
+ document.querySelector('#owner-logout').onclick=async()=>{await sb.auth.signOut();location.href='auth.html'};
+ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+ const api=async body=>{const r=await fetch(C.supabaseUrl+'/functions/v1/pms-operations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(body)});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'failed');return d};
+ async function load(){try{const {properties}=await api({action:'listings',operation:'list'});host.innerHTML=`<div class="workspace-cards">${properties.map(p=>`<button data-property="${p.id}">${p.cover_image?`<img src="${esc(p.cover_image)}" alt="">`:''}<strong>${esc(p.name)}</strong><span>${p.active?'Ativo':'Pausado'} · ${esc(p.code)}</span><span>Editar anúncio →</span></button>`).join('')}</div>${properties.length?'':'<p>Nenhum imóvel foi atribuído ao seu acesso. Peça ao administrador para vincular seus imóveis.</p>'}`;host.querySelectorAll('[data-property]').forEach(b=>b.onclick=()=>ListingEditor.open({property:properties.find(p=>String(p.id)===b.dataset.property),host,api,onBack:load,onSaved:load}));}catch{host.innerHTML='<p>Seu acesso não permite editar anúncios ou está suspenso. Solicite ao administrador a permissão “Editar anúncios e comodidades” para os seus imóveis.</p>'}}
+ await load();
+})();

@@ -1,3 +1,4 @@
+import {listingsAction} from './listings.ts';
 import {taskPhotos} from "./photos.ts";
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
@@ -30,7 +31,7 @@ async function operator(request:Request){
 
 
 const validRoles=["admin","host","staff","service_provider"];
-const permissionKeys=["reservations","housekeeping","maintenance","finance","manage_team"];
+const permissionKeys=["reservations","housekeeping","maintenance","finance","manage_team","manage_listings"];
 const roleDefaults=(role:string)=>role==="admin"?Object.fromEntries(permissionKeys.map(k=>[k,true])):role==="host"?{reservations:true,housekeeping:true,maintenance:true,finance:false,manage_team:false}:role==="staff"?{reservations:false,housekeeping:true,maintenance:false,finance:false,manage_team:false}:{reservations:false,housekeeping:false,maintenance:true,finance:false,manage_team:false};
 const cleanPermissions=(value:any,role:string)=>{const defaults=roleDefaults(role);for(const key of permissionKeys)if(typeof value?.[key]==="boolean")defaults[key]=value[key];return defaults};
 const cleanPropertyIds=(value:any,available:number[])=>[...new Set((Array.isArray(value)?value:[]).map(Number).filter((id:number)=>available.includes(id)))];
@@ -396,6 +397,7 @@ Deno.serve(async request=>{
   if(request.method!=="POST")return json({ok:false,error:"method_not_allowed"},405);
   const actor=await operator(request);if(!actor)return json({ok:false,error:"operator_required"},403);
   const body=await request.json().catch(()=>({}));
+  if(body.action==="listings")return listingsAction(body,actor,admin,json);
   if(body.action==="hub")return hub(actor);
   if(body.action==="task_photos")return taskPhotos(body,actor,admin,json);
   if(body.action==="task_action")return taskAction(body,actor);

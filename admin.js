@@ -1,7 +1,7 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
-const validViews=new Set(["today","calendar","calendar_links","reservations","notifications","changes","finance","access","guests","properties","settings"]);
+const validViews=new Set(["menu","today","calendar","calendar_links","reservations","notifications","changes","finance","access","guests","properties","settings"]);
 const requestedView=new URLSearchParams(location.search).get("view")==="guarantees"?"reservations":new URLSearchParams(location.search).get("view");
 let propertyGallery=[], propertyCover="";
 let session=null,state=null,currentView=validViews.has(requestedView)?requestedView:"today",calendarMonth=new Date().toISOString().slice(0,7),filters={search:"",status:"all",property:"all"};
@@ -29,6 +29,7 @@ async function boot(){
   const {data:{session:s}}=await sb.auth.getSession();session=s;
   if(!session){location.href="auth.html?mode=login&return="+encodeURIComponent("admin.html"+location.search);return}
   const {data:p}=await sb.from("profiles").select("role,full_name").eq("id",session.user.id).single();
+  if(p?.role==="host"){location.href="meus-imoveis.html";return}
   if(p?.role!=="admin"){$("#admin-loading").textContent="Esta área é restrita à administração.";return}
   $("#admin-user").textContent=p.full_name||session.user.email;
   bind();await load();
@@ -368,7 +369,7 @@ async function saveCancellationPolicy(e){e.preventDefault();const f=e.currentTar
 async function saveSettings(e){e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");b.disabled=true;m.textContent="Salvando…";try{const d=await api("ops_settings_action",{operation:"payment_settings",active_provider:f.elements.active_provider.value,pix_enabled:f.elements.pix_enabled.checked,card_enabled:f.elements.card_enabled.checked,pix_expiration_minutes:Number(f.pix_expiration_minutes.value),post_booking_payment_minutes:Number(f.post_booking_payment_minutes.value),modification_payment_deadline_hours:Number(f.modification_payment_deadline_hours.value)});state.settings=d.settings;m.textContent="Regras atualizadas."}catch{m.textContent="Não foi possível salvar."}finally{b.disabled=false}}
 
 function renderProperties(){
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>PORTFÓLIO</small><h2>Imóveis</h2></div><button id="new-property">+ Novo imóvel</button></div><div class="property-admin-grid">${state.properties.map(p=>`<button class="property-admin-card ${p.active?"":"inactive"}" data-property-edit="${p.id}"><small>${esc(p.code)}</small><h3>${esc(p.name)}</h3><p>${esc(p.property_type)} · até ${p.max_guests} hóspedes</p><span>Check-in ${esc((p.check_in_time||"15:00").slice(0,5))} · Checkout ${esc((p.check_out_time||"11:00").slice(0,5))}</span><em>${p.active?"Ativo":"Pausado"}</em></button>`).join("")}</div></section>`;
+  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>PORTFÓLIO</small><h2>Imóveis</h2></div><button id="new-property">+ Novo imóvel</button></div><div class="property-admin-grid">${state.properties.map(p=>`<button class="property-admin-card ${p.active?"":"inactive"}" data-property-edit="${p.id}"><img src="${esc(p.cover_image||'')}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:12px"><small>${esc(p.code)}</small><h3>${esc(p.name)}</h3><p>${esc(p.property_type)} · até ${p.max_guests} hóspedes</p><span>Check-in ${esc((p.check_in_time||"15:00").slice(0,5))} · Checkout ${esc((p.check_out_time||"11:00").slice(0,5))}</span><em>${p.active?"Ativo":"Pausado"}</em></button>`).join("")}</div></section>`;
   $("#new-property").onclick=()=>openProperty(null);$$('[data-property-edit]').forEach(b=>b.onclick=()=>openProperty(Number(b.dataset.propertyEdit)));
 }
 let calendarLinksRequest=0;
@@ -434,7 +435,7 @@ async function openAvailability(propertyId){
  const days=(key,title)=>`<fieldset><legend>${title}</legend>${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((label,i)=>`<label class="admin-checkbox"><input name="${key}" type="checkbox" value="${i}" ${r[key].includes(i)?'checked':''}>${label}</label>`).join('')}</fieldset>`;
  const custom=x=>`<div class="custom-stay-row admin-form-grid"><label>Entrada de<input name="custom_start" type="date" required value="${esc(x.start||'')}"></label><label>Entrada até<input name="custom_end" type="date" required value="${esc(x.end||'')}"></label><label>Mínimo de noites<input name="custom_min" type="number" min="1" max="1125" required value="${x.min_nights||1}"></label><label>Máximo de noites<input name="custom_max" type="number" min="1" max="1125" required value="${x.max_nights||1125}"></label><button type="button" data-remove-duration>Excluir período</button></div>`;
  $('#admin-modal-content').innerHTML=`<small>${esc(prop(propertyId)?.name)}</small><h2>Disponibilidade do imóvel</h2><button type="button" id="back-property-details">Voltar aos dados do imóvel</button><section><h3>Calendário do imóvel</h3><div id="property-availability-calendar"></div></section><h3>Configurações de disponibilidade</h3><form id="availability-form" class="admin-form"><div class="admin-form-grid">${number('min_nights','Mínimo de noites',1,1125)}${number('weekend_min_nights','Mínimo quando inclui sexta ou sábado',1,1125)}${number('max_nights','Máximo de noites',1,1125)}${choice('lead_days','Tempo de antecedência',[[0,'Mesmo dia'],[1,'1 dia'],[2,'2 dias'],[3,'3 dias'],[7,'7 dias']])}${choice('same_day_cutoff','Aviso prévio para o mesmo dia',Array.from({length:24},(_,i)=>{const hour=String(i).padStart(2,'0')+':00';return [hour,hour]}))}${choice('preparation_days','Tempo de preparação',[[0,'Nenhum'],[1,'1 noite antes e depois de cada reserva'],[2,'2 noites antes e depois de cada reserva']])}${choice('window_months','Período de disponibilidade',[3,6,9,12,24,36].map(n=>[n,n+' meses de antecedência']))}</div><p>Horários de Brasília. A janela limita a última noite da estadia. Preparação vale para reservas do site e períodos importados; não cria uma hospedagem.</p>${days('checkin_days','Dias permitidos para check-in')}${days('checkout_days','Dias permitidos para checkout')}<h3>Durações por período de entrada</h3><p>Substituem os mínimos e máximos gerais para entradas no período. Os períodos não podem se sobrepor.</p><div id="custom-stays">${r.custom_stays.map(custom).join('')}</div><button type="button" id="add-custom-stay">Adicionar período</button><label class="admin-checkbox"><input name="use_pricelabs_min" type="checkbox" ${r.use_pricelabs_min?'checked':''}> Respeitar também o mínimo do PriceLabs (vale o maior)</label><label class="admin-checkbox"><input name="allow_same_day_requests" type="checkbox" ${r.allow_same_day_requests?'checked':''}> Permitir pedidos de reserva para hoje, sujeitos à aprovação</label><p>Reservas Airbnb e outros bloqueios continuam sendo importados. As regras acima controlam novas reservas do site; iCal não altera regras do Airbnb ou Booking.</p><p role="status" id="availability-message"></p><button type="submit">Salvar disponibilidade</button></form><section id="property-calendar-connections"></section>`;
- $('#back-property-details').onclick=()=>openProperty(propertyId);renderPropertyCalendar(propertyId,today().slice(0,7));renderPropertyConnections(propertyId);
+ organizeAvailability();$('#back-property-details').onclick=()=>openProperty(propertyId);renderPropertyCalendar(propertyId,today().slice(0,7));renderPropertyConnections(propertyId);
  const wire=()=>$$('[data-remove-duration]').forEach(b=>b.onclick=()=>b.closest('.custom-stay-row').remove());wire();
  $('#add-custom-stay').onclick=()=>{if($$('.custom-stay-row').length>=100)return;$('#custom-stays').insertAdjacentHTML('beforeend',custom({}));wire()};
  $('#availability-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,button=f.querySelector('[type=submit]'),message=$('#availability-message');button.disabled=true;message.textContent='Salvando…';
@@ -656,6 +657,50 @@ function openReservationIncident(reservationId){
   catch{m.textContent="Não foi possível registrar. Tente novamente.";b.disabled=false;}
  };
 }
+
+// Task-oriented workspace. Existing financial flows remain in their original handlers.
+const legacyProperty=openProperty,legacyToday=renderToday,legacyCalendar=renderCalendar,legacyView=showView;
+let todayTab='today';
+async function listingApi(body){const r=await fetch(C.supabaseUrl+'/functions/v1/pms-operations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(body)});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'failed');return d}
+const workspaceCard=(key,title,summary)=>`<button type="button" data-workspace="${key}"><strong>${esc(title)}</strong><span>${esc(summary)}</span><span aria-hidden="true">Editar →</span></button>`;
+
+function organizeAvailability(){
+ const host=$('#admin-modal-content'),form=$('#availability-form'),calendar=$('#property-availability-calendar').parentElement,connections=$('#property-calendar-connections');
+ const heading=form.previousElementSibling;heading.hidden=true;
+ const tabs=document.createElement('div');tabs.className='workspace-tabs';tabs.innerHTML='<button type="button" data-availability-tab="calendar">Calendário</button><button type="button" data-availability-tab="rules">Regras de estadia</button><button type="button" data-availability-tab="links">Calendários conectados</button>';host.insertBefore(tabs,calendar);
+ const activate=key=>{calendar.hidden=key!=='calendar';form.hidden=key!=='rules';connections.hidden=key!=='links';tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.availabilityTab===key))};tabs.onclick=e=>{const b=e.target.closest('button');if(b)activate(b.dataset.availabilityTab)};activate('calendar');
+ const grid=form.querySelector('.admin-form-grid');
+ for(const label of [...grid.children]){const input=label.querySelector('input,select');const value=input.tagName==='SELECT'?input.selectedOptions[0].textContent:input.value;const title=label.firstChild.textContent;const detail=document.createElement('details');detail.className='workspace-rule';const summary=document.createElement('summary');summary.textContent=title+' · '+value;grid.insertBefore(detail,label);detail.append(summary,label);input.addEventListener('change',()=>{summary.textContent=title+' · '+(input.tagName==='SELECT'?input.selectedOptions[0].textContent:input.value)})}
+ form.addEventListener('invalid',e=>{const d=e.target.closest('details');if(d)d.open=true},true);
+}
+
+function setupWorkspace(){
+ const paths={today:'M5 3h14v18l-7-4-7 4z',calendar:'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',properties:'M3 11l9-8 9 8 M5 10v11h14V10 M9 21v-7h6v7',notifications:'M6 17h12l-2-3V9a4 4 0 0 0-8 0v5z M10 20h4',menu:'M4 6h16 M4 12h16 M4 18h16'};
+ const nav=document.createElement('nav');nav.className='admin-bottom-nav';nav.setAttribute('aria-label','Navegação principal');nav.innerHTML=Object.entries({today:'Hoje',calendar:'Calendário',properties:'Imóveis',notifications:'Avisos',menu:'Menu'}).map(([v,l])=>`<button data-main-view="${v}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[v]}"/></svg><span>${l}</span></button>`).join('');$('#admin-app').append(nav);nav.onclick=e=>{const b=e.target.closest('[data-main-view]');if(b&&state)showView(b.dataset.mainView)};
+}
+showView=function(view){
+ if(view==='menu'){currentView='menu';history.replaceState(null,'','admin.html?view=menu');$('#admin-context').textContent='SUA OPERAÇÃO';$('#admin-title').textContent='Menu';renderWorkspaceMenu()}else legacyView(view);
+ $$('[data-main-view]').forEach(b=>{const active=b.dataset.mainView===view;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false')});
+};
+function renderWorkspaceMenu(){
+ $('#admin-content').innerHTML=`<p class="workspace-summary">Escolha o assunto que deseja gerenciar.</p><div class="workspace-cards">${[['reservations','Reservas','Estadias, pagamentos, garantia e ocorrências'],['guests','Hóspedes','Contatos e histórico de estadias'],['finance','Financeiro','Recebimentos e cobranças'],['changes','Alterações','Pedidos de mudança nas reservas'],['access','Acessos ao site','Visitas e conversão'],['settings','Configurações','Regras e integrações']].map(([k,t,s])=>workspaceCard(k,t,s)).join('')}<a href="pms-operacao.html?view=team"><strong>Equipe e acessos</strong><span>Convide pessoas e escolha os imóveis e módulos permitidos.</span></a><a href="pms-operacao.html"><strong>Limpeza e manutenção</strong><span>Tarefas, vistorias e prontidão dos imóveis.</span></a><a href="experiencias-admin.html"><strong>Experiências</strong><span>Produtos e pacotes disponíveis aos hóspedes.</span></a></div>`;$$('[data-workspace]').forEach(b=>b.onclick=()=>showView(b.dataset.workspace));
+}
+renderToday=function(){
+ if(todayTab==='today')legacyToday();else{const rows=state.reservations.filter(r=>r.status==='confirmed'&&r.check_in>today()).sort((a,b)=>a.check_in.localeCompare(b.check_in));$('#admin-content').innerHTML=`<section class="admin-panel"><h2>Próximas chegadas</h2><div class="admin-stack">${rows.map(r=>reservationCard(r,date(r.check_in))).join('')||empty('Nenhuma chegada futura registrada.')}</div></section>`;bindCards()}
+ $('#admin-content').insertAdjacentHTML('afterbegin',`<div class="workspace-tabs"><button data-today-tab="today" class="${todayTab==='today'?'active':''}">Hoje</button><button data-today-tab="next" class="${todayTab==='next'?'active':''}">Próximas</button></div>`);$$('[data-today-tab]').forEach(b=>b.onclick=()=>{todayTab=b.dataset.todayTab;renderToday()});
+};
+renderCalendar=function(){
+ $('#admin-content').innerHTML=`<p class="workspace-summary">Selecione o imóvel para consultar as datas e a disponibilidade.</p><div class="workspace-cards">${state.properties.map(p=>`<button data-calendar-property="${p.id}">${p.cover_image?`<img src="${esc(p.cover_image)}" alt="">`:''}<strong>${esc(p.name)}</strong><span>${esc(p.code)} · ${p.active?'Ativo':'Pausado'}</span><span>Abrir calendário →</span></button>`).join('')}</div><button id="all-calendars" class="workspace-back">Ver agenda de todos os imóveis</button>`;
+ $$('[data-calendar-property]').forEach(b=>b.onclick=()=>openAvailability(Number(b.dataset.calendarProperty)));$('#all-calendars').onclick=legacyCalendar;
+};
+openProperty=function(id){
+ if(!id){legacyProperty(id);return}const p=prop(id);if(!p)return;
+ $('#admin-modal-content').innerHTML=`<button class="workspace-back" id="workspace-close">← Imóveis</button><div class="workspace-editor-head">${p.cover_image?`<img src="${esc(p.cover_image)}" alt="">`:''}<div><small>${esc(p.code)} · ${p.active?'ATIVO':'PAUSADO'}</small><h2>${esc(p.name)}</h2></div></div><p class="workspace-summary">Escolha um assunto para consultar ou editar.</p><div class="workspace-cards">${workspaceCard('space','Seu espaço',p.tagline||'Título, descrição e comodidades')}${workspaceCard('photos','Fotos',(p.gallery||[]).length+' imagens · capa e ordem')}${workspaceCard('availability','Disponibilidade','Calendário, regras de estadia e calendários conectados')}${workspaceCard('conditions','Preços e condições','Limpeza, garantia e parcelamento')}${workspaceCard('details','Dados do imóvel','Tipo, capacidade, horários e situação do anúncio')}</div>`;openModal();$('#workspace-close').onclick=closeModal;
+ $$('[data-workspace]').forEach(b=>b.onclick=async()=>{const key=b.dataset.workspace;if(key==='availability')return openAvailability(id);if(key==='space'){try{const d=await listingApi({action:'listings',operation:'list'});return ListingEditor.open({property:d.properties.find(x=>Number(x.id)===id),host:$('#admin-modal-content'),api:listingApi,onBack:()=>openProperty(id),onSaved:async()=>{await load(true);openProperty(id)}})}catch{$('#admin-modal-content').innerHTML='<p>Não foi possível carregar o imóvel. Feche e tente novamente.</p>';return}}
+ legacyProperty(id);const form=$('#property-form');const groups={photos:[],conditions:['cleaning_fee','guarantee_amount','max_installments','no_interest_installments','interest_payer'],details:['name','code','slug','property_type','max_guests','check_in_time','check_out_time','active']};form.querySelectorAll('label').forEach(l=>{const input=l.querySelector('input,select,textarea');if(input)l.hidden=!groups[key].includes(input.name)});form.querySelector('.property-media-editor').hidden=key!=='photos';$('#admin-modal-content h2').textContent={photos:'Fotos do imóvel',conditions:'Preços e condições',details:'Dados do imóvel'}[key];$('#admin-modal-content').insertAdjacentHTML('afterbegin','<button type="button" class="workspace-back" id="back-workspace">← '+esc(p.name)+'</button>');$('#back-workspace').onclick=()=>openProperty(id);
+ });
+};
+setupWorkspace();
 
 boot();
 })();
