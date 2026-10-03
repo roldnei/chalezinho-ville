@@ -1,7 +1,11 @@
 # Disponibilidade por imóvel — desenvolvimento
 
-Acessos: Calendário → Disponibilidade (na linha do imóvel), Imóveis →
-Disponibilidade, ou Links de calendários → selecionar imóvel → Configurar disponibilidade.
+Acesso principal: Imóveis → abrir imóvel → Disponibilidade.
+A seção reúne calendário mensal filtrado pelo imóvel, regras e calendários conectados.
+O calendário geral continua disponível como visão operacional, com atalho por imóvel.
+Antecedência: mesmo dia, 1, 2, 3, 7 dias. Preparação: nenhuma, 1 ou 2 noites.
+Horário de mesmo dia: seleção de horas. Valores antigos fora das opções são preservados.
+Não foi criado fluxo de pedidos sujeitos a aprovação para o mesmo dia.
 
 Regras em `properties.features.availability`, alteráveis somente por administrador,
 com validação no servidor, auditoria e controle de edição concorrente.

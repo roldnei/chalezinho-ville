@@ -1825,3 +1825,12 @@ footer{justify-content:space-between!important}
 @media(max-width:800px){.hero{--home-hero:url("assets/hero-signature-opt-w640.webp")}}
 
 .calendar-source-actions{display:flex;flex-wrap:wrap;gap:10px}.calendar-source-form{border-top:1px solid #594335;padding-top:20px;margin-top:25px}.admin-calendar-grid .calendar-event{height:40px!important;border-radius:5px!important;display:flex!important;flex-direction:column;align-items:flex-start!important;justify-content:center;gap:2px}.calendar-event .calendar-guest-phone{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;color:#fff}.admin-calendar-grid .calendar-track{min-height:150px}.calendar-event.ical,.calendar-legend .ical:before{background:#665397!important}
+
+/* Property availability: compact month view suitable for the admin modal. */
+.property-availability-entry{padding:18px;border:1px solid #8d74534d;border-radius:14px;margin:18px 0}
+.property-calendar-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:18px 0}
+.property-calendar-toolbar label{display:grid;gap:6px}.property-calendar-toolbar input{max-width:190px}
+.property-month-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:12px 0}.property-month-grid>strong{text-align:center;font-size:12px}
+.property-month-day{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0;min-height:58px;padding:6px 2px!important;border-radius:8px!important}.property-month-day small{font-size:9px;letter-spacing:0;text-transform:none}.property-month-day.occupied{background:#76293c!important;border-color:#ac5166!important;color:#fff}
+.property-calendar-source{display:flex;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid #8d74534d}.property-calendar-source span{font-size:12px}.property-calendar-source strong{overflow-wrap:anywhere}
+#property-calendar-connections{margin-top:28px}#property-availability-calendar{margin-bottom:26px}#property-day-detail{overflow-wrap:anywhere}

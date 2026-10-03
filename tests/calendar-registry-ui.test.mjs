@@ -19,7 +19,7 @@ test('registry creates, edits and deletes links and reloads calendar periods',as
  submit($('#choose-calendar-property'));await wait(()=>$('.calendar-source-form'));let f=$('.calendar-source-form');f.elements.label.value='New <unsafe>';f.elements.feed_url.value='https://example.com/new.ics';submit(f);await wait(()=>sources.length===26&&$('.calendar-source-form')!==f);assert.equal(loads,2);
  f=$('[data-source-id="new"]');f.elements.label.value='Edited QA';submit(f);await wait(()=>$('[data-source-id="new"]')!==f);assert.equal(loads,3);
  $('[data-close-modal]').click();$('#back-to-calendar').click();$('#calendar-month').value='2099-10';$('#calendar-month').dispatchEvent(new w.Event('change'));assert.match($('#admin-content').textContent,/Edited QA/);
- $('[data-view="calendar_links"]').click();await wait(()=>$('[data-calendar-manage]'));submit($('#choose-calendar-property'));await wait(()=>$('[data-source-id="new"]'));$('[data-source-id="new"] [data-delete-calendar]').click();await wait(()=>sources.length===25&&!$('[data-source-id="new"]'));assert.equal(loads,4);
+ $('#manage-calendar-links').click();await wait(()=>$('[data-calendar-manage]'));submit($('#choose-calendar-property'));await wait(()=>$('[data-source-id="new"]'));$('[data-source-id="new"] [data-delete-calendar]').click();await wait(()=>sources.length===25&&!$('[data-source-id="new"]'));assert.equal(loads,4);
  $('[data-close-modal]').click();$('#back-to-calendar').click();assert.doesNotMatch($('#admin-content').textContent,/Edited QA/);
  }finally{w.close()}
 });
