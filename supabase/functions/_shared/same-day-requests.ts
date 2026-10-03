@@ -10,8 +10,8 @@ export async function sameDayRequests(db:any,body:any,user:any,manager:boolean,c
   const rows=checked(await q);return {requests:rows.map((r:any)=>({...r,status:['pending','approved'].includes(r.status)&&!requestActive(r,now)?'expired':r.status}))};
  }
  if(op==='create'){
-  const input={property_id:Number(body.property_id),check_in:String(body.check_in||''),check_out:String(body.check_out||''),guests:Number(body.guests),guest_name:String(body.guest_name||'').trim(),guest_phone:String(body.guest_phone||'').trim(),note:String(body.note||'').trim()};
-  if(input.check_in!==brazilClock(now).date||!/^\d{4}-\d{2}-\d{2}$/.test(input.check_out)||!Number.isInteger(input.guests)||input.guests<1||input.guest_name.length<2||input.guest_name.length>160||!/^[+\d ()-]{8,30}$/.test(input.guest_phone)||input.note.length>1000)throw Error('invalid_request');
+  const input={property_id:Number(body.property_id),check_in:String(body.check_in||''),check_out:String(body.check_out||''),guests:Number(body.guests),guest_name:String(body.guest_name||'').trim(),guest_phone:String(body.guest_phone||'').trim(),estimated_arrival_time:String(body.estimated_arrival_time||'').trim(),note:String(body.note||'').trim()};
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(input.estimated_arrival_time)||input.check_in!==brazilClock(now).date||!/^\d{4}-\d{2}-\d{2}$/.test(input.check_out)||!Number.isInteger(input.guests)||input.guests<1||input.guest_name.length<2||input.guest_name.length>160||!/^[+\d ()-]{8,30}$/.test(input.guest_phone)||input.note.length>1000)throw Error('invalid_request');
   const existing=checked(await db.from('same_day_requests').select('*').eq('user_id',user.id).eq('property_id',input.property_id).eq('check_in',input.check_in).eq('check_out',input.check_out).maybeSingle());if(existing)return {request:existing};
   const {count,error}=await db.from('same_day_requests').select('id',{count:'exact',head:true}).eq('user_id',user.id).eq('check_in',input.check_in);if(error)throw Error('request_service_unavailable');if(count>=5)throw Error('request_limit');
   const p=await check(input);if(!p?.available||!p.same_day_approval_required)throw Error('dates_unavailable');
