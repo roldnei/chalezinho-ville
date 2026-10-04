@@ -251,11 +251,12 @@ async function serverUpsellPreview(){
  }
 }
 function paymentChoice(){
- return {method:document.querySelector('input[name="pay-method"]:checked')?.value||"pix",installments:Number($("#installments")?.value||1)};
+ return {method:document.querySelector('input[name="pay-method"]:checked')?.value||"pix",installments:Number($("#installments")?.value||0)};
 }
 async function maybeOfferUpsell(){
  if(!$("#accept-cancel")?.checked){setFlowError("Aceite a política de cancelamento para continuar.");return}
  const choice=paymentChoice();
+ if(choice.method==="card"&&(!choice.installments||$("#installments").disabled)){setFlowError("Escolha uma opção de parcelamento disponível para este cartão.");return}
  if(state.upsellHandled){await performStartPayment(choice);return}
  setFlowError("Verificando a melhor opção antes do pagamento…");
  let candidate=null;
@@ -381,6 +382,7 @@ function renderSummary(){
   pay.appendChild(card);
   const optionId=state.rate.quote_option_id;
   const refreshPlans=async()=>{
+    const previousInstallments=$("#installments").value;
     $("#installments").disabled=true;
     const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
     state.installmentQuote=null;
@@ -389,13 +391,17 @@ function renderSummary(){
       if(state.rate.quote_option_id!==optionId)return;
       state.installmentQuote={...quote,optionId,cardBin:bin};
       $("#installments").innerHTML=quote.plans.map(p=>`<option value="${p.installments}">${p.installments}x de ${brlC(p.installment_cents)} · total ${brlC(p.total_cents)} · ${p.interest_free?"sem juros":"com juros"}</option>`).join("");
+      if(previousInstallments){
+        if(quote.plans.some(p=>String(p.installments)===previousInstallments))$("#installments").value=previousInstallments;
+        else {$("#installments").insertAdjacentHTML("afterbegin",'<option value="">Escolha outra opção de parcelamento</option>');$("#installments").value=""}
+      }
       $("#installments").disabled=false;$("#installments").dispatchEvent(new Event("change"));
     }catch{$("#installment-total").textContent="Parcelas indisponíveis. Tente consultar novamente.";}
   };
   $("#installments").addEventListener("change",()=>{
     if(paymentChoice().method!=="card"){$("#installment-total").textContent="Total no Pix: "+brlC(total)+".";return;}
     const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
-    $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
+    $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Escolha uma opção de parcelamento disponível para este cartão.";
   });
   const retryPlans=document.createElement("button");retryPlans.type="button";retryPlans.textContent="Consultar parcelas novamente";retryPlans.onclick=refreshPlans;pay.insertBefore(retryPlans,card);
   if(enabled.card_enabled)refreshPlans();
