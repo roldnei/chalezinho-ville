@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),box=document.getElementById("callback-status");
+const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),box=document.getElementById("callback-status");
 const qs=new URLSearchParams(location.search),nextRaw=qs.get("next")||"conta.html";
 const safeNext=v=>{try{const u=new URL(v,location.origin);return u.origin===location.origin?(u.pathname+u.search+u.hash).replace(/^\//,""):"conta.html"}catch{return "conta.html"}};
 const next=safeNext(nextRaw);

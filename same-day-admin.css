@@ -1,0 +1,70 @@
+/* Request cards do not have the status-dot column used by notification rows. */
+#same-day-queue .notification-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid #684537;
+  border-radius: 8px;
+  margin-top: 12px;
+  white-space: normal;
+  line-height: 1.5;
+}
+#same-day-queue .notification-row > strong,
+#same-day-queue .notification-row > span {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#same-day-queue .notification-row > span { color: #d4c1b3; font-size: 14px; }
+#same-day-queue .notification-row:focus-visible { outline: 2px solid #e3b58e; outline-offset: 3px; }
+@media (max-width: 480px) {
+  #same-day-queue { padding: 12px; }
+  #same-day-queue h3 { font-size: 17px; line-height: 1.4; }
+}
+/* Same-day review dialog: touch-friendly controls on every screen size. */
+#admin-modal-content:has(#same-day-review-status) label {
+  display: grid;
+  gap: 8px;
+  margin: 22px 0 16px;
+  color: #d4c1b3;
+  font-size: 14px;
+}
+#same-day-decision-note {
+  display: block;
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid #76543e;
+  border-radius: 8px;
+  background: #241710;
+  color: #fff;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+}
+#approve-same-day, #reject-same-day {
+  display: block;
+  width: 100%;
+  min-height: 48px;
+  margin: 10px 0 0;
+  padding: 13px 16px;
+  border: 1px solid #cfaa82;
+  border-radius: 8px;
+  background: #cfaa82;
+  color: #21140e;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: normal;
+  cursor: pointer;
+}
+#reject-same-day { background: transparent; color: #eda89c; border-color: #8b4a3e; }
+#approve-same-day:disabled, #reject-same-day:disabled { opacity: .55; cursor: wait; }
+#same-day-decision-note:focus-visible, #approve-same-day:focus-visible, #reject-same-day:focus-visible { outline: 2px solid #f6ddbf; outline-offset: 3px; }
+#same-day-review-status { line-height: 1.5; overflow-wrap: anywhere; }

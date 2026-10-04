@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),ENGINE=C.bookingEngine;
+const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENGINE=C.bookingEngine;
 const pagbankSandbox=C.environment==="development";
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
@@ -29,6 +29,14 @@ async function guaranteeApi(action,body={}){const r=await fetch(C.guaranteeEngin
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
 const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
+setInterval(()=>{if(session&&!document.hidden)renderSameDayRequests()},30000);
+async function renderSameDayRequests(){
+ let host=$('#same-day-requests');if(!host){host=document.createElement('section');host.id='same-day-requests';host.className='account-section';$('.account-hero').after(host)}
+ try{const {requests}=await api('same_day_request',{operation:'list'});const labels={pending:'Aguardando aprovação',approved:'Aprovado — conclua o pagamento',rejected:'Pedido recusado',expired:'Pedido expirado',booked:'Reserva criada'};
+ host.innerHTML=`<h2>Pedidos de reserva para hoje</h2><button type="button" id="refresh-same-day">Atualizar pedidos</button>${requests.map(r=>`<article class="account-reservation"><h3>${esc(properties.find(p=>Number(p.id)===Number(r.property_id))?.name||'Imóvel')}</h3><p>${esc(r.check_in)} a ${esc(r.check_out)} · ${r.guests} hóspedes</p><p>Chegada prevista: ${r.estimated_arrival_time?esc(r.estimated_arrival_time):'Não informada'} · horário de Guarapari</p><strong>${labels[r.status]||esc(r.status)}</strong><p>${esc(r.decision_note||'')}</p>${r.status==='approved'?`<p>Conclua até ${fmtDateTime(r.expires_at)}. Valores e disponibilidade serão consultados novamente.</p><a class="primary-action" href="reservar.html?approved_request=${encodeURIComponent(r.id)}&pagbank=sandbox">Escolher tarifa e pagar</a>`:''}</article>`).join('')||'<p>Nenhum pedido enviado.</p>'}`;$('#refresh-same-day').onclick=renderSameDayRequests;
+ }catch{host.innerHTML='<p>Não foi possível consultar seus pedidos. Atualize a página.</p>'}
+}
+
 async function boot({afterRefundRefresh=false}={}){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
  $("#account-email").textContent=session.user.email||"";
@@ -46,7 +54,7 @@ async function boot({afterRefundRefresh=false}={}){
  if(profile?.role==="admin"){$("#ops-link").hidden=false;$("#experience-admin-link").hidden=false}
  renderExperienceCart(reservationsCache);
  renderPendingPayments(reservationsCache);
- renderReservations(reservationsCache);
+ renderReservations(reservationsCache);renderSameDayRequests();
  showRefundStatuses(reservationsCache,!afterRefundRefresh);
  showCancellationRequests(reservationsCache);
  const requestedCharge=new URLSearchParams(location.search).get("charge");
@@ -135,7 +143,7 @@ async function checkoutCartItem(id,btn){
   const d=await api("checkout_experience_cart_item",{cart_item_id:id});
   cartItems=cartItems.filter(x=>String(x.id)!==String(id));
   const charge={...d.charge,reservation_id:item?.reservation_id};charges.unshift(charge);
-  renderExperienceCart(reservationsCache);renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+  renderExperienceCart(reservationsCache);renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
   openChargePayment(charge);
  }catch(e){btn.disabled=false;alert(e.message==="experience_payment_already_pending"?"Já existe um pagamento pendente para esta categoria.":"Não foi possível iniciar o pagamento agora.")}
 }
@@ -492,7 +500,7 @@ async function startChargePayment(){
    activeCharge.status="processing";
    activeCharge.payment_id=d.payment?.id||activeCharge.payment_id||null;
    activeCharge.payments={...(activeCharge.payments||{}),status:d.payment?.status||"pending",method:d.payment?.method||method,installments:d.payment?.installments||installments};
-   renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+   renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
   }
   $("#post-payment-message").textContent="";
   renderPostBookingPagBankPayment(d.payment);
@@ -504,6 +512,7 @@ async function startChargePayment(){
 }
 function renderPostBookingPagBankPayment(payment){
  const box=$("#post-payment-sim");
+ const isModification=activeCharge?.kind==="modification";
  box.innerHTML='<div class="post-charge-summary"><span>PagBank sandbox · '+(payment.method==="card"?"Cartão":"Pix")+'</span><strong>'+brlC(payment.amount_cents||activeCharge?.amount_cents)+'</strong></div>'+
   (payment.pix_code?'<p>Pix copia e cola de teste:</p><textarea readonly aria-label="Pix copia e cola">'+esc(payment.pix_code)+'</textarea>':'')+
   '<p id="post-sandbox-status" role="status">Consultando a cobrança no PagBank…</p>';
@@ -522,10 +531,10 @@ function renderPostBookingPagBankPayment(payment){
   const s=await api("pagbank_sandbox_status",{payment_id:payment.id});
   failures=0;
   const status=$("#post-sandbox-status");if(!status)return;
-  if(s.manual_review){finish("Pagamento recebido, mas a experiência requer conferência manual. Não pague novamente.");return}
-  if(s.charge_status==="applied"){finish("Pagamento aprovado pelo PagBank. Experiência incluída na reserva.");return}
+  if(s.manual_review){finish("Pagamento recebido, mas "+(isModification?"a alteração":"a experiência")+" requer conferência manual. Não pague novamente.");return}
+  if(s.charge_status==="applied"){finish(isModification?"Pagamento aprovado pelo PagBank. Alteração aplicada à reserva.":"Pagamento aprovado pelo PagBank. Experiência incluída na reserva.");return}
   if(["refused","cancelled","expired"].includes(s.payment_status)){
-   finish("Pagamento recusado ou encerrado pelo PagBank. A experiência não foi incluída. Se o prazo estiver aberto, você poderá tentar novamente em Minhas Reservas.");return;
+   finish("Pagamento recusado ou encerrado pelo PagBank. "+(isModification?"A alteração não foi aplicada.":"A experiência não foi incluída.")+" Se o prazo estiver aberto, você poderá tentar novamente em Minhas Reservas.");return;
   }
   status.textContent=s.payment_status==="under_review"?"Pagamento em análise no PagBank. Aguarde a confirmação.":"Aguardando confirmação do PagBank…";
  }catch{
@@ -552,7 +561,7 @@ async function handlePostPaymentOutcome(paymentId,outcome,box){
    if(activeCharge){
     activeCharge.status=d.charge_status||"processing";
     activeCharge.payments={...(activeCharge.payments||{}),status:"under_review"};
-    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);
+    renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
    }
    $("#post-payment-message").textContent="Pagamento em análise. A alteração/experiência ainda não foi aplicada.";
    box.querySelectorAll("button").forEach(b=>b.disabled=b.dataset.postOutcome==="under_review");
@@ -608,11 +617,12 @@ function renderGuarantee(g,r){
 function openGuaranteeCard(id){
  const r=reservationsCache.find(r=>(r.guarantees||[]).some(g=>g.id===id)),g=r?.guarantees.find(g=>g.id===id);if(!g)return;
  const modal=document.createElement("div");modal.className="booking-modal";modal.setAttribute("role","dialog");modal.setAttribute("aria-modal","true");modal.setAttribute("aria-label","Atualizar cartão da caução");
- modal.innerHTML='<div class="booking-panel post-payment-panel"><button type="button" class="modal-close" aria-label="Fechar">×</button><small>CAUÇÃO · '+esc(r.confirmation_code)+'</small><h2>Atualizar cartão</h2><p>Valor da caução: '+brlC(g.amount_cents)+'. O PagBank guarda o cartão. O site guarda apenas um token vinculado a esta reserva.</p><form class="account-form"><label>Nome no cartão<input name="holder" autocomplete="cc-name" required></label><label>Número do cartão<input name="number" inputmode="numeric" autocomplete="cc-number" required></label><label>Mês<input name="month" inputmode="numeric" autocomplete="cc-exp-month" maxlength="2" required></label><label>Ano<input name="year" inputmode="numeric" autocomplete="cc-exp-year" maxlength="4" required></label><label>Código de segurança<input name="cvv" type="password" inputmode="numeric" autocomplete="cc-csc" maxlength="4" required></label><label><input name="consent" type="checkbox" required> Autorizo o uso deste cartão exclusivamente para a caução desta reserva e eventuais danos comprovados.</label><label><input name="renewal" type="checkbox"> Autorizo renovações durante esta estadia. Entendo que duas autorizações podem bloquear temporariamente até '+brlC(Number(g.amount_cents)*2)+' do limite, até a confirmação da liberação anterior.</label><p>Uma autorização já ativa continua válida. A troca será usada na próxima solicitação necessária.</p><p class="form-result" role="status"></p><button class="primary-action" type="submit">Salvar cartão da caução</button></form></div>';
+ modal.innerHTML='<div class="booking-panel post-payment-panel"><button type="button" class="modal-close" aria-label="Fechar">×</button><small>CAUÇÃO · '+esc(r.confirmation_code)+'</small><h2>Atualizar cartão</h2><p>Valor da caução: '+brlC(g.amount_cents)+'. O PagBank guarda o cartão. O site guarda apenas um token vinculado a esta reserva.</p><form class="account-form"><label>Nome no cartão<input name="holder" autocomplete="cc-name" required></label><label>Número do cartão<input name="number" inputmode="numeric" autocomplete="cc-number" required></label><label>Mês<input name="month" inputmode="numeric" autocomplete="cc-exp-month" maxlength="2" required></label><label>Ano<input name="year" inputmode="numeric" autocomplete="cc-exp-year" maxlength="4" required></label><label>Código de segurança<input name="cvv" type="password" inputmode="numeric" autocomplete="cc-csc" maxlength="4" required></label><label><input name="consent" type="checkbox" required> Autorizo o uso deste cartão exclusivamente para a caução desta reserva e eventuais danos comprovados.</label><label><input name="renewal" type="checkbox" required> Autorizo renovações durante esta estadia. Entendo que duas autorizações podem bloquear temporariamente até '+brlC(Number(g.amount_cents)*2)+' do limite, até a confirmação da liberação anterior.</label><p>Uma autorização já ativa continua válida. A troca será usada na próxima solicitação necessária.</p><p class="form-result" role="status"></p><button class="primary-action" type="submit">Salvar cartão da caução</button></form></div>';
  document.body.appendChild(modal);modal.querySelector('.modal-close').onclick=()=>modal.remove();
  const form=modal.querySelector('form'),fields=form.elements;fields.holder.value=profile?.full_name||"";fields.holder.focus();
  form.onsubmit=async e=>{e.preventDefault();const btn=form.querySelector('button'),message=form.querySelector('.form-result');btn.disabled=true;message.textContent="Validando cartão com o PagBank…";
   try{
+   if(!fields.consent.checked||!fields.renewal.checked){message.textContent="Aceite a garantia e a renovação automática para atualizar o cartão.";btn.disabled=false;return}
    const key=await api("pagbank_sandbox_card_key");await loadPagBankCardSdk();
    const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:fields.holder.value.trim(),number:fields.number.value.replace(/\D/g,""),expMonth:fields.month.value,expYear:fields.year.value,securityCode:fields.cvv.value});
    if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_card");

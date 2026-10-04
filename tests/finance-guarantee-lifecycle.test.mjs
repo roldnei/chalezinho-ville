@@ -9,6 +9,7 @@ const one=async(sql,args=[]) => (await db.query(sql,args)).rows[0];
 before(async()=>{
  db=await creditDatabase();
  await db.exec(`
+ set timezone='America/Sao_Paulo';
  create table properties(id bigint primary key,guarantee_amount_cents bigint default 50000,check_in_time time default '15:00',check_out_time time default '11:00',timezone text default 'America/Sao_Paulo');
  insert into properties(id) values(1);
  alter table reservations add user_id uuid,add property_id bigint default 1,add check_out date,add operational_status text;

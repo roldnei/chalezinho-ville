@@ -6,11 +6,13 @@
   <meta name="robots" content="noindex,nofollow">
   <meta name="theme-color" content="#0e0b09">
   <title>Central de Operações | Chalezinho Ville</title>
-  <link rel="stylesheet" href="styles.css?v=157">
+  <link rel="stylesheet" href="styles.css?v=propertyavailability2">
+  <link rel="stylesheet" href="same-day-admin.css?v=2">
+  <link rel="stylesheet" href="admin-workspace.css?v=property-mobile3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
-<script src="image-manifest.js?v=1"></script><script src="responsive-images.js?v=1"></script></head>
+<script src="image-manifest.js?v=1"></script><script src="responsive-images.js?v=1"></script><link rel="stylesheet" href="amenities.css?v=3"><script src="amenities.js?v=review2"></script></head>
 <body class="admin-body">
   <div id="admin-app" class="admin-app" aria-busy="true">
     <aside class="admin-sidebar">
@@ -20,6 +22,7 @@
         <button data-view="today" class="active"><span>Hoje</span><strong id="nav-today-count">0</strong></button>
         <button data-view="calendar"><span>Calendário</span></button>
         <button data-view="reservations"><span>Reservas</span></button>
+        <button data-view="guests"><span>Hóspedes</span></button>
         <button data-view="notifications"><span>Notificações</span><strong id="nav-alert-count">0</strong></button>
         <button data-view="changes"><span>Alterações</span></button>
         <button data-view="access"><span>Acessos</span></button>
@@ -40,7 +43,7 @@
         <div><small id="admin-context">OPERAÇÃO DE HOJE</small><h1 id="admin-title">Visão geral</h1></div>
         <div class="admin-top-actions">
           <button id="admin-refresh" type="button">Atualizar</button>
-          <button id="admin-notification-shortcut" type="button">Avisos <strong id="top-alert-count">0</strong></button>
+          <button id="admin-notification-shortcut" type="button">Notificações <strong id="top-alert-count">0</strong></button>
         </div>
       </header>
       <section id="admin-loading" class="admin-loading">Carregando a operação…</section>
@@ -65,7 +68,8 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="app-config.js?v=153"></script>
-  <script src="admin.js?v=access2"></script>
+  <script src="app-config.js?v=review2"></script>
+  <script src="listing-editor.js?v=review2"></script>
+  <script src="admin.js?v=property-mobile3"></script>
 </body>
 </html>

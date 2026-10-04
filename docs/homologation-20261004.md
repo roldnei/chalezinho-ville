@@ -1,0 +1,71 @@
+# Homologação consolidada — 04/10/2026
+
+Escopo: desenvolvimento, Fase 1/PMS, PagBank sandbox, excluindo execução de estornos. Supabase `pxfqmnhqodqyaaqeyjgr`; branch `feature/guest-directory`. Nenhuma promoção ou alteração em produção. Nenhuma cobrança real.
+
+## Atualização documental — 04/10/2026, após investigação solicitada pelo proprietário
+
+Foi localizada evidência oficial antes ausente da análise: o README do módulo de checkout transparente PagBank/PrestaShop explica que, numa pré-autorização de R$ 1.000 com captura de R$ 800, os R$ 200 restantes voltam automaticamente ao limite. Fonte: https://github.com/pagseguro/pagseguro-modulo-prestashop (seção 5, tipo de captura manual).
+
+A FAQ do PagBank também informa que não é necessário cancelar a diferença e menciona até 24 horas para o emissor restabelecer o limite; essa FAQ está na categoria de maquininhas, portanto seu prazo não foi adotado como SLA da API do site: https://faq.pagbank.com.br/duvida/como-funciona-a-pre-autorizacao-quando-o-valor-confirmado-for-inferior-ao-valor-reservado/1366
+
+Na reserva de teste 57BBF31A42, o registro consultado continua com autorização de R$ 500, captura de R$ 180 e nenhuma confirmação individual de liberação. O campo release_confirmed é controle interno do PMS, não evidência de que R$ 320 continuam bloqueados no emissor.
+
+**Revisão do parecer anterior:** a liberação automática do residual possui respaldo documental oficial. O comportamento observado no sandbox é compatível com essa regra. A ausência de extrato de limite de um cartão fictício é uma limitação de evidência do ensaio, não uma falha comprovada nem justificativa para executar estorno. Não foi comprovado um crédito real de R$ 320 em um cartão específico; não foi alterado o histórico financeiro para simular essa confirmação. Esta atualização substitui a afirmação anterior de ausência de orientação do PagBank, sem certificar produção ou estornos.
+
+## Parecer original (ler com a atualização acima)
+
+Rodada de execução e revisão encerrada, com **ressalva impeditiva para declarar aprovação integral da caução**: o PagBank não fornece comprovação da liberação dos R$ 320 restantes após captura parcial de R$ 180. A consulta foi repetida no PMS em 04/10 e continuou sem confirmação. Não se trata do estorno excluído pelo proprietário. Os demais resultados abaixo possuem evidências especificadas; testes automatizados e evidências históricas não são apresentados como novos testes de navegador.
+
+## Correções publicadas nesta rodada
+
+- Login: bloqueio do envio HTML nativo que apagava os campos e navegava para `auth.html?`; envio só habilitado depois da inicialização, erro explícito se dependências não carregarem. Login manual posterior funcionou e a sessão persistiu entre conta, reservas e administração. A causa de falhas de rede anteriores não foi comprovada.
+- Parcelamento: atualização da cotação pelo BIN preserva 6x selecionado quando permitido; se a opção deixar de existir, exige nova escolha explícita, sem mudar silenciosamente para 1x.
+- Confirmação de cobrança adicional distingue alteração de reserva de experiência.
+- Lembrete pré-estadia: mensagens ainda na fila acompanham datas, imóvel, horário de check-in e fuso. Mensagens entregues/em processamento não são reescritas nem duplicadas. Migração `20261004141000_reschedule_pre_stay_notification.sql` aplicada somente em DEV; lembrete da reserva de ensaio corrigido para 16/11, 15h BRT, referente à chegada em 17/11.
+- Regressão de contatos atualizada para a navegação atual: evento → detalhes → contato.
+
+## Evidências atuais
+
+| Área | Resultado e limite |
+|---|---|
+| Regressão | **220/220 testes** aprovados, nenhum ignorado. Sintaxe dos três frontends e TypeScript dos três módulos financeiros aprovados. |
+| Login/sessão | Login manual confirmado pelo proprietário, navegação autenticada e recarga sem novo login. Testes cobrem armazenamento persistente/temporário, erro de rede e envio duplicado. Não representa semanas de sessão transcorridas. |
+| Cadastro | CH2 aberto, campos carregados e salvamento sem alteração concluído. Cabeçalho/voltar e ações do formulário revisados. |
+| Calendário | Multicalendário abre por Calendário; mês/semana, filtro por imóvel e disponibilidade por imóvel presentes. Seis fontes iCal ativas e sem último erro na consulta registrada. |
+| Hospedagem com cartão | **AB3F33E60F**, CH2, 16–18/11, R$ 1.452,80, **6x**, pagamento `paid` do PagBank sandbox e reserva confirmada. Escolha 6x preservada após preenchimento do cartão. |
+| Alteração de datas | Hóspede pediu 17–19/11; administrador aprovou R$ 50,40. Reserva original permaneceu 16–18 enquanto aguardava pagamento. |
+| Pix complementar | R$ 50,40 `paid` pelo sandbox; só então datas 17–19/11 aplicadas. Conta mostra total R$ 1.503,20, recebidos R$ 1.503,20, saldo R$ 0,00 e histórico do adicional. |
+| E-mails | `payment_awaiting`, `payment_paid`, `reservation_confirmed`, `modification_requested`, `modification_payment_required` e `modification_confirmed` com entrega registrada, uma tentativa, sem erro. Lembrete futuro permanece corretamente na fila. Não prova leitura pelo destinatário. |
+| Mesmo dia | Pedido anterior aprovado com chegada 18:30; avisos de solicitação e decisão entregues em 03/10. Em 04/10 a conta exibe sua expiração corretamente; não foi criada nova reserva para hoje. |
+| Renovação da garantia | **5F7627F740**: renovação automática em 02/10 às 11:15 BRT, R$ 500, validade até 07/10 às 11:15; cobre saída em 05/10. Autorização anterior liberada depois da nova. Consulta ao PagBank feita no PMS em 04/10. |
+| Captura parcial | **57BBF31A42**: R$ 500 autorizados, R$ 180 capturados, R$ 320 não capturados. Consulta em 04/10 permanece com `release_confirmed=false`. Interface informa “Aguardando comprovação do provedor”. |
+| Agendamentos | Quatro jobs: 288/288/288/1440 execuções bem-sucedidas nas 24h consultadas; 72 respostas HTTP 200, sem timeout, na hora consultada. |
+| RLS | Nenhuma tabela pública sem RLS na consulta desta rodada. Isso isoladamente não comprova isolamento entre contas. Evidências remotas de papéis abaixo. |
+
+## Evidências anteriores reaproveitadas
+
+`docs/phase1-isolated-homologation-20260929.md` e `docs/finance/homologation-live-20260929.md` registram testes no mesmo DEV: experiência adicional e upgrade pagos no sandbox; alteração gratuita, cancelamento de pedido, expiração e idempotência; checklist, vistoria, prontidão, check-in/out e auditoria; acesso de gerente restrito por imóvel e 403 para gestão de equipe; administrador suspenso recusado; webhooks e destinatário de e-mail de teste. Os produtos de ensaio foram restaurados a rascunho/arquivados, explicando ausência de ofertas no checkout atual. Não foram reativados nesta rodada.
+
+Cadastro de comodidades, destaque de oito itens, busca, ícones, escopo por imóvel, operação e papéis também fazem parte da regressão atual. A suíte não equivale a uma revisão visual de todas as telas/dispositivos ou novo ensaio remoto com cada perfil.
+
+## Limites explícitos
+
+- Estornos não foram executados nesta rodada, conforme instrução do proprietário. Pendências de testes antigos preservadas.
+- Para fechar caução integralmente, obter orientação/evidência do PagBank para desautorização do restante após captura parcial; pergunta e identificadores em `docs/finance/guarantee-renewal-live-20260929.md`. Não realizar cancelamento de R$ 320 sem saber se a operação estorna o montante capturado.
+- iCal não é inventário transacional compartilhado. Há janela entre alterações externas e sincronização; não garante ausência de reservas simultâneas em plataformas diferentes.
+- E-mail foi validado. Esta rodada não certifica entrega automática via WhatsApp nem chat próprio.
+- Preview/sandbox não é autorização de produção. Credenciais de e-mail de ensaio têm vencimento documentado em 29/10/2026; revisão para produção é separada.
+
+## Rastreabilidade e reversão
+
+Correções de login: `68857ee7526e96b6c8be05353056a880660bd21f`. Parcelamento: `774ae4ed3aa2b0f8e8c32c6c438c96bf47b43d7e`. Este documento acompanha o commit de fechamento com texto de pagamento, migração e teste de reagendamento. Preservados históricos e reservas de ensaio.
+
+Se o último frontend apresentar regressão, republicar o preview de `774ae4e`, mantendo correção do login/parcelamento. A migração nova é aditiva: eventual reversão remove somente seu trigger/função; não desfaz mensagens já entregues nem pagamentos. Não executar reversão automaticamente sem falha comprovada.
+
+## Regra solicitada em 04/10: aceites obrigatórios
+
+Novas reservas exigem aceite explícito da garantia e de suas renovações quando há caução, além da política de cancelamento, termos de hospedagem, regras e ciência da política de privacidade. Checkboxes começam desmarcados. Servidor rejeita ausência, valores que não sejam boolean true e versões/documentos incorretos antes de tokenização/hold/pagamento. Versões são registradas na reserva. Troca de cartão também exige aceite da renovação. Nenhum consentimento antigo foi criado ou alterado.
+
+Os documentos gerais existentes ainda são rascunhos sem texto final, identificados no checkout de desenvolvimento. A implementação do bloqueio não constitui aprovação do conteúdo para produção. Produção exige documentos ativos; drafts só são selecionados em DEV.
+
+Validação: 224 testes aprovados, sintaxe e TypeScript aprovados. Testes incluem cada aceite ausente, falsos booleanos, documentos incompletos e rejeição antes de iniciar pagamento no checkout. Ajustada somente a fixture de datas dos testes de check-in para o fuso do imóvel, pois o fuso do executor avançava o dia antes de Guarapari. Backend DEV booking-engine v38 e guarantee-preview v15.

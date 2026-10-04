@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,ENGINE=C.bookingEngine,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey);
+const C=window.CHALEZINHO_CONFIG,ENGINE=C.bookingEngine,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -48,7 +48,7 @@ async function init(){
  $("#step-next").addEventListener("click",next);
  await initChaletFilter();
  renderDevBanner();
- await restoreResume();
+ await restoreResume();await restoreSameDay();
 }
 async function initChaletFilter(){
  const select=$("#book-chalet"),requested=new URLSearchParams(location.search).get("chalet")||"";
@@ -116,18 +116,34 @@ function renderResults(list){
  if(!list.length)box.innerHTML='<p>Este chalé não está disponível para consulta. Selecione “Todos os chalés” para ver outras opções.</p>';
  list.forEach(p=>{
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
-  const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+esc(x)+"</span>").join("");
-  const status=p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível";
+  const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+(window.VilleAmenities?.icon(x)||"")+esc(x)+"</span>").join("");
+  const availabilityMessages={maximum_stay:"Estadia acima do máximo permitido",advance_notice:"Antecedência mínima não atendida",same_day_cutoff:"Horário limite para hoje encerrado",availability_window:"Fora do período disponível",checkin_day:"Check-in não permitido neste dia",checkout_day:"Checkout não permitido neste dia",past_date:"Data de entrada já passou"};
+  const status=p.requestable?"Sujeito à aprovação":availabilityMessages[p.unavailable_reason]||(p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível");
   const minNotice=p.unavailable_reason==="minimum_stay"?'<div class="minimum-stay-alert"><small>MÍNIMO DE ESTADIA</small><strong>'+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'</strong><span>Para estas datas, este chalé exige no mínimo '+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'.</span></div>':"";
   const total=p.from_stay_price!=null?Number(p.from_stay_price):null;
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
   const price=p.available?'<small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">pacote · '+perNight+' por noite</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
-  a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(String(p.property_type).toUpperCase())+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available?"":"disabled")+' data-id="'+p.id+'">'+(p.available?"Ver tarifas":"Indisponível")+'</button></div>';
+  a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(String(p.property_type).toUpperCase())+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available||p.requestable?"":"disabled")+' data-id="'+p.id+'">'+(p.requestable?"Pedir aprovação":p.available?"Ver tarifas":"Indisponível")+'</button></div>';
   VilleImages.set(a.querySelector(".booking-gallery img"),p.cover_image,{sizes:"(max-width: 800px) 100vw, 240px"});
   box.appendChild(a);
  });
- box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>openFlow(Number(b.dataset.id))));
+ box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",()=>{const p=state.search.find(x=>x.id===Number(b.dataset.id));return p?.requestable?openSameDayRequest(p.id):openFlow(Number(b.dataset.id))}));
  $("#booking-results").scrollIntoView({behavior:"smooth"});
+}
+
+async function openSameDayRequest(propertyId){
+ const p=state.search.find(x=>Number(x.id)===propertyId);if(!p)return;
+ if(!state.session){const ret=new URLSearchParams({request_property:String(propertyId),check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value});location.href='auth.html?mode=login&return='+encodeURIComponent('reservar.html?'+ret);return}
+ let dialog=$('#same-day-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='same-day-dialog';dialog.className='same-day-dialog';document.body.appendChild(dialog)}
+ dialog.innerHTML=`<h2>Pedido de reserva para hoje</h2><p>${esc(p.name)} · ${esc($('#book-in').value)} a ${esc($('#book-out').value)}</p><p><strong>Este pedido passará por aprovação.</strong> Nenhuma cobrança será feita agora. Após a aprovação, você deverá escolher a tarifa e pagar para confirmar. As datas não ficam garantidas enquanto o pagamento não for iniciado.</p><form id="same-day-form"><label>Nome<input name="guest_name" required minlength="2" maxlength="160" autocomplete="name"></label><label>Telefone<input name="guest_phone" required minlength="8" maxlength="30" autocomplete="tel"></label><label>Horário previsto de chegada<input name="estimated_arrival_time" type="time" required></label><p>Informe o horário local de Guarapari. A previsão será analisada junto com seu pedido.</p><label>Mensagem (opcional)<textarea name="note" maxlength="1000"></textarea></label><p id="same-day-message" role="status"></p><button type="submit">Enviar pedido para aprovação</button><button type="button" id="close-same-day">Voltar</button></form>`;
+ dialog.showModal();$('#close-same-day').onclick=()=>dialog.close();$('#same-day-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,b=f.querySelector('[type=submit]');b.disabled=true;
+ try{await api('same_day_request',{operation:'create',property_id:propertyId,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:Number($('#book-guests').value),guest_name:f.elements.guest_name.value,guest_phone:f.elements.guest_phone.value,estimated_arrival_time:f.elements.estimated_arrival_time.value,note:f.elements.note.value});dialog.innerHTML='<h2>Pedido recebido</h2><p>A equipe foi avisada com prioridade. Acompanhe a aprovação em Minhas reservas.</p><a class="primary-action" href="conta.html">Acompanhar pedido</a><button id="close-same-day" type="button">Fechar</button>';$('#close-same-day').onclick=()=>dialog.close()}
+ catch(e){$('#same-day-message').textContent=e.message==='dates_unavailable'?'Estas datas não estão mais disponíveis para pedido. Consulte novamente.':'Não foi possível enviar o pedido. Confira os dados e tente novamente.';b.disabled=false}};
+}
+async function restoreSameDay(){
+ const q=new URLSearchParams(location.search),id=q.get('approved_request');
+ if(id){try{const {request:r}=await api('same_day_request',{operation:'get',id});if(r.status!=='approved')throw Error('expired');state.approvedRequest=r.id;$('#book-in').value=r.check_in;$('#book-out').value=r.check_out;$('#book-guests').value=r.guests;await search();await openFlow(Number(r.property_id))}catch{error('Este pedido não está aprovado ou expirou. Consulte Minhas reservas.')}return}
+ if(q.has('request_property')){$('#book-in').value=q.get('check_in')||'';$('#book-out').value=q.get('check_out')||'';$('#book-guests').value=q.get('guests')||'2';await search();if(state.search.some(p=>p.requestable&&p.id===Number(q.get('request_property'))))openSameDayRequest(Number(q.get('request_property')))}
 }
 
 async function openFlow(id){
@@ -152,7 +168,7 @@ function showStep(n){
 }
 async function generateQuote(withExperiences){
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
- const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen});
+ const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen,same_day_request_id:state.approvedRequest||undefined});
  q.selected_variant_ids=chosen.map(String).sort();state.quote=q;startCountdown(q.expires_at);return q;
 }
 function renderRates(){
@@ -235,11 +251,13 @@ async function serverUpsellPreview(){
  }
 }
 function paymentChoice(){
- return {method:document.querySelector('input[name="pay-method"]:checked')?.value||"pix",installments:Number($("#installments")?.value||1)};
+ return {method:document.querySelector('input[name="pay-method"]:checked')?.value||"pix",installments:Number($("#installments")?.value||0)};
 }
 async function maybeOfferUpsell(){
- if(!$("#accept-cancel")?.checked){setFlowError("Aceite a política de cancelamento para continuar.");return}
+ if(!$("#accept-cancel")?.checked||!$("#accept-terms")?.checked){setFlowError("Aceite os termos e a política de cancelamento para continuar.");return}
+ if(Number(state.property?.guarantee_amount_cents||0)>0&&(!$("#guarantee-card-consent")?.checked||!$("#guarantee-renewal-consent")?.checked)){setFlowError("O aceite da garantia e da renovação automática é obrigatório para reservar.");return}
  const choice=paymentChoice();
+ if(choice.method==="card"&&(!choice.installments||$("#installments").disabled)){setFlowError("Escolha uma opção de parcelamento disponível para este cartão.");return}
  if(state.upsellHandled){await performStartPayment(choice);return}
  setFlowError("Verificando a melhor opção antes do pagamento…");
  let candidate=null;
@@ -344,9 +362,11 @@ function renderSummary(){
  const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(e.price_cents)+'</strong></div>').join("");
  $("#summary-content").innerHTML='<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div>'+expRows+'<div class="summary-total"><span>TOTAL DA RESERVA</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+state.rate.name+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
  const guarantee=Number(state.property.guarantee_amount_cents||0);
- $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · PAGBANK SANDBOX</small><h4>'+brlC(guarantee)+'</h4><p>Informe o cartão neste pagamento para a caução. O PagBank guarda os dados do cartão; o site guarda apenas um token vinculado à reserva. A pré-autorização será solicitada perto do check-in e reservará temporariamente '+brlC(guarantee)+' do limite, sem cobrança. Uma ocorrência comprovada poderá gerar captura parcial; sem dano, a autorização será liberada. Em estadias longas, cada autorização tem prazo próprio. A renovação abaixo é opcional e pode bloquear temporariamente até duas vezes o valor da caução, até a liberação da autorização anterior.</p><label><input id="guarantee-card-consent" type="checkbox"> Autorizo o uso deste cartão exclusivamente para a caução desta reserva, conforme as regras acima.</label><label><input id="guarantee-renewal-consent" type="checkbox"> Autorizo renovações da caução durante esta estadia. Estou ciente da possível sobreposição temporária dos limites bloqueados.</label></div>':"";
+ $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · PAGBANK SANDBOX</small><h4>'+brlC(guarantee)+'</h4><p>Informe o cartão neste pagamento para a caução. O PagBank guarda os dados do cartão; o site guarda apenas um token vinculado à reserva. A pré-autorização será solicitada perto do check-in e reservará temporariamente '+brlC(guarantee)+' do limite, sem cobrança. Uma ocorrência comprovada poderá gerar captura parcial; sem dano, a autorização será liberada. Em estadias longas, cada autorização tem prazo próprio. O aceite da garantia e de suas renovações é obrigatório para reservar. A renovação pode bloquear temporariamente até duas vezes o valor da caução, até a liberação da autorização anterior.</p><label><input id="guarantee-card-consent" type="checkbox" required> Autorizo o uso deste cartão exclusivamente para a caução desta reserva, conforme as regras acima.</label><label><input id="guarantee-renewal-consent" type="checkbox" required> Autorizo renovações da caução durante esta estadia. Estou ciente da possível sobreposição temporária dos limites bloqueados.</label></div>':"";
  const doc=state.rate.cancellation_policy;
  const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
+ const requiredDocs=state.config.required_booking_documents||[];
+ pol.insertAdjacentHTML("beforeend",requiredDocs.map(d=>'<details class="policy-document"><summary>'+esc(d.title)+' · versão '+esc(d.version)+'</summary><p>'+esc(d.body)+'</p></details>').join('')+'<label class="accept-line"><input id="accept-terms" type="checkbox" required><span>Li e aceito os termos de hospedagem e as regras apresentados, e estou ciente da política de privacidade.</span></label>');
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
  const pay=$("#payment-options"),terms=state.property.features?.payment_terms||{max_installments:12,no_interest_installments:6};
  const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
@@ -365,6 +385,7 @@ function renderSummary(){
   pay.appendChild(card);
   const optionId=state.rate.quote_option_id;
   const refreshPlans=async()=>{
+    const previousInstallments=$("#installments").value;
     $("#installments").disabled=true;
     const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
     state.installmentQuote=null;
@@ -373,13 +394,17 @@ function renderSummary(){
       if(state.rate.quote_option_id!==optionId)return;
       state.installmentQuote={...quote,optionId,cardBin:bin};
       $("#installments").innerHTML=quote.plans.map(p=>`<option value="${p.installments}">${p.installments}x de ${brlC(p.installment_cents)} · total ${brlC(p.total_cents)} · ${p.interest_free?"sem juros":"com juros"}</option>`).join("");
+      if(previousInstallments){
+        if(quote.plans.some(p=>String(p.installments)===previousInstallments))$("#installments").value=previousInstallments;
+        else {$("#installments").insertAdjacentHTML("afterbegin",'<option value="">Escolha outra opção de parcelamento</option>');$("#installments").value=""}
+      }
       $("#installments").disabled=false;$("#installments").dispatchEvent(new Event("change"));
     }catch{$("#installment-total").textContent="Parcelas indisponíveis. Tente consultar novamente.";}
   };
   $("#installments").addEventListener("change",()=>{
     if(paymentChoice().method!=="card"){$("#installment-total").textContent="Total no Pix: "+brlC(total)+".";return;}
     const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
-    $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Consultando parcelas…";
+    $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Escolha uma opção de parcelamento disponível para este cartão.";
   });
   const retryPlans=document.createElement("button");retryPlans.type="button";retryPlans.textContent="Consultar parcelas novamente";retryPlans.onclick=refreshPlans;pay.insertBefore(retryPlans,card);
   if(enabled.card_enabled)refreshPlans();
@@ -426,10 +451,11 @@ async function performStartPayment(choice){
   const plan=quoted?.plans.find(p=>p.installments===installments);
   if(method==="card"&&(!plan||!quoted.offer_id||quoted.optionId!==state.rate.quote_option_id||quoted.cardBin!==credit_card_bin))
     throw new Error("installment_quote_required");
+  if(!$("#accept-cancel")?.checked||!$("#accept-terms")?.checked)throw new Error("policy_acceptance_required");
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
-  if(hasGuarantee&&!$("#guarantee-card-consent")?.checked)throw new Error("guarantee_consent_required");
+  if(hasGuarantee&&(!$("#guarantee-card-consent")?.checked||!$("#guarantee-renewal-consent")?.checked))throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{access_session_id:accessSessionId(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,accepted_document_ids:[state.rate.cancellation_policy?.id].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
+  const d=await api("start_payment",{access_session_id:accessSessionId(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,terms_consent:$("#accept-terms")?.checked===true,accepted_document_ids:[state.rate.cancellation_policy?.id,...(state.config.required_booking_documents||[]).map(d=>d.id)].filter(Boolean),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card,guarantee_card_consent:hasGuarantee,guarantee_consent_version:"guarantee-v2",guarantee_renewal_consent:!!$("#guarantee-renewal-consent")?.checked}:{})});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
@@ -439,7 +465,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
-  setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"Autorize o uso do cartão para a caução desta reserva.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
+  setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"O aceite da garantia e da renovação automática é obrigatório para reservar.":e.message==="policy_acceptance_required"?"Aceite os termos e a política de cancelamento antes de pagar.":e.message==="booking_terms_unavailable"?"Os termos da reserva estão indisponíveis. Tente novamente mais tarde.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  clearInterval(window.__quoteTimer);

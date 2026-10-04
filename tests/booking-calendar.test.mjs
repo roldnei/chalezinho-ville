@@ -1,6 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import ts from 'typescript';
 const code=ts.transpileModule(await readFile(new URL('../supabase/functions/_shared/calendars.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,calendarHttpResponse}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,calendarHttpResponse,calendarPeriodKey}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 const wrap=body=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'+body+'END:VCALENDAR\r\n';
 const event='BEGIN:VEVENT\r\nUID:external\r\nDTSTART;VALUE=DATE:20270310\r\nDTEND;VALUE=DATE:20270312\r\nEND:VEVENT\r\n';
 test('valid empty calendar and exclusive checkout parse correctly',()=>{assert.deepEqual(parseCalendar(wrap('')),[]);assert.deepEqual(parseCalendar(wrap(event)),[{start:'2027-03-10',end:'2027-03-12'}]);});
@@ -27,8 +27,19 @@ test('HTTP calendar transfer handles chunked bodies, redirects and truncation',(
 test('multiple sources combine dates and one failure keeps availability protected',async()=>{
  const original=globalThis.fetch;
  const sources=[{id:'a',property_id:1,provider:'booking',enabled:true,feed_url:'https://ical.booking.com/v1/export?t=a',label:'A'},{id:'b',property_id:1,provider:'booking',enabled:true,feed_url:'https://ical.booking.com/v1/export?t=b',label:'B'},{id:'c',property_id:1,provider:'booking',enabled:false}];
- const admin={from(table){const rows=table==='properties'?[{id:1,name:'Test'}]:sources;return {select(){return this},eq(){return this},is(){return this},update(){return this},then(resolve){return Promise.resolve({data:rows}).then(resolve)}}}};
+ const admin={from(table){const rows=table==='properties'?[{id:1,name:'Test'}]:sources;return {select(){return this},eq(){return this},is(){return this},order(){return this},range(){return this},update(){return this},then(resolve){return Promise.resolve({data:rows}).then(resolve)}}}};
  try{globalThis.fetch=async()=>new Response(wrap(event));let data=await calendarService(admin,'https://test.invalid').channels('booking');assert.equal(data.listings[0].periods.length,2);assert.equal(data.ok,true);
  globalThis.fetch=async url=>new Response(String(url).includes('t=b')?'invalid':wrap(event));data=await calendarService(admin,'https://test.invalid').channels('booking');assert.equal(data.ok,false);assert.equal(data.listings[0].periods.length,1);
  }finally{globalThis.fetch=original}
+});
+
+test('calendar keys distinguish sources and preserve legacy Airbnb links',()=>{
+ const p={start:'2027-03-10',end:'2027-03-12'};
+ assert.equal(calendarPeriodKey('airbnb',3,p),'airbnb:3:2027-03-10:2027-03-12');
+ assert.notEqual(calendarPeriodKey('booking',1,{...p,calendar_id:'a'}),calendarPeriodKey('booking',1,{...p,calendar_id:'b'}));
+});
+test('configuration reads all sources beyond the API cap',async()=>{
+ const rows=Array.from({length:1201},(_,i)=>({id:String(i),label:'Calendar '+i}));
+ const db={from(t){return {select(){return this},is(){return this},order(){return this},range(a,b){return Promise.resolve({data:rows.slice(a,b+1)})},then(resolve){return Promise.resolve({data:[]}).then(resolve)}}}};
+ assert.equal((await calendarService(db,'https://example.test').configuration()).sources.length,1201);
 });
