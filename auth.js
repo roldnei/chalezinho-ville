@@ -1,4 +1,6 @@
 (()=>{
+try{
+if(!window.supabase?.createClient||!window.CHALEZINHO_CONFIG||!window.VilleSession)throw new Error('auth_dependencies_unavailable');
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),DEV_BASE=location.origin;
 window.ChalezinhoAuth={sb};
 let anonymousId="";
@@ -40,5 +42,7 @@ by("pane-signup")?.addEventListener("submit",async e=>{e.preventDefault();msg("C
 });
 by("pane-recover")?.addEventListener("submit",async e=>{e.preventDefault();msg("Enviando instruções…");const callback=DEV_BASE+"/auth-callback.html?next="+encodeURIComponent("auth.html?mode=reset&return="+encodeURIComponent(returnTarget));const {error}=await sb.auth.resetPasswordForEmail(by("recover-email").value.trim(),{redirectTo:callback});if(error)return msg(authMessage(error,"recover"));msg("Se o e-mail estiver cadastrado, enviaremos o link de recuperação.",true)});
 by("pane-reset")?.addEventListener("submit",async e=>{e.preventDefault();const p=by("reset-password").value;if(p.length<8)return msg("Use pelo menos 8 caracteres.");const {error}=await sb.auth.updateUser({password:p});if(error)return msg(authMessage(error,"reset"));msg("Senha alterada.",true);setTimeout(()=>location.href=returnTarget,700)});
-sb.auth.getSession().then(({data})=>{if(data.session&&mode==="login")location.href=returnTarget;if(!data.session&&mode==="identify")show("login")});
+window.VilleAuthBoot?.ready();
+sb.auth.getSession().then(({data})=>{if(data.session&&mode==="login")location.href=returnTarget;if(!data.session&&mode==="identify")show("login")}).catch(()=>msg("Não foi possível recuperar a sessão. Entre novamente."));
+}catch{window.VilleAuthBoot?.fail("initialization")}
 })();
