@@ -2,7 +2,17 @@
 
 Escopo: desenvolvimento, Fase 1/PMS, PagBank sandbox, excluindo execução de estornos. Supabase `pxfqmnhqodqyaaqeyjgr`; branch `feature/guest-directory`. Nenhuma promoção ou alteração em produção. Nenhuma cobrança real.
 
-## Parecer
+## Atualização documental — 04/10/2026, após investigação solicitada pelo proprietário
+
+Foi localizada evidência oficial antes ausente da análise: o README do módulo de checkout transparente PagBank/PrestaShop explica que, numa pré-autorização de R$ 1.000 com captura de R$ 800, os R$ 200 restantes voltam automaticamente ao limite. Fonte: https://github.com/pagseguro/pagseguro-modulo-prestashop (seção 5, tipo de captura manual).
+
+A FAQ do PagBank também informa que não é necessário cancelar a diferença e menciona até 24 horas para o emissor restabelecer o limite; essa FAQ está na categoria de maquininhas, portanto seu prazo não foi adotado como SLA da API do site: https://faq.pagbank.com.br/duvida/como-funciona-a-pre-autorizacao-quando-o-valor-confirmado-for-inferior-ao-valor-reservado/1366
+
+Na reserva de teste 57BBF31A42, o registro consultado continua com autorização de R$ 500, captura de R$ 180 e nenhuma confirmação individual de liberação. O campo release_confirmed é controle interno do PMS, não evidência de que R$ 320 continuam bloqueados no emissor.
+
+**Revisão do parecer anterior:** a liberação automática do residual possui respaldo documental oficial. O comportamento observado no sandbox é compatível com essa regra. A ausência de extrato de limite de um cartão fictício é uma limitação de evidência do ensaio, não uma falha comprovada nem justificativa para executar estorno. Não foi comprovado um crédito real de R$ 320 em um cartão específico; não foi alterado o histórico financeiro para simular essa confirmação. Esta atualização substitui a afirmação anterior de ausência de orientação do PagBank, sem certificar produção ou estornos.
+
+## Parecer original (ler com a atualização acima)
 
 Rodada de execução e revisão encerrada, com **ressalva impeditiva para declarar aprovação integral da caução**: o PagBank não fornece comprovação da liberação dos R$ 320 restantes após captura parcial de R$ 180. A consulta foi repetida no PMS em 04/10 e continuou sem confirmação. Não se trata do estorno excluído pelo proprietário. Os demais resultados abaixo possuem evidências especificadas; testes automatizados e evidências históricas não são apresentados como novos testes de navegador.
 
