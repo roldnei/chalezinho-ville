@@ -61,3 +61,11 @@ Cadastro de comodidades, destaque de oito itens, busca, ícones, escopo por imó
 Correções de login: `68857ee7526e96b6c8be05353056a880660bd21f`. Parcelamento: `774ae4ed3aa2b0f8e8c32c6c438c96bf47b43d7e`. Este documento acompanha o commit de fechamento com texto de pagamento, migração e teste de reagendamento. Preservados históricos e reservas de ensaio.
 
 Se o último frontend apresentar regressão, republicar o preview de `774ae4e`, mantendo correção do login/parcelamento. A migração nova é aditiva: eventual reversão remove somente seu trigger/função; não desfaz mensagens já entregues nem pagamentos. Não executar reversão automaticamente sem falha comprovada.
+
+## Regra solicitada em 04/10: aceites obrigatórios
+
+Novas reservas exigem aceite explícito da garantia e de suas renovações quando há caução, além da política de cancelamento, termos de hospedagem, regras e ciência da política de privacidade. Checkboxes começam desmarcados. Servidor rejeita ausência, valores que não sejam boolean true e versões/documentos incorretos antes de tokenização/hold/pagamento. Versões são registradas na reserva. Troca de cartão também exige aceite da renovação. Nenhum consentimento antigo foi criado ou alterado.
+
+Os documentos gerais existentes ainda são rascunhos sem texto final, identificados no checkout de desenvolvimento. A implementação do bloqueio não constitui aprovação do conteúdo para produção. Produção exige documentos ativos; drafts só são selecionados em DEV.
+
+Validação: 224 testes aprovados, sintaxe e TypeScript aprovados. Testes incluem cada aceite ausente, falsos booleanos, documentos incompletos e rejeição antes de iniciar pagamento no checkout. Ajustada somente a fixture de datas dos testes de check-in para o fuso do imóvel, pois o fuso do executor avançava o dia antes de Guarapari. Backend DEV booking-engine v38 e guarantee-preview v15.

@@ -1,3 +1,4 @@
+import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
 import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
@@ -612,7 +613,7 @@ async function startPayment(req:Request,body:any,development:boolean){
     .eq("id",(option.quotes as any)?.property_id).single();
   if(!property)return json({ok:false,error:"property_unavailable"},503);
   const needsGuarantee=Number(property.guarantee_amount_cents)>0;
-  if(needsGuarantee&&(!body?.guarantee_card_consent||typeof body?.encrypted_card!=="string"||
+  if(needsGuarantee&&(typeof body?.encrypted_card!=="string"||
      body.encrypted_card.length<20||body.encrypted_card.length>10000))
     return json({ok:false,error:"guarantee_card_required"},400);
   if(method==="card"&&Number(option.total_amount_cents)/Number(installments)<500)
@@ -631,9 +632,10 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(method==="card"&&Number(body?.quoted_total_cents)!==chargedAmount)
     return json({ok:false,error:"installment_quote_changed"},409);
   const requiredPolicyId=option.cancellation_policy_id;
-  const acceptedIds=Array.isArray(accepted_document_ids)?accepted_document_ids.map(String):[];
-  if(!requiredPolicyId||!acceptedIds.includes(String(requiredPolicyId)))
-    return json({ok:false,error:"policy_acceptance_required"},400);
+  const {data:termsRows,error:termsError}=await admin.from("policy_documents").select("id,document_type,code,version,status").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft"]:["active"]);
+  if(termsError)return json({ok:false,error:"booking_terms_unavailable"},503);
+  const requiredTerms=bookingDocuments(termsRows||[],development);
+  try{assertBookingConsent(body,needsGuarantee,requiredTerms,requiredPolicyId)}catch(e){return json({ok:false,error:(e as Error).message},400)}
 
   const {data:paymentQuote,error:paymentQuoteError}=await admin.from("quotes").select("property_id,check_in,check_out,guests,pricing_snapshot").eq("id",quote_id).single();
   const {data:existingHold,error:existingHoldError}=await admin.from("reservations").select("id").eq("quote_id",quote_id).in("status",["hold","pending_payment","confirmed"]).limit(1);
@@ -686,10 +688,10 @@ async function startPayment(req:Request,body:any,development:boolean){
   const {data:acceptedPolicy,error:policyError}=await admin.from("policy_documents")
     .select("id,code,version").eq("id",requiredPolicyId).single();
   if(policyError||!acceptedPolicy) return json({ok:false,error:"policy_unavailable"},409);
-  const {error:acceptanceError}=await admin.from("reservation_policy_acceptances").insert({
-    reservation_id:reservationId,user_id:user.id,document_id:acceptedPolicy.id,
-    document_code:acceptedPolicy.code,document_version:acceptedPolicy.version
-  });
+  const {error:acceptanceError}=await admin.from("reservation_policy_acceptances").insert([acceptedPolicy,...requiredTerms].map(doc=>({
+    reservation_id:reservationId,user_id:user.id,document_id:doc.id,
+    document_code:doc.code,document_version:doc.version
+  })));
   if(acceptanceError) return json({ok:false,error:"policy_acceptance_failed"},500);
 
   const {data:qitems}=await admin.from("quote_experience_items").select("*").eq("quote_id",quote_id);
@@ -1997,7 +1999,7 @@ Deno.serve(async(req)=>{
       if(action==="identity_status"){
         const {data,error}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
         if(error) return json({ok:false,error:"identity_check_unavailable"},500);
-        const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
+const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
         if(paymentIdentityError) return json({ok:false,error:"identity_check_unavailable"},500);
         const identity=Array.isArray(paymentIdentity)?paymentIdentity[0]:paymentIdentity;
         return json({ok:true,complete:Boolean(data),payment_eligible:identity?.document_type==="cpf"});
@@ -2033,14 +2035,15 @@ Deno.serve(async(req)=>{
         purposes:purposesQ.data||[],
         payment_settings:settingsQ.data||{},
         policy_documents:docsQ.data||[],
+        required_booking_documents:bookingDocuments(docsQ.data||[],development),
         experience_products:productsQ.data||[],
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
     if(action==="property_media"){
-      const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery,features").eq("active",true).order("id");
+      const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery").eq("active",true).order("id");
       if(error) return json({ok:false,error:"media_unavailable"},500);
-      return json({ok:true,properties:(data||[]).map(({features,...property}:any)=>({...property,features:{amenities:Array.isArray(features)?features:features?.amenities||[],amenity_highlights:features?.amenity_highlights,amenity_categories:features?.amenity_categories||{}}}))});
+      return json({ok:true,properties:data||[]});
     }
     if(action==="search"){
       const start=url.searchParams.get("start")||body.start;

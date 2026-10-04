@@ -193,7 +193,7 @@ async function handler(req:Request){
   }
   if(!token)return reply({ok:false,error:"pagbank_sandbox_not_configured"},503);
   if(action==="replace_card"){
-    if(!owner||body.consent!==true)return reply({ok:false,error:"guarantee_consent_required"},400);
+    if(!owner||body.consent!==true||body.renewal_consent!==true)return reply({ok:false,error:"guarantee_consent_required"},400);
     const encrypted=String(body.encrypted_card||"");
     if(!id(body.operation_key)||encrypted.length<20||encrypted.length>10000)
       return reply({ok:false,error:"encrypted_card_required"},400);
