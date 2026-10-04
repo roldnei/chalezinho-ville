@@ -10,5 +10,9 @@ test('multicalendar, imported details, property filter and reservation tabs pres
  $('.calendar-event[data-guest-stay]').click();assert.match($('#admin-modal-content').textContent,/não distingue/);assert.ok($('#event-contact'));$('[data-close-modal]').click();
  token='renewed';$('#admin-refresh').click();await wait(()=>used.includes('Bearer renewed'));
  $('[data-view=reservations]').click();assert.equal(w.document.querySelectorAll('.admin-reservation-list>button').length,2);$('.admin-reservation-list [data-reservation]').click();assert.ok($('.drawer-next-actions [data-checkin]'));assert.equal($('#reservation-finance-summary').parentElement.hidden,true);$('[data-detail-tab="1"]').click();assert.equal($('#reservation-finance-summary').parentElement.hidden,false);assert.equal($('#reservation-guest').parentElement.hidden,true);
+ $('[data-view=properties]').click();$('[data-property-edit="2"]').click();$('[data-workspace=details]').click();
+ assert.ok($('.property-form-heading #back-workspace'));assert.ok($('.property-form-footer [type=submit]'));assert.equal($('#property-form').elements.name.value,'Essenza');
+ $('#back-workspace').click();assert.ok($('[data-workspace=details]'));$('[data-workspace=details]').click();
+ const f=$('#property-form');f.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await wait(()=>!$('.property-form-footer [type=submit]').disabled);
  }finally{w.close()}
 });
