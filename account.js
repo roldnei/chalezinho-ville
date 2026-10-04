@@ -512,6 +512,7 @@ async function startChargePayment(){
 }
 function renderPostBookingPagBankPayment(payment){
  const box=$("#post-payment-sim");
+ const isModification=activeCharge?.kind==="modification";
  box.innerHTML='<div class="post-charge-summary"><span>PagBank sandbox · '+(payment.method==="card"?"Cartão":"Pix")+'</span><strong>'+brlC(payment.amount_cents||activeCharge?.amount_cents)+'</strong></div>'+
   (payment.pix_code?'<p>Pix copia e cola de teste:</p><textarea readonly aria-label="Pix copia e cola">'+esc(payment.pix_code)+'</textarea>':'')+
   '<p id="post-sandbox-status" role="status">Consultando a cobrança no PagBank…</p>';
@@ -530,10 +531,10 @@ function renderPostBookingPagBankPayment(payment){
   const s=await api("pagbank_sandbox_status",{payment_id:payment.id});
   failures=0;
   const status=$("#post-sandbox-status");if(!status)return;
-  if(s.manual_review){finish("Pagamento recebido, mas a experiência requer conferência manual. Não pague novamente.");return}
-  if(s.charge_status==="applied"){finish("Pagamento aprovado pelo PagBank. Experiência incluída na reserva.");return}
+  if(s.manual_review){finish("Pagamento recebido, mas "+(isModification?"a alteração":"a experiência")+" requer conferência manual. Não pague novamente.");return}
+  if(s.charge_status==="applied"){finish(isModification?"Pagamento aprovado pelo PagBank. Alteração aplicada à reserva.":"Pagamento aprovado pelo PagBank. Experiência incluída na reserva.");return}
   if(["refused","cancelled","expired"].includes(s.payment_status)){
-   finish("Pagamento recusado ou encerrado pelo PagBank. A experiência não foi incluída. Se o prazo estiver aberto, você poderá tentar novamente em Minhas Reservas.");return;
+   finish("Pagamento recusado ou encerrado pelo PagBank. "+(isModification?"A alteração não foi aplicada.":"A experiência não foi incluída.")+" Se o prazo estiver aberto, você poderá tentar novamente em Minhas Reservas.");return;
   }
   status.textContent=s.payment_status==="under_review"?"Pagamento em análise no PagBank. Aguarde a confirmação.":"Aguardando confirmação do PagBank…";
  }catch{
