@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey),DEV_BASE=location.origin;
+const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),DEV_BASE=location.origin;
 window.ChalezinhoAuth={sb};
 let anonymousId="";
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
@@ -13,7 +13,8 @@ const panes={login:by("pane-login"),signup:by("pane-signup"),recover:by("pane-re
 function show(name){Object.values(panes).forEach(x=>x&&(x.hidden=true));if(panes[name])panes[name].hidden=false;document.querySelectorAll("[data-auth-mode]").forEach(b=>b.classList.toggle("active",b.dataset.authMode===name))}
 document.querySelectorAll("[data-auth-mode]").forEach(b=>b.addEventListener("click",()=>show(b.dataset.authMode)));show(mode);
 
-by("pane-login")?.addEventListener("submit",async e=>{e.preventDefault();msg("Entrando…");track("login_started",{source:"auth_page"});const {error}=await sb.auth.signInWithPassword({email:by("login-email").value.trim(),password:by("login-password").value});if(error)return msg(authMessage(error,"login"));location.href=returnTarget});
+if(by("remember-session"))by("remember-session").checked=window.VilleSession.remembered();
+by("pane-login")?.addEventListener("submit",async e=>{e.preventDefault();window.VilleSession.choose(by("remember-session").checked);msg("Entrando…");track("login_started",{source:"auth_page"});const {error}=await sb.auth.signInWithPassword({email:by("login-email").value.trim(),password:by("login-password").value});if(error)return msg(authMessage(error,"login"));location.href=returnTarget});
 const digits=v=>String(v||"").replace(/\D/g,"");
 function validCpf(v){const s=digits(v);if(s.length!==11||/^(\d)\1{10}$/.test(s))return false;for(let n=9;n<11;n++){const sum=[...s.slice(0,n)].reduce((a,x,i)=>a+Number(x)*(n+1-i),0),check=(sum*10)%11;if(Number(s[n])!==(check===10?0:check))return false}return true}
 by("signup-document-type")?.addEventListener("change",()=>{const passport=by("signup-document-type").value==="passport";by("signup-country-label").hidden=!passport;by("signup-country").required=passport;by("signup-document-number").inputMode=passport?"text":"numeric";by("signup-document-number").placeholder=passport?"Número do passaporte":"000.000.000-00"});
