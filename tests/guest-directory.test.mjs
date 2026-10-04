@@ -60,7 +60,7 @@ test('UI creates contact, links two stays, edits phone, unlinks, and escapes nam
  assert.equal(db.data.guest_contacts.length,1);assert.equal(db.data.guest_stay_links.length,2);
  $('[data-close-modal]').click();$('[data-view="calendar"]').click();$('#calendar-month').value='2099-10';$('#calendar-month').dispatchEvent(new w.Event('change'));
  assert.equal(w.document.querySelectorAll('[data-guest-stay]').length,2);assert.match($('#admin-content').textContent,/5527999994321/);
- $('[data-guest-stay]').click();const old=$('#guest-form');$('[data-unlink-stay]').click();await wait(()=>$('#guest-form')!==old);assert.equal(db.data.guest_stay_links.length,1);
+  $('[data-guest-stay]').click();assert.ok($('#event-contact'));$('#event-contact').click();const old=$('#guest-form');$('[data-unlink-stay]').click();await wait(()=>$('#guest-form')!==old);assert.equal(db.data.guest_stay_links.length,1);
  }finally{w.close()}
 });
 test('UI shows unavailable contact service without hiding the admin shell',async()=>{const {w}=await setup({fail:true});try{assert.match(w.document.body.textContent,/Não foi possível consultar os hóspedes/);assert.equal(w.document.querySelector('#new-guest').disabled,true)}finally{w.close()}});
