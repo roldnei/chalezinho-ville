@@ -91,14 +91,15 @@
  const defaults=items=>[...items].sort((a,b)=>{const rank=x=>{let i=priority.indexOf(normalize(x));return i<0?99:i};return rank(a)-rank(b)}).slice(0,8);
  const highlights=f=>{const items=list(f);return Array.isArray(f?.amenity_highlights)?[...new Set(f.amenity_highlights)].filter(x=>items.includes(x)).slice(0,8):defaults(items)};
  function render(parent,features){
-  parent.querySelector('[data-public-amenities]')?.remove();const items=list(features);if(!items.length)return;
+  if(!features)return;
+  const previous=parent.querySelector('[data-public-amenities]')||parent.querySelector('.detail-comfort:has(.amenity-cloud)');const items=list(features);if(!items.length){previous?.remove();return}
   const section=document.createElement('section');section.dataset.publicAmenities='';section.className='public-amenities';
   const heading=document.createElement('h2');heading.textContent='O que esse lugar oferece';section.append(heading);
   const row=name=>{const li=document.createElement('li'),icon=document.createElement('span');icon.className='amenity-mark';icon.setAttribute('aria-hidden','true');icon.innerHTML=window.VilleAmenities.icon(name);li.append(icon,document.createTextNode(name));return li};
   const top=document.createElement('ul');top.className='amenity-highlights';highlights(features).forEach(x=>top.append(row(x)));section.append(top);
   const details=document.createElement('details'),summary=document.createElement('summary');summary.textContent=`Mostrar mais comodidades (${items.length})`;details.append(summary);
   categories.forEach(cat=>{const names=items.filter(x=>(categories.includes(features?.amenity_categories?.[x])?features.amenity_categories[x]:category(x))===cat);if(!names.length)return;const h=document.createElement('h3'),ul=document.createElement('ul');h.textContent=cat;names.forEach(x=>ul.append(row(x)));details.append(h,ul)});section.append(details);
-  const target=parent.querySelector('.detail-closing');if(target)parent.insertBefore(section,target);else parent.append(section);
+  const target=parent.querySelector('.detail-closing');if(previous)previous.replaceWith(section);else if(target)parent.insertBefore(section,target);else parent.append(section);
  }
  window.VilleAmenities={categories,category,list,defaults,highlights,render,catalog,icon,normalize};
 })();

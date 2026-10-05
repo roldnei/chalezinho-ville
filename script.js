@@ -3,7 +3,7 @@ document.addEventListener('DOMContentLoaded',()=>{const els=document.querySelect
 document.addEventListener('DOMContentLoaded',async()=>{
  try{
   const endpoint=window.CHALEZINHO_CONFIG.bookingEngine+'?action=property_media';
-  const response=await fetch(endpoint,{signal:AbortSignal.timeout(8000),headers:{'X-Chalezinho-Env':'development'}});
+  const response=await fetch(endpoint,{cache:'no-store',signal:AbortSignal.timeout(8000),headers:{'X-Chalezinho-Env':'development'}});
   if(response.ok){const payload=await response.json();if(payload.ok)applyPropertyMedia(payload.properties||[])}
  }catch(error){console.warn('Galeria indisponível; exibindo fotos atuais.',error)}
  document.querySelectorAll('[data-carousel]').forEach(box=>{

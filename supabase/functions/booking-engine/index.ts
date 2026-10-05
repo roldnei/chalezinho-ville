@@ -1,4 +1,5 @@
 import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
+import {publicProperty} from "../_shared/public-property.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
 import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
@@ -2057,9 +2058,9 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     }
     if(action==="legal_documents")return await legalDocuments(req,body,development);
     if(action==="property_media"){
-      const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery").eq("active",true).order("id");
+      const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery,features").eq("active",true).order("id");
       if(error) return json({ok:false,error:"media_unavailable"},500);
-      return json({ok:true,properties:data||[]});
+      return json({ok:true,properties:(data||[]).map(publicProperty)});
     }
     if(action==="search"){
       const start=url.searchParams.get("start")||body.start;

@@ -1,4 +1,19 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {JSDOM} from 'jsdom';import {listingPatch} from '../supabase/functions/pms-operations/listings.ts';
+import {publicProperty} from '../supabase/functions/_shared/public-property.ts';
+test('saved listing settings reach the public page and replace stale amenities',()=>{
+ const saved=listingPatch({section:'amenities',amenities:['Wi-Fi','Deck privativo'],amenity_highlights:['Deck privativo'],amenity_categories:{'Deck privativo':'Lazer e área externa'}},{features:{payment_terms:{private:true}}});
+ const property=publicProperty({code:'CH2',...saved});
+ assert.equal(property.features.payment_terms,undefined);
+ const w=new JSDOM('<main data-property-code="CH2"><section class="detail-comfort"><div class="amenity-cloud">Churrasqueira</div></section><section class="detail-closing"></section></main>',{runScripts:'outside-only'}).window;
+ w.eval(readFileSync('amenities.js','utf8'));w.eval(readFileSync('script.js','utf8'));w.applyPropertyMedia([property]);
+ assert.equal(w.document.querySelector('.amenity-cloud'),null);
+ assert.deepEqual([...w.document.querySelectorAll('.amenity-highlights li')].map(x=>x.textContent),['Deck privativo']);
+ assert.deepEqual([...w.document.querySelectorAll('details li')].map(x=>x.textContent).sort(),['Deck privativo','Wi-Fi']);
+ assert.equal(w.document.querySelector('details').open,false);
+ w.document.querySelector('summary').click();assert.equal(w.document.querySelector('details').open,true);
+ w.applyPropertyMedia([{code:'CH2',features:{amenities:[]}}]);assert.equal(w.document.querySelector('[data-public-amenities]'),null);
+ w.close();
+});
 test('public page respects ordered highlights and groups all items, escaping text',()=>{const w=new JSDOM('<main></main>',{runScripts:'outside-only'}).window;w.eval(readFileSync('amenities.js','utf8'));const features={amenities:['Wi-Fi','Hidromassagem','Ar-condicionado','Deck privativo','<img src=x onerror=alert(1)>'],amenity_highlights:['Hidromassagem','Wi-Fi'],amenity_categories:{'Deck privativo':'Lazer e área externa'}};w.VilleAmenities.render(w.document.querySelector('main'),features);assert.deepEqual([...w.document.querySelectorAll('.amenity-highlights li')].map(x=>x.textContent),['Hidromassagem','Wi-Fi']);assert.equal(w.document.querySelectorAll('details li').length,5);assert.equal(w.document.querySelectorAll('img').length,0);assert.equal(w.document.querySelector('details').open,false);assert.match(w.document.querySelector('details').textContent,/Lazer e área externa/);w.close()});
 test('default highlights prioritize only existing items and limit to eight',()=>{const w=new JSDOM('',{runScripts:'outside-only'}).window;w.eval(readFileSync('amenities.js','utf8'));const items=['Rede','Toalhas','Fogueira','Varanda','Televisão','Wi-Fi','Ar-condicionado','Piscina aquecida','Spa aquecido','Hidromassagem'];const a=w.VilleAmenities.highlights({amenities:items});assert.equal(a.length,8);assert.equal(a[0],'Wi-Fi');assert.equal(a[1],'Hidromassagem');assert.ok(a.every(x=>items.includes(x)));assert.equal(w.VilleAmenities.highlights({amenities:items,amenity_highlights:[]}).length,0);w.close()});
 test('backend validates highlight membership, duplicate and count and preserves other settings',()=>{const p={features:{payment_terms:{x:1}}};const body={section:'amenities',amenities:['Wi-Fi','Spa aquecido'],amenity_highlights:['Spa aquecido','Wi-Fi'],amenity_categories:{'Wi-Fi':'Internet e escritório'}};const v=listingPatch(body,p);assert.deepEqual(v.features.amenity_highlights,body.amenity_highlights);assert.deepEqual(v.features.payment_terms,{x:1});assert.throws(()=>listingPatch({...body,amenity_highlights:['Piscina']},p));assert.throws(()=>listingPatch({...body,amenity_highlights:['Wi-Fi','Wi-Fi']},p));assert.throws(()=>listingPatch({...body,amenity_highlights:Array(9).fill('Wi-Fi')},p));});
