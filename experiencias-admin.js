@@ -25,6 +25,7 @@ function bind(){
   $("#experience-picker").addEventListener("change",()=>selectExperience($("#experience-picker").value||null));
   $("#new-experience").addEventListener("click",()=>selectExperience(null));
   $("#experience-form").addEventListener("submit",save);
+  $("#add-component").onclick=()=>addComponent();
   $("#photo-upload").addEventListener("change",uploadPhotos);
   $("#toggle-status").addEventListener("click",toggleStatus);
   $("#delete-experience").addEventListener("click",deleteExperience);
@@ -51,6 +52,11 @@ function selectExperience(id){
   $("#exp-description").value=current?.description||"";
   $("#exp-upsell-yes").checked=current?.upsell_enabled===true;
   $("#exp-upsell-no").checked=current?.upsell_enabled!==true;
+  $("#exp-status").value=current?.status==='active'?'active':'inactive';
+  $("#exp-standalone").checked=current?.details?.standalone_enabled!==false;$("#exp-offer").checked=current?.details?.offer_enabled!==false;
+  $("#exp-lead").value=current?.minimum_lead_hours??24;$("#exp-capacity").value=current?.daily_capacity??'';$("#exp-inventory").value=current?.inventory??'';
+  $("#package-properties").innerHTML=(data.properties||[]).map(p=>`<label><input type="checkbox" value="${p.id}" ${current?.experience_property_eligibility?.some(x=>Number(x.property_id)===Number(p.id))?'checked':''}> ${esc(p.name)}</label>`).join('');
+  $("#package-components").innerHTML='';(window.VilleOffers.components(current||{})||[]).forEach(addComponent);if(!$('#package-components').children.length)addComponent();
   renderStatus();renderPhotos();renderActions();
   $("#admin-message").textContent="";
   $("#experience-form").scrollIntoView({behavior:"smooth",block:"start"});
@@ -69,9 +75,9 @@ function renderActions(){
 }
 function renderPhotos(){
   const count=mediaItems.length;
-  $("#photo-count").textContent=count+"/5 fotos";
-  $("#photo-count").className="photo-count "+(count>=5?"ok":"warn");
-  $("#photo-help").textContent=count>=5?"Galeria pronta para o carrossel.":"Adicione pelo menos "+(5-count)+" foto"+(5-count===1?"":"s")+" para completar o carrossel.";
+  $("#photo-count").textContent=count+" foto"+(count===1?'':'s');
+  $("#photo-count").className="photo-count "+(count>=1?"ok":"warn");
+  $("#photo-help").textContent=count>=1?"Use fotos coerentes com os itens vendidos.":"Adicione pelo menos uma foto.";
   const box=$("#photo-grid");
   box.innerHTML=mediaItems.map((m,i)=>'<figure class="simple-photo"><img src="'+esc(m.media_url)+'" alt="'+esc(m.alt_text||"Foto da experiência")+'"><button type="button" data-remove-photo="'+i+'" aria-label="Excluir foto">×</button><span>'+(i+1)+'</span></figure>').join("");
   box.querySelectorAll("[data-remove-photo]").forEach(b=>b.onclick=()=>{mediaItems.splice(Number(b.dataset.removePhoto),1);normalizeMedia();renderPhotos()});
@@ -97,7 +103,7 @@ async function save(e){
   const name=$("#exp-name").value.trim(),price=Math.round(Number($("#exp-price").value||0)*100);
   if(!name){$("#admin-message").textContent="Informe o nome da experiência.";return}
   if(price<=0){$("#admin-message").textContent="Informe o preço.";return}
-  if(mediaItems.length<5){$("#admin-message").textContent="Adicione pelo menos 5 fotos antes de salvar.";return}
+  if(mediaItems.length<1){$("#admin-message").textContent="Adicione uma foto antes de salvar.";return}
   $("#save-experience").disabled=true;$("#admin-message").textContent=current?"Salvando alterações…":"Salvando experiência…";
   try{
     const r=await api("experience_admin_action",{
@@ -105,12 +111,16 @@ async function save(e){
       package_type:$("#exp-type").value,name,
       price_cents:price,description:$("#exp-description").value.trim(),
       upsell_enabled:$("#exp-upsell-yes").checked,
+      status:$('#exp-status').value,standalone_enabled:$('#exp-standalone').checked,offer_enabled:$('#exp-offer').checked,
+      property_ids:[...$('#package-properties').querySelectorAll('input:checked')].map(x=>Number(x.value)),
+      minimum_lead_hours:Number($('#exp-lead').value),daily_capacity:$('#exp-capacity').value?Number($('#exp-capacity').value):null,inventory:$('#exp-inventory').value!==''?Number($('#exp-inventory').value):null,
+      components:[...$('#package-components').children].map(row=>({name:row.querySelector('[name=name]').value.trim(),quantity:Number(row.querySelector('[name=quantity]').value),frequency:row.querySelector('[name=frequency]').value,choices:row.querySelector('[name=choices]').value.split(',').map(x=>x.trim()).filter(Boolean)})),
       media_items:mediaItems.map((m,i)=>({media_url:m.media_url,alt_text:m.alt_text||name,display_order:(i+1)*10}))
     });
     $("#admin-message").textContent=current?"Alterações salvas.":"Experiência criada.";
     await load(r.product.id);
   }catch(err){
-    $("#admin-message").textContent=err.message==="experience_requires_five_photos"?"São necessárias pelo menos 5 fotos.":"Não foi possível salvar: "+err.message;
+    $("#admin-message").textContent=err.message==="experience_photo_required"?"Adicione pelo menos uma foto.":"Não foi possível salvar: "+err.message;
   }finally{$("#save-experience").disabled=false}
 }
 async function toggleStatus(){
@@ -121,7 +131,7 @@ async function toggleStatus(){
     const r=await api("experience_admin_action",{operation:"toggle_product_status",id:current.id});
     $("#admin-message").textContent=r.product.status==="active"?"Experiência ativada.":"Experiência pausada.";
     await load(current.id);
-  }catch(err){$("#admin-message").textContent=err.message==="experience_requires_five_photos"?"Adicione pelo menos 5 fotos antes de ativar.":"Não foi possível alterar o status: "+err.message}
+  }catch(err){$("#admin-message").textContent=err.message==="experience_photo_required"?"Adicione uma foto antes de ativar.":"Não foi possível alterar o status: "+err.message}
 }
 async function deleteExperience(){
   if(!current)return;
@@ -131,6 +141,11 @@ async function deleteExperience(){
     $("#admin-message").textContent=r.archived?"A experiência tinha histórico e foi retirada da operação, preservando os registros antigos.":"Experiência excluída.";
     current=null;await load();
   }catch(err){$("#admin-message").textContent="Não foi possível excluir: "+err.message}
+}
+function addComponent(c={}){
+ const row=document.createElement('div');row.className='offer-component-row';
+ row.innerHTML=`<label>Item<input name="name" required maxlength="160" placeholder="Ex.: bebida" value="${esc(c.name||'')}"></label><label>Quantidade<input name="quantity" type="number" required min="1" max="100" value="${c.quantity||1}"></label><label>Entrega<select name="frequency"><option value="arrival">Na chegada</option><option value="daily">Por dia</option><option value="departure">Na saída</option></select></label><label>Escolhas (opcional)<input name="choices" placeholder="Vinho, espumante" value="${esc((c.choices||[]).join(', '))}"></label><button type="button" aria-label="Remover item">×</button>`;
+ row.querySelector('[name=frequency]').value=c.frequency||'arrival';row.querySelector('button').onclick=()=>row.remove();$('#package-components').append(row);
 }
 boot();
 })();

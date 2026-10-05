@@ -1,5 +1,7 @@
 import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
 import {publicProperty} from "../_shared/public-property.ts";
+import {offerIssues,priceStayOffer,compositionSnapshot,experienceComponents} from "../_shared/stay-offers.ts";
+import {stayOfferService} from "../_shared/stay-offer-service.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
 import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
@@ -37,6 +39,7 @@ const admin = createClient(projectUrl, serviceKey, {auth:{persistSession:false,a
 const {reservationRefundAction,reservationRefundStatus,reservationCancelRequest}=reservationRefundService({admin,currentUser,userIsAdmin,json});
 
 const experienceCredit=experienceCreditService({admin,currentUser,userIsAdmin,json});
+const stayOffers=stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl});
 
 async function developmentPolicies(){
   const {data,error}=await admin.from("cancellation_policy_assignments")
@@ -213,7 +216,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   if(stay<1) throw new Error("invalid_dates");
 
   const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices] = await Promise.all([
-    retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents").eq("active",true).order("id")),
+    retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone").eq("active",true).order("id")),
     retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
       .lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"])),
     retryDb("search_change_holds",()=>admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
@@ -270,9 +273,24 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   });
 }
 
-async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null){
-  const {property_id,check_in,check_out,guests,experience_variant_ids=[]}=body||{};
-  const list=await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development,!!approvedRequest);
+async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null){
+  const {property_id,check_in,check_out,guests}=body||{};
+  let experience_variant_ids=Array.isArray(body.experience_variant_ids)?[...new Set(body.experience_variant_ids)]:[];
+  let offer:any=null;
+  if(body.stay_offer_id){
+    const catalog=await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
+    if(!offer)throw Error("offer_unavailable");
+    const issues=offerIssues(offer,catalog.products,Number(property_id),{check_in,check_out});
+    if(issues.length)throw Error(issues[0]);
+    for(const id of offer.product_ids){
+      const product=catalog.products.find((x:any)=>x.id===id);
+      const variant=product.experience_variants.filter((x:any)=>x.active).sort((a:any,b:any)=>a.display_order-b.display_order)[0];
+      if(!variant)throw Error("package_unavailable");
+      experience_variant_ids=experience_variant_ids.filter((vid:any)=>!product.experience_variants.some((x:any)=>x.id===vid));
+      experience_variant_ids.push(variant.id);
+    }
+  }
+  const list=availableList||await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development,!!approvedRequest);
   const property=list.find((x:any)=>Number(x.id)===Number(property_id));
   if(!property) throw new Error("property_not_found");
   if(!property.available){
@@ -284,13 +302,15 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   const expSnapshots:any[]=[];
   if(Array.isArray(experience_variant_ids)&&experience_variant_ids.length){
     const {data:variants,error}=await admin.from("experience_variants")
-      .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,daily_capacity,inventory,package_type,price_cents,upsell_enabled)")
+      .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,daily_capacity,inventory,package_type,price_cents,upsell_enabled,details)")
       .in("id",experience_variant_ids);
     if(error) throw new Error("experience_lookup_failed");
+    if(variants?.length!==experience_variant_ids.length)throw Error("experience_unavailable");
     const productIds=[...new Set((variants||[]).map((v:any)=>v.product_id))];
     const {data:eligibleRows}=await admin.from("experience_property_eligibility").select("product_id").eq("property_id",property.id).in("product_id",productIds);
     const eligible=new Set((eligibleRows||[]).map((x:any)=>String(x.product_id)));
     const seenPackageTypes=new Set<string>();
+    const seenComponents=new Set<string>();
     for(const v of variants||[]){
       const prod=(v as any).experience_products;
       const packageType=String(prod.package_type||"other");
@@ -298,10 +318,15 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
       seenPackageTypes.add(packageType);
       const leadOk=(Date.parse(check_in+"T15:00:00-03:00")-Date.now()) >= Number(prod.minimum_lead_hours||0)*3600000;
       const stockOk=prod.inventory==null || Number(prod.inventory)>0;
-      const allowed=v.active && eligible.has(String(prod.id)) && leadOk && stockOk && (prod.status==="active" || (development && prod.status==="draft"));
+      const allowed=v.active && eligible.has(String(prod.id)) && stockOk && prod.status==="active";
       if(!allowed) throw new Error("experience_unavailable");
+      const viability=await admin.rpc("experience_sale_issue",{p_product:prod.id,p_property:property.id,p_start:check_in,p_end:check_out,p_exclude:excludeReservationId});
+      if(viability.error)throw Error("experience_lookup_failed");if(viability.data)throw Error(viability.data);
+      const included=offer?.product_ids.includes(prod.id)||false;
+      if(!included&&prod.details?.standalone_enabled===false)throw Error("experience_not_sold_separately");
+      for(const c of experienceComponents(prod.details)){const key=c.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();if(seenComponents.has(key))throw Error("experience_component_conflict");seenComponents.add(key)}
       experienceTotal+=Number(v.price_cents||0);
-      expSnapshots.push({variant:v,product:prod});
+      expSnapshots.push({variant:v,product:prod,included,composition:compositionSnapshot(prod,body.experience_preferences?.[prod.id]||{})});
     }
   }
 
@@ -314,7 +339,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     check_in,check_out,guests:Number(guests),
     base_amount_cents:baseCents,
     cleaning_fee_cents:cleaningCents,
-    pricing_snapshot:{source:"pricelabs",base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
+    pricing_snapshot:{source:"pricelabs",base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,stay_offer_id:offer?.id||null,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
     rules_version:"2026-09-v1",
     expires_at:expiresAt
   }).select().single();
@@ -324,7 +349,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     const rows=expSnapshots.map(x=>({
       quote_id:q.id,product_id:x.product.id,variant_id:x.variant.id,
       product_name_snapshot:x.product.name,variant_name_snapshot:x.variant.code==="package"?null:x.variant.name,
-      unit_price_cents:Number(x.variant.price_cents),quantity:1
+      unit_price_cents:Number(x.variant.price_cents),quantity:1,composition_snapshot:x.composition
     }));
     const {error}=await admin.from("quote_experience_items").insert(rows);
     if(error) throw new Error("quote_experience_failed");
@@ -342,18 +367,21 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     const cancellationPolicy=development&&p.selectable?policyForPlan(policyAssignments,p.code):p.policy_documents;
     if(development&&p.selectable&&!cancellationPolicy) throw new Error("cancellation_policy_unavailable");
     const accommodation=Math.round(baseCents*Number(p.multiplier_bps)/10000);
-    const total=accommodation+cleaningCents+experienceTotal;
+    const price=priceStayOffer([{key:"accommodation",gross_cents:accommodation,included:!!offer},{key:"cleaning",gross_cents:cleaningCents,included:!!offer},...expSnapshots.map(x=>({key:x.product.id,gross_cents:Number(x.variant.price_cents),included:x.included}))],offer);
+    const contract={property_id:property.id,property_name:property.name,check_in,check_out,guests:Number(guests),rate_code:p.code,rate_name:p.name,cancellation_policy:cancellationPolicy,offer_version:offer?.updated_at||null,offer_rules:offer?{min_nights:offer.min_nights,max_nights:offer.max_nights,start_date:offer.start_date,end_date:offer.end_date,property_ids:offer.property_ids}:null,payment_terms:property.features?.payment_terms||null,price_source:"pricelabs",offer_id:offer?.id||null,offer_name:offer?.name||null,description:offer?.description||null,discount_bps:offer?.discount_bps||0,discount_enabled:offer?.discount_enabled||false,...price,experiences:expSnapshots.map(x=>({...x.composition,included:x.included,net_price_cents:price.lines.find(l=>l.key===x.product.id)?.net_cents}))};
+    const netAccommodation=price.lines[0].net_cents,netCleaning=price.lines[1].net_cents,netExperiences=price.lines.slice(2).reduce((s,x)=>s+x.net_cents,0);
+    const total=price.total_cents;
     const row={
-      quote_id:q.id,rate_plan_id:p.id,accommodation_amount_cents:accommodation,
-      cleaning_fee_cents:cleaningCents,total_amount_cents:total,
+      quote_id:q.id,rate_plan_id:p.id,accommodation_amount_cents:netAccommodation,
+      cleaning_fee_cents:netCleaning,total_amount_cents:total,contract_snapshot:contract,
       cancellation_policy_id:cancellationPolicy?.id||null
     };
     if(p.selectable) inserted.push(row);
     display.push({
       code:p.code,name:p.name,selectable:p.selectable,
-      accommodation_amount_cents:accommodation,cleaning_fee_cents:cleaningCents,
-      stay_amount_cents:accommodation+cleaningCents,
-      experience_amount_cents:experienceTotal,total_amount_cents:total,
+      accommodation_amount_cents:netAccommodation,cleaning_fee_cents:netCleaning,
+      stay_amount_cents:netAccommodation+netCleaning,contract_snapshot:contract,
+      experience_amount_cents:netExperiences,total_amount_cents:total,
       cancellation_policy:cancellationPolicy||null
     });
   }
@@ -370,7 +398,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   }
   const {cleaning_fee:_hiddenCleaning,...guestProperty}=property;
   return {ok:true,quote_id:q.id,expires_at:expiresAt,property:guestProperty,rate_options:display,experiences:expSnapshots.map(x=>({
-    product_id:x.product.id,product:x.product.name,package_type:x.product.package_type,
+    product_id:x.product.id,product:x.product.name,package_type:x.product.package_type,included:x.included,composition:x.composition,
     variant:x.variant.code==="package"?null:x.variant.name,price_cents:Number(x.variant.price_cents)
   }))};
 }
@@ -382,7 +410,7 @@ async function upsellPreview(body:any){
   if(!quote_id) return json({ok:false,error:"missing_data"},400);
 
   const {data:q,error:qe}=await admin.from("quotes")
-    .select("id,property_id,status,expires_at")
+    .select("id,property_id,status,expires_at,pricing_snapshot")
     .eq("id",quote_id).eq("status","active").gt("expires_at",new Date().toISOString()).single();
   if(qe||!q) return json({ok:false,error:"quote_expired"},409);
 
@@ -390,7 +418,7 @@ async function upsellPreview(body:any){
     .select("product_id,unit_price_cents,created_at")
     .eq("quote_id",quote_id).order("created_at");
   if(qie) return json({ok:false,error:"experience_lookup_failed"},500);
-  if(!qitems?.length) return json({ok:true,upsell:null});
+  if(!qitems?.length||q.pricing_snapshot?.stay_offer_id) return json({ok:true,upsell:null});
 
   const productIds=[...new Set(qitems.map((x:any)=>x.product_id))];
   const {data:products,error:pe}=await admin.from("experience_products")
@@ -434,6 +462,7 @@ async function applyUpsell(body:any,development:boolean){
     .select("*").eq("id",quote_id).eq("status","active").gt("expires_at",new Date().toISOString()).single();
   if(qe||!q) return json({ok:false,error:"quote_expired"},409);
 
+  if(q.pricing_snapshot?.stay_offer_id)return json({ok:false,error:"offer_composition_fixed"},409);
   const {data:oldOptions,error:ooe}=await admin.from("quote_options")
     .select("id,rate_plan_id,accommodation_amount_cents,cleaning_fee_cents,total_amount_cents,cancellation_policy_id")
     .eq("quote_id",quote_id);
@@ -442,7 +471,7 @@ async function applyUpsell(body:any,development:boolean){
   if(!oldSelected) return json({ok:false,error:"invalid_quote_option"},400);
 
   const {data:qitems,error:qie}=await admin.from("quote_experience_items")
-    .select("product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,created_at")
+    .select("product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,composition_snapshot,created_at")
     .eq("quote_id",quote_id).order("created_at");
   if(qie) return json({ok:false,error:"experience_lookup_failed"},500);
   if(!qitems?.length) return json({ok:false,error:"upsell_not_available"},409);
@@ -453,7 +482,7 @@ async function applyUpsell(body:any,development:boolean){
   if(cpe) return json({ok:false,error:"experience_lookup_failed"},500);
 
   const {data:target,error:te}=await admin.from("experience_products")
-    .select("id,name,package_type,price_cents,status,inventory")
+    .select("id,name,package_type,price_cents,status,inventory,details")
     .eq("id",target_product_id).single();
   if(te||!target||target.status!=="active"||(target.inventory!=null&&Number(target.inventory)<=0)) return json({ok:false,error:"upsell_not_available"},409);
 
@@ -501,17 +530,18 @@ async function applyUpsell(body:any,development:boolean){
     .map((x:any)=>({
       quote_id:newQ.id,product_id:x.product_id,variant_id:x.variant_id,
       product_name_snapshot:x.product_name_snapshot,variant_name_snapshot:x.variant_name_snapshot,
-      unit_price_cents:x.unit_price_cents,quantity:x.quantity
+      unit_price_cents:x.unit_price_cents,quantity:x.quantity,composition_snapshot:x.composition_snapshot
     }));
   newItems.push({
     quote_id:newQ.id,product_id:target.id,variant_id:targetVariant.id,
     product_name_snapshot:target.name,variant_name_snapshot:targetVariant.code==="package"?null:targetVariant.name,
-    unit_price_cents:Number(target.price_cents),quantity:1
+    unit_price_cents:Number(target.price_cents),quantity:1,composition_snapshot:compositionSnapshot(target)
   });
   const {error:nie}=await admin.from("quote_experience_items").insert(newItems);
   if(nie){await admin.from("quotes").delete().eq("id",newQ.id);return json({ok:false,error:"quote_experience_failed"},500);}
 
   const newOptionRows=oldOptions.map((o:any)=>({
+    contract_snapshot:{...priceStayOffer([{key:"accommodation",gross_cents:Number(o.accommodation_amount_cents),included:false},{key:"cleaning",gross_cents:Number(o.cleaning_fee_cents),included:false},...newItems.map((i:any)=>({key:i.product_id,gross_cents:Number(i.unit_price_cents),included:false}))]),offer_id:null,experiences:newItems.map((i:any)=>({...i.composition_snapshot,included:false,net_price_cents:Number(i.unit_price_cents)}))},
     quote_id:newQ.id,rate_plan_id:o.rate_plan_id,
     accommodation_amount_cents:o.accommodation_amount_cents,
     cleaning_fee_cents:o.cleaning_fee_cents,
@@ -539,7 +569,7 @@ async function applyUpsell(body:any,development:boolean){
     return {
       quote_option_id:o.id,code:p.code,name:p.name,selectable:p.selectable!==false,
       stay_amount_cents:Number(o.accommodation_amount_cents)+Number(o.cleaning_fee_cents),
-      experience_amount_cents:newExperienceTotal,total_amount_cents:o.total_amount_cents,
+      experience_amount_cents:newExperienceTotal,total_amount_cents:o.total_amount_cents,contract_snapshot:o.contract_snapshot,
       cancellation_policy:policyById[String(o.cancellation_policy_id)]||null
     };
   });
@@ -607,9 +637,11 @@ async function startPayment(req:Request,body:any,development:boolean){
     return json({ok:false,error:"invalid_installments"},400);
 
   const {data:option,error:optionError}=await admin.from("quote_options")
-    .select("id,quote_id,cancellation_policy_id,total_amount_cents,quotes(property_id)")
+    .select("id,quote_id,cancellation_policy_id,total_amount_cents,contract_snapshot,quotes(property_id,pricing_snapshot)")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
+  if((option.quotes as any)?.pricing_snapshot?.modification_only)return json({ok:false,error:"modification_quote_not_payable"},409);
+  if(option.contract_snapshot?.experiences?.some((p:any)=>p.components?.some((c:any)=>c.choices?.length&&!c.choice)))return json({ok:false,error:"experience_choice_required"},400);
   const {data:property}=await admin.from("properties").select("guarantee_amount_cents")
     .eq("id",(option.quotes as any)?.property_id).single();
   if(!property)return json({ok:false,error:"property_unavailable"},503);
@@ -666,6 +698,7 @@ async function startPayment(req:Request,body:any,development:boolean){
     const msg=String(rpcErr.message||"");
     if(msg.includes("quote_expired")) return json({ok:false,error:"quote_expired"},409);
     if(msg.includes("dates_unavailable")) return json({ok:false,error:"dates_unavailable"},409);
+    for(const code of ["experience_unavailable","experience_capacity","offer_unavailable"])if(msg.includes(code))return json({ok:false,error:code},409);
     return json({ok:false,error:"hold_failed"},500);
   }
   const hold=Array.isArray(rpc)?rpc[0]:rpc;
@@ -702,7 +735,7 @@ async function startPayment(req:Request,body:any,development:boolean){
       await admin.from("experience_order_items").insert(qitems.map((x:any)=>({
         order_id:order.id,product_id:x.product_id,variant_id:x.variant_id,
         product_name_snapshot:x.product_name_snapshot,variant_name_snapshot:x.variant_name_snapshot,
-        unit_price_cents:x.unit_price_cents,quantity:x.quantity,status:"active"
+        unit_price_cents:opt.contract_snapshot?.lines?.find((l:any)=>l.key===x.product_id)?.net_cents??x.unit_price_cents,quantity:x.quantity,status:"active",composition_snapshot:x.composition_snapshot
       })));
     }
   }
@@ -726,7 +759,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(qitems?.length){
     for(const x of qitems) ledger.push({
       reservation_id:reservationId,payment_id:payment.id,entry_type:"experience",
-      amount_cents:Number(x.unit_price_cents)*Number(x.quantity),description:x.product_name_snapshot
+      amount_cents:Number(opt.contract_snapshot?.lines?.find((l:any)=>l.key===x.product_id)?.net_cents??x.unit_price_cents)*Number(x.quantity),description:x.product_name_snapshot
     });
   }
   const allocated=spreadBuyerFee(ledger.map(x=>x.amount_cents),buyerInterest);
@@ -932,11 +965,37 @@ async function userIsAdmin(user:any){
   return data?.role==="admin" && data.pms_access_status==="active";
 }
 
+async function modificationQuote(r:any,propertyId:number,checkIn:string,checkOut:string,development:boolean){
+  const {data:orders,error:oe}=await admin.from("experience_orders").select("experience_order_items(product_id,status)").eq("reservation_id",r.id).eq("status","active");
+  if(oe)throw Error("experience_lookup_failed");
+  for(const item of (orders||[]).flatMap((o:any)=>o.experience_order_items||[]).filter((i:any)=>i.status==="active")){
+    const issue=await admin.rpc("experience_sale_issue",{p_product:item.product_id,p_property:propertyId,p_start:checkIn,p_end:checkOut,p_exclude:r.id,p_require_active:false});
+    if(issue.error)throw Error("experience_lookup_failed");if(issue.data)throw Error(issue.data);
+  }
+  const quote=await createQuote({property_id:propertyId,check_in:checkIn,check_out:checkOut,guests:r.guests,experience_variant_ids:[]},development,r.id);
+  const mark=await admin.from("quotes").update({pricing_snapshot:{modification_only:true,reservation_id:r.id,source:"pricelabs"}}).eq("id",quote.quote_id);if(mark.error)throw Error("modification_quote_failed");
+  const original=r.contract_snapshot;
+  if(original?.offer_id){
+    const count=nights(checkIn,checkOut),rules=original.offer_rules||{};
+    if(count<Number(rules.min_nights||1)||rules.max_nights&&count>rules.max_nights)throw Error("offer_duration");
+    if(rules.property_ids&&!rules.property_ids.includes(propertyId))throw Error("offer_property_incompatible");
+    const bps=original.discount_enabled?Number(original.discount_bps||0):0;
+    for(const option of quote.rate_options){
+      const price=priceStayOffer([{key:"accommodation",gross_cents:option.accommodation_amount_cents,included:true},{key:"cleaning",gross_cents:option.cleaning_fee_cents,included:true}],{discount_enabled:true,discount_bps:bps});
+      option.accommodation_amount_cents=price.lines[0].net_cents;option.cleaning_fee_cents=price.lines[1].net_cents;
+      option.stay_amount_cents=price.total_cents;option.total_amount_cents=price.total_cents;
+      option.contract_snapshot={...original,...price,check_in:checkIn,check_out:checkOut,property_id:propertyId,amendment:true,original_contract_total_cents:original.total_cents,experiences:original.experiences};
+      if(option.quote_option_id){const result=await admin.from("quote_options").update({accommodation_amount_cents:option.accommodation_amount_cents,cleaning_fee_cents:option.cleaning_fee_cents,total_amount_cents:option.total_amount_cents,contract_snapshot:option.contract_snapshot}).eq("id",option.quote_option_id);if(result.error)throw Error("modification_quote_failed")}
+    }
+  }
+  return quote;
+}
+
 async function requestModification(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
   const {reservation_id,requested_check_in,requested_check_out,requested_property_id}=body||{};
-  const {data:r}=await admin.from("reservations").select("id,user_id,property_id,guests,stay_amount,total_amount,rate_plan_code,check_in,check_out,status").eq("id",reservation_id).single();
+  const {data:r}=await admin.from("reservations").select("id,user_id,property_id,guests,stay_amount,total_amount,contract_snapshot,rate_plan_code,check_in,check_out,status").eq("id",reservation_id).single();
   if(!r || r.user_id!==user.id) return json({ok:false,error:"not_found"},404);
   if(!["confirmed","pending_payment"].includes(r.status)) return json({ok:false,error:"reservation_not_changeable"},409);
   const {data:openRequest}=await admin.from("modification_requests")
@@ -950,7 +1009,7 @@ async function requestModification(req:Request,body:any,development:boolean){
   const targetProperty=Number(requested_property_id||r.property_id);
   let quote;
   try{
-    quote=await createQuote({property_id:targetProperty,check_in:requested_check_in,check_out:requested_check_out,guests:r.guests,experience_variant_ids:[]},development,r.id);
+    quote=await modificationQuote(r,targetProperty,requested_check_in,requested_check_out,development);
   }catch(e){
     const msg=String((e as Error).message||"modification_quote_failed");
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
@@ -1050,8 +1109,7 @@ async function modificationAction(req:Request,body:any,development:boolean){
     // Refresh availability and price when approving; the request-time quote only lasts 15 minutes.
     let currentQuote:any;
     try{
-      currentQuote=await createQuote({property_id:targetProperty,check_in:targetIn,check_out:targetOut,
-        guests:Number(m.reservations?.guests||2),experience_variant_ids:[]},development,m.reservation_id);
+      currentQuote=await modificationQuote(m.reservations,targetProperty,targetIn,targetOut,development);
     }catch(e){
       const message=String((e as Error)?.message||"modification_quote_failed");
       const min=/^minimum_stay:(\d+)$/.exec(message);
@@ -1453,6 +1511,9 @@ async function experienceAdminAction(req:Request,body:any){
     const packageType=["romantic","beach","breakfast","celebration","wellness","other"].includes(String(body?.package_type))?String(body.package_type):"other";
     const priceCents=Math.max(0,Math.round(Number(body?.price_cents||0)));
     const upsellEnabled=body?.upsell_enabled===true;
+    let components;try{components=experienceComponents({components:body.components||[]})}catch{return json({ok:false,error:"invalid_components"},400)}
+    const propertyIds=Array.isArray(body.property_ids)?[...new Set(body.property_ids.map(Number))]:null;
+    if(propertyIds&&(!propertyIds.length||propertyIds.some((x:any)=>!Number.isSafeInteger(x)||x<1)))return json({ok:false,error:"experience_property_required"},400);
     const rawMedia=Array.isArray(body?.media_items)?body.media_items:[];
     const mediaItems=[...new Map(rawMedia
       .map((m:any,i:number)=>({
@@ -1464,7 +1525,7 @@ async function experienceAdminAction(req:Request,body:any){
       .map((m:any)=>[m.media_url,m])).values()];
     if(!name) return json({ok:false,error:"experience_name_required"},400);
     if(priceCents<=0) return json({ok:false,error:"experience_price_required"},400);
-    if(mediaItems.length<5) return json({ok:false,error:"experience_requires_five_photos",photo_count:mediaItems.length},400);
+    if(mediaItems.length<1) return json({ok:false,error:"experience_photo_required",photo_count:mediaItems.length},400);
 
     let existing:any=null;
     if(id){
@@ -1476,49 +1537,22 @@ async function experienceAdminAction(req:Request,body:any){
     const code=existing?.code || (baseCode+"_"+crypto.randomUUID().slice(0,6));
     const productPayload={
       code,name,description,package_type:packageType,price_cents:priceCents,upsell_enabled:upsellEnabled,
-      status:existing?.status==="inactive"?"inactive":"active",
+      status:body.status==="active"?"active":body.status==="inactive"?"inactive":existing?.status||"draft",
       sales_headline:existing?.sales_headline||null,
-      details:existing?.details||{},
-      minimum_lead_hours:Number(existing?.minimum_lead_hours||0),
+      details:{...(existing?.details||{}),...(body.components?{components}:{}),standalone_enabled:body.standalone_enabled??existing?.details?.standalone_enabled??true,offer_enabled:body.offer_enabled??existing?.details?.offer_enabled??true},
+      minimum_lead_hours:Number(body.minimum_lead_hours??existing?.minimum_lead_hours??0),daily_capacity:body.daily_capacity===null?null:Number(body.daily_capacity??existing?.daily_capacity??0)||null,inventory:body.inventory===null?null:body.inventory!==undefined?Number(body.inventory):existing?.inventory??null,
       travel_purposes:Array.isArray(existing?.travel_purposes)?existing.travel_purposes:[],
       display_order:Number(existing?.display_order||0)
     };
-    let product:any=null,error:any=null;
-    if(id){
-      const r=await admin.from("experience_products").update(productPayload).eq("id",id).select().single();product=r.data;error=r.error;
-    }else{
-      const r=await admin.from("experience_products").insert(productPayload).select().single();product=r.data;error=r.error;
-    }
-    if(error||!product) return json({ok:false,error:"experience_save_failed"},500);
-
-    // New packages apply to all active properties by default; existing eligibility is preserved.
-    if(!id){
-      const {data:properties}=await admin.from("properties").select("id").eq("active",true);
-      if(properties?.length) await admin.from("experience_property_eligibility").insert(properties.map((p:any)=>({product_id:product.id,property_id:p.id})));
-    }
-
-    // Keep the existing booking engine compatible: the first active variant mirrors package price.
-    const {data:variants}=await admin.from("experience_variants").select("*").eq("product_id",product.id).eq("active",true).order("display_order");
-    if(variants?.length){
-      const primary=variants[0];
-      await admin.from("experience_variants").update({code:"package",name:"Pacote",price_cents:priceCents,active:true,display_order:10}).eq("id",primary.id);
-      if(variants.length>1) await admin.from("experience_variants").update({active:false}).in("id",variants.slice(1).map((v:any)=>v.id));
-    }else{
-      await admin.from("experience_variants").insert({product_id:product.id,code:"package",name:"Pacote",price_cents:priceCents,active:true,display_order:10});
-    }
-
-    const {data:oldMedia}=await admin.from("experience_media").select("id,media_url").eq("product_id",product.id);
-    const kept=new Set(mediaItems.map((m:any)=>m.media_url));
-    const removed=(oldMedia||[]).filter((m:any)=>!kept.has(m.media_url));
-    await admin.from("experience_media").delete().eq("product_id",product.id);
-    await admin.from("experience_media").insert(mediaItems.map((m:any)=>({...m,product_id:product.id})));
-
-    // Clean up removed uploaded objects, but never touch repository asset paths.
-    const storagePrefix=projectUrl+"/storage/v1/object/public/experience-media/";
-    const storagePaths=removed.map((m:any)=>String(m.media_url||"")).filter((u:string)=>u.startsWith(storagePrefix)).map((u:string)=>decodeURIComponent(u.slice(storagePrefix.length)));
-    if(storagePaths.length) await admin.storage.from("experience-media").remove(storagePaths);
-
-    return json({ok:true,product,photo_count:mediaItems.length});
+    if(!components.length&&body.components)return json({ok:false,error:"package_components_required"},400);
+    if([productPayload.minimum_lead_hours,productPayload.daily_capacity,productPayload.inventory].some(x=>x!==null&&(!Number.isInteger(x)||x<0||x>100000)))return json({ok:false,error:"invalid_experience_limits"},400);
+    const prefix=projectUrl+"/storage/v1/object/public/experience-media/";
+    if(mediaItems.some((m:any)=>!(m.media_url.startsWith(prefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)$/.test(m.media_url))))return json({ok:false,error:"invalid_offer_photo"},400);
+    const {data:props}=await admin.from("properties").select("id").eq("active",true);
+    const eligibleIds=propertyIds||(existing?(await admin.from("experience_property_eligibility").select("property_id").eq("product_id",id)).data?.map((x:any)=>x.property_id):props?.map((x:any)=>x.id))||[];
+    const {data:product,error}=await admin.rpc("save_experience_package_atomic",{p_id:id,p_actor:user.id,p_product:productPayload,p_properties:eligibleIds,p_media:mediaItems});
+    if(error||!product)return json({ok:false,error:"experience_save_failed"},409);
+    return json({ok:true,product});
   }
 
   if(operation==="toggle_product_status"){
@@ -1528,7 +1562,7 @@ async function experienceAdminAction(req:Request,body:any){
     const next=product.status==="active"?"inactive":"active";
     if(next==="active"){
       const {count}=await admin.from("experience_media").select("id",{count:"exact",head:true}).eq("product_id",product.id);
-      if(Number(count||0)<5) return json({ok:false,error:"experience_requires_five_photos",photo_count:Number(count||0)},400);
+      if(Number(count||0)<1) return json({ok:false,error:"experience_photo_required",photo_count:Number(count||0)},400);
     }
     const {data,error}=await admin.from("experience_products").update({status:next}).eq("id",product.id).select().single();
     if(error) return json({ok:false,error:"experience_status_failed"},500);
@@ -1641,13 +1675,13 @@ async function guestExperienceCatalog(req:Request,body:any){
   if(!reservationId) return json({ok:false,error:"missing_data"},400);
 
   const {data:r,error:re}=await admin.from("reservations")
-    .select("id,user_id,property_id,check_in,status")
+    .select("id,user_id,property_id,check_in,check_out,status")
     .eq("id",reservationId).single();
   if(re||!r||r.user_id!==user.id) return json({ok:false,error:"not_found"},404);
   if(r.status!=="confirmed") return json({ok:false,error:"reservation_not_available"},409);
 
   const {data:products,error:pe}=await admin.from("experience_products")
-    .select("id,name,description,sales_headline,package_type,price_cents,upsell_enabled,minimum_lead_hours,daily_capacity,inventory,status,created_at,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility!inner(property_id),experience_media(id,media_url,alt_text,display_order)")
+    .select("id,name,description,sales_headline,package_type,price_cents,upsell_enabled,minimum_lead_hours,daily_capacity,inventory,status,details,created_at,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility!inner(property_id),experience_media(id,media_url,alt_text,display_order)")
     .eq("status","active")
     .eq("experience_property_eligibility.property_id",r.property_id)
     .order("display_order");
@@ -1664,10 +1698,11 @@ async function guestExperienceCatalog(req:Request,body:any){
   const items=[];
   for(const p of products||[]){
     const variant=(p.experience_variants||[]).filter((v:any)=>v.active).sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))[0];
-    if(!variant) continue;
+    if(!variant||p.details?.standalone_enabled===false) continue;
     const leadOk=(arrival-now)>=Number(p.minimum_lead_hours||0)*3600000;
     const stockOk=p.inventory==null||Number(p.inventory)>0;
-    if(!leadOk||!stockOk) continue;
+    if(!stockOk) continue;
+    const viability=await admin.rpc("experience_sale_issue",{p_product:p.id,p_property:r.property_id,p_start:r.check_in,p_end:r.check_out,p_exclude:r.id});if(viability.error||viability.data)continue;
 
     const current=activeItems.find((i:any)=>i.experience_products?.package_type===p.package_type);
     let purchaseMode="add",payableCents=Number(variant.price_cents),upgradeFrom=null;
@@ -1700,7 +1735,7 @@ async function guestExperienceCatalog(req:Request,body:any){
 
     items.push({
       product_id:p.id,variant_id:variant.id,name:p.name,description:p.description,
-      sales_headline:p.sales_headline,package_type:p.package_type,
+      sales_headline:p.sales_headline,package_type:p.package_type,components:experienceComponents(p.details),
       price_cents:Number(variant.price_cents),payable_cents:payableCents,purchase_mode:purchaseMode,
       upgrade_from:upgradeFrom,
       media:(p.experience_media||[]).slice().sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))
@@ -1729,7 +1764,7 @@ async function purchasePostBookingExperience(req:Request,body:any,development:bo
   const {data,error}=await admin.rpc("add_experience_cart_item_atomic",{
     p_reservation_id:reservationId,
     p_user_id:user.id,
-    p_variant_id:variantId
+    p_variant_id:variantId,p_preferences:body.experience_preferences||{}
   });
   if(error){
     const msg=String(error.message||"");
@@ -1783,7 +1818,7 @@ async function checkoutExperienceCartItem(req:Request,body:any){
   if(error){
     const msg=String(error.message||"");
     for(const code of ["cart_item_not_found","reservation_not_available","experience_unavailable","experience_lead_time",
-      "experience_out_of_stock","experience_already_added","experience_upgrade_not_available",
+      "experience_out_of_stock","experience_already_added","experience_upgrade_not_available","experience_choice_required","invalid_experience_choice","experience_component_conflict",
       "experience_capacity_reached","experience_payment_already_pending"])
       if(msg.includes(code)) return json({ok:false,error:code},409);
     return json({ok:false,error:"experience_checkout_failed"},500);
@@ -2052,10 +2087,12 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         payment_settings:settingsQ.data||{},
         policy_documents:docsQ.data||[],
         required_booking_documents:bookingDocuments(docsQ.data||[],development),
-        experience_products:productsQ.data||[],
+        experience_products:productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
+    if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
+    if(action==="stay_offer_action")return await stayOffers.action(req,body,development);
     if(action==="legal_documents")return await legalDocuments(req,body,development);
     if(action==="property_media"){
       const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery,features").eq("active",true).order("id");
@@ -2067,10 +2104,19 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
       const end=url.searchParams.get("end")||body.end;
       const guests=Number(url.searchParams.get("guests")||body.guests||2);
       const listings=await searchData(start,end,guests,null,development);
-      return json({ok:true,listings:listings.map((x:any)=>{
+      const offerId=body.stay_offer_id||url.searchParams.get("stay_offer_id");
+      const catalog=offerId?await stayOffers.catalog():null;
+      const listingOffers=await Promise.all(listings.map(async(x:any)=>{
         const {cleaning_fee,...rest}=x;
-        return {...rest,from_stay_price:x.base_price!=null?Number(x.base_price)*1.10+Number(x.cleaning_fee||0):null};
-      })});
+        if(!x.available)return {...rest,from_stay_price:null};
+        const selected=catalog?.offers.find((o:any)=>o.id===offerId);
+        const issues=offerId?selected?offerIssues(selected,catalog.products,x.id,{check_in:start,check_out:end}):["offer_unavailable"]:[];
+        if(issues.length)return {...rest,offer_issues:issues,from_stay_price:null};
+        let quote;try{quote=await createQuote({property_id:x.id,check_in:start,check_out:end,guests,stay_offer_id:offerId||undefined},development,null,null,listings)}catch(e){return {...rest,from_stay_price:null,offer_issues:[(e as Error).message]}};
+        const available=quote.rate_options.filter((p:any)=>p.selectable);
+        return {...rest,from_stay_price:Math.min(...available.map((p:any)=>p.total_amount_cents))/100,quote,offer_issues:[]};
+      }));
+      return json({ok:true,listings:listingOffers});
     }
     if(action==="same_day_request"){
       const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);
@@ -2173,7 +2219,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
     if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
-    const clientErrors=["same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available"];
+    const clientErrors=["same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available","offer_unavailable","offer_duration","offer_period","offer_property_incompatible","package_paused","package_lead_time","package_property_incompatible","package_unavailable","experience_component_conflict","invalid_experience_choice","experience_choice_required"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
 });

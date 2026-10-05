@@ -39,7 +39,7 @@ const cleanPropertyIds=(value:any,available:number[])=>[...new Set((Array.isArra
 async function syncTurnovers(actor:any){
   const actorId=actor.id;
   const start=new Date(Date.now()-2*86400000).toISOString().slice(0,10),end=new Date(Date.now()+45*86400000).toISOString().slice(0,10);
-  const {data:reservations}=await admin.from("reservations").select("id,property_id,check_in,check_out,guest_name,status,properties(name,check_in_time,check_out_time),experience_orders(status,experience_order_items(product_name_snapshot,variant_name_snapshot,quantity,status))").eq("status","confirmed").gte("check_out",start).lte("check_out",end);
+  const {data:reservations}=await admin.from("reservations").select("id,property_id,check_in,check_out,guest_name,status,properties(name,check_in_time,check_out_time),experience_orders(status,experience_order_items(product_name_snapshot,variant_name_snapshot,quantity,status,composition_snapshot))").eq("status","confirmed").gte("check_out",start).lte("check_out",end);
   for(const r of reservations||[]){
     if(!canUseProperty(actor,Number(r.property_id)))continue;
     const property=Array.isArray(r.properties)?r.properties[0]:r.properties;
@@ -61,9 +61,9 @@ async function syncTurnovers(actor:any){
         await admin.from("pms_task_checklist_items").insert(labels.map((label:string,index:number)=>({task_id:task.id,label,display_order:index})));
       }
     }
-    const experiences=(r.experience_orders||[]).filter((o:any)=>o.status==="active").flatMap((o:any)=>o.experience_order_items||[]).filter((x:any)=>x.status==="active");
+    const experiences=(r.experience_orders||[]).filter((o:any)=>o.status==="active").flatMap((o:any)=>o.experience_order_items||[]).filter((x:any)=>x.status==="active"&&!x.composition_snapshot);
     if(experiences.length){
-      const {data:setupExists}=await admin.from("pms_tasks").select("id,status,property_id,scheduled_for,due_at,pms_task_checklist_items(id,label,completed)").eq("reservation_id",r.id).eq("task_type","setup").maybeSingle();
+      const {data:setupExists}=await admin.from("pms_tasks").select("id,status,property_id,scheduled_for,due_at,pms_task_checklist_items(id,label,completed)").eq("reservation_id",r.id).eq("task_type","setup").is("experience_item_id",null).maybeSingle();
       if(!setupExists){
         const checkInAt=new Date(`${r.check_in}T${String(property?.check_in_time||"15:00").slice(0,5)}:00-03:00`);
         const scheduledAt=new Date(checkInAt.getTime()-24*60*60*1000).toISOString(),dueAt=new Date(checkInAt.getTime()-60*60*1000).toISOString();

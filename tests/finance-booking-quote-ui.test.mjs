@@ -14,7 +14,7 @@ test('advancing unchanged experiences preserves the quoted price and original ex
  w.sessionStorage.setItem('chalezinho_booking_resume',JSON.stringify({property:{id:1,name:'QA'},selectedByProduct:{},rateCode:'non_refundable',check_in:'2099-10-01',check_out:'2099-10-03',guests:2,
  quote:{quote_id:'snapshot',expires_at:expiry,experiences:[],selected_variant_ids:[],rate_options:[{code:'non_refundable',selectable:true,quote_option_id:'option-snapshot',total_amount_cents:808}]}}));
  try{
-  w.eval(js);for(let i=0;i<50&&w.document.querySelector('#checkout-panel').dataset.step!=='4';i++)await new Promise(r=>setTimeout(r,5));
+  w.eval(await readFile(new URL('../stay-offers.js',import.meta.url),'utf8'));w.eval(js);for(let i=0;i<50&&w.document.querySelector('#checkout-panel').dataset.step!=='4';i++)await new Promise(r=>setTimeout(r,5));
   w.document.querySelector('#step-back').click();w.document.querySelector('#step-back').click();
   w.document.querySelector('#step-next').click();for(let i=0;i<50&&w.document.querySelector('#checkout-panel').dataset.step!=='3';i++)await new Promise(r=>setTimeout(r,5));
   assert.equal(w.document.querySelector('#checkout-panel').dataset.step,'3');

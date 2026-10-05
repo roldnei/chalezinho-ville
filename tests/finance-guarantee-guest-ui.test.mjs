@@ -22,7 +22,7 @@ async function setup({settledCancellation=false,guaranteeOverride={},extraReserv
   return {ok:true,json:async()=>body.action==='config'?{ok:true,payment_settings:{}}:body.action==='pagbank_sandbox_card_key'?{ok:true,public_key:'fixture-public-key'}:{ok:true,requests:[],cases:[],finance:{guarantees:[],payments:[],events:[]}}};
  };
  w.PagSeguro={encryptCard:input=>{assert.equal(input.number,'4111111111111111');assert.equal(input.securityCode,'123');return {encryptedCard:'encrypted-fixture-only-no-real-card'}}};
- w.eval(js);
+ w.eval(await readFile(new URL('../stay-offers.js',import.meta.url),'utf8'));w.eval(js);
  for(let i=0;i<40&&!w.document.querySelector('[data-guarantee-card]');i++)await new Promise(r=>setTimeout(r,5));
  return {dom,w,calls};
 }

@@ -29,7 +29,7 @@ async function setup(captured=false,withoutGuarantee=false,overrides={}){
   if(body.action==='reservation_finance')result.finance.incidents=structuredClone(incidents);
   return {ok:true,json:async()=>result};
  };
- w.eval(js);
+ w.eval(await readFile(new URL('../stay-offers.js',import.meta.url),'utf8'));w.eval(js);
  for(let i=0;i<30&&!w.document.querySelector('[data-reservation]');i++)await new Promise(r=>setTimeout(r,5));
  const res=w.document.querySelector('[data-reservation]');assert.ok(res,'reservation rendered');res.click();
  await new Promise(r=>setTimeout(r,10));
