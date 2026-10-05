@@ -1843,3 +1843,5 @@ footer{justify-content:space-between!important}
 .legal-links{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:24px;font-size:.875rem}.legal-links a{color:inherit}
 .legal-body,.policy-document p,.legal-document-form details p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:1rem}.accepted-documents details{margin:16px 0}.legal-document-form{margin:24px 0}.legal-document-form textarea{width:100%;font-size:1rem}
 .legal-page{max-width:900px;margin:40px auto;padding:24px}.legal-page h1{margin:24px 0}.legal-page p{line-height:1.7}
+
+.property-house-rules{color:#ded3c2;border-top-color:rgba(255,255,255,.16)}.property-house-rules h2{color:#f3ebdf}.property-house-rules a{color:inherit}
