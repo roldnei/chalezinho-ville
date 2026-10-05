@@ -50,7 +50,12 @@ async function init(){
  initStayModes();
  window.addEventListener("beforeunload",()=>{if(state.property&&!$("#checkout-modal").hidden&&Number($("#checkout-panel").dataset.step)<6)saveResume()});
  renderDevBanner();
- await restoreResume();await restoreSameDay();
+ const incoming=new URLSearchParams(location.search);
+ if(incoming.has("check_in")&&incoming.has("check_out")){
+  $("#book-in").value=incoming.get("check_in");$("#book-out").value=incoming.get("check_out");$("#book-guests").value=incoming.get("guests")||"2";
+  await search();
+  if(incoming.get("from")==="showcase"){const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);if(rate)$("#rate-options").querySelector(`[data-option="${rate.quote_option_id}"]`)?.click()}}
+ }else{await restoreResume();await restoreSameDay()}
 }
 async function initChaletFilter(){
  const select=$("#book-chalet"),requested=new URLSearchParams(location.search).get("chalet")||"";

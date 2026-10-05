@@ -11,8 +11,9 @@
   if(!document.querySelector('.hero,[data-property-code],#property-detail'))return;
   try{
    const res=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_offers',{cache:'no-store',headers:{'X-Chalezinho-Env':'development'}});
-   if(!res.ok)return;const {offers=[]}=await res.json();
+   if(!res.ok)throw Error("offer_catalog_unavailable");const {offers=[]}=await res.json();
    const code=document.querySelector('main[data-property-code]')?.dataset.propertyCode||new URLSearchParams(location.search).get('codigo');
+   if(!code&&document.querySelector('.hero')&&window.VilleShowcase){await window.VilleShowcase.load(offers);return}
    let property=null;if(code){const r=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=property_media',{cache:'no-store'});property=(await r.json()).properties?.find(p=>p.code===code)}
    const available=offers.filter(o=>!property?Object.values(o.issues_by_property||{}).some(x=>!x.length):o.property_ids.map(Number).includes(property.id)&&!(o.issues_by_property?.[property.id]||[]).length);
    const section=document.createElement('section');section.className='stay-offers-public';section.id='estadias-completas';
@@ -24,7 +25,7 @@
    if(version!==bootVersion)return;document.querySelector('#estadias-completas')?.remove();
    const main=document.querySelector('main[data-property-code],#property-detail')||document.querySelector('main');
    const hero=main?.querySelector('.detail-hero');if(hero)hero.after(section);else{const target=document.querySelector('#experiencias,#estadias-completas');if(target)target.replaceWith(section);else document.querySelector('.hero')?.after(section)}
-  }catch(error){console.warn('Não foi possível carregar as estadias completas.',error)}
+  }catch(error){console.warn('Não foi possível carregar as estadias completas.',error);if(!document.querySelector('main[data-property-code],#property-detail')&&window.VilleShowcase&&!document.querySelector('.stay-showcase'))await window.VilleShowcase.load([])}
  }
  document.addEventListener('DOMContentLoaded',boot);document.addEventListener('ville:property-ready',()=>{document.querySelector('#estadias-completas')?.remove();boot()});
 })();

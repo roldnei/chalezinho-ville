@@ -4,8 +4,8 @@ const pid='d7c8da18-e089-46d1-962b-f90816135ef5',vid='10000000-0000-4000-8000-00
 const p={id:pid,name:'Chegada romântica',status:'active',package_type:'romantic',price_cents:10000,details:{components:[{name:'Bebida',quantity:1,frequency:'arrival',choices:['Vinho','Espumante']}]},experience_media:[{media_url:'assets/hero-signature.webp'}],experience_variants:[{id:vid,active:true,price_cents:10000}],experience_property_eligibility:[{property_id:1}]};
 const offer={id:oid,name:'Chegada preparada',description:'Hospedagem e bebida',status:'active',property_ids:[1],product_ids:[pid],discount_bps:500,discount_enabled:true};
 const property={id:1,code:'CH1',name:'Ville Signature',available:true,cover_image:'assets/hero-signature.webp',features:{},property_type:'chalet'};
-async function setup(saved){
- const dom=new JSDOM(html,{url:'https://qa.example/reservar.html?chalet=CH1'+(saved?'&resume=1':''),runScripts:'outside-only'}),w=dom.window,calls=[];
+async function setup(saved,url=null){
+ const dom=new JSDOM(html,{url:url||'https://qa.example/reservar.html?chalet=CH1'+(saved?'&resume=1':''),runScripts:'outside-only'}),w=dom.window,calls=[];
  w.HTMLElement.prototype.scrollIntoView=()=>{};w.VilleImages={set(){}};
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://qa.example',supabaseKey:'fixture',bookingEngine:'https://qa.example/engine',environment:'development'};
  w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:saved?{user:{email:"qa@example.test",user_metadata:{}}}:null}})}})};
@@ -32,4 +32,9 @@ test('login resume and reload preserve complete offer and chosen preference',asy
  const $=s=>a.w.document.querySelector(s);$('#book-in').value='2030-01-01';$('#book-out').value='2030-01-03';$('#book-search').click();await wait(()=>$('.booking-select'));$('.booking-select').click();await wait(()=>$('.rate-card'));$('.rate-card').click();$('#step-next').click();const choice=$('[data-component="Bebida"]');choice.value='Espumante';choice.dispatchEvent(new a.w.Event('change'));$('#step-next').click();await wait(()=>$('#checkout-panel').dataset.step==='3');a.w.dispatchEvent(new a.w.Event('beforeunload'));saved=a.w.sessionStorage.getItem('chalezinho_booking_resume');assert.equal(JSON.parse(saved).offerId,oid);
  }finally{a.dom.window.close()}
  const b=await setup(saved);try{await wait(()=>b.w.document.querySelector('#checkout-panel').dataset.step==='4');assert.equal(b.w.document.querySelector('#checkout-stay-mode').value,oid);assert.match(b.w.document.querySelector('#checkout-offer-context').textContent,/Chegada preparada/);assert.equal(JSON.parse(saved).preferences[pid].Bebida,'Espumante');assert.equal(b.calls.filter(x=>x.action==='quote').length,0,'retains valid quote, does not change price on login return')}finally{b.dom.window.close()}
+});
+
+test('dated storefront selection rechecks prices, opens chosen property and selects advertised tariff',async()=>{
+ const {dom,w,calls}=await setup(null,'https://qa.example/reservar.html?chalet=CH1&stay_offer='+oid+'&check_in=2030-01-01&check_out=2030-01-03&guests=2&rate=non_refundable&from=showcase');
+ try{await wait(()=>w.document.querySelector('.rate-card')?.classList.contains('selected'));assert.equal(w.document.querySelector('#book-in').value,'2030-01-01');assert.equal(w.document.querySelector('#checkout-stay-mode').value,oid);assert.equal(w.document.querySelector('#checkout-modal').hidden,false);assert.equal(calls.filter(c=>c.action==='quote').at(-1).body.stay_offer_id,oid);assert.equal(calls.find(c=>c.action==='search').params.start,'2030-01-01')}finally{dom.window.close()}
 });

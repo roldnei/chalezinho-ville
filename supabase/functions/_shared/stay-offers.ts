@@ -1,3 +1,4 @@
+import {showcaseSettings} from "./stay-showcase.ts";
 type Row = Record<string, any>;
 const fail = (code: string): never => {throw new Error(code)};
 export function experienceComponents(details: Row = {}) {
@@ -26,7 +27,7 @@ export function validateStayOffer(input: Row) {
   const start_date=input.start_date||null,end_date=input.end_date||null;
   if([start_date,end_date].some(x=>x&&!/^\d{4}-\d{2}-\d{2}$/.test(x))||start_date&&end_date&&end_date<start_date)fail('invalid_offer_period');
   return {name,description,property_ids,product_ids,min_nights,max_nights,discount_bps,discount_enabled:input.discount_enabled!==false,
-    start_date,end_date,media,status:input.status==='active'?'active':'paused'};
+    start_date,end_date,media,showcase:showcaseSettings(input.showcase),status:input.status==='active'?'active':'paused'};
 }
 export function offerIssues(offer: Row, products: Row[], propertyId?: number, dates?: {check_in:string;check_out:string}, now=Date.now()) {
   const issues: string[]=[];

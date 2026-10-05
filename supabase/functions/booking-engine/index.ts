@@ -1,6 +1,7 @@
 import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
 import {publicProperty} from "../_shared/public-property.ts";
 import {offerIssues,priceStayOffer,compositionSnapshot,experienceComponents} from "../_shared/stay-offers.ts";
+import {cachedWeekdayShowcase} from "../_shared/stay-showcase.ts";
 import {stayOfferService} from "../_shared/stay-offer-service.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
 import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
@@ -211,12 +212,8 @@ async function adminCalendarAction(req:Request,body:any){
  return json({ok:true,...await calendars.configuration()});
 }
 
-async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false){
-  if(!validDate(start)||!validDate(end)||end<=start) throw new Error("invalid_dates");
-  const stay=nights(start,end);
-  if(stay<1) throw new Error("invalid_dates");
-
-  const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices] = await Promise.all([
+async function searchSources(start:string,end:string){
+  return Promise.all([
     retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone").eq("active",true).order("id")),
     retryDb("search_reservations",()=>admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")
       .lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"])),
@@ -229,6 +226,11 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     bookingCalendarData(),
     prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
   ]);
+}
+async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false,sources:any=null){
+  if(!validDate(start)||!validDate(end)||end<=start)throw Error("invalid_dates");
+  const stay=nights(start,end);if(stay<1)throw Error("invalid_dates");
+  const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices]=sources||await searchSources(start,end);
   const {data:properties,error:pe}=propertiesQ;
   const {data:dbRows,error:re}=reservationsQ;
   const {data:changeHolds,error:he}=changeHoldsQ;
@@ -248,7 +250,9 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   return (properties||[]).map((p:any)=>{
     const cal=icalMap[p.name];
     const bookingCal=bookingMap[p.name];
-    const pr=priceMap[p.name];
+    const rawPrice:any=priceMap[p.name];
+    const pricedDays=sources?(rawPrice?.days||[]).filter((d:any)=>d.date>=start&&d.date<end):null;
+    const pr=sources&&rawPrice?{...rawPrice,days:pricedDays,total_price:pricedDays.reduce((sum:number,d:any)=>sum+Number(d.price),0),min_stay:pricedDays.find((d:any)=>d.date===start)?.min_stay}:rawPrice;
     const rules=availabilityRules(p.features?.availability||{});
     const sameDayApproval=rules.allow_same_day_requests&&start===brazilClock().date;
     const decision=availabilityDecision(sameDayApproval?{...rules,lead_days:0,same_day_cutoff:"23:59"}:rules,start,end,pr?.min_stay);
@@ -258,7 +262,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     const channelOccupied=airbnbOccupied||bookingOccupied;
     const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id)&&occupied({start:x.check_in,end:x.check_out}))
       || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id)&&occupied({start:x.target_check_in,end:x.target_check_out}))
-      || (operationalBlocks||[]).some((x:any)=>Number(x.property_id)===Number(p.id));
+      || (operationalBlocks||[]).some((x:any)=>Number(x.property_id)===Number(p.id)&&overlaps(start,end,x.start_date,x.end_date));
     const minStay=decision.min_stay;
     const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
     const requestable=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&!decision.reason&&hasPrice;
@@ -274,12 +278,12 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   });
 }
 
-async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null){
+async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null,persist=true,offerCatalog:any=null){
   const {property_id,check_in,check_out,guests}=body||{};
   let experience_variant_ids=Array.isArray(body.experience_variant_ids)?[...new Set(body.experience_variant_ids)]:[];
   let offer:any=null;
   if(body.stay_offer_id){
-    const catalog=await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
+    const catalog=offerCatalog||await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
     if(!offer)throw Error("offer_unavailable");
     const issues=offerIssues(offer,catalog.products,Number(property_id),{check_in,check_out});
     if(issues.length)throw Error(issues[0]);
@@ -334,7 +338,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   const baseCents=cents(property.base_price);
   const cleaningCents=cents(property.cleaning_fee);
   const expiresAt=new Date(Date.now()+15*60000).toISOString();
-  const {data:q,error:qe}=await admin.from("quotes").insert({
+  const result=persist?await admin.from("quotes").insert({
     property_id:property.id,
     client_token_hash:crypto.randomUUID(),
     check_in,check_out,guests:Number(guests),
@@ -343,10 +347,11 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     pricing_snapshot:{source:"pricelabs",base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,stay_offer_id:offer?.id||null,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
     rules_version:"2026-09-v1",
     expires_at:expiresAt
-  }).select().single();
+  }).select().single():{data:{id:null},error:null};
+  const {data:q,error:qe}=result;
   if(qe||!q) throw new Error("quote_create_failed");
 
-  if(expSnapshots.length){
+  if(persist&&expSnapshots.length){
     const rows=expSnapshots.map(x=>({
       quote_id:q.id,product_id:x.product.id,variant_id:x.variant.id,
       product_name_snapshot:x.product.name,variant_name_snapshot:x.variant.code==="package"?null:x.variant.name,
@@ -387,7 +392,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     });
   }
   let optionRows:any[]=[];
-  if(inserted.length){
+  if(persist&&inserted.length){
     const {data,error}=await admin.from("quote_options").insert(inserted).select("id,rate_plan_id,total_amount_cents");
     if(error) throw new Error("quote_options_failed");
     optionRows=data||[];
@@ -2093,6 +2098,11 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         experience_products:productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
+    }
+    if(action==="stay_showcase"){
+      if(!development)return json({ok:false,error:"development_only"},403);
+      const cards=await cachedWeekdayShowcase({catalog:()=>stayOffers.catalog(),today:brazilClock().date,sources:searchSources,search:(start:string,end:string,sources:any)=>searchData(start,end,2,null,development,false,sources),quote:(body:any,list:any[],catalog:any)=>createQuote(body,development,null,null,list,false,catalog)});
+      return json({ok:true,...cards});
     }
     if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
     if(action==="stay_offer_action")return await stayOffers.action(req,body,development);

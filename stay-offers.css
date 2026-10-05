@@ -4,3 +4,6 @@
 .rate-policy{padding:8px 14px 16px;color:#f4eee6;font-size:13px;line-height:1.5}.rate-policy summary{cursor:pointer;min-height:44px;display:flex;align-items:center;text-decoration:underline}.rate-policy p{max-width:65ch}
 .offer-context label{display:grid;gap:8px;min-width:0}.offer-context select{display:block;width:100%;max-width:100%;min-width:0;box-sizing:border-box;min-height:44px;padding:12px;background:#302a25;color:#fff;border:1px solid #62564a;font:inherit}.booking-offer-choice select{max-width:100%;min-width:0;box-sizing:border-box}.simple-experience-form input[type=checkbox],.simple-experience-form input[type=radio]{width:20px;height:20px;min-height:20px;padding:0}.simple-experience-form label:has(input[type=checkbox]){display:flex;align-items:center;gap:12px}
 .account-page:has(.simple-experience-admin) .detail-header{position:relative;background:#0f0c0a;color:#f7f0e7}.account-page:has(.simple-experience-admin) .simple-experience-admin{padding-top:60px}
+
+/* Preserve the original composition of offer photographs on every screen. */
+.stay-offer-cards img{object-fit:contain;background:#17120d;display:block}
