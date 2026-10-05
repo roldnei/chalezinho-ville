@@ -62,9 +62,9 @@ async function initChaletFilter(){
   if(requested){const option=document.createElement("option");option.value=requested;option.textContent="Chalé "+requested.slice(0,40);select.appendChild(option)}
  }
  select.value=[...select.options].some(o=>o.value===requested)?requested:"";
- select.addEventListener("change",()=>{
+ select.addEventListener("change",async()=>{
   const url=new URL(location.href);if(select.value)url.searchParams.set("chalet",select.value);else url.searchParams.delete("chalet");history.replaceState(null,"",url);
-  if(state.search)renderResults(state.search);
+  refreshStayOptions();persistSelection();if(state.search)await search();
  });
 }
 async function closeCheckout(){
@@ -89,6 +89,7 @@ async function closeCheckout(){
   return;
  }
  $("#checkout-modal").hidden=true;
+ if($("#booking-results").classList.contains("booking-results-hidden")&&state.search)await search();
 }
 function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
 function error(t){$("#booking-error").textContent=t}
@@ -177,9 +178,12 @@ function showStep(n){
  $("#step-next").textContent=n===5?(pagbankSandbox?"Ir para pagamento de teste":"Iniciar pagamento de teste"):"Continuar";
 }
 async function generateQuote(withExperiences){
+ const controls=['#stay-mode','#checkout-stay-mode','#step-next'].map($).filter(Boolean);controls.forEach(x=>x.disabled=true);
+ try{
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
  const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen,stay_offer_id:state.offerId||undefined,experience_preferences:state.preferences,same_day_request_id:state.approvedRequest||undefined});
  q.selected_variant_ids=chosen.map(String).sort();q.preferences_key=JSON.stringify(state.preferences);state.quote=q;startCountdown(q.expires_at);renderOfferContext();return q;
+ }finally{controls.forEach(x=>x.disabled=x.id==='checkout-stay-mode'&&$('#checkout-panel').dataset.step==='6')}
 }
 function renderRates(){
  const box=$("#rate-options");box.innerHTML="";const ref=state.quote.rate_options.find(x=>x.code==="reference");
@@ -569,9 +573,10 @@ function initStayModes(){
  state.preferences=saved.preferences||{};
  if(!q.has('stay_offer')&&!q.has('mode')){if(saved.check_in)$('#book-in').value=saved.check_in;if(saved.check_out)$('#book-out').value=saved.check_out;if(saved.guests)$('#book-guests').value=saved.guests}
  const options='<option value="">Somente hospedagem</option>'+(state.config.stay_offers||[]).map(o=>'<option value="'+esc(o.id)+'">Com experiência incluída · '+esc(o.name)+'</option>').join('');
- for(const id of ['#stay-mode','#checkout-stay-mode']){$(id).innerHTML=options;$(id).onchange=async e=>{state.offerId=e.target.value||null;state.selectedByProduct={};syncStayModes();persistSelection();if(!$('#checkout-modal').hidden){state.rate=null;state.rateCode=null;showStep(1);try{await generateQuote(false);renderRates()}catch(e){setFlowError(window.VilleOffers.issues[e.message]||'Esta oferta não está disponível para estas datas. Escolha somente hospedagem ou outras datas.')}}else if($('#book-in').value&&$('#book-out').value)await search()}}
- syncStayModes();
+ for(const id of ['#stay-mode','#checkout-stay-mode']){$(id).innerHTML=options;$(id).onchange=async e=>{state.offerId=e.target.value||null;state.selectedByProduct={};syncStayModes();persistSelection();if(!$('#checkout-modal').hidden){state.quote=null;state.rate=null;state.rateCode=null;showStep(1);$('#rate-options').innerHTML='<div class="loading-state">Recalculando a estadia…</div>';$('#booking-results').classList.add('booking-results-hidden');try{await generateQuote(false);renderRates()}catch(e){setFlowError(window.VilleOffers.issues[e.message]||'Esta oferta não está disponível para estas datas. Escolha somente hospedagem ou outras datas.')}}else if($('#book-in').value&&$('#book-out').value)await search()}}
+ refreshStayOptions();syncStayModes();
 }
+function refreshStayOptions(){const code=$("#book-chalet").value,propertyId=Number((state.properties||[]).find(p=>p.code===code)?.id);const compatible=(state.config.stay_offers||[]).filter(o=>!code||o.property_ids.map(Number).includes(propertyId));if(state.offerId&&!compatible.some(o=>o.id===state.offerId))state.offerId=null;const options='<option value="">Somente hospedagem</option>'+compatible.map(o=>'<option value="'+esc(o.id)+'">Com experiência incluída · '+esc(o.name)+'</option>').join('');for(const id of ["#stay-mode","#checkout-stay-mode"])$(id).innerHTML=options;syncStayModes();}
 function syncStayModes(){for(const id of ['#stay-mode','#checkout-stay-mode'])if($(id))$(id).value=state.offerId||'';$('#stay-selection-copy').textContent=selectedOffer()?selectedOffer().description+' O preço inclui hospedagem, limpeza e os pacotes desta oferta.':'Hospedagem e limpeza. Você pode acrescentar pacotes avulsos pelo preço cheio.';renderOfferContext()}
 function persistSelection(){try{sessionStorage.setItem('ville-stay-selection',JSON.stringify({offerId:state.offerId,preferences:state.preferences,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value}))}catch{}}
 function renderOfferContext(){const node=$('#checkout-offer-context');if(node)node.textContent=selectedOffer()?'Com experiência incluída · '+selectedOffer().name:'Somente hospedagem · adicionais avulsos pelo preço cheio'}
