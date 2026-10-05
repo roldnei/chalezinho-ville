@@ -1201,7 +1201,7 @@ async function legalDocuments(req:Request,body:any,development:boolean){
  if(body?.operation==="publish"){
   if(!development)return json({ok:false,error:"development_only"},403);
   if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
-  const {data,error}=await admin.rpc("publish_booking_document",{p_type:body.document_type,p_title:body.title,p_body:body.body,p_actor:user.id,p_previous_id:body.previous_id||null});
+  const {data,error}=await admin.rpc("publish_booking_document",{p_type:body.document_type,p_title:body.title,p_body:String(body.body||"").replace(/^Chalezinho Ville • Versão .*$/gm,"").trim(),p_actor:user.id,p_previous_id:body.previous_id||null});
   if(error)return json({ok:false,error:error.message?.includes("policy_version_changed")?"policy_version_changed":"document_save_failed"},409);
   return json({ok:true,document_id:data});
  }
