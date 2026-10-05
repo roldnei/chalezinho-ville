@@ -7,6 +7,7 @@ import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,sh
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey} from "../_shared/calendars.ts";
+import {experiencePaymentEntries} from "../_shared/finance/experience-payment-entries.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
 import {assertFinanceDevelopment} from "../_shared/finance/environment.ts";
@@ -729,14 +730,18 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(acceptanceError) return json({ok:false,error:acceptanceError.message?.includes("policy_version_changed")?"policy_version_changed":"policy_acceptance_failed"},409);
 
   const {data:qitems}=await admin.from("quote_experience_items").select("*").eq("quote_id",quote_id);
+  let paidExperienceItems:any[]=[];
   if(qitems?.length){
-    const {data:order}=await admin.from("experience_orders").insert({reservation_id:reservationId,user_id:user.id,status:"pending"}).select().single();
+    const {data:order,error:orderError}=await admin.from("experience_orders").insert({reservation_id:reservationId,user_id:user.id,status:"pending"}).select().single();
+    if(orderError||!order?.id)return json({ok:false,error:"experience_order_create_failed"},503);
     if(order?.id){
-      await admin.from("experience_order_items").insert(qitems.map((x:any)=>({
+      const {data:items,error:itemsError}=await admin.from("experience_order_items").insert(qitems.map((x:any)=>({
         order_id:order.id,product_id:x.product_id,variant_id:x.variant_id,
         product_name_snapshot:x.product_name_snapshot,variant_name_snapshot:x.variant_name_snapshot,
         unit_price_cents:opt.contract_snapshot?.lines?.find((l:any)=>l.key===x.product_id)?.net_cents??x.unit_price_cents,quantity:x.quantity,status:"active",composition_snapshot:x.composition_snapshot
-      })));
+      }))).select("id,unit_price_cents,quantity,product_name_snapshot");
+      if(itemsError||items?.length!==qitems.length)return json({ok:false,error:"experience_order_create_failed"},503);
+      paidExperienceItems=items;
     }
   }
 
@@ -756,12 +761,10 @@ async function startPayment(req:Request,body:any,development:boolean){
     {reservation_id:reservationId,payment_id:payment.id,entry_type:"accommodation",amount_cents:Number(opt.accommodation_amount_cents),description:"Hospedagem"},
     {reservation_id:reservationId,payment_id:payment.id,entry_type:"cleaning",amount_cents:Number(opt.cleaning_fee_cents),description:"Taxa de limpeza"}
   ];
-  if(qitems?.length){
-    for(const x of qitems) ledger.push({
-      reservation_id:reservationId,payment_id:payment.id,entry_type:"experience",
-      amount_cents:Number(opt.contract_snapshot?.lines?.find((l:any)=>l.key===x.product_id)?.net_cents??x.unit_price_cents)*Number(x.quantity),description:x.product_name_snapshot
-    });
-  }
+  try{
+    ledger.push(...experiencePaymentEntries(reservationId,payment.id,paidExperienceItems,
+      Number(opt.total_amount_cents)-Number(opt.accommodation_amount_cents)-Number(opt.cleaning_fee_cents)));
+  }catch{return json({ok:false,error:"experience_allocation_invalid",payment_id:payment.id},503)}
   const allocated=spreadBuyerFee(ledger.map(x=>x.amount_cents),buyerInterest);
   ledger.forEach((line,index)=>line.amount_cents=allocated[index]);
   const {error:ledgerError}=await admin.from("financial_entries").insert(ledger);

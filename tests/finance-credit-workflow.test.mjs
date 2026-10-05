@@ -7,12 +7,12 @@ let db;const actor=randomUUID(),guest=randomUUID();
 const one=async(sql,params=[]) => (await db.query(sql,params)).rows[0];
 before(async()=>{db=await creditDatabase();await db.query('insert into auth.users values($1),($2)',[actor,guest]);await db.query("insert into profiles values($1,'admin'),($2,'guest')",[actor,guest]);});
 after(async()=>{await db?.close();});
-async function fixture(){
+async function fixture(itemPrice=49900){
  const r=(await one('insert into reservations default values returning id')).id;
  const p=(await one("insert into payments(reservation_id,amount_cents,status,provider,provider_payment_id) values($1,149900,'paid','pagbank_sandbox','CHAR_QA') returning id",[r])).id;
  const o=(await one('insert into experience_orders(reservation_id) values($1) returning id',[r])).id;
- const i=(await one('insert into experience_order_items(order_id,unit_price_cents) values($1,49900) returning id',[o])).id;
- await db.query("insert into financial_entries(reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents) values($1,$2,$3,'experience',49900)",[r,p,i]);
+ const i=(await one('insert into experience_order_items(order_id,unit_price_cents) values($1,$2) returning id',[o,itemPrice])).id;
+ await db.query("insert into financial_entries(reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents) values($1,$2,$3,'experience',$4)",[r,p,i,itemPrice]);
  await db.query("insert into financial_entries(reservation_id,payment_id,entry_type,amount_cents) values($1,$2,'accommodation',100000)",[r,p]);
  await db.query("insert into reservation_policy_acceptances(reservation_id,document_id,document_code,document_version) select $1,id,code,version from policy_documents where code='refundable_v1' and version='1.2'",[r]);
  return {r,p,i,key:randomUUID()};
@@ -81,4 +81,15 @@ test('credit audit retains item provenance and duplicate key cannot accept a nul
  const e=await one("select payload from finance_events where reservation_id=$1 and source='experience_credits'",[f.r]);
  assert.equal(e.payload.experience_order_item_id,f.i);assert.equal(e.payload.service_not_provided,true);
  await assert.rejects(prepare({...f,i:null}),/idempotency_conflict/);
+});
+
+
+test('settled avulso permits a credit at the contracted net price; pending charges still block it',async()=>{
+ const f=await fixture(95);
+ await db.query("insert into post_booking_charges(reservation_id,kind,amount_cents,status) values($1,'experience',500,'paid')",[f.r]);
+ const result=await prepare(f);
+ assert.equal((await one('select refund_due_cents from reservation_cancellations where id=$1',[result.id])).refund_due_cents,95);
+ const pending=await fixture();
+ await db.query("insert into post_booking_charges(reservation_id,kind,amount_cents,status) values($1,'experience',500,'awaiting_payment')",[pending.r]);
+ await assert.rejects(prepare(pending),/previous_refund_pending/);
 });

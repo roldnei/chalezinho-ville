@@ -191,565 +191,1173 @@ function monthBounds(value){const [y,m]=value.split("-").map(Number),start=`${y}
 function renderCalendar(){
   const b=calendarSpan==='week'?{start:calendarWeekStart,end:new Date(Date.parse(calendarWeekStart)+7*86400000).toISOString().slice(0,10),days:7}:monthBounds(calendarMonth),direct=state.reservations.filter(r=>["confirmed","pending_payment","hold"].includes(r.status)&&r.check_in<b.end&&r.check_out>b.start),manual=(state.calendar_blocks||[]).filter(x=>x.status==="active"&&x.start_date<b.end&&x.end_date>b.start).map(x=>({...x,id:`block:${x.id}`,source:"operational",start:x.start_date,end:x.end_date,guest_name:x.reason,status:"blocked"})),external=[...state.channel_periods.filter(x=>x.start<b.end&&x.end>b.start),...manual];
   const dayHeads=Array.from({length:b.days},(_,i)=>{const d=new Date(Date.parse(b.start)+i*86400000);return `<span class="${d.toISOString().slice(0,10)===today()?"today":""}"><b>${d.getUTCDate()}</b><small>${d.toLocaleDateString("pt-BR",{weekday:"narrow",timeZone:"UTC"})}</small></span>`}).join("");
-  $("#admin-content").innerHTML=`<section class="admin-panel calendar-panel"><div class="admin-calendar-toolbar"><div><button data-month-prev>‹</button><label class="calendar-period">${calendarSpan==='week'?date(b.start)+' – '+date(new Date(Date.parse(b.end)-86400000).toISOString().slice(0,10)):new Date(b.start+'T12:00:00').toLocaleDateString('pt-BR',{month:'long',year:'numeric'})}<input aria-label="Escolher mês" id="calendar-month" type="month" value="${calendarMonth}"></label><button data-month-next>›</button><button data-month-today>Hoje</button><select aria-label="Visão do calendário" id="calendar-span"><option value="month" ${calendarSpan==='month'?'selected':''}>Mês</option><option value="week" ${calendarSpan==='week'?'selected':''}>Semana</option></select><select aria-label="Filtrar imóvel" id="calendar-property"><option value="all">Todos os imóveis</option>${state.properties.map(p=>`<option value="${p.id}" ${String(p.id)===calendarProperty?'selected':''}>${esc(p.name)}</option>`).join('')}</select><button id="manage-calendar-links">Calendários conectados</button></div><div class="calendar-legend"><span class="direct">Site</span><span class="airbnb">Airbnb</span><span class="booking">Booking</span><span class="ical">Outros calendários</span><span class="operational">Operação</span><span class="pending">Pagamento</span></div></div>
-    <div class="calendar-scroll"><div class="admin-calendar-grid" style="--days:${b.days};--calendar-width:${b.days*82}px"><div class="calendar-corner">Imóvel</div><div class="calendar-days">${dayHeads}</div>${state.properties.filter(p=>p.active&&(calendarProperty==='all'||String(p.id)===calendarProperty)).map(p=>calendarRow(p,b,direct,external)).join("")}</div></div>
-    <div class="calendar-mobile-agenda">${[...direct.map(x=>({...x,start:x.check_in,end:x.check_out})),...external].filter(x=>calendarProperty==='all'||String(x.property_id)===calendarProperty).sort((a,b)=>a.start.localeCompare(b.start)).map(x=>calendarAgendaItem(x)).join("")||empty("Nenhuma ocupação neste mês.")}</div></section>`;
-  $('#calendar-property').onchange=e=>{calendarProperty=e.target.value;renderCalendar()};$('#calendar-span').onchange=e=>{calendarSpan=e.target.value;renderCalendar()};
-  $("#manage-calendar-links").onclick=()=>showView("calendar_links");$$('[data-calendar-availability]').forEach(b=>b.onclick=()=>openAvailability(Number(b.dataset.calendarAvailability)));
-  $("#calendar-month").onchange=e=>{calendarMonth=e.target.value;calendarWeekStart=calendarMonth+'-01';renderCalendar()};
-  $("[data-month-prev]").onclick=()=>changeMonth(-1);$("[data-month-next]").onclick=()=>changeMonth(1);$("[data-month-today]").onclick=()=>{calendarMonth=today().slice(0,7);calendarWeekStart=today();renderCalendar()};bindCards();
-}
-function changeMonth(delta){if(calendarSpan==='week'){calendarWeekStart=new Date(Date.parse(calendarWeekStart)+delta*7*86400000).toISOString().slice(0,10);calendarMonth=calendarWeekStart.slice(0,7);renderCalendar();return}const [y,m]=calendarMonth.split("-").map(Number),d=new Date(Date.UTC(y,m-1+delta,1));calendarMonth=d.toISOString().slice(0,7);renderCalendar()}
-function calendarRow(p,b,direct,external){
-  const events=[...direct.filter(r=>Number(r.property_id)===Number(p.id)).map(r=>({...r,start:r.check_in,end:r.check_out,source:r.source||"direct"})),...external.filter(e=>Number(e.property_id)===Number(p.id))];
-  const laneEnds=[];events.sort((a,c)=>a.start.localeCompare(c.start));
-  const bars=events.map(e=>{let lane=laneEnds.findIndex(end=>end<=e.start);if(lane<0)lane=laneEnds.length;laneEnds[lane]=e.end;const start=Math.max(1,Math.floor((Date.parse(e.start)-Date.parse(b.start))/86400000)+1),finish=Math.min(b.days+1,Math.floor((Date.parse(e.end)-Date.parse(b.start))/86400000)+1),left=(start-1)/b.days*100,width=Math.max(2,(finish-start)/b.days*100);const label=e.guest_name||e.calendar_label||sourceLabel(e.source);const contact=e.guest_phone||"Telefone não informado";const packages=e.id&&!String(e.id).includes(":")?byReservation(state.experience_orders,e.id).flatMap(o=>o.experience_order_items||[]).filter(x=>x.status==="active").length:0;return `<button class="calendar-event ${esc(e.source)} ${e.status==="pending_payment"||e.status==="hold"?"pending":""}" style="left:${left}%;width:${width}%;top:${8+lane*44}px" ${stayButton(e)} aria-label="${esc(label)} · ${esc(contact)}" title="${esc(label)} · ${esc(e.calendar_label||sourceLabel(e.source))} · ${esc(contact)} · ${date(e.start)} a ${date(e.end)}"><strong>${esc(label)}</strong><small class="calendar-guest-phone">${esc(contact)}</small>${packages?`<em>+${packages} pacote${packages>1?"s":""}</em>`:""}</button>`}).join("");
-  return `<div class="calendar-property"><strong>${esc(p.name)}</strong><small>${esc(p.code)}</small><button data-calendar-availability="${p.id}">Disponibilidade</button></div><div class="calendar-track" style="min-height:${Math.max(150,laneEnds.length*44+16)}px">${Array.from({length:b.days},()=>"<i></i>").join("")}${bars}</div>`;
-}
-function calendarAgendaItem(e){const p=prop(e.property_id);return `<button class="calendar-agenda-item" ${stayButton(e)}><span class="calendar-source ${esc(e.source)}">${esc(sourceLabel(e.source))}</span><div><strong>${esc(e.guest_name||e.calendar_label||"Hóspede não informado")}</strong><small>${esc(e.guest_phone||"Telefone não informado")}</small><small>${esc(p?.name||"")} · ${date(e.start||e.check_in)} a ${date(e.end||e.check_out)}</small></div></button>`}
+  $("#admin-content").innerHTML=`<section class="admin-panel calendar-panel"><div class="admin-calendar-toolbar"><div><button data-month-prev>‹</button><label class="calendar-period">${calendarSpan==='week'?date(b.start)+' – '+date(ne…63285 tokens truncated…(action==="guest_cancel"){
+    if(m.user_id!==user.id) return json({ok:false,error:"not_allowed"},403);
 
-function renderReservations(){
-  const rows=filteredReservations();
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>GESTÃO DE RESERVAS</small><h2>Estadias</h2></div><button id="new-reservation">+ Nova reserva manual</button></div><div class="admin-filters"><label class="admin-search">Buscar<input id="reservation-search" value="${esc(filters.search)}" placeholder="Nome, código, telefone ou e-mail"></label><label>Status<select id="reservation-status"><option value="all">Todos</option>${["confirmed","pending_payment","hold","cancelled","not_confirmed","no_show","imported"].map(s=>`<option value="${s}" ${filters.status===s?"selected":""}>${statusLabel(s)}</option>`).join("")}</select></label><label>Imóvel<select id="reservation-property"><option value="all">Todos</option>${state.properties.map(p=>`<option value="${p.id}" ${String(filters.property)===String(p.id)?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label></div><div class="admin-reservation-summary"><strong>${rows.length}</strong> reservas e períodos encontrados</div><p class="workspace-summary">Inclui reservas do site e períodos dos calendários conectados. Um período importado pode ser reserva ou bloqueio; consulte seus detalhes.</p><div class="admin-reservation-list">${rows.length?rows.map(r=>reservationCard(r)).join(""):empty("Nenhuma reserva corresponde aos filtros.")}</div></section>`;
-  $("#new-reservation").onclick=openManualReservation;$("#reservation-search").oninput=e=>{filters.search=e.target.value;const pos=e.target.selectionStart;renderReservations();$('#reservation-search').focus();$('#reservation-search').setSelectionRange(pos,pos)};$("#reservation-status").onchange=e=>{filters.status=e.target.value;renderReservations()};$("#reservation-property").onchange=e=>{filters.property=e.target.value;renderReservations()};bindCards();
-}
-function filteredReservations(){
-  const q=filters.search.trim().toLowerCase(),reference=today();
-  return [...state.reservations,...importedRows()].filter(r=>(filters.status==="all"||r.status===filters.status)&&(filters.property==="all"||String(r.property_id)===String(filters.property))&&(!q||[r.guest_name,r.guest_email,r.guest_phone,r.confirmation_code,prop(r.property_id)?.name].some(v=>String(v||"").toLowerCase().includes(q)))).sort((a,b)=>{
-    const aUpcoming=a.check_out>=reference,bUpcoming=b.check_out>=reference;
-    if(aUpcoming!==bUpcoming)return aUpcoming?-1:1;
-    return aUpcoming?a.check_in.localeCompare(b.check_in):b.check_in.localeCompare(a.check_in);
-  })
-}
+    if(m.status==="awaiting_payment"&&m.payment_charge_id){
+      const {data,error}=await admin.rpc("cancel_post_booking_charge_atomic",{p_charge_id:m.payment_charge_id,p_user_id:user.id});
+      if(error){
+        const msg=String(error.message||"");
+        if(msg.includes("payment_processing")) return json({ok:false,error:"payment_processing"},409);
+        if(msg.includes("charge_already_applied")||msg.includes("charge_already_paid")) return json({ok:false,error:"not_allowed"},403);
+        return json({ok:false,error:"modification_cancel_failed"},500);
+      }
+      const row=Array.isArray(data)?data[0]:data;
+      return json({ok:true,status:row?.result_modification_status||"cancelled"});
+    }
 
-let sameDayPolling=false;
-async function pollSameDayPriority(){
- if(!session||!state||document.hidden||sameDayPolling)return;sameDayPolling=true;
- try{const {requests}=await api('same_day_request',{operation:'list'}),count=requests.filter(r=>r.status==='pending').length;
- let bar=$('#same-day-priority');if(!bar){bar=document.createElement('button');bar.id='same-day-priority';bar.className='same-day-priority';$('#admin-app').prepend(bar);bar.onclick=()=>showView('notifications')}
- bar.hidden=count===0;bar.textContent=`URGENTE · ${count} pedido(s) de reserva para hoje — analisar`;
- if(currentView==='notifications')renderSameDayQueue();
- }catch{}finally{sameDayPolling=false}
-}
-setInterval(pollSameDayPriority,30000);
-async function renderSameDayQueue(){
- const host=$('#same-day-queue');if(!host)return;
- try{const {requests}=await api('same_day_request',{operation:'list'});if(!host.isConnected)return;
- const pending=requests.filter(r=>r.status==='pending');host.innerHTML=`<h3>Prioridade · Pedidos para hoje (${pending.length})</h3>${pending.map(r=>`<button class="notification-row critical unread" data-same-day="${esc(r.id)}"><strong>${esc(r.guest_name)} · ${esc(prop(r.property_id)?.name||'Imóvel')}</strong><span>${date(r.check_in)} a ${date(r.check_out)} · Analisar pedido</span></button>`).join('')||'<p>Nenhum pedido aguardando aprovação.</p>'}`;
- for(const n of state.notifications.filter(n=>n.entity_type==='same_day_request')){const r=requests.find(r=>r.id===n.entity_id);const row=$('[data-notification="'+n.id+'"]');if(r&&row){const label={pending:'Aguardando aprovação',approved:'Aprovado para pagamento',rejected:'Recusado',expired:'Prazo encerrado',booked:'Reserva criada'}[r.status]||r.status;row.querySelector('strong').textContent='Pedido de reserva · '+label;row.querySelector('p').textContent=(r.guest_name||'Hóspede')+' · '+(prop(r.property_id)?.name||'Imóvel')+' · '+date(r.check_in);if(r.status!=='pending'){row.classList.remove('critical');row.querySelector('small').textContent='HISTÓRICO'}}}
- host.querySelectorAll('[data-same-day]').forEach(b=>b.onclick=()=>openSameDayReview(b.dataset.sameDay));
- }catch{if(host.isConnected)host.textContent='Não foi possível consultar os pedidos para hoje.'}
-}
-async function openSameDayReview(id){
- $('#admin-modal-content').innerHTML='<p>Consultando pedido…</p>';openModal();
- try{const {request:r}=await api('same_day_request',{operation:'get',id});
- const labels={pending:'Aguardando aprovação',approved:'Aprovado para pagamento',rejected:'Recusado',expired:'Expirado',booked:'Reserva criada'};
- $('#admin-modal-content').innerHTML=`<small>URGENTE · RESERVA PARA HOJE</small><h2>${esc(prop(r.property_id)?.name||'Imóvel')}</h2><p><strong>${esc(r.guest_name)}</strong> · ${esc(r.guest_phone)}</p><p>${date(r.check_in)} a ${date(r.check_out)} · ${r.guests} hóspedes</p><p><strong>Chegada prevista:</strong> ${r.estimated_arrival_time?esc(r.estimated_arrival_time)+' (horário de Guarapari)':'Não informada'}</p><p>${esc(r.note)}</p><p>${labels[r.status]||esc(r.status)} · prazo: ${dateTime(r.expires_at)}</p><p>A aprovação libera o checkout por até 1 hora, sem cobrança e sem garantir as datas. A disponibilidade será conferida novamente no pagamento.</p>${r.status==='pending'?'<label>Resposta ao hóspede<textarea id="same-day-decision-note" maxlength="1000"></textarea></label><button id="approve-same-day">Aprovar para pagamento</button><button id="reject-same-day">Recusar pedido</button>':`<p>${esc(r.decision_note||'')}</p>`}<p id="same-day-review-status" role="status"></p>`;
- for(const [selector,operation] of [['#approve-same-day','approve'],['#reject-same-day','reject']]){const button=$(selector);if(button)button.onclick=async()=>{const buttons=$$('#admin-modal-content button');buttons.forEach(b=>b.disabled=true);try{await api('same_day_request',{operation,id,decision_note:$('#same-day-decision-note').value});await load(true);await openSameDayReview(id)}catch(e){$('#same-day-review-status').textContent=e.message==='dates_unavailable'?'Datas indisponíveis: aprovação não realizada.':'O pedido expirou, já foi analisado ou não pôde ser atualizado. Reabra para conferir.';buttons.forEach(b=>b.disabled=false)}}}
- }catch{$('#admin-modal-content').innerHTML='<h2>Pedido indisponível</h2><p>O pedido não foi encontrado ou não pôde ser consultado.</p>'}
-}
+    if(!["requested","quoted","awaiting_guest_acceptance","accepted"].includes(m.status))
+      return json({ok:false,error:"not_allowed"},403);
 
-function renderNotifications(){
-  const rows=[...state.notifications].sort((a,b)=>(b.severity==='critical')-(a.severity==='critical'));
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>AVISOS OPERACIONAIS</small><h2>O que precisa da sua atenção</h2></div><button id="mark-all-read">Marcar todas como lidas</button></div><div id="same-day-queue"></div><h3>Histórico de notificações</h3><p>Registro dos avisos enviados. Consulte os pedidos acima para ver o que ainda precisa de decisão.</p><div class="notification-list">${rows.length?rows.map(n=>`<button class="notification-row ${n.read_at?"read":"unread"} ${n.severity}" data-notification="${n.id}" data-reservation="${n.reservation_id||""}"><i></i><div><small>${esc(n.entity_type==='same_day_request'?'HISTÓRICO':n.severity==="critical"?"URGENTE":n.severity==="warning"?"ATENÇÃO":"ATUALIZAÇÃO")}</small><strong>${esc(n.entity_type==='same_day_request'?'Pedido de reserva recebido':n.title)}</strong><p>${esc(n.entity_type==='same_day_request'?'Abra para consultar a decisão e o prazo atuais.':n.message||"")}</p></div><time>${dateTime(n.created_at)}</time></button>`).join(""):empty("Nenhuma notificação registrada.")}</div></section>`;
-  $("#mark-all-read").onclick=async()=>{await api("admin_notification_action",{operation:"mark_all_read"});state.notifications.forEach(n=>n.read_at=new Date().toISOString());updateCounts();renderNotifications()};bindCards();renderSameDayQueue();
-}
-async function markNotification(id){const n=state.notifications.find(x=>x.id===id);if(!n||n.read_at)return;await api("admin_notification_action",{operation:"mark_read",notification_id:id}).catch(()=>{});n.read_at=new Date().toISOString();updateCounts()}
-
-function renderFinance(){
-  const paid=state.payments.filter(p=>p.status==="paid"),realPaid=paid.filter(p=>p.provider!=="mock"),testPaid=paid.filter(p=>p.provider==="mock"),pending=state.payments.filter(p=>["processing","under_review","awaiting_payment"].includes(p.status)),refused=state.payments.filter(p=>p.status==="refused"),total=realPaid.reduce((s,p)=>s+Number(p.amount_cents||0),0),testTotal=testPaid.reduce((s,p)=>s+Number(p.amount_cents||0),0);
-  $("#admin-content").innerHTML=`<div class="admin-kpis">${kpi("Recebido",brl(total),realPaid.length+" pagamentos reais")}${kpi("Simulado",brl(testTotal),testPaid.length+" pagamentos de teste")}${kpi("Em andamento",pending.length,"Aguardando conclusão")}${kpi("Recusados",refused.length,"Podem exigir contato")}${kpi("Cobranças adicionais",state.charges.length,"Experiências e alterações")}</div><section class="admin-panel"><div class="admin-panel-head"><div><small>MOVIMENTAÇÃO RECENTE</small><h2>Pagamentos</h2></div></div><div class="finance-list">${state.payments.slice(0,100).map(p=>{const r=state.reservations.find(x=>x.id===p.reservation_id),isTest=p.provider==="mock";return `<button data-reservation="${p.reservation_id}" class="finance-row"><div><strong>${esc(r?.guest_name||r?.confirmation_code||"Reserva")}</strong><span>${esc(prop(r?.property_id)?.name||"")} · ${dateTime(p.created_at)}${isTest?" · TESTE":""}</span></div><span class="admin-status ${statusClass(p.status)}">${statusLabel(p.status)}</span><b>${brl(p.amount_cents)}</b></button>`}).join("")||empty("Nenhum pagamento registrado.")}</div></section>`;bindCards();
-}
-
-function renderChanges(){
-  const rows=state.modifications.slice().sort((a,b)=>b.created_at.localeCompare(a.created_at));
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>PEDIDOS DE ALTERAÇÃO</small><h2>Análise e acompanhamento</h2></div><span>${rows.filter(m=>["requested","quoted"].includes(m.status)).length} para analisar</span></div><div class="admin-card-grid">${rows.length?rows.map(m=>changeCard(m)).join(""):empty("Nenhuma alteração de reserva registrada.")}</div></section>`;
-  $$('[data-change-approve]').forEach(b=>b.onclick=()=>openChangeDecision(b.dataset.changeApprove,false));
-  $$('[data-change-reject]').forEach(b=>b.onclick=()=>openChangeDecision(b.dataset.changeReject,true));
-  bindCards();
-}
-function changeCard(m){
-  const r=state.reservations.find(x=>x.id===m.reservation_id),p=prop(m.requested_property_id||r?.property_id),open=["requested","quoted"].includes(m.status),amount=m.admin_additional_amount_cents??m.estimated_additional_amount_cents??0;
-  const guidance=m.status==="awaiting_payment"?`Aguardando ${brl(amount)} até ${dateTime(m.payment_due_at)}.`:m.status==="payment_expired"?"Prazo encerrado; a reserva original foi mantida.":m.status==="applied"?"Alteração concluída e aplicada à reserva.":"";
-  return `<article class="admin-operation-card"><div><small>${esc(r?.confirmation_code||"RESERVA")} · ${esc(p?.name||"")}</small><h3>${esc(r?.guest_name||"Hóspede")}</h3><p>${date(m.requested_check_in)} → ${date(m.requested_check_out)}</p><span class="admin-status ${statusClass(m.status)}">${statusLabel(m.status)}</span>${guidance?`<p>${esc(guidance)}</p>`:""}</div>${open?`<div class="admin-card-actions"><button data-change-approve="${m.id}">Aprovar</button><button class="danger" data-change-reject="${m.id}">Recusar</button></div>`:`<button data-reservation="${m.reservation_id}">Abrir reserva</button>`}</article>`;
-}
-function openChangeDecision(id,reject){
-  const m=state.modifications.find(x=>x.id===id),suggested=Number(m?.estimated_additional_amount_cents||0)/100;
-  $("#admin-modal-content").innerHTML=`<small>ALTERAÇÃO DE RESERVA</small><h2>${reject?"Recusar solicitação":"Aprovar solicitação"}</h2><p>${reject?"A reserva original continuará válida.":"As novas datas serão protegidas durante o prazo de pagamento. A alteração só será aplicada depois do pagamento ou da confirmação de uma alteração gratuita."}</p><form id="change-decision-form" class="admin-form">${reject?"":`<label>Valor adicional (R$)<input name="amount" type="number" min="0" step="0.01" value="${suggested}"></label>`}<label>Observação para o histórico<textarea name="note" rows="3"></textarea></label><p class="admin-form-message"></p><button class="${reject?"admin-danger":"admin-primary"}">${reject?"Confirmar recusa":"Aprovar e avisar hóspede"}</button></form>`;
-  openModal();$("#change-decision-form").onsubmit=e=>decideChange(e,id,reject);
-}
-async function decideChange(e,id,reject){e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");b.disabled=true;m.textContent="Processando…";try{await api("modification_action",{operation:"decide",request_id:id,decision:reject?"reject":"approve",additional_amount_cents:reject?0:Math.round(Number(f.amount.value||0)*100),admin_note:f.note.value});closeModal();await load(true);renderChanges()}catch(err){m.textContent=({dates_unavailable:"As novas datas não estão mais disponíveis.",minimum_stay:"A estadia não atende ao mínimo de noites.",modification_payment_deadline_passed:"O prazo disponível antes do check-in é insuficiente."})[err.message]||"Não foi possível concluir esta decisão."}finally{b.disabled=false}}
-
-function renderGuarantees(){
-  const rows=state.guarantees.slice().sort((a,b)=>b.created_at.localeCompare(a.created_at));
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>GARANTIAS DE HOSPEDAGEM</small><h2>Pré-autorizações e ocorrências</h2></div></div><div class="admin-card-grid">${rows.length?rows.map(g=>guaranteeCard(g)).join(""):empty("Nenhuma garantia registrada.")}</div></section>`;
-  $$('[data-guarantee]').forEach(b=>b.onclick=()=>openGuarantee(b.dataset.guarantee));
-}
-function guaranteeCard(g){const r=state.reservations.find(x=>x.id===g.reservation_id),verified=g.provider==="pagbank_sandbox"&&!!g.provider_authorization_id;return `<article class="admin-operation-card"><div><small>${esc(r?.confirmation_code||"RESERVA")} · ${esc(prop(r?.property_id)?.name||"")}</small><h3>${esc(r?.guest_name||"Hóspede")}</h3><p>${verified?"Pré-autorização PagBank":"Caução sem pré-autorização confirmada"} · ${brl(g.amount_cents)}</p><span class="admin-status ${statusClass(g.status)}">${verified?statusLabel(g.financial?.status||g.status):"Não autorizada no PagBank"}</span></div><button data-guarantee="${g.id}">Ver garantia</button></article>`}
-function guaranteeAttention(code){return ({authorization_declined:"Cartão recusado. Solicite ao hóspede a atualização em Minha conta; a reserva continua confirmada.",renewal_consent_required:"A estadia exige renovação. O hóspede precisa autorizar possíveis bloqueios simultâneos ao atualizar o cartão.",authorization_result_uncertain:"Resultado incerto: consulte o PagBank e recupere a autorização pelo histórico antes de tentar novamente.",authorization_cleanup_pending:"A liberação de uma autorização anterior está pendente. Não solicite novos bloqueios.",card_token_missing:"Falta cartão vinculado; o hóspede pode informá-lo em Minha conta.",authorization_attempts_exhausted:"Limite de três tentativas em 24 horas atingido.",authorization_expired:"Autorização vencida. A reserva exige regularização da caução.",incident_requires_review:"Renovação bloqueada por ocorrência em análise.",identity_unavailable:"Revise os dados do hóspede antes de solicitar a caução.",reservation_changed:"Datas alteradas: a cobertura da caução será reavaliada.",captured_guarantee_dates_changed:"Datas alteradas após captura: revisão manual necessária.",unexpected_provider_capture:"Cobrança inesperada no provedor: investigar antes de qualquer nova operação."})[code]||"";}
-async function loadAuthorizationHistory(id){
- const box=$("#guarantee-authorization-history");if(!box)return;
- try{const d=await api("authorization_history",{guarantee_id:id});if(!box.isConnected)return;
-  const labels={requested:"Solicitação em andamento",uncertain:"Aguardando conciliação",authorized:"Autorizada",declined:"Recusada",release_pending:"Liberação pendente",released:"Liberada",captured:"Capturada",expired:"Vencida"};
-  box.innerHTML='<h3>Autorizações da reserva</h3><p>'+(d.coverage?.covers_checkout?'Autorização atual cobre o checkout.':d.coverage?.active?'A autorização está ativa, mas não cobre o checkout. Acompanhe a renovação.':'Não há cobertura ativa confirmada.')+'</p>'+(d.authorizations||[]).map(a=>`<article><p>${esc(labels[a.state]||a.state)} · ${brl(a.amount_cents)} · ${dateTime(a.created_at)}</p><small>${esc(a.reference_id)}${a.capture_before?' · Válida até '+dateTime(a.capture_before):''}</small>${!a.provider_charge_id&&['requested','uncertain'].includes(a.state)?`<form data-recover-authorization="${a.id}" class="admin-form"><p>Se o PagBank criou a autorização, copie os identificadores do portal. O sistema verificará se ela pertence a esta solicitação.</p><label>ID da cobrança<input name="charge" placeholder="CHAR_…" required></label><label>ID do pedido<input name="order" placeholder="ORDE_…" required></label><p role="status"></p><button>Conferir e vincular autorização</button></form>`:''}</article>`).join('');
-  box.querySelectorAll('[data-recover-authorization]').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button');b.disabled=true;
-   try{await api('recover_authorization',{guarantee_id:id,authorization_id:f.dataset.recoverAuthorization,charge_id:f.elements.charge.value.trim(),order_id:f.elements.order.value.trim()});await load(true);openGuarantee(id)}
-   catch{f.querySelector('[role="status"]').textContent='Não foi possível verificar o vínculo. Confira os IDs e a referência no PagBank.';b.disabled=false;}
-  });
- }catch{box.textContent='Histórico indisponível. Consulte novamente antes de iniciar outra operação.';}
-}
-function openGuarantee(id){
- const g=state.guarantees.find(x=>x.id===id);if(!g)return;
- const r=state.reservations.find(x=>x.id===g.reservation_id), captured=Number(g.captured_amount_cents||0),refunded=Number(g.refunded_amount_cents||0);
- const retryRefund=(g.guarantee_refunds||[]).find(x=>x.state==="uncertain"&&x.provider_error_code==="40008");
- const active=Boolean(g.provider_authorization_id)&&["guaranteed","incident_reported"].includes(g.status)&&Date.parse(g.provider_capture_before||'')>Date.now()+3600000,pending=(g.incidents||[]).filter(i=>i.decision==="pending"), approved=(g.incidents||[]).find(i=>i.decision==="approved"&&i.status==="open");
- const categories={damage:"Dano",broken_item:"Item quebrado",missing_item:"Item desaparecido",extra_cleaning:"Limpeza extraordinária",penalty:"Multa",other:"Outra ocorrência"};
- $("#admin-modal-content").innerHTML=`<small>GARANTIA · ${esc(r?.confirmation_code||"RESERVA")}</small><h2>Caução da reserva</h2><p>${esc(r?.guest_name||"Hóspede")} · ${esc(prop(r?.property_id)?.name||"")} · ${date(r?.check_in)} a ${date(r?.check_out)}</p>
- <dl class="reservation-finance-values"><dt>Valor exigido</dt><dd>${brl(g.amount_cents)}</dd><dt>Capturado por danos</dt><dd>${brl(captured)}</dd><dt>Estornado</dt><dd>${brl(refunded)}</dd><dt>Disponível para captura</dt><dd>${brl(active?Number(g.amount_cents)-captured:0)}</dd><dt>Liberação confirmada</dt><dd>${g.release_confirmed||g.status==="released"?brl(g.status==="released"?g.amount_cents:g.released_amount_cents):captured>=Number(g.amount_cents)?"Sem saldo a liberar · captura integral":"Aguardando comprovação do provedor"}</dd></dl>
- <p>Estado: ${esc(statusLabel(g.financial?.status||g.status))}. ${g.provider_capture_before?`Validade: ${dateTime(g.provider_capture_before)}.`:""}</p>
- <p role="status">${esc(guaranteeAttention(g.attention_code||g.provider_error_code))}</p><div id="guarantee-authorization-history">Consultando histórico de autorizações…</div>
- ${!active&&["guaranteed","incident_reported"].includes(g.status)?"<p>Captura indisponível: confirme a autorização e sua validade. É necessária uma margem superior a uma hora antes do vencimento.</p>":""}
- <h3>Ocorrências</h3>${(g.incidents||[]).map(i=>`<article><p>${esc(categories[i.category]||"Ocorrência")} · ${esc(i.description)} · ${brl(i.requested_capture_cents)}</p><p>${esc(i.decision||i.status)} · ${dateTime(i.created_at)}</p>${i.decision==="pending"&&i.status==="open"?`<button type="button" data-incident="${i.id}" data-decision="approved" ${active?"":"disabled"}>Aprovar cobrança</button><button type="button" data-incident="${i.id}" data-decision="no_charge">Encerrar sem cobrança</button><button type="button" data-attach-incident="${i.id}">Adicionar comprovantes</button>`:""}${(i.evidence||[]).map(e=>`<button type="button" data-evidence="${esc(e.path)}">Abrir ${esc(e.name||"comprovante")}</button>`).join("")}</article>`).join("")||"<p>Nenhuma ocorrência.</p>"}
- <form id="guarantee-form" class="admin-form"><h3>Nova ocorrência</h3><label>Categoria<select name="category">${Object.entries(categories).map(([v,l])=>`<option value="${v}">${l}</option>`).join("")}</select></label><label>Descrição<input name="description" placeholder="Descreva o ocorrido" minlength="5"></label><label>Valor proposto (R$)<input name="amount" type="number" min="0" step="0.01" value="0"></label><label>Fotos<input name="damage_files" type="file" accept="image/jpeg,image/png,image/webp" multiple></label><label>Recibo<input name="receipt_file" type="file" accept="image/jpeg,image/png,image/webp,application/pdf"></label><p>Registrar uma ocorrência não cobra o hóspede. A cobrança exige decisão e comprovantes.</p><p class="admin-form-message" role="status"></p><div class="drawer-actions"><button type="button" data-guarantee-action="report_incident">Registrar ocorrência</button>${approved&&g.status==="incident_reported"?`<button type="button" data-guarantee-action="capture" data-capture-cents="${approved.requested_capture_cents}" ${active?"":"disabled"}>Cobrar ${brl(approved.requested_capture_cents)}</button>`:""}${g.status==="guaranteed"?'<button type="button" data-guarantee-action="release">Liberar caução</button>':""}${g.status==="pending"?'<button type="button" data-guarantee-action="authorize_saved">Solicitar pré-autorização do cartão vinculado</button>':""}<button type="button" data-guarantee-action="status">Consultar PagBank</button></div>
- ${retryRefund?`<p>O PagBank recusou temporariamente a devolução de ${brl(retryRefund.requested_cents)}. Nenhum estorno foi confirmado.</p><button type="button" data-guarantee-action="retry_refund">Reenviar estorno pendente</button>`:""}
- ${(g.guarantee_refunds||[]).filter(x=>["prepared","dispatching","uncertain"].includes(x.state)).map(x=>`<p>Estorno pendente: ${brl(x.requested_cents)}; confirmado: ${brl(x.confirmed_cents)}. ${x.provider_error_code==="40005"?"O PagBank mantém a chave em uso. Aguardando conciliação; não crie outra solicitação.":"Consulte o PagBank para acompanhar."}</p>`).join("")}
- ${captured>refunded&&!(g.guarantee_refunds||[]).some(x=>["prepared","dispatching","uncertain"].includes(x.state))?`<h3>Estornar cobrança de dano</h3><label>Valor a devolver (R$)<input name="refund_amount" type="number" min="0.01" max="${(captured-refunded)/100}" step="0.01"></label><label>Justificativa<input name="refund_reason" minlength="5"></label><button type="button" data-guarantee-action="refund">Solicitar estorno</button>`:""}</form>`;
- openModal();const f=$("#guarantee-form");f.dataset.operationKey=crypto.randomUUID();f.dataset.refundId=retryRefund?.id||"";
- loadAuthorizationHistory(id);
- $("#admin-modal-content").querySelectorAll("[data-attach-incident]").forEach(b=>b.onclick=()=>{
-  f.dataset.incidentId=b.dataset.attachIncident;
-  f.querySelector('[data-guarantee-action="report_incident"]').dataset.guaranteeAction="attach_incident_evidence";
-  f.querySelector('[data-guarantee-action="attach_incident_evidence"]').textContent="Salvar comprovantes nesta ocorrência";
-  f.querySelector('.admin-form-message').textContent="Selecione fotos e recibo abaixo e salve os comprovantes.";
- });
- $("#admin-modal-content").querySelectorAll("[data-evidence]").forEach(b=>b.onclick=async()=>{
-  const {data,error}=await sb.storage.from("guarantee-evidence").createSignedUrl(b.dataset.evidence,60);
-  if(error)f.querySelector('.admin-form-message').textContent="Não foi possível abrir o comprovante.";
-  else window.open(data.signedUrl,"_blank","noopener");
- });
-
- f.querySelectorAll("[data-guarantee-action]").forEach(b=>b.onclick=()=>runGuaranteeAction(id,b.dataset.guaranteeAction,b.dataset.captureCents));
- $("#admin-modal-content").querySelectorAll("[data-incident]").forEach(b=>b.onclick=async()=>{
-   b.disabled=true;const m=f.querySelector(".admin-form-message");m.textContent="Registrando decisão…";
-   try{await api("decide_incident",{guarantee_id:id,incident_id:b.dataset.incident,decision:b.dataset.decision});await load(true);openReservation(g.reservation_id);openGuarantee(id);}
-   catch(e){m.textContent=e.message==="incident_evidence_missing"?"Anexe fotos e recibo para aprovar a cobrança.":"Não foi possível registrar a decisão.";b.disabled=false;}
- });
-}
-async function uploadGuaranteeEvidence(id,form,status){
- const damage=[...(form.damage_files?.files||[])],receipt=[...(form.receipt_file?.files||[])];
- if(!damage.length||receipt.length!==1||damage.length>10)throw new Error("incident_files_required");
- const evidence=[];
- for(const [kind,files] of [["damage",damage],["receipt",receipt]])for(const file of files){
-  const types={"image/jpeg":"jpg","image/png":"png","image/webp":"webp",...(kind==="receipt"?{"application/pdf":"pdf"}:{})};
-  if(!types[file.type]||!file.size||file.size>8388608)throw new Error("incident_file_invalid");
-  const path=`${id}/${kind}/${crypto.randomUUID()}.${types[file.type]}`;
-  status.textContent=`Enviando ${file.name}…`;
-  const {error}=await sb.storage.from("guarantee-evidence").upload(path,file,{contentType:file.type,upsert:false});
-  if(error)throw new Error("incident_upload_failed");
-  evidence.push({kind,path,name:file.name.slice(0,120),content_type:file.type});
- }
- return evidence;
-}
-async function runGuaranteeAction(id,operation,captureCents){
- const f=$("#guarantee-form"),m=f.querySelector(".admin-form-message"),buttons=f.querySelectorAll("button");
- buttons.forEach(b=>b.disabled=true);m.textContent="Processando…";
- try{
-  const hasFiles=f.damage_files.files.length||f.receipt_file.files.length;
-  const evidence=["report_incident","attach_incident_evidence"].includes(operation)&&hasFiles?await uploadGuaranteeEvidence(id,f,m):[];
-  const result=await api(operation,{guarantee_id:id,refund_id:f.dataset.refundId,incident_id:f.dataset.incidentId,operation_key:f.dataset.operationKey,
-   amount_cents:operation==="capture"?Number(captureCents):Math.round(Number(operation==="refund"?f.refund_amount.value:f.amount.value||0)*100),
-   description:f.description.value,category:f.category.value,reason:f.refund_reason?.value,evidence});
-  const reservationId=state.guarantees.find(g=>g.id===id)?.reservation_id;
-  await load(true);if(reservationId)openReservation(reservationId);openGuarantee(id);
-  const message=$("#guarantee-form .admin-form-message");
-  if(result.refund&&result.refund.state!=="confirmed")message.textContent=`Estorno pendente de confirmação. Devolvido: ${brl(result.refund.confirmed_cents)}. ${result.refund.provider_error_code==="40008"?"PagBank: reembolso temporariamente indisponível (40008).":"Use Consultar PagBank para conciliar."}`;
-  else if(result.guarantee?.status?.includes("requested")||result.guarantee?.status?.includes("uncertain")||result.reconciliation==="unavailable")message.textContent="Resultado pendente. Consulte o PagBank antes de nova ação.";
-  else message.textContent=operation==="report_incident"?"Ocorrência registrada, sem cobrança.":operation==="refund"?"Estorno confirmado pelo PagBank.":"Estado consultado e atualizado.";
- }catch(e){m.textContent=({incident_files_required:"Inclua fotos e recibo para solicitar cobrança.",invalid_incident:"Confira a descrição e o valor da ocorrência.",refund_provider_balance_mismatch:"O saldo do PagBank não confere. Consulte a cobrança antes de estornar.",refund_exceeds_captured:"O estorno ultrapassa o valor capturado disponível.",previous_refund_pending:"Há um estorno pendente. Consulte o PagBank.",capture_result_uncertain:"Captura pendente de conciliação. Consulte o PagBank."})[e.message]||"Não foi possível concluir. Consulte o estado da cobrança antes de repetir.";}
- finally{buttons.forEach(b=>b.disabled=false);}
-}
-
-
-async function renderLegalEditor(){
- const host=document.createElement('section');host.className='admin-panel';host.innerHTML='<h2>Termos e documentos</h2><p>Ao salvar, a nova versão aparece automaticamente nas próximas reservas. Reservas anteriores conservam o texto aceito.</p><div class="legal-editor-content" role="status">Carregando documentos…</div>';$('#admin-content').prepend(host);
- try{const result=await api('legal_documents');if(!host.isConnected)return;
- host.querySelector('.legal-editor-content').innerHTML=result.documents.map(d=>`<form class="admin-form legal-document-form" data-id="${esc(d.id)}" data-type="${esc(d.document_type)}"><h3>${esc(d.title)} · versão ${esc(d.version)}</h3><label>Título<input name="title" required maxlength="200" value="${esc(d.title)}"></label><label>Texto completo<textarea name="body" rows="12" required minlength="100" maxlength="100000">${esc(d.body)}</textarea></label><details><summary>Histórico de versões</summary>${result.history.filter(h=>h.document_type===d.document_type).map(h=>`<details><summary>Versão ${esc(h.version)} · ${dateTime(h.effective_at||h.created_at)} (Brasília)</summary><p class="legal-body">${esc(h.body)}</p></details>`).join('')}</details><p class="admin-form-message" role="status"></p><button class="admin-primary">Salvar e publicar nova versão em desenvolvimento</button></form>`).join('');
- host.querySelectorAll('form').forEach(f=>f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button'),m=f.querySelector('.admin-form-message');b.disabled=true;m.textContent='Publicando nova versão…';try{await api('legal_documents',{operation:'publish',document_type:f.dataset.type,previous_id:f.dataset.id,title:f.elements.title.value,body:f.elements.body.value});host.remove();await renderLegalEditor()}catch(err){m.textContent=err.message==='policy_version_changed'?'Outro administrador publicou uma versão. Atualize a página antes de editar.':'Não foi possível publicar. Seu texto permanece neste formulário.'}finally{b.disabled=false}});
- }catch{host.querySelector('.legal-editor-content').textContent='Não foi possível consultar os documentos.'}
-}
-function renderSettings(){
-  const s=state.settings||{},health=state.channel_health||{};
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>DESENVOLVIMENTO</small><h2>Cancelamento por tarifa</h2></div></div><p>Edite os prazos e salve para criar uma nova versão. Novas cotações de desenvolvimento passam a usar a versão salva. Reservas já aceitas preservam sua versão; o site público continua na configuração atual.</p><div class="admin-two-col">${(state.cancellation_policies||[]).map(row=>{const r=row.cancellation_policy_rules||{},d=r.policy_documents||{},nonref=row.rate_plan_code==="non_refundable";return `<form class="admin-form cancellation-policy-form" data-rate-plan="${esc(row.rate_plan_code)}"><h3>${nonref?"Tarifa não reembolsável":"Tarifa reembolsável"} · versão ${esc(d.version||"—")}</h3><label>Cancelamento comercial gratuito (horas)<input name="commercial_free_cancellation_hours" type="number" min="0" max="720" required value="${Number(r.commercial_free_cancellation_hours??24)}"></label><p>A janela comercial não reduz os prazos já concedidos nem direitos legais. Salvar cria uma nova versão para futuras reservas.</p><label>Prazo adicional preservado após contratação (dias corridos)<input name="withdrawal_days" type="number" min="7" max="30" required value="${Number(r.withdrawal_days||7)}"></label>${nonref?"":`<label>Reembolso integral antes do check-in (dias completos)<input name="full_refund_days_before_checkin" type="number" min="1" max="365" required value="${Number(r.full_refund_days_before_checkin||20)}"></label><label>Hospedagem devolvida após esse prazo (%)<input name="late_accommodation_refund_percent" type="number" min="0" max="100" required value="${Number(r.late_accommodation_refund_percent??50)}"></label>`}<p>Após o direito de arrependimento, ${nonref?"hospedagem não reembolsável":"aplica-se o prazo e percentual acima"}. Limpeza e experiências não prestadas: devolução integral.</p><details><summary>Ler texto desta versão</summary><p style="white-space:pre-line">${esc(d.body||"")}</p></details><p class="admin-form-message" role="status"></p><button class="admin-primary">Salvar nova versão</button></form>`}).join("")||"<p>As tarifas de desenvolvimento ainda não foram configuradas.</p>"}</div></section><div class="admin-two-col"><section class="admin-panel"><div class="admin-panel-head"><div><small>PAGAMENTOS</small><h2>Regras comerciais</h2></div></div><form id="admin-payment-settings" class="admin-form"><p>Configure o máximo de parcelas e as parcelas sem juros em <strong>Imóveis → Editar imóvel</strong>. As parcelas restantes dependem das taxas consultadas no PagBank.</p><label>Gateway<select name="active_provider"><option value="pagbank_sandbox" ${s.active_provider==="pagbank_sandbox"?"selected":""}>PagBank sandbox</option><option value="disabled" ${s.active_provider!=="pagbank_sandbox"?"selected":""}>Pagamentos desativados</option></select></label><label class="admin-checkbox"><input type="checkbox" name="pix_enabled" ${s.pix_enabled?"checked":""}> PIX ativo</label><label class="admin-checkbox"><input type="checkbox" name="card_enabled" ${s.card_enabled?"checked":""}> Cartão ativo</label><label>Validade do Pix (minutos)<input name="pix_expiration_minutes" type="number" min="5" max="1440" value="${Number(s.pix_expiration_minutes||15)}"></label><label>Prazo de pagamento de experiências (minutos)<input name="post_booking_payment_minutes" type="number" min="5" max="1440" value="${Number(s.post_booking_payment_minutes||15)}"></label><label>Prazo de alteração aprovada (horas)<input name="modification_payment_deadline_hours" type="number" min="1" max="168" value="${Number(s.modification_payment_deadline_hours||24)}"></label><p class="admin-form-message"></p><button class="admin-primary">Salvar regras</button></form></section><section class="admin-panel"><div class="admin-panel-head"><div><small>CANAIS</small><h2>Integrações</h2></div></div><div class="integration-health"><article class="${health.airbnb?"is-success":"is-warning"}"><strong>Airbnb</strong><span>${health.airbnb?"Calendários sincronizados":"Sincronização indisponível"}</span></article><article class="${health.booking?"is-success":"is-warning"}"><strong>Booking.com</strong><span>${health.booking?"Calendários sincronizados":health.booking_configured?"Sincronização indisponível":"Configuração pendente"}</span></article>${state.integrations.map(i=>`<article><strong>${esc(sourceLabel(i.provider))} · ${esc(prop(i.property_id)?.name||"")}</strong><span>${i.active?"Ativa":"Pausada"}</span></article>`).join("")}</div></section></div>`;
-  renderLegalEditor();
-  $("#admin-payment-settings").onsubmit=saveSettings;
-  $$(".cancellation-policy-form").forEach(f=>f.onsubmit=saveCancellationPolicy);
-}
-async function saveCancellationPolicy(e){e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");b.disabled=true;m.textContent="Salvando nova versão…";try{const nonref=f.dataset.ratePlan==="non_refundable";await api("admin_cancellation_policy_action",{rate_plan_code:f.dataset.ratePlan,commercial_free_cancellation_hours:Number(f.elements.commercial_free_cancellation_hours.value),withdrawal_days:Number(f.elements.withdrawal_days.value),full_refund_days_before_checkin:nonref?20:Number(f.elements.full_refund_days_before_checkin.value),late_accommodation_refund_percent:nonref?0:Number(f.elements.late_accommodation_refund_percent.value)});await load(true);const updated=$(`.cancellation-policy-form[data-rate-plan="${f.dataset.ratePlan}"] .admin-form-message`);if(updated)updated.textContent="Nova versão salva e vinculada à tarifa de desenvolvimento."}catch(err){m.textContent=err.message==="invalid_policy_configuration"?"Revise os prazos e percentuais.":"Não foi possível salvar a política."}finally{b.disabled=false}}
-async function saveSettings(e){e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");b.disabled=true;m.textContent="Salvando…";try{const d=await api("ops_settings_action",{operation:"payment_settings",active_provider:f.elements.active_provider.value,pix_enabled:f.elements.pix_enabled.checked,card_enabled:f.elements.card_enabled.checked,pix_expiration_minutes:Number(f.pix_expiration_minutes.value),post_booking_payment_minutes:Number(f.post_booking_payment_minutes.value),modification_payment_deadline_hours:Number(f.modification_payment_deadline_hours.value)});state.settings=d.settings;m.textContent="Regras atualizadas."}catch{m.textContent="Não foi possível salvar."}finally{b.disabled=false}}
-
-function renderProperties(){
-  $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>PORTFÓLIO</small><h2>Imóveis</h2></div><button id="new-property">+ Novo imóvel</button></div><div class="property-admin-grid">${state.properties.map(p=>`<button class="property-admin-card ${p.active?"":"inactive"}" data-property-edit="${p.id}"><img src="${esc(p.cover_image||'')}" alt="" style="width:80px;height:80px;object-fit:cover;border-radius:12px"><small>${esc(p.code)}</small><h3>${esc(p.name)}</h3><p>${esc(({chalet:'Chalé',house:'Casa',apartment:'Apartamento'})[p.property_type]||p.property_type)} · até ${p.max_guests} hóspedes</p><span>Check-in ${esc((p.check_in_time||"15:00").slice(0,5))} · Checkout ${esc((p.check_out_time||"11:00").slice(0,5))}</span><em>${p.active?"Ativo":"Pausado"}</em></button>`).join("")}</div></section>`;
-  $("#new-property").onclick=()=>openProperty(null);$$('[data-property-edit]').forEach(b=>b.onclick=()=>openProperty(Number(b.dataset.propertyEdit)));
-}
-let calendarLinksRequest=0;
-async function renderCalendarLinks(){
- const request=++calendarLinksRequest;
- $("#admin-content").innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><h2>Links de calendários</h2><button id="back-to-calendar">Ver calendário</button></div><p>Cadastre vários calendários por imóvel. Os períodos dos links ativos aparecem juntos na agenda e são considerados na disponibilidade.</p><form id="choose-calendar-property" class="admin-form"><label>Imóvel<select name="property_id" required>${state.properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label><button type="submit">Adicionar ou gerenciar links</button><button type="button" id="configure-availability">Configurar disponibilidade</button></form><div id="calendar-links-list" role="status">Carregando links…</div></section>`;
- $("#back-to-calendar").onclick=()=>showView("calendar");$("#configure-availability").onclick=()=>openAvailability(Number($("#choose-calendar-property").elements.property_id.value));
- $("#choose-calendar-property").onsubmit=e=>{e.preventDefault();openPropertyCalendars(Number(e.currentTarget.elements.property_id.value))};
- try{const data=await api("admin_calendar",{operation:"list"});if(currentView!=="calendar_links"||request!==calendarLinksRequest)return;
-  $("#calendar-links-list").innerHTML=data.sources.map(s=>`<article class="admin-operation-card"><div><small>${esc(prop(s.property_id)?.name||"Imóvel")} · ${esc(sourceLabel(s.provider))}</small><h3>${esc(s.label)}</h3><p style="overflow-wrap:anywhere">${esc(s.feed_url||"Link antigo ainda não migrado para este cadastro")}</p><p>${!s.feed_url?"Configuração antiga em uso; informe o link para gerenciar aqui.":!s.enabled?"Desativado":s.last_error?"Erro de sincronização — conferir link":"Ativo"}</p></div><button data-calendar-manage="${s.property_id}">Editar ou excluir</button></article>`).join("")||empty("Nenhum link cadastrado. Escolha um imóvel para adicionar.");
-  $$("[data-calendar-manage]").forEach(b=>b.onclick=()=>openPropertyCalendars(Number(b.dataset.calendarManage)));
- }catch{if(currentView==="calendar_links"&&request===calendarLinksRequest)$("#calendar-links-list").textContent="Não foi possível consultar os links. Tente atualizar.";}
-}
-
-async function openPropertyCalendars(propertyId){
- $("#admin-modal-content").innerHTML="<h2>Calendários</h2><p>Carregando…</p>";openModal();
- try{
-  const data=await api("admin_calendar",{operation:"list"}),out=data.exports.find(x=>Number(x.property_id)===propertyId),sources=data.sources.filter(x=>Number(x.property_id)===propertyId);
-  const form=source=>`<form class="admin-form calendar-source-form" data-source-id="${esc(source?.id||"")}"><h3>${source?esc(source.label):"Adicionar calendário"}</h3><label>Nome do calendário<input name="label" maxlength="120" required value="${esc(source?.label||"")}" placeholder="Ex.: Booking — Signature"></label><label>Link iCal externo<input name="feed_url" type="url" required autocomplete="off" value="${esc(source?.feed_url||"")}" placeholder="https://…"></label><label class="admin-checkbox"><input name="enabled" type="checkbox" ${source?.enabled!==false?"checked":""}> Usar na disponibilidade</label>${source?`<p>${source.enabled?"Ativo":"Desativado"}. ${!source.feed_url?"Link pendente. Integração anterior preservada até a configuração ou exclusão.":source.last_checked_at?`Última consulta: ${dateTime(source.last_checked_at)}. ${source.last_error?"Erro na sincronização; disponibilidade protegida.":`${source.event_count??0} bloqueios encontrados.`}`:"Ainda não consultado."}</p>`:""}<p class="admin-form-message" role="status"></p><div class="calendar-source-actions"><button type="submit">${source?"Salvar alterações":"Cadastrar calendário"}</button>${source?'<button type="button" data-test-calendar>Testar agora</button><button type="button" data-delete-calendar>Excluir calendário</button>':""}</div></form>`;
-  $("#admin-modal-content").innerHTML=`<div class="calendar-settings"><small>CALENDÁRIOS · ${esc(prop(propertyId)?.name)}</small><h2>Calendários do imóvel</h2><button type="button" id="back-property-availability">Voltar à disponibilidade</button><p>Ambiente de testes. Use o link nos anúncios reais somente após a publicação aprovada do sistema.</p><label>iCal do nosso site — copiar para as plataformas<input id="calendar-export-url" readonly value="${esc(out?.url||"")}"></label><button id="copy-calendar-export">Copiar link do site</button><button id="rotate-calendar-export">Renovar link</button><p id="calendar-export-message" role="status"></p><p>Um único link por imóvel. Exporta reservas próprias e bloqueios, sem dados pessoais. A atualização nas plataformas não é instantânea.</p>${form(null)}<h3>Calendários cadastrados (${sources.length})</h3>${sources.map(form).join("")||"<p>Nenhum calendário cadastrado.</p>"}</div>`;
-  $("#back-property-availability").onclick=()=>openAvailability(propertyId);
-  $("#copy-calendar-export").onclick=async()=>{try{await navigator.clipboard.writeText(out.url);$("#calendar-export-message").textContent="Link copiado."}catch{$("#calendar-export-url").select();$("#calendar-export-message").textContent="Selecione e copie o link acima."}};
-  $("#rotate-calendar-export").onclick=async()=>{if(!confirm("O link anterior deixará de funcionar. Será necessário atualizar as plataformas. Renovar?"))return;try{await api("admin_calendar",{operation:"rotate",property_id:propertyId});await openPropertyCalendars(propertyId)}catch{$("#calendar-export-message").textContent="Não foi possível renovar."}};
-  for(const f of $$('.calendar-source-form')){
-   const message=f.querySelector('.admin-form-message'),source_id=f.dataset.sourceId||null;
-   const busy=v=>f.querySelectorAll('button').forEach(b=>b.disabled=v);
-   f.onsubmit=async e=>{e.preventDefault();busy(true);message.textContent="Validando…";try{await api("admin_calendar",{operation:"save",property_id:propertyId,source_id,label:f.elements.label.value,feed_url:f.elements.feed_url.value,enabled:f.elements.enabled.checked});await load(true);await openPropertyCalendars(propertyId);$("#calendar-export-message").textContent="Calendário salvo. Agenda atualizada."}catch(err){message.textContent=err.message==="calendar_duplicate"?"Este link já está cadastrado neste imóvel.":"Não foi possível salvar. Confira o nome e o link HTTPS de um calendário iCal válido. A configuração anterior foi preservada."}finally{busy(false)}};
-   const test=f.querySelector('[data-test-calendar]');if(test)test.onclick=async()=>{busy(true);message.textContent="Consultando…";try{const r=await api("admin_calendar",{operation:"test",property_id:propertyId,source_id});message.textContent=r.result.healthy?`Consulta concluída: ${r.result.events} bloqueios.`:"Falha na consulta. Confira o link salvo."}catch{message.textContent="Não foi possível consultar."}finally{busy(false)}};
-   const remove=f.querySelector('[data-delete-calendar]');if(remove)remove.onclick=async()=>{if(!confirm("Excluir este calendário? Seus bloqueios deixarão de ser considerados nas próximas consultas. As reservas próprias e os outros calendários serão mantidos."))return;busy(true);try{await api("admin_calendar",{operation:"delete",property_id:propertyId,source_id});await load(true);await openPropertyCalendars(propertyId);$("#calendar-export-message").textContent="Calendário excluído. Agenda atualizada."}catch{message.textContent="Não foi possível excluir."}finally{busy(false)}};
+    await admin.from("modification_requests").update({status:"cancelled",updated_at:new Date().toISOString()}).eq("id",m.id);
+    await admin.from("reservation_change_events").insert({reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"cancelled",actor_user_id:user.id});
+    return json({ok:true,status:"cancelled"});
   }
- }catch{$("#admin-modal-content").innerHTML="<h2>Calendários</h2><p>Não foi possível carregar a configuração.</p>"}
-}
-let propertyCalendarRequest=0;
-async function renderPropertyCalendar(propertyId,month){
- const request=++propertyCalendarRequest,host=$('#property-availability-calendar');if(!host)return;
- host.innerHTML='<p role="status">Carregando calendário do imóvel…</p>';
- const b=monthBounds(month);
- try{
- const hub=await api('admin_hub',{start:b.start,end:b.end});if(request!==propertyCalendarRequest||!host.isConnected)return;
- const events=[...(hub.reservations||[]).filter(x=>Number(x.property_id)===propertyId&&['confirmed','hold','pending_payment'].includes(x.status)).map(x=>({...x,start:x.check_in,end:x.check_out,label:x.guest_name||'Reserva do site'})),...(hub.channel_periods||[]).filter(x=>Number(x.property_id)===propertyId).map(x=>({...x,label:x.calendar_label||sourceLabel(x.source)})),...(hub.calendar_blocks||[]).filter(x=>Number(x.property_id)===propertyId&&x.status==='active').map(x=>({...x,start:x.start_date,end:x.end_date,label:x.reason||'Bloqueio operacional'}))];
- const offset=new Date(b.start+'T12:00:00Z').getUTCDay();
- host.innerHTML=`<div class="property-calendar-toolbar"><button type="button" data-property-month="-1" aria-label="Mês anterior">‹</button><label>Mês<input id="property-calendar-month" type="month" value="${month}"></label><button type="button" data-property-month="1" aria-label="Próximo mês">›</button></div><p>Ocupações deste imóvel. Dias sem ocupação ainda dependem das regras de estadia e da consulta de disponibilidade.</p><div class="property-month-grid">${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map(d=>`<strong>${d}</strong>`).join('')}${'<span></span>'.repeat(offset)}${Array.from({length:b.days},(_,i)=>{const day=`${month}-${String(i+1).padStart(2,'0')}`,rows=events.filter(x=>x.start<=day&&x.end>day);return `<button type="button" class="property-month-day ${rows.length?'occupied':''}" data-property-day="${day}" aria-label="${date(day)}: ${rows.length?'com ocupação':'sem ocupação registrada'}"><b>${i+1}</b><small>${rows.length?'Ocupado':'—'}</small></button>`}).join('')}</div><div id="property-day-detail" aria-live="polite"></div>`;
- $('#property-calendar-month').onchange=e=>{if(/^\d{4}-\d{2}$/.test(e.target.value))renderPropertyCalendar(propertyId,e.target.value)};
- $$('[data-property-month]').forEach(button=>button.onclick=()=>{const d=new Date(Date.UTC(b.y,b.m-1+Number(button.dataset.propertyMonth),1));renderPropertyCalendar(propertyId,d.toISOString().slice(0,7))});
- $$('[data-property-day]').forEach(button=>button.onclick=()=>{const day=button.dataset.propertyDay,rows=events.filter(x=>x.start<=day&&x.end>day);$('#property-day-detail').innerHTML=`<h4>${date(day)}</h4>${rows.map(x=>`<p><strong>${esc(x.label)}</strong> · ${esc(sourceLabel(x.source||'direct'))}<br>${date(x.start)} a ${date(x.end)}</p>`).join('')||'<p>Nenhuma ocupação registrada neste dia.</p>'}`});
- }catch{if(host.isConnected&&request===propertyCalendarRequest)host.innerHTML='<p role="alert">Não foi possível carregar as ocupações. Reabra a disponibilidade para tentar novamente.</p>'}
-}
-async function renderPropertyConnections(propertyId){
- const host=$('#property-calendar-connections');if(!host)return;
- try{const data=await api('admin_calendar',{operation:'list'});if(!host.isConnected)return;
- const sources=data.sources.filter(s=>Number(s.property_id)===propertyId);
- host.innerHTML=`<h3>Conectar calendários</h3><p>Inclua, edite ou exclua links do Airbnb, Booking e de outros calendários para este imóvel.</p>${sources.map(s=>`<div class="property-calendar-source"><strong>${esc(s.label)}</strong><span>${s.enabled?'Ativo':'Desativado'}${s.last_error?' · Conferir sincronização':''}</span></div>`).join('')||'<p>Nenhum calendário conectado.</p>'}<button type="button" id="property-manage-links">Gerenciar calendários conectados</button>`;
- $('#property-manage-links').onclick=()=>openPropertyCalendars(propertyId);
- }catch{if(host.isConnected)host.textContent='Não foi possível consultar os calendários conectados.'}
-}
 
-async function openAvailability(propertyId){
- $('#admin-modal-content').innerHTML='<h2>Disponibilidade</h2><p>Carregando…</p>';openModal();
- try{
- const data=await api('admin_availability',{operation:'get',property_id:propertyId}),r=data.rules;
- const choice=(name,label,options)=>{if(!options.some(([v])=>String(v)===String(r[name])))options.push([r[name],String(r[name])+' (configurado)']);return `<label>${label}<select name="${name}">${options.map(([value,title])=>`<option value="${value}" ${String(value)===String(r[name])?'selected':''}>${title}</option>`).join('')}</select></label>`};
- const number=(name,label,min,max)=>`<label>${label}<input name="${name}" type="number" min="${min}" max="${max}" required value="${r[name]}"></label>`;
- const days=(key,title)=>`<fieldset><legend>${title}</legend>${['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'].map((label,i)=>`<label class="admin-checkbox"><input name="${key}" type="checkbox" value="${i}" ${r[key].includes(i)?'checked':''}>${label}</label>`).join('')}</fieldset>`;
- const custom=x=>`<div class="custom-stay-row admin-form-grid"><label>Entrada de<input name="custom_start" type="date" required value="${esc(x.start||'')}"></label><label>Entrada até<input name="custom_end" type="date" required value="${esc(x.end||'')}"></label><label>Mínimo de noites<input name="custom_min" type="number" min="1" max="1125" required value="${x.min_nights||1}"></label><label>Máximo de noites<input name="custom_max" type="number" min="1" max="1125" required value="${x.max_nights||1125}"></label><button type="button" data-remove-duration>Excluir período</button></div>`;
- $('#admin-modal-content').innerHTML=`<small>${esc(prop(propertyId)?.name)}</small><h2>Disponibilidade do imóvel</h2><button type="button" id="back-property-details">Voltar aos dados do imóvel</button><section><h3>Calendário do imóvel</h3><div id="property-availability-calendar"></div></section><h3>Configurações de disponibilidade</h3><form id="availability-form" class="admin-form"><div class="admin-form-grid">${number('min_nights','Mínimo de noites',1,1125)}${number('weekend_min_nights','Mínimo quando inclui sexta ou sábado',1,1125)}${number('max_nights','Máximo de noites',1,1125)}${choice('lead_days','Tempo de antecedência',[[0,'Mesmo dia'],[1,'1 dia'],[2,'2 dias'],[3,'3 dias'],[7,'7 dias']])}${choice('same_day_cutoff','Aviso prévio para o mesmo dia',Array.from({length:24},(_,i)=>{const hour=String(i).padStart(2,'0')+':00';return [hour,hour]}))}${choice('preparation_days','Tempo de preparação',[[0,'Nenhum'],[1,'1 noite antes e depois de cada reserva'],[2,'2 noites antes e depois de cada reserva']])}${choice('window_months','Período de disponibilidade',[3,6,9,12,24,36].map(n=>[n,n+' meses de antecedência']))}</div><p>Horários de Brasília. A janela limita a última noite da estadia. Preparação vale para reservas do site e períodos importados; não cria uma hospedagem.</p>${days('checkin_days','Dias permitidos para check-in')}${days('checkout_days','Dias permitidos para checkout')}<h3>Durações por período de entrada</h3><p>Substituem os mínimos e máximos gerais para entradas no período. Os períodos não podem se sobrepor.</p><div id="custom-stays">${r.custom_stays.map(custom).join('')}</div><button type="button" id="add-custom-stay">Adicionar período</button><label class="admin-checkbox"><input name="use_pricelabs_min" type="checkbox" ${r.use_pricelabs_min?'checked':''}> Respeitar também o mínimo do PriceLabs (vale o maior)</label><label class="admin-checkbox"><input name="allow_same_day_requests" type="checkbox" ${r.allow_same_day_requests?'checked':''}> Permitir pedidos de reserva para hoje, sujeitos à aprovação</label><p>Reservas Airbnb e outros bloqueios continuam sendo importados. As regras acima controlam novas reservas do site; iCal não altera regras do Airbnb ou Booking.</p><p role="status" id="availability-message"></p><button type="submit">Salvar disponibilidade</button></form><section id="property-calendar-connections"></section>`;
- organizeAvailability();$('#back-property-details').onclick=()=>openProperty(propertyId);renderPropertyCalendar(propertyId,today().slice(0,7));renderPropertyConnections(propertyId);
- const wire=()=>$$('[data-remove-duration]').forEach(b=>b.onclick=()=>b.closest('.custom-stay-row').remove());wire();
- $('#add-custom-stay').onclick=()=>{if($$('.custom-stay-row').length>=100)return;$('#custom-stays').insertAdjacentHTML('beforeend',custom({}));wire()};
- $('#availability-form').onsubmit=async e=>{e.preventDefault();const f=e.currentTarget,button=f.querySelector('[type=submit]'),message=$('#availability-message');button.disabled=true;message.textContent='Salvando…';
- const rules={};for(const k of ['min_nights','weekend_min_nights','max_nights','lead_days','preparation_days','window_months'])rules[k]=Number(f.elements[k].value);
- rules.same_day_cutoff=f.elements.same_day_cutoff.value;for(const k of ['checkin_days','checkout_days'])rules[k]=[...f.querySelectorAll(`[name="${k}"]:checked`)].map(x=>Number(x.value));for(const k of ['use_pricelabs_min','allow_same_day_requests'])rules[k]=f.elements[k].checked;
- rules.custom_stays=[...f.querySelectorAll('.custom-stay-row')].map(x=>({start:x.querySelector('[name=custom_start]').value,end:x.querySelector('[name=custom_end]').value,min_nights:Number(x.querySelector('[name=custom_min]').value),max_nights:Number(x.querySelector('[name=custom_max]').value)}));
- try{await api('admin_availability',{operation:'save',property_id:propertyId,updated_at:data.updated_at,rules});await load(true);await openAvailability(propertyId);$('#availability-message').textContent='Disponibilidade salva. Agenda atualizada.'}catch(err){message.textContent=err.message==='availability_conflict'?'Este imóvel foi alterado em outra tela. Feche e abra novamente antes de salvar.':'Confira os limites, os dias selecionados e se há períodos sobrepostos.'}finally{button.disabled=false}};
- }catch{$('#admin-modal-content').innerHTML='<h2>Disponibilidade</h2><p>Não foi possível carregar as regras. Feche e tente novamente.</p>'}
-}
+  if(action==="guest_accept"){
+    if(m.user_id!==user.id || m.status!=="awaiting_guest_acceptance") return json({ok:false,error:"not_allowed"},403);
+    await admin.from("modification_requests").update({status:"accepted",guest_accepted_at:new Date().toISOString()}).eq("id",m.id);
+    await admin.from("reservation_change_events").insert({reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"guest_accepted",amount_cents:m.admin_additional_amount_cents,actor_user_id:user.id});
+    return json({ok:true,status:"accepted"});
+  }
 
-function openProperty(id){const p=id?state.properties.find(x=>Number(x.id)===Number(id)):null;$("#admin-modal-content").innerHTML=`<small>IMÓVEL</small><h2>${p?"Editar imóvel":"Cadastrar novo imóvel"}</h2>${p?'<section class="property-availability-entry"><h3>Disponibilidade</h3><p>Veja o calendário, configure as regras de estadia e gerencie os calendários conectados deste imóvel.</p><button type="button" id="open-property-availability">Abrir disponibilidade</button></section>':""}<form id="property-form" class="admin-form"><input type="hidden" name="id" value="${p?.id||""}"><div class="admin-form-grid"><label>Nome<input name="name" required value="${esc(p?.name||"")}" placeholder="Ex.: Ville Signature"></label><label>Código interno<input name="code" required value="${esc(p?.code||"")}" placeholder="Ex.: CH1"></label><label>Endereço da página<input name="slug" required value="${esc(p?.slug||"")}" placeholder="ville-signature"></label><label>Tipo<select name="property_type">${[["chalet","Chalé"],["apartment","Apartamento"],["house","Casa"],["cabin","Cabana"],["other","Outro"]].map(([v,l])=>`<option value="${v}" ${p?.property_type===v?"selected":""}>${l}</option>`).join("")}</select></label><label>Máximo de hóspedes<input name="max_guests" type="number" min="1" max="50" value="${p?.max_guests||2}"></label><label>Taxa de limpeza (R$)<input name="cleaning_fee" type="number" min="0" step="0.01" value="${Number(p?.cleaning_fee||0)}"></label><label>Garantia (R$)<input name="guarantee_amount" type="number" min="0" step="0.01" value="${Number(p?.guarantee_amount_cents||0)/100}"></label><label>Até parcelas no cartão<input name="max_installments" type="number" min="1" max="12" required value="${Number(p?.features?.payment_terms?.max_installments??12)}"></label><label>Parcelas sem juros para hóspede<input name="no_interest_installments" type="number" min="0" max="12" required value="${Number(p?.features?.payment_terms?.no_interest_installments??6)}"></label><label>Juros após as parcelas gratuitas<select name="interest_payer"><option value="guest" ${p?.features?.payment_terms?.interest_payer!=="merchant"?"selected":""}>Por conta do hóspede</option><option value="merchant" ${p?.features?.payment_terms?.interest_payer==="merchant"?"selected":""}>Por conta do estabelecimento</option></select></label><label>Horário de check-in<input name="check_in_time" type="time" value="${esc((p?.check_in_time||"15:00").slice(0,5))}"></label><label>Horário de checkout<input name="check_out_time" type="time" value="${esc((p?.check_out_time||"11:00").slice(0,5))}"></label></div><label>Chamada curta<input name="tagline" value="${esc(p?.tagline||"")}" placeholder="Como o imóvel será apresentado"></label><label>Descrição<textarea name="summary" rows="4">${esc(p?.summary||"")}</textarea></label><section class="property-media-editor"><h3>Fotos do imóvel</h3><p>Envie até 40 imagens. Escolha a capa e ajuste a ordem com as setas. JPG, PNG, WebP ou AVIF, até 5 MB por imagem. As versões para celular e computador são geradas automaticamente antes do envio.</p><input id="property-media-files" type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple><div id="property-media-list" class="property-media-list"></div><p id="property-media-message" role="status"></p></section><label class="admin-checkbox"><input name="active" type="checkbox" ${p?.active!==false?"checked":""}> Imóvel ativo para novas reservas</label><p class="admin-form-message"></p><button type="submit" class="admin-primary">Salvar imóvel</button></form>`;openModal();organizePropertyForm();
-  propertyGallery=(Array.isArray(p?.gallery)?p.gallery:[]).map(item=>typeof item==="string"?{url:item,alt:""}:item).filter(item=>item?.url);
-  propertyCover=p?.cover_image||propertyGallery[0]?.url||"";
-  if(propertyCover&&!propertyGallery.some(item=>item.url===propertyCover)) propertyGallery.unshift({url:propertyCover,alt:""});
-  renderPropertyMedia();$("#property-media-files").onchange=uploadPropertyMedia;
-  $("#property-form").onsubmit=saveProperty;if(p)$("#open-property-availability").onclick=()=>openAvailability(Number(p.id))}
-function organizePropertyForm(){
- const host=$('#admin-modal-content'),form=$('#property-form');
- const heading=document.createElement('div');heading.className='property-form-heading';
- for(const node of [...host.children])if(node!==form)heading.append(node);
- host.prepend(heading);
- const fields=document.createElement('div');fields.className='property-form-fields';
- const footer=document.createElement('div');footer.className='property-form-footer';
- const save=form.querySelector('[type="submit"]'),message=form.querySelector('.admin-form-message');
- message.setAttribute('role','status');message.setAttribute('aria-live','polite');
- for(const node of [...form.children])if(node!==save&&node!==message)fields.append(node);
- footer.append(message,save);form.append(fields,footer);
- form.addEventListener('invalid',e=>{e.target.scrollIntoView?.({block:'center'})},true);
-}
-function renderPropertyMedia(){
-  const list=$("#property-media-list");list.replaceChildren();
-  propertyGallery.forEach((item,i)=>{
-    const row=document.createElement("div");row.className="property-media-row";
-    const img=document.createElement("img");VilleImages.set(img,item.url,{sizes:"120px"});img.alt=item.alt||"Foto do imóvel";img.loading="lazy";row.append(img);
-    const controls=document.createElement("div");
-    const alt=document.createElement("input");alt.type="text";alt.maxLength=180;alt.placeholder="Descreva a foto para acessibilidade";alt.value=item.alt||"";alt.setAttribute("aria-label","Descrição da foto "+(i+1));alt.oninput=()=>item.alt=alt.value;controls.append(alt);
-    [["Capa",()=>{propertyCover=item.url;renderPropertyMedia()}],["↑",()=>move(i,-1)],["↓",()=>move(i,1)],["Remover",()=>{propertyGallery.splice(i,1);if(propertyCover===item.url)propertyCover=propertyGallery[0]?.url||"";renderPropertyMedia()}]].forEach(([label,action])=>{const button=document.createElement("button");button.type="button";button.textContent=label;button.onclick=action;if(label==="Capa"&&propertyCover===item.url){button.textContent="✓ Capa";button.setAttribute("aria-pressed","true")}controls.append(button)});
-    row.append(controls);list.append(row);
-  });
-}
-function move(i,delta){const next=i+delta;if(next<0||next>=propertyGallery.length)return;[propertyGallery[i],propertyGallery[next]]=[propertyGallery[next],propertyGallery[i]];renderPropertyMedia()}
-async function uploadPropertyMedia(e){
- const files=[...e.target.files],status=$("#property-media-message"),input=e.target,save=$("#property-form button.admin-primary");
- if(propertyGallery.length+files.length>40){status.textContent="O limite é de 40 fotos por imóvel.";input.value="";return}
- input.disabled=true;save.disabled=true;let failed=0;
- try{for(const file of files){
-  const uploaded=[];
-  try{
-   if(!["image/jpeg","image/png","image/webp","image/avif"].includes(file.type)||file.size>5242880)throw Error("Formato inválido ou acima de 5 MB.");
-   status.textContent=`Otimizando ${file.name}…`;
-   const variants=await VilleImages.compress(file),prefix=`${session.user.id}/responsive-${crypto.randomUUID()}`;
-   let publicUrl="";
-   for(const variant of variants){
-    const path=`${prefix}-w${variant.width}.webp`;
-    const {error}=await sb.storage.from("property-media").upload(path,variant.blob,{contentType:"image/webp",cacheControl:"31536000",upsert:false});
-    if(error)throw error;uploaded.push(path);
-    publicUrl=sb.storage.from("property-media").getPublicUrl(path).data.publicUrl;
-   }
-   propertyGallery.push({url:publicUrl,alt:file.name.replace(/\.[^.]+$/,"").replace(/[-_]/g," ")});
-   if(!propertyCover)propertyCover=publicUrl;renderPropertyMedia();
-  }catch(err){failed++;if(uploaded.length)await sb.storage.from("property-media").remove(uploaded);console.warn("Foto não enviada",err);}
- }
- status.textContent=`${propertyGallery.length} foto(s) prontas. ${failed?failed+" arquivo(s) não puderam ser enviados; confira formato e limite de 5 MB. ":""}Salve o imóvel para publicar a galeria.`;
- }finally{input.disabled=false;save.disabled=false;input.value=""}
-}
-async function saveProperty(e){e.preventDefault();if($("#property-media-files")?.disabled)return;const f=e.currentTarget,x=f.elements,m=f.querySelector(".admin-form-message"),b=f.querySelector('[type="submit"]');if(b.disabled)return;b.disabled=true;m.textContent="Salvando…";try{await api("admin_property_action",{operation:"save",id:x.id.value||null,name:x.name.value,code:x.code.value,slug:x.slug.value,property_type:x.property_type.value,max_guests:Number(x.max_guests.value),cleaning_fee:Number(x.cleaning_fee.value),guarantee_amount_cents:Math.round(Number(x.guarantee_amount.value||0)*100),max_installments:Number(x.max_installments.value),no_interest_installments:Number(x.no_interest_installments.value),interest_payer:x.interest_payer.value,check_in_time:x.check_in_time.value,check_out_time:x.check_out_time.value,tagline:x.tagline.value,summary:x.summary.value,cover_image:propertyCover,gallery:propertyGallery,active:x.active.checked});closeModal();await load(true)}catch(err){m.textContent="Não foi possível salvar. Verifique se código e endereço já não estão em uso."}finally{b.disabled=false}}
+  if(!(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
 
-function openManualReservation(){
-  const t=today();$("#admin-modal-content").innerHTML=`<small>NOVA RESERVA</small><h2>Adicionar reserva manual</h2><p>Use para reservas feitas fora do site. A disponibilidade será conferida em todos os calendários antes de salvar.</p><form id="manual-reservation-form" class="admin-form"><div class="admin-form-grid"><label>Imóvel<select name="property_id" required>${state.properties.filter(p=>p.active).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label><label>Hóspedes<input name="guests" type="number" min="1" value="2" required></label><label>Check-in<input name="check_in" type="date" min="${t}" required></label><label>Checkout<input name="check_out" type="date" min="${t}" required></label><label>Nome do hóspede<input name="guest_name" required></label><label>Telefone<input name="guest_phone" inputmode="tel"></label><label>E-mail<input name="guest_email" type="email"></label><label>Total combinado (R$)<input name="total_amount" type="number" min="0" step="0.01" value="0"></label></div><p class="admin-form-message"></p><button class="admin-primary">Salvar reserva</button></form>`;openModal();$("#manual-reservation-form").onsubmit=saveManualReservation;
-}
-async function saveManualReservation(e){e.preventDefault();const f=e.currentTarget,x=f.elements,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");b.disabled=true;m.textContent="Conferindo disponibilidade…";try{await api("admin_reservation_action",{operation:"create_manual",property_id:Number(x.property_id.value),guests:Number(x.guests.value),check_in:x.check_in.value,check_out:x.check_out.value,guest_name:x.guest_name.value,guest_phone:x.guest_phone.value,guest_email:x.guest_email.value,total_amount:Number(x.total_amount.value||0)});closeModal();await load(true);renderReservations()}catch(err){m.textContent=err.message==="occupied"?"Essas datas já estão ocupadas em um dos calendários.":err.message==="capacity"?"A quantidade de hóspedes ultrapassa a capacidade do imóvel.":"Não foi possível criar a reserva."}finally{b.disabled=false}}
+  if(action==="decide"){
+    const decision=body?.decision;
+    if(decision==="reject"){
+      if(!["requested","quoted"].includes(m.status)) return json({ok:false,error:"modification_not_approvable"},409);
+      await admin.from("modification_requests").update({status:"rejected",admin_note:body?.admin_note||null,decided_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq("id",m.id);
+      await admin.from("reservation_change_events").insert({reservation_id:m.reservation_id,modification_request_id:m.id,event_type:"rejected",actor_user_id:user.id});
+      return json({ok:true,status:"rejected"});
+    }
 
-function openReservation(id){
-  const r=state.reservations.find(x=>x.id===id);if(!r)return;const p=prop(r.property_id),payments=byReservation(state.payments,id),orders=byReservation(state.experience_orders,id),charges=byReservation(state.charges,id),mods=byReservation(state.modifications,id),guarantees=byReservation(state.guarantees,id),notes=byReservation(state.notes,id);const items=orders.flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
-  $("#reservation-detail").innerHTML=`<small>${esc(r.confirmation_code||sourceLabel(r.source))}</small><h2 id="drawer-title">${esc(r.guest_name||"Hóspede")}</h2><div class="drawer-status"><span class="admin-status ${statusClass(r.status)}">${statusLabel(r.status)}</span><span>${esc(sourceLabel(r.source))}</span></div>
-  <section class="drawer-block"><h3>Estadia</h3><div class="drawer-dates"><div><small>CHECK-IN</small><strong>${date(r.check_in)}</strong><span>${esc((p?.check_in_time||"15:00").slice(0,5))}</span></div><div><small>CHECKOUT</small><strong>${date(r.check_out)}</strong><span>${esc((p?.check_out_time||"11:00").slice(0,5))}</span></div></div><p><strong>${esc(p?.name||"Imóvel")}</strong> · ${r.guests} hóspede${r.guests===1?"":"s"}</p></section>
-  <section class="drawer-block"><h3>Contato</h3><button type="button" id="reservation-guest">Vincular ou editar hóspede</button><p>${esc(r.guest_email||"E-mail não informado")}<br>${esc(r.guest_phone||"Telefone não informado")}</p></section>
-  ${window.VilleOffers.contractMarkup(r.contract_snapshot)}<section class="drawer-block"><h3>Experiências</h3>${items.length?items.map(i=>`<div class="drawer-line"><span>${esc(i.product_name_snapshot)}${i.variant_name_snapshot?" · "+esc(i.variant_name_snapshot):""}</span><strong>${brl(Number(i.unit_price_cents)*Number(i.quantity||1))}</strong>${r.status==="confirmed"&&!r.checked_in_at?`<button type="button" data-experience-credit="${esc(i.id)}">Retirar e calcular crédito</button>`:""}</div>`).join(""):empty("Nenhuma experiência ativa.")}${charges.filter(c=>c.status==="awaiting_payment").map(c=>`<div class="drawer-alert">Pagamento pendente: ${esc(c.description||c.kind)} · ${brl(c.amount_cents)}</div>`).join("")}</section>
-  <section class="drawer-block"><h3>Pagamento</h3>${payments.length?payments.map(x=>`<div class="drawer-line"><span>${statusLabel(x.status)} · ${esc(x.method==='card'?'Cartão':x.method==='pix'?'Pix':x.method||x.provider)}${x.method==="card"?` · ${Number(x.installments||1)}x · juros ${brl(x.metadata?.buyer_interest_cents||0)}`:""}</span><strong>${brl(x.amount_cents)}</strong></div>`).join(""):empty("Nenhum pagamento registrado.")}<div class="drawer-total"><span>Total da reserva</span><strong>${brl(Math.round(Number(r.total_amount||0)*100))}</strong></div></section>
-  ${mods.length?`<section class="drawer-block"><h3>Alterações</h3>${mods.map(m=>`<div class="drawer-line"><span>${statusLabel(m.status)} · ${date(m.requested_check_in)} a ${date(m.requested_check_out)}</span><strong>${brl(m.admin_additional_amount_cents||0)}</strong></div>`).join("")}</section>`:""}
-  <section class="drawer-block"><h3>Garantia da reserva</h3>${guarantees.length?guarantees.map(g=>`<div class="drawer-line"><span>${statusLabel(g.financial?.status||g.status)} · ${g.provider==="pagbank_sandbox"&&g.provider_authorization_id?(["guaranteed","incident_reported"].includes(g.status)?"Autorizada no PagBank":g.status==="captured"?"Captura registrada no PagBank":g.status==="released"?"Autorização encerrada":"Em conciliação no PagBank"):"Sem autorização confirmada"}</span><strong>${brl(g.amount_cents)}</strong></div><p>Capturado: <strong>${brl(g.captured_amount_cents||0)}</strong> · Estornado: ${brl(g.refunded_amount_cents||0)}</p><button type="button" data-guarantee="${esc(g.id)}">Ver garantia e ocorrências</button>`).join(""):empty("Nenhuma garantia vinculada a esta reserva.")}</section>
-  <section class="drawer-block"><h3>Financeiro da reserva</h3><div id="reservation-finance-summary" role="status">Consultando histórico financeiro…</div></section>
-  <section class="drawer-block"><h3>Ocorrências</h3><p>Registrar uma ocorrência não realiza cobrança. A decisão financeira é uma ação separada.</p><div id="reservation-incidents">Consultando ocorrências…</div><button type="button" id="new-reservation-incident">Nova ocorrência</button></section>
-  <section class="drawer-block"><h3>Estornos e cancelamentos</h3><div id="reservation-refund-history">Consultando histórico…</div></section>
-  <section class="drawer-block"><h3>Histórico interno</h3><div class="drawer-notes">${notes.length?notes.map(n=>`<p>${esc(n.note)}<small>${dateTime(n.created_at)}</small></p>`).join(""):empty("Nenhuma anotação interna.")}</div><form id="reservation-note-form" class="drawer-note-form"><textarea name="note" rows="2" placeholder="Escreva uma observação para a equipe"></textarea><button>Adicionar</button></form></section>
-  ${(state.cancel_requests||[]).filter(x=>x.reservation_id===r.id).map(x=>`<section class="drawer-block"><h3>Cancelamento solicitado pelo hóspede</h3><p>${esc(x.reason)} · ${dateTime(x.requested_at)}</p><p>Estado: ${esc(x.status)}</p><button data-review-cancel="${esc(x.id)}">Analisar solicitação</button></section>`).join("")}
-  <section class="drawer-actions"><button data-checkin ${r.status!=="confirmed"||r.check_in>today()||r.check_out<today()||r.checked_in_at?"disabled":""}>Registrar check-in</button><button data-checkout ${r.status!=="confirmed"||r.check_in>today()||!r.checked_in_at||r.checked_out_at?"disabled":""}>Registrar checkout</button>${r.status==="confirmed"?'<button class="danger" data-cancel-reservation>Cancelar reserva</button><button data-voluntary-refund>Estorno voluntário</button>':""}</section>`;
-  $("#reservation-drawer").hidden=false;document.body.classList.add("drawer-open");
-  $("#reservation-guest").onclick=()=>openStayGuest("reservation:"+r.id);
-  $("#reservation-note-form").onsubmit=e=>addNote(e,r.id);const ci=$("[data-checkin]"),co=$("[data-checkout]"),ca=$("[data-cancel-reservation]");if(ci)ci.onclick=()=>reservationAction(r.id,"check_in");if(co)co.onclick=()=>reservationAction(r.id,"check_out");if(ca)ca.onclick=()=>cancelReservation(r.id);
-  const voluntary=$("[data-voluntary-refund]");if(voluntary)voluntary.onclick=()=>voluntaryRefund(r.id);
-  $$("[data-review-cancel]").forEach(b=>b.onclick=()=>cancelReservation(r.id,b.dataset.reviewCancel));
-  document.querySelectorAll("#reservation-detail [data-guarantee]").forEach(b=>b.addEventListener("click",()=>openGuarantee(b.dataset.guarantee)));
-  document.querySelectorAll("#reservation-detail [data-experience-credit]").forEach(b=>b.onclick=()=>openExperienceCredit(r.id,b.dataset.experienceCredit));
-  organizeReservationDetail();
-  loadRefundHistory(r.id);
-  loadReservationFinance(r.id);
- const legal=document.createElement('section');legal.className='drawer-block';legal.innerHTML='<h3>Documentos aceitos</h3><button type="button">Consultar versões desta reserva</button>';$('#reservation-detail').append(legal);
- legal.querySelector('button').onclick=async()=>{try{const result=await api('reservation_policy',{reservation_id:r.id});legal.innerHTML='<h3>Documentos aceitos</h3>'+result.documents.map(d=>`<details><summary>${esc(d.title)} · versão ${esc(d.version)}</summary><p>Aceito em ${dateTime(d.accepted_at)} (Brasília)</p><p class="legal-body">${esc(d.body)}</p></details>`).join('')}catch{legal.querySelector('button').textContent='Não foi possível consultar. Tente novamente.'}};
-  $("#new-reservation-incident").onclick=()=>openReservationIncident(r.id);
-}
-function organizeReservationDetail(){
- const root=$('#reservation-detail'),actions=root.querySelector('.drawer-actions'),status=root.querySelector('.drawer-status');
- const next=document.createElement('div');next.className='drawer-next-actions';
- for(const button of actions.querySelectorAll('[data-checkin],[data-checkout]'))next.append(button);
- status.after(next);
- const tabs=document.createElement('div');tabs.className='workspace-tabs';tabs.innerHTML=['Estadia','Financeiro','Histórico'].map((t,i)=>`<button type="button" data-detail-tab="${i}">${t}</button>`).join('');next.after(tabs);
- const blocks=[...root.querySelectorAll(':scope > .drawer-block')];
- const financial=['Pagamento','Garantia da reserva','Financeiro da reserva','Ocorrências','Estornos e cancelamentos'];
- const activate=i=>{blocks.forEach(block=>{const h=block.querySelector('h3')?.textContent;const group=financial.includes(h)?1:h==='Histórico interno'?2:0;block.hidden=group!==i});actions.hidden=i!==1;tabs.querySelectorAll('button').forEach(b=>{b.classList.toggle('active',Number(b.dataset.detailTab)===i);b.setAttribute('aria-pressed',String(Number(b.dataset.detailTab)===i))})};tabs.onclick=e=>{const b=e.target.closest('button');if(b)activate(Number(b.dataset.detailTab))};activate(0);
-}
-function openPropertyPrices(p){
- $('#admin-modal-content').innerHTML=`<button type="button" class="workspace-back" id="price-back">← ${esc(p.name)}</button><h2>Preços</h2><p>As diárias são calculadas pela integração de preços e pelas regras de tarifa do site. A taxa de limpeza e o parcelamento ficam em “Taxas e pagamento”.</p><button type="button" id="price-calendar">Consultar datas do imóvel</button><button type="button" id="price-settings">Configurações de preços e tarifas</button>`;
- $('#price-back').onclick=()=>openProperty(p.id);$('#price-calendar').onclick=()=>openAvailability(p.id);$('#price-settings').onclick=()=>{closeModal();showView('settings')};
-}
-function openExperienceCredit(reservationId,itemId){
- const item=byReservation(state.experience_orders,reservationId).flatMap(o=>o.experience_order_items||[]).find(i=>i.id===itemId);
- if(!item)return;
- $("#admin-modal-content").innerHTML=`<small>EXPERIÊNCIA DA RESERVA</small><h2>Retirar ${esc(item.product_name_snapshot)}</h2><form id="experience-credit-form" class="admin-form"><p>O crédito será calculado pelos pagamentos vinculados ao item. A retirada ocorre na aprovação; a devolução só será confirmada após conciliação.</p><label class="admin-checkbox"><input name="not_provided" type="checkbox" required> Confirmei que este serviço ainda não foi prestado.</label><label>Justificativa<textarea name="reason" minlength="5" maxlength="1000" required></textarea></label><p class="admin-form-message" role="status"></p><button class="admin-primary">Calcular crédito</button></form>`;
- openModal();const f=$("#experience-credit-form"),key=crypto.randomUUID();
- f.onsubmit=async e=>{
-  e.preventDefault();const b=f.querySelector("button"),m=f.querySelector(".admin-form-message");b.disabled=true;m.textContent="Conferindo item e pagamentos…";
-  try{
-   const result=await api("experience_credit",{reservation_id:reservationId,item_id:itemId,operation_key:key,service_not_provided:f.elements.not_provided.checked,reason:f.elements.reason.value.trim()});
-   const d=await api("reservation_refund_action",{reservation_id:reservationId,operation:"status",kind:"voluntary_refund",case_id:result.cancellation_id});
-   renderRefundDecision(reservationId,{...d,kind:"voluntary_refund"});
-  }catch(err){m.textContent=({experience_credit_review_required:"Os pagamentos deste item exigem revisão: upgrade, juros, estorno anterior ou vínculo incompleto. Nenhum valor foi devolvido.",previous_refund_pending:"Conclua a operação financeira pendente antes de retirar o item.",experience_credit_already_exists:"Este item já possui uma solicitação. Consulte Estornos e cancelamentos na reserva.",reservation_not_changeable:"A reserva exige análise individual antes da retirada.",service_review_required:"Confirme se o serviço ainda não foi prestado."})[err.message]||"Não foi possível calcular. Consulte o histórico antes de repetir.";b.disabled=false;}
- };
-}
-async function loadRefundHistory(id){
-  const box=$("#reservation-refund-history");
-  try{const {cases:rows}=await api("reservation_refund_action",{operation:"list",reservation_id:id});
-    if(!box||!box.isConnected)return;
-    box.innerHTML=rows?.length?rows.map(c=>`<div class="drawer-line"><span>${c.kind==="voluntary_refund"?"Estorno voluntário":"Cancelamento"} · ${esc(c.status)}<br>${esc(c.reason)}</span><strong>${brl(c.refund_due_cents)}</strong>${c.status!=="confirmed"?`<button data-refund-case="${esc(c.id)}" data-refund-kind="${esc(c.kind)}">Ver conciliação</button>`:""}</div>`).join(""):"Nenhum estorno solicitado.";
-    box.querySelectorAll("[data-refund-case]").forEach(b=>b.onclick=async()=>{
-      try{const d=await api("reservation_refund_action",{operation:"status",reservation_id:id,kind:b.dataset.refundKind,case_id:b.dataset.refundCase});
-        renderRefundDecision(id,{...d,kind:b.dataset.refundKind});openModal()}
-      catch{box.textContent="Não foi possível consultar a conciliação."}
+    if(!["requested","quoted"].includes(m.status)) return json({ok:false,error:"modification_not_approvable"},409);
+
+    const targetProperty=Number(m.requested_property_id||m.reservations?.property_id);
+    const targetIn=String(m.requested_check_in||m.reservations?.check_in||"");
+    const targetOut=String(m.requested_check_out||m.reservations?.check_out||"");
+    const listings=await searchData(targetIn,targetOut,Number(m.reservations?.guests||2),m.reservation_id,development);
+    const target=listings.find((x:any)=>Number(x.id)===targetProperty);
+    if(!target?.available){
+      if(target?.unavailable_reason==="minimum_stay") return json({ok:false,error:"minimum_stay",min_stay:Number(target.min_stay||1)},409);
+      return json({ok:false,error:target?.unavailable_reason||"dates_unavailable"},409);
+    }
+
+    // Refresh availability and price when approving; the request-time quote only lasts 15 minutes.
+    let currentQuote:any;
+    try{
+      currentQuote=await modificationQuote(m.reservations,targetProperty,targetIn,targetOut,development);
+    }catch(e){
+      const message=String((e as Error)?.message||"modification_quote_failed");
+      const min=/^minimum_stay:(\d+)$/.exec(message);
+      return json({ok:false,error:min?"minimum_stay":message,min_stay:min?Number(min[1]):undefined},409);
+    }
+    const currentOption=currentQuote.rate_options.find((x:any)=>x.code===m.reservations?.rate_plan_code&&x.selectable);
+    if(!currentOption) return json({ok:false,error:"original_rate_unavailable"},409);
+    const freshReference=Number(currentOption.stay_amount_cents);
+    const {error:repriceError}=await admin.from("modification_requests").update({
+      reference_quote_id:currentQuote.quote_id,reference_amount_cents:freshReference,
+      estimated_additional_amount_cents:Math.max(0,freshReference-Number(m.original_amount_cents))
+    }).eq("id",m.id).in("status",["requested","quoted"]);
+    if(repriceError) return json({ok:false,error:"modification_reprice_failed"},500);
+    if(freshReference!==Number(m.reference_amount_cents))
+      return json({ok:false,error:"modification_price_changed",reference_amount_cents:freshReference,
+        additional_amount_cents:Math.max(0,freshReference-Number(m.original_amount_cents))},409);
+    // The approved charge is calculated server-side; a cheaper replacement keeps the paid price.
+    const originalCents=Number(m.original_amount_cents);
+    const referenceCents=freshReference;
+    if(!Number.isSafeInteger(originalCents)||!Number.isSafeInteger(referenceCents)||originalCents<0||referenceCents<0)
+      return json({ok:false,error:"invalid_modification_quote"},409);
+    const amount=Math.max(0,referenceCents-originalCents);
+    const {data:settings}=await admin.from("payment_settings").select("modification_payment_deadline_hours").eq("id",1).single();
+    const {data,error}=await admin.rpc("create_modification_charge_atomic",{
+      p_request_id:m.id,
+      p_admin_id:user.id,
+      p_amount_cents:amount,
+      p_deadline_hours:Number(settings?.modification_payment_deadline_hours||24),
+      p_admin_note:body?.admin_note||null
     });
-  }catch{if(box?.isConnected)box.textContent="Histórico indisponível. Atualize a página."}
+    if(error){
+      const msg=String(error.message||"");
+      for(const code of ["dates_unavailable","modification_not_approvable","reservation_not_changeable","modification_payment_deadline_passed","invalid_dates"])
+        if(msg.includes(code)) return json({ok:false,error:code},409);
+      return json({ok:false,error:"modification_approval_failed"},500);
+    }
+    const row=Array.isArray(data)?data[0]:data;
+    return json({ok:true,status:"awaiting_payment",charge:{
+      id:row?.charge_id||null,
+      amount_cents:Number(row?.amount_cents||0),
+      expires_at:row?.expires_at||null,
+      reminder_at:row?.reminder_at||null
+    }});
+  }
+
+  // Legacy path only for requests accepted before the payment-required workflow.
+  if(action==="apply"){
+    if(m.status!=="accepted") return json({ok:false,error:"guest_acceptance_required"},409);
+    const {data:rpc,error:rpcErr}=await admin.rpc("apply_modification_mock_atomic",{p_request_id:m.id,p_actor_user_id:user.id});
+    if(rpcErr) return json({ok:false,error:"modification_apply_failed"},500);
+    const row=Array.isArray(rpc)?rpc[0]:rpc;
+    return json({ok:true,status:"applied",payment_id:row?.result_payment_id||null,total_amount:row?.result_total_amount||null});
+  }
+
+  return json({ok:false,error:"invalid_operation"},400);
 }
-async function addNote(e,id){e.preventDefault();const f=e.currentTarget,n=f.note.value.trim();if(!n)return;await api("admin_reservation_action",{operation:"add_note",reservation_id:id,note:n});await load(true);openReservation(id)}
-async function reservationAction(id,operation){
- try{await api("admin_reservation_action",{operation,reservation_id:id});await load(true);openReservation(id)}
- catch(e){
-  if(e.message!=="guarantee_check_in_exception_required"){alert("Não foi possível concluir a operação. Atualize a reserva e confira o estado atual.");return;}
-  $("#admin-modal-content").innerHTML='<small>CHECK-IN · CAUÇÃO PENDENTE</small><h2>Registrar decisão do responsável</h2><p>A caução ainda não oferece a cobertura necessária. A reserva paga continua válida. Regularize a garantia ou registre por que decidiu liberar a entrada.</p><form id="guarantee-checkin-exception" class="admin-form"><label>Justificativa<textarea name="reason" minlength="10" maxlength="1000" required></textarea></label><p class="admin-form-message" role="status"></p><button type="submit">Liberar entrada e registrar exceção</button></form>';
-  openModal();const form=$("#guarantee-checkin-exception");form.onsubmit=async event=>{event.preventDefault();const b=form.querySelector('button');b.disabled=true;
-   try{await api("admin_reservation_action",{operation,reservation_id:id,guarantee_exception_reason:form.elements.reason.value.trim()});closeModal();await load(true);openReservation(id)}
-   catch{form.querySelector('.admin-form-message').textContent="Não foi possível registrar. Consulte novamente a reserva.";b.disabled=false;}
-  };
+
+async function opsData(req:Request){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}] = await Promise.all([
+    admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name))").order("created_at",{ascending:false}).limit(50),
+    admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents!incidents_guarantee_id_fkey(*),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").order("created_at",{ascending:false}).limit(50),
+    admin.from("payments").select("id,reservation_id,provider,method,installments,amount_cents,status,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
+    admin.from("post_booking_charges").select("id,reservation_id,kind,description,amount_cents,status,expires_at,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
+    admin.from("payment_settings").select("*").eq("id",1).single(),
+    admin.from("properties").select("id,code,name,active,cleaning_fee,guarantee_amount_cents,max_guests").order("id"),
+    admin.from("property_integrations").select("property_id,provider,environment_key,external_listing_id,active").order("provider"),
+    admin.from("notification_outbox").select("id,template_code,status,send_after,attempt_count,max_attempts,last_error,created_at,reservations(confirmation_code)").order("created_at",{ascending:false}).limit(50)
+  ]);
+  const bookingConfigured=(await calendars.channels("booking")).listings.map((x:any)=>({name:x.name,configured:x.ok}));
+  return json({ok:true,modifications:mods||[],guarantees:guarantees||[],payments:payments||[],charges:charges||[],settings:settings||null,properties:properties||[],integrations:integrations||[],booking_configured:bookingConfigured,notifications:notifications||[]});
+}
+
+function localDate(offsetDays=0){
+  const now=new Date(Date.now()+offsetDays*86400000);
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(now);
+}
+
+async function adminHubData(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const start=validDate(String(body?.start||""))?String(body.start):localDate(-31);
+  const end=validDate(String(body?.end||""))?String(body.end):localDate(185);
+  if(end<=start) return json({ok:false,error:"invalid_dates"},400);
+
+  const [propertiesQ,reservationsQ,notificationsQ,integrationsQ,settingsQ,blocksQ,airbnb,booking] = await Promise.all([
+    admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,active,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone,created_at,updated_at").order("id"),
+    admin.from("reservations").select("id,property_id,user_id,check_in,check_out,status,source,guests,guest_name,guest_email,guest_phone,stay_amount,experience_amount,total_amount,rate_plan_code,confirmation_code,hold_expires_at,created_at,updated_at,confirmed_at,cancelled_at,not_confirmed_at,not_confirmed_reason,cancellation_actor,cancellation_reason,no_show_at,operational_status,checked_in_at,checked_out_at").lte("check_in",end).gte("check_out",start).order("created_at",{ascending:false}).limit(750),
+    admin.from("admin_notifications").select("id,notification_type,severity,title,message,reservation_id,entity_type,entity_id,payload,read_at,created_at").order("created_at",{ascending:false}).limit(150),
+    admin.from("property_integrations").select("id,property_id,provider,external_listing_id,pms,environment_key,active,updated_at").order("provider"),
+    admin.from("payment_settings").select("*").eq("id",1).single(),
+    admin.from("pms_calendar_blocks").select("*").gte("end_date",start).lte("start_date",end).order("start_date"),
+    airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
+    bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
+  ]);
+  if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error)
+    return json({ok:false,error:"admin_hub_unavailable"},500);
+  let cancellationPolicies:any[];
+  try { cancellationPolicies=await developmentPolicies(); }
+  catch { return json({ok:false,error:"cancellation_policy_unavailable"},500); }
+
+  const reservations=reservationsQ.data||[];
+  const reservationIds=reservations.map((r:any)=>r.id);
+  const empty:any[]=[];
+  const [paymentsQ,ordersQ,chargesQ,modsQ,guaranteesQ,notesQ,ledgerQ] = reservationIds.length ? await Promise.all([
+    admin.from("payments").select("id,reservation_id,provider,provider_payment_id,method,installments,amount_cents,status,metadata,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("experience_orders").select("id,reservation_id,status,created_at,experience_order_items(id,product_id,variant_id,product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,created_at)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,description,snapshot,expires_at,applied_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,status,admin_additional_amount_cents,estimated_additional_amount_cents,admin_note,payment_due_at,created_at,updated_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("guarantees").select("id,reservation_id,provider,provider_authorization_id,provider_capture_before,attention_code,provider_error_code,amount_cents,captured_amount_cents,refunded_amount_cents,released_amount_cents,release_confirmed,status,created_at,updated_at,incidents!incidents_guarantee_id_fkey(id,description,requested_capture_cents,evidence,status,category,decision,actor_user_id,decided_at,created_at,resolved_at),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("reservation_notes").select("id,reservation_id,author_user_id,note,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false}),
+    admin.from("financial_entries").select("id,reservation_id,payment_id,experience_order_item_id,entry_type,amount_cents,currency,description,created_at").in("reservation_id",reservationIds).order("created_at",{ascending:false})
+  ]) : [{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty},{data:empty}];
+
+  if([paymentsQ,ordersQ,chargesQ,modsQ,guaranteesQ,notesQ,ledgerQ].some(q=>q.error))
+    return json({ok:false,error:"reservation_financial_data_unavailable"},503);
+  const properties=propertiesQ.data||[];
+  const propertyByName=new Map<string,any>(properties.map((p:any)=>[String(p.name),p]));
+  const channelPeriods:any[]=[];
+  for(const listing of airbnb?.listings||[]){
+    const p=propertyByName.get(String(listing.name));
+    if(!p) continue;
+    for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
+      channelPeriods.push({id:calendarPeriodKey("airbnb",p.id,period),property_id:p.id,source:"airbnb",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+  }
+  for(const listing of booking?.listings||[]){
+    const p=propertyByName.get(String(listing.name));
+    if(!p) continue;
+    for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
+      channelPeriods.push({id:calendarPeriodKey("booking",p.id,period),property_id:p.id,source:period.source||"booking",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+  }
+
+  return json({
+    ok:true,server_now:new Date().toISOString(),range:{start,end},properties,reservations,
+    payments:paymentsQ.data||[],experience_orders:ordersQ.data||[],charges:chargesQ.data||[],
+    modifications:modsQ.data||[],guarantees:(guaranteesQ.data||[]).map((g:any)=>({...g,financial:guaranteeState(g)})),notes:notesQ.data||[],ledger:ledgerQ.data||[],
+    notifications:notificationsQ.data||[],integrations:integrationsQ.data||[],settings:settingsQ.data||{},
+    cancellation_policies:cancellationPolicies,
+    calendar_blocks:blocksQ.data||[],
+    channel_periods:channelPeriods,
+    channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
+  });
+}
+
+async function legalDocuments(req:Request,body:any,development:boolean){
+ const user=await currentUser(req);
+ if(body?.operation==="publish"){
+  if(!development)return json({ok:false,error:"development_only"},403);
+  if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+  const {data,error}=await admin.rpc("publish_booking_document",{p_type:body.document_type,p_title:body.title,p_body:String(body.body||"").replace(/^Chalezinho Ville • Versão .*$/gm,"").trim(),p_actor:user.id,p_previous_id:body.previous_id||null});
+  if(error)return json({ok:false,error:error.message?.includes("policy_version_changed")?"policy_version_changed":"document_save_failed"},409);
+  return json({ok:true,document_id:data});
  }
+ const isAdmin=!!user&&await userIsAdmin(user);
+ const {data,error}=await admin.from("policy_documents").select("id,document_type,code,version,title,body,status,effective_at,created_at,published_by").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft","archived"]:["active"]).order("created_at",{ascending:false});
+ if(error)return json({ok:false,error:"booking_terms_unavailable"},503);
+ return json({ok:true,documents:bookingDocuments(data||[],development),...(isAdmin?{history:data||[]}:{} )});
 }
-function cancelReservation(id,requestId=null){
-  const request=(state.cancel_requests||[]).find(x=>x.id===requestId);
-  $("#admin-modal-content").innerHTML=`<small>CANCELAMENTO · PAGBANK SANDBOX</small><h2>${request?"Analisar pedido do hóspede":"Calcular devolução"}</h2><form id="refund-prepare" class="admin-form"><p>A reserva permanece ativa até a confirmação do PagBank e da conciliação.</p><label>${request?"Motivo informado pelo hóspede":"Justificativa"}<textarea name="reason" rows="3" required ${request?"readonly":""}>${esc(request?.reason||"")}</textarea></label><p class="admin-form-message" role="status"></p><button class="admin-primary">Ver cálculo e cobranças</button>${request?.status==="requested"?'<button type="button" id="reject-guest-cancel">Recusar solicitação</button>':""}</form>`;
-  openModal();$("#refund-prepare").onsubmit=async e=>{
-    e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");
-    b.disabled=true;m.textContent="Conferindo pagamentos e política aceita…";
-    try{const d=await api("reservation_refund_action",{reservation_id:id,operation:"prepare",reason:f.reason.value,guest_request_id:requestId});renderRefundDecision(id,d)}
-    catch(err){m.textContent=refundError(err)}finally{b.disabled=false}
-  };
-  const reject=$("#reject-guest-cancel");if(reject)reject.onclick=async()=>{
-    const note=window.prompt("Motivo da recusa para o hóspede:");if(!note?.trim())return;
-    reject.disabled=true;
-    try{await api("reservation_cancel_request",{operation:"reject",reservation_id:id,request_id:requestId,decision_note:note});closeModal();await load(true);openReservation(id)}
-    catch{$("#refund-prepare .admin-form-message").textContent="Não foi possível recusar; confira o estado da solicitação.";reject.disabled=false}
-  };
+
+async function adminCancellationPolicyAction(req:Request,body:any,development:boolean){
+  if(!development) return json({ok:false,error:"development_only"},403);
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const code=String(body?.rate_plan_code||"");
+  const withdrawal=Number(body?.withdrawal_days);
+  const commercial=Number(body?.commercial_free_cancellation_hours);
+  const full=Number(body?.full_refund_days_before_checkin);
+  const late=Number(body?.late_accommodation_refund_percent);
+  if(!["refundable","non_refundable"].includes(code)||![commercial,withdrawal,full,late].every(Number.isInteger)
+     ||commercial<0||commercial>720||withdrawal<7||withdrawal>30||full<1||full>365||late<0||late>100||(code==="non_refundable"&&late!==0))
+    return json({ok:false,error:"invalid_policy_configuration"},400);
+  const {data,error}=await admin.rpc("save_finance_cancellation_policy",{
+    p_rate_plan_code:code,p_withdrawal_days:withdrawal,p_commercial_free_hours:commercial,
+    p_full_refund_days_before_checkin:full,p_late_accommodation_refund_percent:late
+  });
+  if(error) return json({ok:false,error:"policy_save_failed"},500);
+  return json({ok:true,document_id:data});
 }
-function voluntaryRefund(id){
-  const operationKey=crypto.randomUUID();
-  $("#admin-modal-content").innerHTML=`<small>ESTORNO VOLUNTÁRIO · PAGBANK SANDBOX</small><h2>Devolver valor sem cancelar a reserva</h2><form id="voluntary-refund" class="admin-form"><label>Valor a devolver (R$)<input name="amount" type="number" min="0.01" step="0.01" required></label><label>Justificativa<textarea name="reason" rows="3" required></textarea></label><p class="admin-form-message" role="status"></p><button class="admin-primary">Ver cálculo e cobranças</button></form>`;
-  openModal();$("#voluntary-refund").onsubmit=async e=>{
-    e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");b.disabled=true;m.textContent="Conferindo saldo da cobrança…";
-    try{const d=await api("reservation_refund_action",{reservation_id:id,kind:"voluntary_refund",operation:"prepare",operation_key:operationKey,amount_cents:Math.round(Number(f.amount.value)*100),reason:f.reason.value});renderRefundDecision(id,{...d,kind:"voluntary_refund"})}
-    catch(err){m.textContent=refundError(err)}finally{b.disabled=false}
-  };
-}
-const refundError=e=>({previous_refund_pending:"Já há um estorno pendente nessa cobrança. Abra o histórico e continue a solicitação existente.",refund_retry_not_ready:"Aguarde um minuto e consulte a cobrança antes de reenviar.",refund_provider_balance_mismatch:"O PagBank ainda não informou um saldo verificável. O reenvio permanece bloqueado.",accepted_policy_missing:"A versão aceita da política não foi encontrada.",ledger_review_required:"Os valores pagos não coincidem com o financeiro; revisão necessária.",partial_refund_provider_receipt_required:"Estorno parcial exige comprovante de valor do PagBank; solicitação bloqueada para revisão.",captured_charges_required:"Não há cobrança PagBank paga e identificada para esta reserva.",individual_review_required:"A política exige análise individual.",refund_allocation_requires_review:"A distribuição entre cobranças exige revisão."})[e.message]||"Não foi possível confirmar esta operação. A reserva permanece ativa; consulte a conciliação.";
-function renderRefundDecision(id,d){
-  const alloc=d.calculation?.allocations||[];
-  const voluntary=d.kind==="voluntary_refund",experienceCredit=d.calculation?.reason==="unprovided_experience";
-  const caseState={prepared:"Pronto para aprovação",pending_provider:"Aguardando PagBank",confirmed:"Confirmado"}[d.status]||"Em análise";
-  const mayApprove=d.status==="prepared"||(d.status==="pending_provider"&&d.refunds?.some(x=>x.state==="prepared"));
-  $("#admin-modal-content").innerHTML=`<small>${experienceCredit?"CRÉDITO DE EXPERIÊNCIA":voluntary?"ESTORNO VOLUNTÁRIO":"CANCELAMENTO"} · ${caseState}</small><h2>${brl(d.refund_due_cents)} a devolver</h2><p>Confirmado no financeiro: ${brl(d.confirmed_cents)}. Restante: ${brl(Math.max(0,d.refund_due_cents-d.confirmed_cents))}.</p>${d.provider_issue==="pagbank_refund_temporarily_unavailable"?'<p role="alert">O PagBank recusou o estorno com o código 40008 (serviço temporariamente indisponível). Nenhum valor foi confirmado como devolvido. Consulte a cobrança e, após um minuto, reenvie a mesma solicitação. O sistema confere o saldo e preserva a chave da operação para evitar duplicidade.</p>':""}${d.provider_issue==="pagbank_refund_key_in_use"?'<p role="alert">O PagBank mantém a chave da operação em uso (40005). A solicitação permanece pendente. Não crie outra devolução; consulte a conciliação ou o suporte do provedor.</p>':""}<p>Política aceita: versão ${esc(d.accepted_version||"—")}. ${voluntary?"A reserva continuará ativa após o estorno.":"A reserva só será cancelada após conciliação."}</p><div class="admin-stack">${alloc.map(x=>`<p>Cobrança ${esc(String(x.charge_id||"").slice(-8))}: paga ${brl(x.captured_cents)} · devolução ${brl(x.refund_cents)} · ${esc(x.calculation?.reason==="unprovided_experience"?"experiência não prestada":x.calculation?.reason==="commercial_free_window"?"cancelamento na janela comercial gratuita":x.calculation?.reason==="withdrawal_window"?"prazo adicional da política aceita":x.calculation?.reason==="voluntary_refund"?"estorno voluntário":x.calculation?.reason||"calculado pela política")}</p>`).join("")}</div><p class="admin-form-message" role="status"></p><div class="drawer-actions">${mayApprove?'<button class="admin-danger" id="refund-approve">Aprovar e solicitar estorno</button>':d.status!=="confirmed"?'<button id="refund-reconcile">Consultar PagBank</button>':""}</div>`;
-  if(!mayApprove&&d.provider_issue==="pagbank_refund_temporarily_unavailable"){
-    const retry=document.createElement("button");retry.textContent="Reenviar estorno pendente";
-    $("#admin-modal-content .drawer-actions").appendChild(retry);
-    retry.onclick=async()=>{retry.disabled=true;const m=$("#admin-modal-content .admin-form-message");
-      m.textContent="Conferindo o saldo e reenviando a mesma solicitação…";
-      try{const next=await api("reservation_refund_action",{reservation_id:id,kind:d.kind,case_id:d.cancellation_id,operation:"retry"});
-        renderRefundDecision(id,{...d,...next});
-      }catch(e){m.textContent=refundError(e);retry.disabled=false;}};
+
+async function adminReservationAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+
+  if(operation==="create_manual"){
+    const propertyId=Number(body?.property_id||0);
+    const checkIn=String(body?.check_in||""),checkOut=String(body?.check_out||"");
+    const guests=Math.max(1,Math.round(Number(body?.guests||1)));
+    const guestName=String(body?.guest_name||"").trim().slice(0,200);
+    const guestEmail=String(body?.guest_email||"").trim().toLowerCase().slice(0,320)||null;
+    const guestPhone=String(body?.guest_phone||"").trim().slice(0,50)||null;
+    const total=Math.max(0,Number(body?.total_amount||0));
+    if(!propertyId||!validDate(checkIn)||!validDate(checkOut)||checkOut<=checkIn||!guestName) return json({ok:false,error:"invalid_reservation"},400);
+    const [{data:property},{data:occupied},{data:changeHolds},{data:blocks},airbnb,booking]=await Promise.all([
+      admin.from("properties").select("id,name,max_guests,cleaning_fee,active").eq("id",propertyId).single(),
+      admin.from("reservations").select("id").eq("property_id",propertyId).in("status",["hold","pending_payment","confirmed"]).lt("check_in",checkOut).gt("check_out",checkIn).limit(1),
+      admin.from("post_booking_charges").select("id").eq("kind","modification").eq("target_property_id",propertyId).in("status",["awaiting_payment","processing","paid"]).gt("expires_at",new Date().toISOString()).lt("target_check_in",checkOut).gt("target_check_out",checkIn).limit(1),
+      admin.from("pms_calendar_blocks").select("id").eq("property_id",propertyId).eq("status","active").lt("start_date",checkOut).gt("end_date",checkIn).limit(1),
+      airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
+      bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
+    ]);
+    if(!property||!property.active) return json({ok:false,error:"property_not_found"},404);
+    if(guests>Number(property.max_guests)) return json({ok:false,error:"capacity"},409);
+    const externalBlocked=(source:any)=>{
+      const listing=(source?.listings||[]).find((x:any)=>x.name===property.name);
+      return !listing?.ok || (listing.periods||[]).some((x:any)=>overlaps(x.start,x.end,checkIn,checkOut));
+    };
+    if(occupied?.length||changeHolds?.length||blocks?.length||externalBlocked(airbnb)||(booking.configured&&externalBlocked(booking))) return json({ok:false,error:"occupied"},409);
+    const code=crypto.randomUUID().replaceAll("-","").slice(0,10).toUpperCase();
+    const cleaning=Number(property.cleaning_fee||0);
+    const {data,error}=await admin.from("reservations").insert({
+      property_id:propertyId,check_in:checkIn,check_out:checkOut,status:"confirmed",source:"manual",guests,
+      guest_name:guestName,guest_email:guestEmail,guest_phone:guestPhone,stay_amount:total,experience_amount:0,
+      total_amount:total,accommodation_amount:Math.max(0,total-cleaning),cleaning_fee:cleaning,
+      confirmation_code:code,confirmed_at:new Date().toISOString(),operational_status:"upcoming"
+    }).select().single();
+    if(error||!data){
+      if(String(error?.message||"").includes("no_overlapping_active_reservations")) return json({ok:false,error:"occupied"},409);
+      return json({ok:false,error:"reservation_create_failed"},500);
+    }
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"manual_reservation_created",entity_type:"reservation",entity_id:data.id,new_value:{confirmation_code:code,check_in:checkIn,check_out:checkOut}});
+    return json({ok:true,reservation:data});
   }
-  const button=$(mayApprove?"#refund-approve":"#refund-reconcile");
-  if(mayApprove&&button){
-    button.disabled=true;
-    const message=$("#admin-modal-content .admin-form-message");
-    message.textContent="Conferindo o saldo de cada cobrança no PagBank…";
-    api("reservation_refund_action",{reservation_id:id,kind:voluntary?"voluntary_refund":"policy_cancellation",
-      case_id:d.cancellation_id,operation:"preflight"}).then(result=>{
-      if(!button.isConnected)return;
-      if(result.ready){button.disabled=false;message.textContent=result.checks?.some(c=>c.mode==="provider_limit")?
-        "Cobrança paga conferida. O sandbox omitiu o saldo devolvido; o PagBank validará o limite no envio. O estorno continuará pendente até confirmação do valor pelo provedor.":
-        "Saldo e cobrança conferidos. A aprovação enviará o estorno ao PagBank sandbox."}
-      else message.textContent="Envio bloqueado: " + ((result.checks||[]).map(c=>
-        `cobrança ${String(c.payment_id||"").slice(-8)}: ${c.status||"indisponível"} via ${c.source||"consulta"}; saldo devolvido ${c.provider_refunded_cents==null?"indisponível":brl(c.provider_refunded_cents)}`
-      ).join("; ")||"não foi possível confirmar o saldo das cobranças")+". A reserva permanece ativa.";
-    }).catch(()=>{if(button.isConnected)message.textContent="Consulta ao PagBank indisponível. Envio bloqueado; tente novamente após a consulta voltar."});
+
+  const reservationId=String(body?.reservation_id||"");
+  const {data:reservation,error}=await admin.from("reservations").select("*").eq("id",reservationId).single();
+  if(error||!reservation) return json({ok:false,error:"reservation_not_found"},404);
+  const now=new Date().toISOString();
+  const todayInBrazil=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+
+  if(operation==="add_note"){
+    const note=String(body?.note||"").trim().slice(0,2000);
+    if(!note) return json({ok:false,error:"note_required"},400);
+    const {data,error:noteError}=await admin.from("reservation_notes").insert({reservation_id:reservation.id,author_user_id:user.id,note}).select().single();
+    if(noteError) return json({ok:false,error:"note_create_failed"},500);
+    return json({ok:true,note:data});
   }
-  if(button)button.onclick=async()=>{
-    button.disabled=true;const m=$("#admin-modal-content .admin-form-message");m.textContent="Consultando PagBank e conciliando…";
-    try{const next=await api("reservation_refund_action",{reservation_id:id,kind:voluntary?"voluntary_refund":"policy_cancellation",case_id:d.cancellation_id,operation:mayApprove?"approve":"reconcile"});
-      if(next.status==="confirmed"){closeModal();await load(true)}else{
-        const observed=(next.provider_checks||[]).map(c=>c.status==="precheck_failed"?"consulta inicial falhou; nenhuma solicitação de estorno enviada":c.status==="unavailable"?"consulta ao provedor indisponível":`cobrança ${esc(c.status)} consultada pelo ${c.source==="order"?"pedido":"identificador da cobrança"}; devolução informada pelo PagBank: ${c.provider_refunded_cents==null?"indisponível":brl(c.provider_refunded_cents)}`).join("; ");
-        m.textContent=`Estorno pendente: ${brl(next.confirmed_cents)} confirmado de ${brl(next.refund_due_cents)}. ${observed}. A reserva continua ativa.`;
-        if(mayApprove)renderRefundDecision(id,{...d,...next,kind:d.kind});else button.disabled=false}}
-    catch(err){m.textContent=refundError(err);if(err.message==="cancellation_already_submitted"){
-      try{renderRefundDecision(id,{...d,...await api("reservation_refund_action",{reservation_id:id,kind:voluntary?"voluntary_refund":"policy_cancellation",case_id:d.cancellation_id,operation:"status"})})}catch{button.disabled=false}
-    }else button.disabled=false}
+  if(operation==="check_in"){
+    if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+    if(reservation.check_in>todayInBrazil||reservation.check_out<todayInBrazil||reservation.checked_in_at) return json({ok:false,error:"check_in_not_allowed"},409);
+    const {data,error:updateError}=await admin.rpc("check_in_with_guarantee",{p_reservation:reservation.id,
+      p_actor:user.id,p_exception_reason:body.guarantee_exception_reason||null});
+    if(updateError)return json({ok:false,error:String(updateError.message).includes("guarantee_check_in_exception_required")?
+      "guarantee_check_in_exception_required":"check_in_failed"},409);
+    return json({ok:true,reservation:data});
+  }
+  if(operation==="check_out"){
+    if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_confirmed"},409);
+    if(reservation.check_in>todayInBrazil||!reservation.checked_in_at||reservation.checked_out_at) return json({ok:false,error:"check_out_not_allowed"},409);
+    const {data,error:updateError}=await admin.from("reservations").update({operational_status:"checked_out",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservation.id).select().single();
+    if(updateError) return json({ok:false,error:"check_out_failed"},500);
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservation.id,new_value:{checked_out_at:data.checked_out_at}});
+    return json({ok:true,reservation:data});
+  }
+  if(operation==="set_operational_status"){
+    const next=String(body?.status||"");
+    if(!["upcoming","preparing","ready","attention"].includes(next)) return json({ok:false,error:"invalid_operational_status"},400);
+    const {data,error:updateError}=await admin.from("reservations").update({operational_status:next,updated_at:now}).eq("id",reservation.id).select().single();
+    if(updateError) return json({ok:false,error:"status_update_failed"},500);
+    return json({ok:true,reservation:data});
+  }
+  if(operation==="cancel"){
+    if(reservation.status!=="confirmed") return json({ok:false,error:"reservation_not_cancellable"},409);
+    const reason=String(body?.reason||"").trim().slice(0,1000);
+    if(!reason) return json({ok:false,error:"cancellation_reason_required"},400);
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"reservation_cancellation_requested",entity_type:"reservation",entity_id:reservation.id,new_value:{reason,state:"pending_refund_reconciliation"}});
+    return json({ok:false,error:"refund_reconciliation_required",status:"pending",reservation_id:reservation.id},409);
+  }
+  return json({ok:false,error:"invalid_operation"},400);
+}
+
+async function adminNotificationAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+  if(operation==="mark_read"){
+    const id=String(body?.notification_id||"");
+    const {error}=await admin.from("admin_notifications").update({read_at:new Date().toISOString()}).eq("id",id);
+    if(error) return json({ok:false,error:"notification_update_failed"},500);
+    return json({ok:true});
+  }
+  if(operation==="mark_all_read"){
+    const {error}=await admin.from("admin_notifications").update({read_at:new Date().toISOString()}).is("read_at",null);
+    if(error) return json({ok:false,error:"notification_update_failed"},500);
+    return json({ok:true});
+  }
+  return json({ok:false,error:"invalid_operation"},400);
+}
+
+async function adminAvailabilityAction(req:Request,body:any){
+ const user=await currentUser(req);if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+ const {data:p,error}=await admin.from("properties").select("id,features,updated_at").eq("id",Number(body.property_id)).single();
+ if(error||!p)return json({ok:false,error:"property_not_found"},404);
+ if(body.operation==="get")return json({ok:true,rules:availabilityRules(p.features?.availability||{}),updated_at:p.updated_at});
+ if(body.operation!=="save")return json({ok:false,error:"invalid_operation"},400);
+ let rules;try{rules=availabilityRules(body.rules)}catch(e){return json({ok:false,error:(e as Error).message},400)}
+ if(body.updated_at!==p.updated_at)return json({ok:false,error:"availability_conflict"},409);
+ const saved=await admin.from("properties").update({features:{...p.features,availability:rules},updated_at:new Date().toISOString()}).eq("id",p.id).eq("updated_at",p.updated_at).select("id").maybeSingle();
+ if(saved.error||!saved.data)return json({ok:false,error:"availability_conflict"},409);
+ await admin.from("audit_events").insert({actor_user_id:user.id,action:"availability_updated",entity_type:"property",entity_id:String(p.id),new_value:rules});
+ return json({ok:true,rules});
+}
+
+async function adminPropertyAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+  if(operation!=="save") return json({ok:false,error:"invalid_operation"},400);
+  const galleryInput=body?.gallery;
+  if(!Array.isArray(galleryInput)||galleryInput.length>40) return json({ok:false,error:"invalid_gallery"},400);
+  const gallery=galleryInput.map((item:any)=>({url:String(item?.url||""),alt:String(item?.alt||"").trim().slice(0,180)}));
+  const allowedPrefix=projectUrl+"/storage/v1/object/public/property-media/";
+  if(gallery.some((item:any)=>!(item.url.startsWith(allowedPrefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=[0-9]+)?$/.test(item.url)))) return json({ok:false,error:"invalid_gallery_url"},400);
+  const coverImage=String(body?.cover_image||"");
+  if(coverImage && !gallery.some((item:any)=>item.url===coverImage)) return json({ok:false,error:"invalid_cover"},400);
+  const id=body?.id?Number(body.id):null;
+  const name=String(body?.name||"").trim().slice(0,160);
+  const code=String(body?.code||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"").slice(0,30);
+  const slug=String(body?.slug||"").trim().toLowerCase().replace(/[^a-z0-9-]/g,"-").replace(/-+/g,"-").replace(/^-|-$/g,"").slice(0,100);
+  const propertyType=["chalet","apartment","house","cabin","other"].includes(String(body?.property_type))?String(body.property_type):"other";
+  const checkIn=String(body?.check_in_time||"15:00").slice(0,5);
+  const checkOut=String(body?.check_out_time||"11:00").slice(0,5);
+  if(!name||!code||!slug||!/^\d{2}:\d{2}$/.test(checkIn)||!/^\d{2}:\d{2}$/.test(checkOut)) return json({ok:false,error:"invalid_property"},400);
+  let terms;
+  try { terms=paymentTerms({payment_terms:{max_installments:Number(body?.max_installments??12),
+    no_interest_installments:Number(body?.no_interest_installments??6),interest_payer:body?.interest_payer}}); }
+  catch { return json({ok:false,error:"invalid_payment_terms"},400); }
+  const {data:previous}=id?await admin.from("properties").select("features").eq("id",id).single():{data:null};
+  const payload={
+    name,code,slug,property_type:propertyType,cover_image:coverImage||null,gallery,
+    tagline:String(body?.tagline||"").trim().slice(0,240)||null,
+    summary:String(body?.summary||"").trim().slice(0,3000)||null,
+    max_guests:Math.max(1,Math.min(50,Math.round(Number(body?.max_guests||2)))),
+    cleaning_fee:Math.max(0,Math.min(100000,Number(body?.cleaning_fee||0))),
+    guarantee_amount_cents:Math.max(0,Math.min(100000000,Math.round(Number(body?.guarantee_amount_cents||0)))),
+    check_in_time:checkIn,check_out_time:checkOut,timezone:"America/Sao_Paulo",active:body?.active!==false,
+    features:{...(previous?.features||{}),payment_terms:terms},updated_at:new Date().toISOString()
   };
+  const result=id
+    ? await admin.from("properties").update(payload).eq("id",id).select().single()
+    : await admin.from("properties").insert(payload).select().single();
+  if(result.error||!result.data) return json({ok:false,error:"property_save_failed"},409);
+  await admin.from("audit_events").insert({actor_user_id:user.id,action:id?"property_updated":"property_created",entity_type:"property",entity_id:String(result.data.id),new_value:{name,code,active:payload.active}});
+  return json({ok:true,property:result.data});
 }
-function closeDrawer(){$("#reservation-drawer").hidden=true;document.body.classList.remove("drawer-open")}
-function openModal(){$("#admin-modal").hidden=false;document.body.classList.add("drawer-open")}
-function closeModal(){$("#admin-modal").hidden=true;if($("#reservation-drawer").hidden)document.body.classList.remove("drawer-open")}
 
-async function loadReservationFinance(id){
- const box=document.querySelector("#reservation-finance-summary");if(!box)return;
- try{
-  const {finance:f}=await api("reservation_finance",{reservation_id:id});if(!box.isConnected)return;
-  const incidents=document.querySelector("#reservation-incidents");
-  if(incidents){
-   incidents.innerHTML=(f.incidents||[]).length?f.incidents.map(i=>`<article class="drawer-block"><strong>${esc(i.description)}</strong><p>${brl(i.requested_capture_cents)} · ${esc(({pending:"Aguardando decisão",no_charge:"Encerrada sem cobrança",approved:"Cobrança aprovada"})[i.decision]||i.decision)}</p><small>${dateTime(i.created_at)}</small>${i.decision==="pending"?`<button type="button" data-incident-no-charge="${esc(i.id)}">Encerrar sem cobrança</button>`:""}${i.guarantee_id?`<button type="button" data-incident-guarantee="${esc(i.guarantee_id)}">Evidências e decisão de cobrança</button>`:""}</article>`).join(""):"<p>Nenhuma ocorrência registrada.</p>";
-   incidents.querySelectorAll('[data-incident-guarantee]').forEach(b=>b.onclick=()=>openGuarantee(b.dataset.incidentGuarantee));
-   incidents.querySelectorAll('[data-incident-no-charge]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await api("reservation_incident",{operation:"no_charge",reservation_id:id,incident_id:b.dataset.incidentNoCharge});await loadReservationFinance(id)}catch{b.textContent="Não foi possível encerrar. Tentar novamente";b.disabled=false}});
+async function opsSettingsAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
+  if(operation==="payment_settings"){
+    let payload;try{payload={...validatePaymentSettings(body),updated_at:new Date().toISOString()}}
+    catch{return json({ok:false,error:"invalid_payment_settings"},400)}
+    const {data,error}=await admin.from("payment_settings").update(payload).eq("id",1).select().single();
+    if(error) return json({ok:false,error:"settings_update_failed"},500);
+    return json({ok:true,settings:data});
   }
-  const labels={contract_cents:"Valor contratado atualizado",approved_credit_cents:"Créditos aprovados",balance_due_cents:"Saldo a receber",credit_balance_cents:"Saldo a devolver",paid_cents:"Pagamentos recebidos",refunded_cents:"Estornos confirmados",net_received_cents:"Recebido líquido da hospedagem",pending_additional_cents:"Cobranças adicionais pendentes",pending_refund_cents:"Estornos aguardando confirmação",damage_captured_cents:"Danos capturados",damage_refunded_cents:"Danos estornados",total_net_received_cents:"Total recebido líquido"};
-  box.innerHTML=`${f.original_quote?`<p>Hospedagem original: ${brl(f.original_quote.accommodation_amount_cents)} · Limpeza: ${brl(f.original_quote.cleaning_fee_cents)} · Total original: ${brl(f.original_quote.total_amount_cents)}</p>`:"<p>Detalhamento original indisponível para este registro legado.</p>"}<dl class="reservation-finance-values">${Object.entries(labels).map(([k,l])=>`<dt>${l}</dt><dd>${f[k]==null?"Não disponível":brl(f[k])}</dd>`).join("")}</dl><details><summary>Histórico financeiro (${f.events_count})</summary>${f.history_migrated?"<p>Inclui saldo inicial importado. Eventos anteriores à migração podem não estar disponíveis.</p>":""}<ol>${f.events.map(e=>`<li>${dateTime(e.recorded_at)} · ${esc(e.source)} · ${esc(e.payload.description||e.payload.reason||e.payload.status||e.payload.state||e.event_type)} ${e.payload.amount_cents!=null?brl(e.payload.amount_cents):""}</li>`).join("")}</ol></details>`;
- }catch{if(box.isConnected){box.textContent="Histórico financeiro indisponível. Os valores não foram tratados como zero. Tente consultar novamente.";const incidents=document.querySelector("#reservation-incidents");if(incidents)incidents.textContent="Ocorrências indisponíveis. Atualize a reserva para tentar novamente.";}}
+  if(operation==="property_settings"){
+    const propertyId=Number(body?.property_id||0);
+    const cleaningFee=Math.max(0,Math.min(100000,Number(body?.cleaning_fee||0)));
+    const guaranteeCents=Math.max(0,Math.min(100000000,Math.round(Number(body?.guarantee_amount_cents||0))));
+    if(!propertyId||!Number.isFinite(cleaningFee)||!Number.isFinite(guaranteeCents)) return json({ok:false,error:"invalid_settings"},400);
+    const {data,error}=await admin.from("properties").update({cleaning_fee:cleaningFee,guarantee_amount_cents:guaranteeCents,updated_at:new Date().toISOString()}).eq("id",propertyId).select("id,code,name,cleaning_fee,guarantee_amount_cents").single();
+    if(error) return json({ok:false,error:"settings_update_failed"},500);
+    return json({ok:true,property:data});
+  }
+  return json({ok:false,error:"invalid_operation"},400);
 }
 
-function openReservationIncident(reservationId){
- const g=state.guarantees.find(x=>x.reservation_id===reservationId);
- if(g){openGuarantee(g.id);return;}
- $("#admin-modal-content").innerHTML=`<small>OCORRÊNCIA DA RESERVA</small><h2>Nova ocorrência</h2><p>Este registro não cobra o hóspede. Valor e evidências devem ser analisados antes de qualquer decisão financeira.</p><form id="reservation-incident-form" class="admin-form"><label>Categoria<select name="category"><option value="damage">Dano</option><option value="broken_item">Item quebrado</option><option value="missing_item">Item desaparecido</option><option value="extra_cleaning">Limpeza extraordinária</option><option value="penalty">Multa</option><option value="other">Outra ocorrência</option></select></label><label>Descrição<textarea name="description" required minlength="5" maxlength="1000"></textarea></label><label>Valor proposto (R$)<input name="amount" type="number" min="0" step="0.01" value="0" required></label><p class="admin-form-message" role="status"></p><button type="submit" class="admin-primary">Registrar ocorrência</button></form>`;
- openModal();const f=$("#reservation-incident-form"),key=crypto.randomUUID();
- f.onsubmit=async e=>{e.preventDefault();const b=f.querySelector('button'),m=f.querySelector('.admin-form-message');b.disabled=true;m.textContent="Registrando…";
-  try{await api("reservation_incident",{operation:"record",reservation_id:reservationId,category:f.elements.category.value,description:f.elements.description.value,amount_cents:Math.round(Number(f.elements.amount.value)*100),operation_key:key});closeModal();await loadReservationFinance(reservationId)}
-  catch{m.textContent="Não foi possível registrar. Tente novamente.";b.disabled=false;}
- };
+async function guaranteeAction(_req:Request,_body:any){
+  return json({ok:false,error:"legacy_guarantee_endpoint_removed"},410);
 }
 
-// Task-oriented workspace. Existing financial flows remain in their original handlers.
-const legacyProperty=openProperty,legacyToday=renderToday,legacyCalendar=renderCalendar,legacyView=showView;
-let todayTab='today';
-let calendarProperty='all',calendarSpan='month',calendarWeekStart=today();
-async function listingApi(body){const fresh=await sb.auth.getSession();session=fresh.data.session;if(!session)throw Error("session_expired");const r=await fetch(C.supabaseUrl+'/functions/v1/pms-operations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(body)});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'failed');return d}
-const workspaceCard=(key,title,summary)=>`<button type="button" data-workspace="${key}"><strong>${esc(title)}</strong><span>${esc(summary)}</span><span aria-hidden="true">Abrir →</span></button>`;
-
-function organizeAvailability(){
- const host=$('#admin-modal-content'),form=$('#availability-form'),calendar=$('#property-availability-calendar').parentElement,connections=$('#property-calendar-connections');
- const heading=form.previousElementSibling;heading.hidden=true;
- const tabs=document.createElement('div');tabs.className='workspace-tabs';tabs.innerHTML='<button type="button" data-availability-tab="calendar">Multicalendário</button><button type="button" data-availability-tab="rules">Regras de estadia</button><button type="button" data-availability-tab="links">Calendários conectados</button>';host.insertBefore(tabs,calendar);
- const activate=key=>{calendar.hidden=key!=='calendar';form.hidden=key!=='rules';connections.hidden=key!=='links';tabs.querySelectorAll('button').forEach(b=>b.classList.toggle('active',b.dataset.availabilityTab===key))};tabs.onclick=e=>{const b=e.target.closest('button');if(b)activate(b.dataset.availabilityTab)};activate('calendar');
- const grid=form.querySelector('.admin-form-grid');
- for(const label of [...grid.children]){const input=label.querySelector('input,select');const value=input.tagName==='SELECT'?input.selectedOptions[0].textContent:input.value;const title=label.firstChild.textContent;const detail=document.createElement('details');detail.className='workspace-rule';const summary=document.createElement('summary');summary.textContent=title+' · '+value;grid.insertBefore(detail,label);detail.append(summary,label);input.addEventListener('change',()=>{summary.textContent=title+' · '+(input.tagName==='SELECT'?input.selectedOptions[0].textContent:input.value)})}
- form.addEventListener('invalid',e=>{const d=e.target.closest('details');if(d)d.open=true},true);
+async function experienceAdminData(req:Request){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const [{data:products,error:pe},{data:properties,error:pre},{data:purposes,error:pu}] = await Promise.all([
+    admin.from("experience_products")
+      .select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,daily_capacity,inventory,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)")
+      .order("display_order"),
+    admin.from("properties").select("id,code,name,active").eq("active",true).order("id"),
+    admin.from("travel_purposes").select("code,label,active,display_order").eq("active",true).order("display_order")
+  ]);
+  if(pe||pre||pu) return json({ok:false,error:"experience_admin_unavailable"},500);
+  return json({ok:true,products:products||[],properties:properties||[],purposes:purposes||[]});
 }
 
-function setupWorkspace(){
- const paths={today:'M5 3h14v18l-7-4-7 4z',calendar:'M3 5h18v16H3z M7 2v6 M17 2v6 M3 10h18',properties:'M3 11l9-8 9 8 M5 10v11h14V10 M9 21v-7h6v7',reservations:'M4 4h16v16H4z M7 8h10 M7 12h10 M7 16h6',notifications:'M6 17h12l-2-3V9a4 4 0 0 0-8 0v5z M10 20h4',menu:'M4 6h16 M4 12h16 M4 18h16'};
- const nav=document.createElement('nav');nav.className='admin-bottom-nav';nav.setAttribute('aria-label','Navegação principal');nav.innerHTML=Object.entries({today:'Hoje',calendar:'Multicalendário',reservations:'Reservas',properties:'Imóveis',menu:'Mais'}).map(([v,l])=>`<button data-main-view="${v}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[v]}"/></svg><span>${l}</span></button>`).join('');$('#admin-app').append(nav);nav.onclick=e=>{const b=e.target.closest('[data-main-view]');if(b&&state)showView(b.dataset.mainView)};
-}
-showView=function(view){
- if(view==='menu'){currentView='menu';history.replaceState(null,'','admin.html?view=menu');$('#admin-context').textContent='SUA OPERAÇÃO';$('#admin-title').textContent='Menu';renderWorkspaceMenu()}else legacyView(view);
- $$('[data-main-view]').forEach(b=>{const active=b.dataset.mainView===view;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false')});
-};
-function renderWorkspaceMenu(){
- $('#admin-content').innerHTML=`<p class="workspace-summary">Escolha o assunto que deseja gerenciar.</p><div class="workspace-cards">${[['reservations','Reservas','Estadias, pagamentos, garantia e ocorrências'],['guests','Hóspedes','Contatos e histórico de estadias'],['finance','Financeiro','Recebimentos e cobranças'],['changes','Alterações','Pedidos de mudança nas reservas'],['access','Acessos ao site','Visitas e conversão'],['settings','Configurações','Regras e integrações']].map(([k,t,s])=>workspaceCard(k,t,s)).join('')}<a href="pms-operacao.html?view=team"><strong>Equipe e acessos</strong><span>Convide pessoas e escolha os imóveis e módulos permitidos.</span></a><a href="pms-operacao.html"><strong>Limpeza e manutenção</strong><span>Tarefas, vistorias e prontidão dos imóveis.</span></a><a href="experiencias-admin.html"><strong>Experiências e estadias completas</strong><span>Pacotes, inclusões e ofertas com hospedagem.</span></a></div>`;$$('[data-workspace]').forEach(b=>b.onclick=()=>showView(b.dataset.workspace));
-}
-renderToday=function(){
- if(todayTab==='today')legacyToday();else{const rows=state.reservations.filter(r=>r.status==='confirmed'&&r.check_in>today()).sort((a,b)=>a.check_in.localeCompare(b.check_in));$('#admin-content').innerHTML=`<section class="admin-panel"><h2>Próximas chegadas</h2><div class="admin-stack">${rows.map(r=>reservationCard(r,date(r.check_in))).join('')||empty('Nenhuma chegada futura registrada.')}</div></section>`;bindCards()}
- $('#admin-content').insertAdjacentHTML('beforeend',`<section class="admin-panel"><h2>Próximos períodos dos canais</h2><p>Reservas ou bloqueios recebidos por iCal.</p><div class="admin-stack">${importedRows().filter(r=>r.check_out>=today()).slice(0,6).map(calendarAgendaItem).join('')||empty('Nenhum período importado.')}</div></section>`);bindCards();
- $('#admin-content').insertAdjacentHTML('afterbegin',`<div class="workspace-tabs"><button data-today-tab="today" class="${todayTab==='today'?'active':''}">Hoje</button><button data-today-tab="next" class="${todayTab==='next'?'active':''}">Próximas</button></div>`);$$('[data-today-tab]').forEach(b=>b.onclick=()=>{todayTab=b.dataset.todayTab;renderToday()});
-};
-renderCalendar=function(){legacyCalendar()};
+async function experienceAdminAction(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
+  const operation=String(body?.operation||"");
 
-openProperty=function(id){
- if(!id){legacyProperty(id);return}const p=prop(id);if(!p)return;
- $('#admin-modal-content').innerHTML=`<button class="workspace-back" id="workspace-close">← Imóveis</button><div class="workspace-editor-head">${p.cover_image?`<img src="${esc(p.cover_image)}" alt="">`:''}<div><small>${esc(p.code)} · ${p.active?'ATIVO':'PAUSADO'}</small><h2>${esc(p.name)}</h2></div></div><p class="workspace-summary">Escolha um assunto para consultar ou editar.</p><div class="workspace-cards">${workspaceCard('space','Descrição',p.tagline||'Título e apresentação do imóvel')}${workspaceCard('amenities','Comodidades','Seleção por categoria e oito destaques')}${workspaceCard('photos','Fotos',(p.gallery||[]).length+' imagens · capa e ordem')}${workspaceCard('availability','Disponibilidade','Calendário, regras de estadia e calendários conectados')}${workspaceCard('prices','Preços','Tarifas e origem dos valores')}${workspaceCard('conditions','Taxas e pagamento','Limpeza, garantia e parcelamento')}${workspaceCard('details','Dados do imóvel','Tipo, capacidade, horários e situação do anúncio')}</div>`;openModal();$('#workspace-close').onclick=closeModal;
- $$('[data-workspace]').forEach(b=>b.onclick=async()=>{const key=b.dataset.workspace;if(key==='availability')return openAvailability(id);if(key==='prices'){return openPropertyPrices(p)}if(key==='space'||key==='amenities'){try{const d=await listingApi({action:'listings',operation:'list'});return ListingEditor.open({initialSection:key,property:d.properties.find(x=>Number(x.id)===id),host:$('#admin-modal-content'),api:listingApi,onBack:()=>openProperty(id),onSaved:async()=>{await load(true);openProperty(id)}})}catch{$('#admin-modal-content').innerHTML='<p>Não foi possível carregar o imóvel. Feche e tente novamente.</p>';return}}
- legacyProperty(id);const form=$('#property-form');const groups={photos:[],conditions:['cleaning_fee','guarantee_amount','max_installments','no_interest_installments','interest_payer'],details:['name','code','slug','property_type','max_guests','check_in_time','check_out_time','active']};form.querySelectorAll('label').forEach(l=>{const input=l.querySelector('input,select,textarea');if(input)l.hidden=!groups[key].includes(input.name)});form.querySelector('.property-media-editor').hidden=key!=='photos';$('#admin-modal-content h2').textContent={photos:'Fotos do imóvel',conditions:'Taxas e pagamento',details:'Dados do imóvel'}[key];$('#admin-modal-content .property-form-heading').insertAdjacentHTML('afterbegin','<button type="button" class="workspace-back" id="back-workspace">← '+esc(p.name)+'</button>');$('#back-workspace').onclick=()=>openProperty(id);
- });
-};
-setupWorkspace();
 
-boot();
-})();
+  if(operation==="save_simple_product"){
+    const id=body?.id||null;
+    const name=String(body?.name||"").trim().slice(0,160);
+    const description=String(body?.description||"").trim().slice(0,3000)||null;
+    const packageType=["romantic","beach","breakfast","celebration","wellness","other"].includes(String(body?.package_type))?String(body.package_type):"other";
+    const priceCents=Math.max(0,Math.round(Number(body?.price_cents||0)));
+    const upsellEnabled=body?.upsell_enabled===true;
+    let components;try{components=experienceComponents({components:body.components||[]})}catch{return json({ok:false,error:"invalid_components"},400)}
+    const propertyIds=Array.isArray(body.property_ids)?[...new Set(body.property_ids.map(Number))]:null;
+    if(propertyIds&&(!propertyIds.length||propertyIds.some((x:any)=>!Number.isSafeInteger(x)||x<1)))return json({ok:false,error:"experience_property_required"},400);
+    const rawMedia=Array.isArray(body?.media_items)?body.media_items:[];
+    const mediaItems=[...new Map(rawMedia
+      .map((m:any,i:number)=>({
+        media_url:String(m?.media_url||"").trim().slice(0,1000),
+        alt_text:String(m?.alt_text||name).trim().slice(0,240)||name,
+        display_order:Number.isFinite(Number(m?.display_order))?Number(m.display_order):(i+1)*10
+      }))
+      .filter((m:any)=>m.media_url)
+      .map((m:any)=>[m.media_url,m])).values()];
+    if(!name) return json({ok:false,error:"experience_name_required"},400);
+    if(priceCents<=0) return json({ok:false,error:"experience_price_required"},400);
+    if(mediaItems.length<1) return json({ok:false,error:"experience_photo_required",photo_count:mediaItems.length},400);
+
+    let existing:any=null;
+    if(id){
+      const {data,error}=await admin.from("experience_products").select("*").eq("id",id).single();
+      if(error||!data) return json({ok:false,error:"experience_not_found"},404);
+      existing=data;
+    }
+    const baseCode=(name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"").slice(0,60)||"pacote");
+    const code=existing?.code || (baseCode+"_"+crypto.randomUUID().slice(0,6));
+    const productPayload={
+      code,name,description,package_type:packageType,price_cents:priceCents,upsell_enabled:upsellEnabled,
+      status:body.status==="active"?"active":body.status==="inactive"?"inactive":existing?.status||"draft",
+      sales_headline:existing?.sales_headline||null,
+      details:{...(existing?.details||{}),...(body.components?{components}:{}),standalone_enabled:body.standalone_enabled??existing?.details?.standalone_enabled??true,offer_enabled:body.offer_enabled??existing?.details?.offer_enabled??true},
+      minimum_lead_hours:Number(body.minimum_lead_hours??existing?.minimum_lead_hours??0),daily_capacity:body.daily_capacity===null?null:Number(body.daily_capacity??existing?.daily_capacity??0)||null,inventory:body.inventory===null?null:body.inventory!==undefined?Number(body.inventory):existing?.inventory??null,
+      travel_purposes:Array.isArray(existing?.travel_purposes)?existing.travel_purposes:[],
+      display_order:Number(existing?.display_order||0)
+    };
+    if(!components.length&&body.components)return json({ok:false,error:"package_components_required"},400);
+    if([productPayload.minimum_lead_hours,productPayload.daily_capacity,productPayload.inventory].some(x=>x!==null&&(!Number.isInteger(x)||x<0||x>100000)))return json({ok:false,error:"invalid_experience_limits"},400);
+    const prefix=projectUrl+"/storage/v1/object/public/experience-media/";
+    if(mediaItems.some((m:any)=>!(m.media_url.startsWith(prefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)$/.test(m.media_url))))return json({ok:false,error:"invalid_offer_photo"},400);
+    const {data:props}=await admin.from("properties").select("id").eq("active",true);
+    const eligibleIds=propertyIds||(existing?(await admin.from("experience_property_eligibility").select("property_id").eq("product_id",id)).data?.map((x:any)=>x.property_id):props?.map((x:any)=>x.id))||[];
+    const {data:product,error}=await admin.rpc("save_experience_package_atomic",{p_id:id,p_actor:user.id,p_product:productPayload,p_properties:eligibleIds,p_media:mediaItems});
+    if(error||!product)return json({ok:false,error:"experience_save_failed"},409);
+    return json({ok:true,product});
+  }
+
+  if(operation==="toggle_product_status"){
+    if(!body?.id) return json({ok:false,error:"experience_not_found"},404);
+    const {data:product}=await admin.from("experience_products").select("id,status").eq("id",body.id).single();
+    if(!product) return json({ok:false,error:"experience_not_found"},404);
+    const next=product.status==="active"?"inactive":"active";
+    if(next==="active"){
+      const {count}=await admin.from("experience_media").select("id",{count:"exact",head:true}).eq("product_id",product.id);
+      if(Number(count||0)<1) return json({ok:false,error:"experience_photo_required",photo_count:Number(count||0)},400);
+    }
+    const {data,error}=await admin.from("experience_products").update({status:next}).eq("id",product.id).select().single();
+    if(error) return json({ok:false,error:"experience_status_failed"},500);
+    return json({ok:true,product:data});
+  }
+
+  if(operation==="delete_product"){
+    if(!body?.id) return json({ok:false,error:"experience_not_found"},404);
+    const productId=body.id;
+    const [{count:orders},{count:quotes},{data:media}]=await Promise.all([
+      admin.from("experience_order_items").select("id",{count:"exact",head:true}).eq("product_id",productId),
+      admin.from("quote_experience_items").select("id",{count:"exact",head:true}).eq("product_id",productId),
+      admin.from("experience_media").select("media_url").eq("product_id",productId)
+    ]);
+    if(Number(orders||0)>0 || Number(quotes||0)>0){
+      const {error}=await admin.from("experience_products").update({status:"archived"}).eq("id",productId);
+      if(error) return json({ok:false,error:"experience_delete_failed"},500);
+      return json({ok:true,archived:true});
+    }
+    const storagePrefix=projectUrl+"/storage/v1/object/public/experience-media/";
+    const storagePaths=(media||[]).map((m:any)=>String(m.media_url||"")).filter((u:string)=>u.startsWith(storagePrefix)).map((u:string)=>decodeURIComponent(u.slice(storagePrefix.length)));
+    const {error}=await admin.from("experience_products").delete().eq("id",productId);
+    if(error) return json({ok:false,error:"experience_delete_failed"},500);
+    if(storagePaths.length) await admin.storage.from("experience-media").remove(storagePaths);
+    return json({ok:true,deleted:true});
+  }
+
+  if(operation==="save_product"){
+    const payload={
+      code:String(body?.code||"").trim().toLowerCase().replace(/[^a-z0-9_]+/g,"_").replace(/^_+|_+$/g,"").slice(0,80),
+      name:String(body?.name||"").trim().slice(0,160),
+      description:String(body?.description||"").trim().slice(0,2000)||null,
+      sales_headline:String(body?.sales_headline||"").trim().slice(0,240)||null,
+      status:["draft","active","inactive","archived"].includes(body?.status)?body.status:"draft",
+      minimum_lead_hours:Math.max(0,Math.min(8760,Number(body?.minimum_lead_hours||0))),
+      travel_purposes:Array.isArray(body?.travel_purposes)?body.travel_purposes.map(String).slice(0,20):[],
+      display_order:Number(body?.display_order||0),
+      details:typeof body?.details==="object"&&body.details?body.details:{}
+    };
+    if(!payload.code||!payload.name) return json({ok:false,error:"invalid_experience"},400);
+    let product:any=null,error:any=null;
+    if(body?.id){
+      const r=await admin.from("experience_products").update(payload).eq("id",body.id).select().single();product=r.data;error=r.error;
+    }else{
+      const r=await admin.from("experience_products").insert(payload).select().single();product=r.data;error=r.error;
+    }
+    if(error||!product) return json({ok:false,error:"experience_save_failed"},500);
+    const propertyIds=Array.isArray(body?.property_ids)?[...new Set(body.property_ids.map(Number).filter(Number.isFinite))]:[];
+    await admin.from("experience_property_eligibility").delete().eq("product_id",product.id);
+    if(propertyIds.length){
+      const {error:eligErr}=await admin.from("experience_property_eligibility").insert(propertyIds.map((property_id:number)=>({product_id:product.id,property_id})));
+      if(eligErr) return json({ok:false,error:"experience_eligibility_save_failed"},500);
+    }
+    return json({ok:true,product});
+  }
+
+  if(operation==="save_variant"){
+    const payload={
+      product_id:body?.product_id,
+      code:String(body?.code||"").trim().toLowerCase().replace(/[^a-z0-9_]+/g,"_").replace(/^_+|_+$/g,"").slice(0,80),
+      name:String(body?.name||"").trim().slice(0,120),
+      price_cents:Math.max(0,Math.round(Number(body?.price_cents||0))),
+      active:body?.active!==false,
+      display_order:Number(body?.display_order||0)
+    };
+    if(!payload.product_id||!payload.code||!payload.name) return json({ok:false,error:"invalid_variant"},400);
+    let variant:any=null,error:any=null;
+    if(body?.id){
+      const r=await admin.from("experience_variants").update(payload).eq("id",body.id).select().single();variant=r.data;error=r.error;
+    }else{
+      const r=await admin.from("experience_variants").insert(payload).select().single();variant=r.data;error=r.error;
+    }
+    if(error||!variant) return json({ok:false,error:"variant_save_failed"},500);
+    return json({ok:true,variant});
+  }
+
+  if(operation==="save_media"){
+    const payload={
+      product_id:body?.product_id,
+      media_url:String(body?.media_url||"").trim().slice(0,1000),
+      alt_text:String(body?.alt_text||"").trim().slice(0,240)||null,
+      display_order:Number(body?.display_order||0)
+    };
+    if(!payload.product_id||!payload.media_url) return json({ok:false,error:"invalid_media"},400);
+    let media:any=null,error:any=null;
+    if(body?.id){
+      const r=await admin.from("experience_media").update(payload).eq("id",body.id).select().single();media=r.data;error=r.error;
+    }else{
+      const r=await admin.from("experience_media").insert(payload).select().single();media=r.data;error=r.error;
+    }
+    if(error||!media) return json({ok:false,error:"media_save_failed"},500);
+    return json({ok:true,media});
+  }
+
+  if(operation==="delete_media"){
+    if(!body?.id) return json({ok:false,error:"invalid_media"},400);
+    const {error}=await admin.from("experience_media").delete().eq("id",body.id);
+    if(error) return json({ok:false,error:"media_delete_failed"},500);
+    return json({ok:true});
+  }
+
+  return json({ok:false,error:"invalid_operation"},400);
+}
+
+
+async function guestExperienceCatalog(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const reservationId=String(body?.reservation_id||"");
+  if(!reservationId) return json({ok:false,error:"missing_data"},400);
+
+  const {data:r,error:re}=await admin.from("reservations")
+    .select("id,user_id,property_id,check_in,check_out,status")
+    .eq("id",reservationId).single();
+  if(re||!r||r.user_id!==user.id) return json({ok:false,error:"not_found"},404);
+  if(r.status!=="confirmed") return json({ok:false,error:"reservation_not_available"},409);
+
+  const {data:products,error:pe}=await admin.from("experience_products")
+    .select("id,name,description,sales_headline,package_type,price_cents,upsell_enabled,minimum_lead_hours,daily_capacity,inventory,status,details,created_at,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility!inner(property_id),experience_media(id,media_url,alt_text,display_order)")
+    .eq("status","active")
+    .eq("experience_property_eligibility.property_id",r.property_id)
+    .order("display_order");
+  if(pe) return json({ok:false,error:"experience_catalog_unavailable"},500);
+
+  const {data:existing}=await admin.from("experience_orders")
+    .select("experience_order_items(id,product_id,product_name_snapshot,unit_price_cents,status,experience_products(package_type,price_cents,name,upsell_enabled))")
+    .eq("reservation_id",r.id)
+    .in("status",["pending","active"]);
+  const activeItems=(existing||[]).flatMap((o:any)=>o.experience_order_items||[]).filter((i:any)=>i.status==="active");
+
+  const arrival=Date.parse(String(r.check_in)+"T15:00:00-03:00");
+  const now=Date.now();
+  const items=[];
+  for(const p of products||[]){
+    const variant=(p.experience_variants||[]).filter((v:any)=>v.active).sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))[0];
+    if(!variant||p.details?.standalone_enabled===false) continue;
+    const leadOk=(arrival-now)>=Number(p.minimum_lead_hours||0)*3600000;
+    const stockOk=p.inventory==null||Number(p.inventory)>0;
+    if(!stockOk) continue;
+    const viability=await admin.rpc("experience_sale_issue",{p_product:p.id,p_property:r.property_id,p_start:r.check_in,p_end:r.check_out,p_exclude:r.id});if(viability.error||viability.data)continue;
+
+    const current=activeItems.find((i:any)=>i.experience_products?.package_type===p.package_type);
+    let purchaseMode="add",payableCents=Number(variant.price_cents),upgradeFrom=null;
+    if(current){
+      if(String(current.product_id)===String(p.id)) continue;
+      if(current.experience_products?.upsell_enabled!==true) continue;
+      const sourceCatalogPrice=Number(current.experience_products?.price_cents??current.unit_price_cents??0);
+      const next=(products||[])
+        .filter((x:any)=>x.package_type===p.package_type&&x.status==="active"&&Number(x.price_cents)>sourceCatalogPrice&&(x.inventory==null||Number(x.inventory)>0))
+        .sort((a:any,b:any)=>Number(a.price_cents)-Number(b.price_cents)||String(a.created_at||"").localeCompare(String(b.created_at||"")))[0];
+      if(!next||String(next.id)!==String(p.id)) continue;
+      payableCents=Math.max(0,Number(variant.price_cents)-Number(current.unit_price_cents||0));
+      if(payableCents<=0) continue;
+      purchaseMode="upgrade";
+      upgradeFrom={product_id:current.product_id,name:current.product_name_snapshot,price_cents:Number(current.unit_price_cents||0)};
+    }
+
+    let capacityOk=true;
+    if(p.daily_capacity!=null){
+      const {count}=await admin.from("experience_order_items")
+        .select("id,experience_orders!inner(reservation_id,status,reservations!inner(check_in,status))",{count:"exact",head:true})
+        .eq("product_id",p.id)
+        .eq("status","active")
+        .in("experience_orders.status",["pending","active"])
+        .eq("experience_orders.reservations.check_in",r.check_in)
+        .in("experience_orders.reservations.status",["confirmed","pending_payment"]);
+      capacityOk=Number(count||0)<Number(p.daily_capacity);
+    }
+    if(!capacityOk) continue;
+
+    items.push({
+      product_id:p.id,variant_id:variant.id,name:p.name,description:p.description,
+      sales_headline:p.sales_headline,package_type:p.package_type,components:experienceComponents(p.details),
+      price_cents:Number(variant.price_cents),payable_cents:payableCents,purchase_mode:purchaseMode,
+      upgrade_from:upgradeFrom,
+      media:(p.experience_media||[]).slice().sort((a:any,b:any)=>Number(a.display_order)-Number(b.display_order))
+    });
+  }
+  return json({
+    ok:true,
+    reservation_id:r.id,
+    items,
+    owned_packages:activeItems.map((i:any)=>({
+      product_id:i.product_id,
+      name:i.product_name_snapshot,
+      package_type:i.experience_products?.package_type||"other",
+      price_cents:Number(i.unit_price_cents||0)
+    }))
+  });
+}
+
+async function purchasePostBookingExperience(req:Request,body:any,development:boolean){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const reservationId=String(body?.reservation_id||"");
+  const variantId=String(body?.variant_id||"");
+  if(!reservationId||!variantId) return json({ok:false,error:"missing_data"},400);
+
+  const {data,error}=await admin.rpc("add_experience_cart_item_atomic",{
+    p_reservation_id:reservationId,
+    p_user_id:user.id,
+    p_variant_id:variantId,p_preferences:body.experience_preferences||{}
+  });
+  if(error){
+    const msg=String(error.message||"");
+    if(msg.includes("experience_payment_already_pending")){
+      const {data:variant}=await admin.from("experience_variants")
+        .select("product_id,experience_products(package_type)").eq("id",variantId).maybeSingle();
+      const packageType=(variant as any)?.experience_products?.package_type;
+      let existing:any=null;
+      if(packageType){
+        const {data}=await admin.from("post_booking_charges")
+          .select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)")
+          .eq("reservation_id",reservationId).eq("user_id",user.id)
+          .in("kind",["experience_add","experience_upgrade"])
+          .in("status",["awaiting_payment","processing","paid"])
+          .gt("expires_at",new Date().toISOString())
+          .eq("snapshot->>package_type",packageType)
+          .order("created_at",{ascending:false}).limit(1).maybeSingle();
+        existing=data;
+      }
+      return json({ok:false,error:"experience_payment_already_pending",existing_charge:existing},409);
+    }
+    for(const code of [
+      "reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock",
+      "experience_already_added","experience_upgrade_not_available","experience_capacity_reached",
+      "experience_payment_already_pending","experience_component_conflict","experience_choice_required","invalid_experience_choice"
+    ]) if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"experience_charge_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({
+    ok:true,
+    cart_item:{
+      id:row?.cart_item_id||null,
+      purchase_mode:row?.purchase_mode||"add",
+      amount_cents:Number(row?.amount_cents||0),
+      description:row?.description||"Experiência"
+    }
+  });
+}
+
+async function checkoutExperienceCartItem(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const cartItemId=String(body?.cart_item_id||"");
+  if(!cartItemId) return json({ok:false,error:"missing_data"},400);
+  const {data:settings}=await admin.from("payment_settings").select("post_booking_payment_minutes").eq("id",1).single();
+  const {data,error}=await admin.rpc("checkout_experience_cart_item_atomic",{
+    p_cart_item_id:cartItemId,p_user_id:user.id,
+    p_expires_minutes:Number(settings?.post_booking_payment_minutes||15)
+  });
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["cart_item_not_found","reservation_not_available","experience_unavailable","experience_lead_time",
+      "experience_out_of_stock","experience_already_added","experience_upgrade_not_available","experience_choice_required","invalid_experience_choice","experience_component_conflict",
+      "experience_capacity_reached","experience_payment_already_pending"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"experience_checkout_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,charge:{id:row?.charge_id||null,
+    kind:row?.purchase_mode==="upgrade"?"experience_upgrade":"experience_add",
+    purchase_mode:row?.purchase_mode||"add",amount_cents:Number(row?.amount_cents||0),
+    description:row?.description||"Experiência",expires_at:row?.expires_at||null}});
+}
+
+async function removeExperienceCartItem(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const cartItemId=String(body?.cart_item_id||"");
+  if(!cartItemId) return json({ok:false,error:"missing_data"},400);
+  const {data,error}=await admin.rpc("remove_experience_cart_item_atomic",{p_cart_item_id:cartItemId,p_user_id:user.id});
+  if(error) return json({ok:false,error:"cart_remove_failed"},500);
+  return json({ok:true,removed:data===true});
+}
+
+async function startPostBookingPayment(req:Request,body:any,development:boolean){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  if(!development) return json({ok:false,error:"payment_provider_not_ready"},409);
+
+  const chargeId=String(body?.charge_id||"");
+  const method=String(body?.method||"pix");
+  const installments=Math.max(1,Number(body?.installments||1));
+  const sandbox=body?.provider==="pagbank_sandbox";
+  if(!sandbox) return json({ok:false,error:"invalid_provider"},400);
+  if(!chargeId||!["pix","card"].includes(method)) return json({ok:false,error:"missing_data"},400);
+
+  const {data:settings}=await admin.from("payment_settings")
+    .select("active_provider,pix_enabled,card_enabled,max_card_installments,pix_expiration_minutes").eq("id",1).single();
+  try{assertPaymentMethod(settings,method)}catch(e){return json({ok:false,error:(e as Error).message},409)}
+  if(method==="card"&&(!Number.isInteger(installments)||installments>12))
+    return json({ok:false,error:"invalid_installments"},400);
+  const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+  if(sandbox&&!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  if(sandbox&&method==="card"&&typeof body?.encrypted_card!=="string")
+    return json({ok:false,error:"encrypted_card_required"},400);
+
+  const {data:chargeTerms}=await admin.from("post_booking_charges")
+    .select("amount_cents,reservations(property_id)").eq("id",chargeId).eq("user_id",user.id).maybeSingle();
+  if(!chargeTerms) return json({ok:false,error:"charge_not_found"},404);
+  const baseAmount=Number(chargeTerms.amount_cents);
+  let plan:any=null;
+  if(method==="card"){
+    try{plan=await loadInstallmentOffer(admin,String(body.installment_offer_id||""),{
+        userId:user.id,chargeId,baseAmount,installments,cardBin:String(body.credit_card_bin||"")})}
+    catch{return json({ok:false,error:"installment_plans_unavailable"},409)}
+  }
+  const buyerInterest=Number(plan?.buyer_interest_cents||0);
+  const chargeTotal=baseAmount+buyerInterest;
+  if(method==="card"&&Number(body?.quoted_total_cents)!==chargeTotal)
+    return json({ok:false,error:"installment_quote_changed"},409);
+
+  const {data,error}=await admin.rpc("start_post_booking_payment_atomic",{
+    p_charge_id:chargeId,p_user_id:user.id,p_provider:sandbox?"pagbank_sandbox":"mock",p_method:method,p_installments:installments
+  });
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["charge_not_found","charge_already_applied","charge_expired","payment_not_required"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"post_booking_payment_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  if(sandbox){
+    const paymentId=row?.payment_id;
+    const {data:payment}=await admin.from("payments").select("provider,provider_payment_id,metadata,status,amount_cents,method,installments")
+      .eq("id",paymentId).single();
+    if(payment?.provider!=="pagbank_sandbox") return json({ok:false,error:"payment_provider_mismatch"},409);
+    if(payment.method!==method||Number(payment.installments||1)!==installments||
+       ![baseAmount,chargeTotal].includes(Number(payment.amount_cents)))
+      return json({ok:false,error:"payment_terms_mismatch"},409);
+    if(payment.provider_payment_id){
+      if(Number(payment.amount_cents)!==chargeTotal) return json({ok:false,error:"payment_terms_mismatch"},409);
+      try{await reconcileSandboxCharge(paymentId,payment.provider_payment_id,token,payment.metadata?.order_id,true)}catch(e){
+        console.error(JSON.stringify({event:"post_booking_status_deferred",payment_id:paymentId,error:String(e)}));
+      }
+      return json({ok:true,payment:{id:paymentId,status:payment.status,amount_cents:chargeTotal,
+        method,installments:method==="card"?installments:null,provider:"pagbank_sandbox"},
+        charge_status:row.charge_status,charge_expires_at:row.charge_expires_at});
+    }
+    const [{data:charge},{data:identity}]=await Promise.all([
+      admin.from("post_booking_charges").select("reservation_id,amount_cents,expires_at,reservations(guest_name,guest_email,guest_phone)").eq("id",chargeId).eq("user_id",user.id).single(),
+      admin.rpc("guest_payment_identity",{p_user_id:user.id})
+    ]);
+    const id=Array.isArray(identity)?identity[0]:identity;
+    const guest=(charge?.reservations as any);
+    if(!charge||Number(charge.amount_cents)!==Number(row.amount_cents)||id?.document_type!=="cpf"||
+       !guest||String(guest.guest_email).toLowerCase()!==String(user.email).toLowerCase())
+      return json({ok:false,error:"pagbank_customer_invalid",payment_id:paymentId},400);
+    const digits=String(guest.guest_phone||"").replace(/\D/g,"");
+    const phone=digits.startsWith("55")&&digits.length>=12?digits.slice(2):digits;
+    try{
+      const {data:amountSaved,error:amountError}=await admin.from("payments").update({amount_cents:chargeTotal,
+        metadata:{...(payment.metadata||{}),environment:"sandbox",base_amount_cents:baseAmount,
+          buyer_interest_cents:buyerInterest}}).eq("id",paymentId)
+        .eq("status","awaiting_payment").is("provider_payment_id",null).select("id").maybeSingle();
+      if(amountError||!amountSaved) throw new Error("payment_state_changed");
+      const expiry=new Date(Math.min(Date.parse(charge.expires_at),Date.now()+Number(settings.pix_expiration_minutes)*60000));
+      const orderInput={referenceId:String(paymentId).replace(/-/g,""),amountCents:chargeTotal,
+        customer:{name:guest.guest_name,email:guest.guest_email,taxId:id.document_number,
+          phone:{area:phone.slice(0,2),number:phone.slice(2)}},method:method as "pix"|"card",
+        expiresAt:expiry,encryptedCard:body?.encrypted_card,installments,
+        buyerInterest:buyerInterest?{total:buyerInterest,installments:Number(plan.buyer_interest_installments)}:undefined,
+        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"};
+      const gateway=paymentGateway("pagbank_sandbox",token);
+      const result=await (method==="pix"?gateway.createPix(orderInput):gateway.createCardPayment(orderInput));
+      const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
+        metadata:{...(payment.metadata||{}),environment:"sandbox",order_id:result.orderId,
+          base_amount_cents:baseAmount,buyer_interest_cents:buyerInterest}}).eq("id",paymentId);
+      if(saveError) throw saveError;
+      if(result.status!=="WAITING") await reconcileSandboxCharge(paymentId,result.chargeId,token,result.orderId,true);
+      return json({ok:true,payment:{id:paymentId,status:result.status==="PAID"?"paid":"awaiting_payment",
+        amount_cents:chargeTotal,method,installments:method==="card"?installments:null,
+        provider:"pagbank_sandbox",pix_code:result.pixCode,qr_image_url:result.qrImageUrl},
+        charge_status:row.charge_status,charge_expires_at:row.charge_expires_at});
+    }catch(e){
+      console.error(JSON.stringify({event:"post_booking_pagbank_uncertain",payment_id:paymentId,error:String(e)}));
+      return json({ok:false,error:"pagbank_start_uncertain",payment_id:paymentId},503);
+    }
+  }
+  return json({ok:true,payment:{
+    id:row?.payment_id||null,status:row?.payment_status||"awaiting_payment",
+    amount_cents:Number(row?.amount_cents||0),method,installments:method==="card"?installments:null
+  },charge_status:row?.charge_status||"processing",charge_expires_at:row?.charge_expires_at||null});
+}
+
+async function confirmFreePostBookingCharge(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const chargeId=String(body?.charge_id||"");
+  const {data,error}=await admin.rpc("confirm_free_post_booking_charge_atomic",{p_charge_id:chargeId,p_user_id:user.id});
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["charge_not_found","payment_required","charge_expired","dates_unavailable","modification_not_payable"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"charge_confirm_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,status:row?.result_status||"applied",total_amount:Number(row?.result_total_amount||0)});
+}
+
+async function cancelPostBookingCharge(req:Request,body:any){
+  const user=await currentUser(req);
+  if(!user) return json({ok:false,error:"authentication_required"},401);
+  const chargeId=String(body?.charge_id||"");
+  const {data,error}=await admin.rpc("cancel_post_booking_charge_atomic",{p_charge_id:chargeId,p_user_id:user.id});
+  if(error){
+    const msg=String(error.message||"");
+    for(const code of ["charge_not_found","charge_already_applied","charge_already_paid","payment_processing"])
+      if(msg.includes(code)) return json({ok:false,error:code},409);
+    return json({ok:false,error:"charge_cancel_failed"},500);
+  }
+  const row=Array.isArray(data)?data[0]:data;
+  return json({ok:true,status:row?.result_charge_status||"cancelled",modification_status:row?.result_modification_status||null});
+}
+
+async function trackEvent(req:Request,body:any){
+  const allowed=new Set(["search_started","search_completed","property_viewed","rate_viewed","rate_selected","experience_viewed","experience_added","experience_upgraded","checkout_started","login_started","account_created","payment_started","payment_failed","booking_confirmed","modification_requested","precheckin_started","guarantee_completed","checkin_completed","checkout_completed","review_requested","repeat_booking_started"]);
+  if(!allowed.has(String(body?.event_name||""))) return json({ok:false,error:"invalid_event"},400);
+  const user=await currentUser(req);
+  const {error}=await admin.from("analytics_events").insert({
+    event_name:body.event_name,anonymous_id:String(body.anonymous_id||"").slice(0,120)||null,user_id:user?.id||null,
+    reservation_id:body.reservation_id||null,property_id:body.property_id||null,
+    metadata:typeof body.metadata==="object"&&body.metadata?body.metadata:{}
+  });
+  if(error){
+    console.error(JSON.stringify({event:"analytics_insert_failed",code:error.code||null,message:error.message||"unknown"}));
+    return json({ok:false,error:"analytics_unavailable"},500);
+  }
+  return json({ok:true});
+}
+
+
+
+async function retryDb(label:string,run:()=>PromiseLike<any>,attempts=3){
+  let last:any=null;
+  for(let attempt=1;attempt<=attempts;attempt++){
+    try{
+      const result=await run();
+      last=result;
+      if(!result?.error) return result;
+      console.error(JSON.stringify({event:"db_query_failed",label,attempt,code:result.error?.code||null,message:result.error?.message||"unknown"}));
+    }catch(error){
+      last={data:null,error};
+      console.error(JSON.stringify({event:"db_query_exception",label,attempt,message:String((error as Error)?.message||error)}));
+    }
+    if(attempt<attempts) await new Promise(r=>setTimeout(r,250*attempt));
+  }
+  return last;
+}
+
+Deno.serve(async(req)=>{
+  if(req.method==="OPTIONS") return new Response("ok",{headers:corsHeaders});
+  try{assertFinanceDevelopment(projectUrl,Deno.env.get("FINANCE_ENVIRONMENT"))}
+  catch{return json({ok:false,error:"isolated_finance_environment_required"},503)}
+  try{
+    const url=new URL(req.url);
+    let body:any={};
+    if(req.method==="POST") body=await req.json().catch(()=>({}));
+    const action=url.searchParams.get("action")||body.action||"config";
+    if(action==="calendar_export"){
+      if(req.method!=="GET")return json({ok:false,error:"method_not_allowed"},405);
+      return await calendars.exportFeed(url.searchParams.get("token")||"");
+    }
+    if(action==="admin_calendar")return await adminCalendarAction(req,body);
+    const origin=req.headers.get("origin")||"";
+    const development=req.headers.get("x-chalezinho-env")==="development" &&
+      (origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-feature-guest-directory-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-8q4qwux69-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-g7cqw9cxg-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-my0vnqxks-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-b1ai8z78g-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-9nrmtmt7w-roldneicosta-4140.vercel.app" ||
+       /^https:\/\/chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(origin) ||
+       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+
+    if(action==="identity_status"||action==="complete_identity"){
+      const user=await currentUser(req);
+      if(!user) return json({ok:false,error:"authentication_required"},401);
+      if(!development) return json({ok:false,error:"not_available"},403);
+      if(action==="identity_status"){
+        const {data,error}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
+        if(error) return json({ok:false,error:"identity_check_unavailable"},500);
+const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_payment_identity",{p_user_id:user.id});
+        if(paymentIdentityError) return json({ok:false,error:"identity_check_unavailable"},500);
+        const identity=Array.isArray(paymentIdentity)?paymentIdentity[0]:paymentIdentity;
+        return json({ok:true,complete:Boolean(data),payment_eligible:identity?.document_type==="cpf"});
+      }
+      const {data,error}=await admin.rpc("register_guest_identity",{
+        p_user_id:user.id,
+        p_document_type:body.document_type,
+        p_issuing_country:body.issuing_country,
+        p_document_number:body.document_number
+      });
+      if(error){
+        if(error.code==="23505") return json({ok:false,error:"identity_conflict"},409);
+        if(String(error.message).includes("invalid_document")) return json({ok:false,error:"invalid_document"},400);
+        return json({ok:false,error:"identity_registration_failed"},500);
+      }
+      return json({ok:true,complete:Boolean(data)});
+    }
+    if(action==="config"){
+      const purposesQ=await retryDb("travel_purposes",()=>admin.from("travel_purposes").select("*").eq("active",true).order("display_order"));
+      if(purposesQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      const settingsQ=await retryDb("payment_settings",()=>admin.from("payment_settings").select("active_provider,pix_enabled,card_enabled,charge_percent,pix_expiration_minutes,max_card_installments,modification_payment_deadline_hours,post_booking_payment_minutes").eq("id",1).single());
+      if(settingsQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      const docsQ=await retryDb("policy_documents",()=>admin.from("policy_documents").select("id,document_type,code,version,title,body,status").in("status",development?["active","draft"]:["active"]).order("document_type"));
+      if(docsQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      const productsQ=await retryDb("experience_products",()=>admin.from("experience_products").select("id,code,name,description,sales_headline,details,package_type,price_cents,upsell_enabled,status,minimum_lead_hours,daily_capacity,inventory,travel_purposes,display_order,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(id,media_url,alt_text,display_order)").in("status",development?["active","draft"]:["active"]).order("display_order"));
+      if(productsQ.error) return json({ok:false,error:"config_unavailable"},500);
+
+      return json({
+        ok:true,
+        purposes:purposesQ.data||[],
+        payment_settings:settingsQ.data||{},
+        policy_documents:docsQ.data||[],
+        required_booking_documents:bookingDocuments(docsQ.data||[],development),
+        experience_products:productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
+        availability_coverage:{direct:true,airbnb:true,booking:true}
+      });
+    }
+    if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
+    if(action==="stay_offer_action")return await stayOffers.action(req,body,development);
+    if(action==="legal_documents")return await legalDocuments(req,body,development);
+    if(action==="property_media"){
+      const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery,features").eq("active",true).order("id");
+      if(error) return json({ok:false,error:"media_unavailable"},500);
+      return json({ok:true,properties:(data||[]).map(publicProperty)});
+    }
+    if(action==="search"){
+      const start=url.searchParams.get("start")||body.start;
+      const end=url.searchParams.get("end")||body.end;
+      const guests=Number(url.searchParams.get("guests")||body.guests||2);
+      const listings=await searchData(start,end,guests,null,development);
+      const offerId=body.stay_offer_id||url.searchParams.get("stay_offer_id");
+      const catalog=offerId?await stayOffers.catalog():null;
+      const listingOffers=await Promise.all(listings.map(async(x:any)=>{
+        const {cleaning_fee,...rest}=x;
+        if(!x.available)return {...rest,from_stay_price:null};
+        const selected=catalog?.offers.find((o:any)=>o.id===offerId);
+        const issues=offerId?selected?offerIssues(selected,catalog.products,x.id,{check_in:start,check_out:end}):["offer_unavailable"]:[];
+        if(issues.length)return {...rest,offer_issues:issues,from_stay_price:null};
+        let quote;try{quote=await createQuote({property_id:x.id,check_in:start,check_out:end,guests,stay_offer_id:offerId||undefined},development,null,null,listings)}catch(e){return {...rest,from_stay_price:null,offer_issues:[(e as Error).message]}};
+        const available=quote.rate_options.filter((p:any)=>p.selectable);
+        return {...rest,from_stay_price:Math.min(...available.map((p:any)=>p.total_amount_cents))/100,quote,offer_issues:[]};
+      }));
+      return json({ok:true,listings:listingOffers});
+    }
+    if(action==="same_day_request"){
+      const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);
+      try{return json({ok:true,...await sameDayRequests(admin,body,user,await userIsAdmin(user),async(r:any)=>(await searchData(r.check_in,r.check_out,r.guests,null,development,true)).find((p:any)=>Number(p.id)===Number(r.property_id)))})}
+      catch(e){return json({ok:false,error:(e as Error).message},409)}
+    }
+    if(action==="quote"){
+      let approved=null;
+      if(body.same_day_request_id){const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);approved=await approvedSameDayRequest(admin,body.same_day_request_id,user.id,body)}
+      return json(await createQuote(body,development,null,approved));
+    }
+    if(action==="reservation_incident"){
+      const user=await currentUser(req);
+      if(!development||!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+      try{return json({ok:true,...await reservationIncident(admin,user.id,body)})}
+      catch(e){const code=String((e as Error)?.message||"");
+        const safe=["reservation_not_found","invalid_incident","verified_evidence_required","incident_not_found","incident_already_decided","invalid_incident_operation","idempotency_conflict"];
+        return json({ok:false,error:safe.includes(code)?code:"incident_operation_failed"},409);}
+    }
+    if(action==="upsell_preview") return await upsellPreview(body);
+    if(action==="apply_upsell") return await applyUpsell(body,development);
+    if(action==="pagbank_sandbox_card_key"){
+      if(!development) return json({ok:false,error:"not_allowed"},403);
+      if(!await currentUser(req)) return json({ok:false,error:"authentication_required"},401);
+      const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+      if(!token) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
+      return json({ok:true,public_key:await getPagBankCardPublicKey(token)});
+    }
+    if(action==="pagbank_sandbox_status") return await sandboxPaymentStatus(req,body,development);
+    if(action==="installment_options") return await installmentOptions(req,body,development);
+    if(action==="start_payment") return await startPayment(req,body,development);
+    if(action==="reservation_policy") return await reservationPolicy(req,body);
+    if(action==="cancel_pending_payment") return await cancelPendingPayment(req,body,development);
+    if(action==="mock_payment") return json({ok:false,error:"not_allowed"},403);
+    if(action==="start_post_booking_payment") return await startPostBookingPayment(req,body,development);
+    if(action==="confirm_free_post_booking_charge") return await confirmFreePostBookingCharge(req,body);
+    if(action==="cancel_post_booking_charge") return await cancelPostBookingCharge(req,body);
+    if(action==="request_modification") return await requestModification(req,body,development);
+    if(action==="modification_action") return await modificationAction(req,body,development);
+    if(action==="ops") return await opsData(req);
+    if(action==="ops_settings_action") return await opsSettingsAction(req,body);
+    if(action==="admin_cancellation_policy_action") return await adminCancellationPolicyAction(req,body,development);
+    if(action==="reservation_finance"){
+      const user=await currentUser(req);
+      if(!development||!user)return json({ok:false,error:"authentication_required"},403);
+      try{return json({ok:true,finance:await reservationFinance(admin,String(body.reservation_id||""),
+        {userId:user.id,manager:await userIsAdmin(user)})})}
+      catch(e){return json({ok:false,error:(e as Error).message==='reservation_not_found'?'reservation_not_found':'reservation_finance_unavailable'},409)}
+    }
+    if(action==="admin_guests"){
+      const user=await currentUser(req);
+      if(!development||!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+      try{return json(await guestDirectory(admin,body,user.id,async()=>{
+        const response=await adminHubData(req,{start:localDate(-365),end:localDate(730)});
+        if(!response.ok)throw Error("guest_directory_unavailable");
+        return (await response.json()).channel_periods||[];
+      }))}catch(e){const code=e instanceof Error?e.message:"guest_directory_unavailable";return json({ok:false,error:code},code.includes("unavailable")?503:400)}
+    }
+    if(action==="admin_hub") return await adminHubData(req,body);
+    if(action==="experience_credit") return await experienceCredit(req,body,development);
+    if(action==="reservation_refund_action") return await reservationRefundAction(req,body,development);
+    if(action==="reservation_refund_status") return await reservationRefundStatus(req,body,development);
+    if(action==="reservation_cancel_request") return await reservationCancelRequest(req,body,development);
+    if(action==="admin_reservation_action") return await adminReservationAction(req,body);
+    if(action==="admin_notification_action") return await adminNotificationAction(req,body);
+    if(action==="admin_availability") return await adminAvailabilityAction(req,body);
+    if(action==="admin_property_action") return await adminPropertyAction(req,body);
+    if(action==="guarantee_action") return await guaranteeAction(req,body);
+    if(action==="experience_admin") return await experienceAdminData(req);
+    if(action==="experience_admin_action") return await experienceAdminAction(req,body);
+    if(action==="guest_experience_catalog") return await guestExperienceCatalog(req,body);
+    if(action==="purchase_post_booking_experience") return await purchasePostBookingExperience(req,body,development);
+    if(action==="checkout_experience_cart_item") return await checkoutExperienceCartItem(req,body);
+    if(action==="remove_experience_cart_item") return await removeExperienceCartItem(req,body);
+    if(action==="track_access"){
+      if(!development)return json({ok:false,error:"not_available"},403);
+      let input;try{input=accessInput(body)}catch{return json({ok:false,error:"invalid_access_event"},400)}
+      let property_id=null;
+      if(input.code){
+        const p=await admin.from("properties").select("id").eq("code",input.code).maybeSingle();
+        if(p.error)return json({ok:false,error:"analytics_unavailable"},503);
+        if(!p.data)return json({ok:false,error:"property_not_found"},400);
+        property_id=p.data.id;
+      }
+      const result=await admin.from("analytics_events").insert({event_name:"site_page_view",anonymous_id:input.session_id,property_id,metadata:{page:input.page}});
+      return result.error?json({ok:false,error:"analytics_unavailable"},503):json({ok:true});
+    }
+    if(action==="admin_access_metrics"){
+      const user=await currentUser(req);
+      if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+      if(![7,30,90].includes(body.days))return json({ok:false,error:"invalid_period"},400);
+      try{return json({ok:true,...await accessReport(admin,body.days)})}
+      catch{return json({ok:false,error:"analytics_unavailable"},503)}
+    }
+    if(action==="track") return await trackEvent(req,body);
+
+    return json({ok:false,error:"unknown_action"},404);
+  }catch(e){
+    const msg=String((e as Error)?.message||"unexpected_error");
+    const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
+    if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
+    if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
+    const clientErrors=["same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available","offer_unavailable","offer_duration","offer_period","offer_property_incompatible","package_paused","package_lead_time","package_property_incompatible","package_unavailable","experience_component_conflict","invalid_experience_choice","experience_choice_required","experience_capacity","package_out_of_stock","package_components_required","experience_not_sold_separately"];
+    return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
+  }
+});

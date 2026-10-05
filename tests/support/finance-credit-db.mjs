@@ -23,7 +23,7 @@ export async function creditDatabase(){
  `);
  for(const name of ['20260928003727_cancellation_policy_admin.sql','20260928123000_pagbank_reservation_refunds.sql',
  '20260928133500_reservation_financial_cases.sql','20260929023043_reservation_finance_ledger.sql',
- '20260929033510_finance_commercial_cancellation_window.sql','20260929033610_finance_experience_credits.sql'])
+ '20260929033510_finance_commercial_cancellation_window.sql','20260929033610_finance_experience_credits.sql','20261005225000_settled_experience_credit.sql'])
   await db.exec(await readFile(new URL('../../supabase/migrations/'+name,import.meta.url),'utf8'));
  return db;
 }

@@ -146,7 +146,7 @@ async function checkoutCartItem(id,btn){
   const item=cartItems.find(x=>String(x.id)===String(id));
   const d=await api("checkout_experience_cart_item",{cart_item_id:id});
   cartItems=cartItems.filter(x=>String(x.id)!==String(id));
-  const charge={...d.charge,reservation_id:item?.reservation_id};charges.unshift(charge);
+  const charge={...d.charge,status:d.charge.status||"awaiting_payment",reservation_id:item?.reservation_id};charges.unshift(charge);
   renderExperienceCart(reservationsCache);renderPendingPayments(reservationsCache);renderReservations(reservationsCache);renderSameDayRequests();
   openChargePayment(charge);
  }catch(e){btn.disabled=false;alert(e.message==="experience_payment_already_pending"?"Já existe um pagamento pendente para esta categoria.":"Não foi possível iniciar o pagamento agora.")}
@@ -445,7 +445,7 @@ function openChargePayment(chargeInput){
   :'A experiência ou upgrade só será incluído no valor pago e na reserva depois da confirmação do pagamento.';
  content.innerHTML='<small>COBRANÇA DA RESERVA · PAGBANK SANDBOX</small><h2>Ir para pagamento de teste</h2><div class="post-charge-summary"><span>'+esc(charge.description||"Cobrança adicional")+'</span><strong>'+brlC(amount)+'</strong></div><p>'+rule+'</p><div class="post-payment-methods"><label><input type="radio" name="post-method" value="pix" checked> Pix</label><label><input type="radio" name="post-method" value="card"> Cartão · até '+free+'x sem juros; até '+maxInst+'x com juros</label></div><div id="post-installments-wrap" hidden><label for="post-installments">Parcelamento</label><select id="post-installments">'+opts+'</select><small id="post-installment-total" role="status">Total inicial: '+brlC(amount)+'. Consultando condições de parcelamento.</small></div><div id="post-card-fields" hidden><label>Nome no cartão<input id="post-card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="post-card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="post-card-short-row"><label>Mês<input id="post-card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="post-card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="post-card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div></div><p>Somente cartões de teste. Nenhuma cobrança real.</p><button class="primary-action" id="post-pay-start">Ir para pagamento de teste</button><div id="post-payment-sim"></div><p id="post-payment-message" class="form-result"></p>';
  const methods=[...content.querySelectorAll('input[name="post-method"]')];
- methods.forEach(r=>{r.disabled=paymentSettings.active_provider!=="pagbank_sandbox"||paymentSettings[r.value+"_enabled"]!==true;r.checked=false;
+  methods.forEach(r=>{r.disabled=paymentSettings.active_provider!=="pagbank_sandbox"||paymentSettings[r.value+"_enabled"]!==true||(r.value==="card"&&amount<500);r.checked=false;
   r.onchange=()=>{const card=document.querySelector('input[name="post-method"]:checked')?.value==="card";$("#post-installments-wrap").hidden=!card;$("#post-card-fields").hidden=!card};});
  const first=methods.find(r=>!r.disabled);if(first){first.checked=true;first.onchange();}
  else $("#post-payment-message").textContent="Pagamentos temporariamente indisponíveis.";
@@ -466,7 +466,8 @@ function openChargePayment(chargeInput){
   $("#post-installment-total").textContent=plan?`${postInstallmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)} · ${plan.interest_free?"sem juros":"juros de "+brlC(plan.buyer_interest_cents)}`:"Consultando parcelas…";
  };
  const refresh=document.createElement("button");refresh.type="button";refresh.textContent="Consultar parcelas novamente";refresh.onclick=refreshPlans;$("#post-installments-wrap").appendChild(refresh);
- if(paymentSettings.card_enabled)refreshPlans();
+ if(amount<500){const note=document.createElement("p");note.textContent="Cartão disponível a partir de R$ 5,00. Para este valor, use Pix quando disponível.";$("#post-card-fields").before(note);}
+ if(paymentSettings.card_enabled&&amount>=500)refreshPlans();
   let previousBin="",binTimer;$("#post-card-number").addEventListener("input",()=>{
    const bin=$("#post-card-number").value.replace(/\D/g,"").slice(0,6);
    if(bin===previousBin)return;previousBin=bin;postInstallmentQuote=null;
