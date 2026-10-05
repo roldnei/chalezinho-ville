@@ -261,7 +261,8 @@ async function maybeOfferUpsell(){
  if(state.upsellHandled){await performStartPayment(choice);return}
  setFlowError("Verificando a melhor opção antes do pagamento…");
  let candidate=null;
- try{candidate=await serverUpsellPreview()}catch(e){setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":"Não foi possível verificar o upsell.");return}
+ try{candidate=await serverUpsellPreview()}catch(e){if(e.message==="policy_version_changed"){try{const current=await api("legal_documents");state.config.required_booking_documents=current.documents;renderSummary()}catch{}setFlowError("Os documentos foram atualizados. Leia e aceite a nova versão antes de pagar.");return}
+  setFlowError(e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":"Não foi possível verificar o upsell.");return}
  setFlowError("");
  if(!candidate){state.upsellHandled=true;await performStartPayment(choice);return}
 
@@ -364,9 +365,10 @@ function renderSummary(){
  const guarantee=Number(state.property.guarantee_amount_cents||0);
  $("#guarantee-info").innerHTML=guarantee?'<div class="guarantee-card"><small>GARANTIA DA HOSPEDAGEM · PAGBANK SANDBOX</small><h4>'+brlC(guarantee)+'</h4><p>Informe o cartão neste pagamento para a caução. O PagBank guarda os dados do cartão; o site guarda apenas um token vinculado à reserva. A pré-autorização será solicitada perto do check-in e reservará temporariamente '+brlC(guarantee)+' do limite, sem cobrança. Uma ocorrência comprovada poderá gerar captura parcial; sem dano, a autorização será liberada. Em estadias longas, cada autorização tem prazo próprio. O aceite da garantia e de suas renovações é obrigatório para reservar. A renovação pode bloquear temporariamente até duas vezes o valor da caução, até a liberação da autorização anterior.</p><label><input id="guarantee-card-consent" type="checkbox" required> Autorizo o uso deste cartão exclusivamente para a caução desta reserva, conforme as regras acima.</label><label><input id="guarantee-renewal-consent" type="checkbox" required> Autorizo renovações da caução durante esta estadia. Estou ciente da possível sobreposição temporária dos limites bloqueados.</label></div>':"";
  const doc=state.rate.cancellation_policy;
- const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label><p class="dev-note">Termos de hospedagem, regras da propriedade e política de privacidade ainda estão em versão de desenvolvimento e precisam de aprovação antes do GO-LIVE.</p>';
+ const pol=$("#policy-box");pol.innerHTML='<div class="policy-document"><strong>'+esc(doc.title)+' · versão '+esc(doc.version)+'</strong><p>'+esc(doc.body)+'</p><button id="download-cancel-policy" type="button" class="text-action">Baixar esta versão da política (.txt)</button></div><label class="accept-line"><input id="accept-cancel" type="checkbox"> <span>Li e aceito a política de cancelamento acima, versão '+esc(doc.version)+'.</span></label>';
  const requiredDocs=state.config.required_booking_documents||[];
- pol.insertAdjacentHTML("beforeend",requiredDocs.map(d=>'<details class="policy-document"><summary>'+esc(d.title)+' · versão '+esc(d.version)+'</summary><p>'+esc(d.body)+'</p></details>').join('')+'<label class="accept-line"><input id="accept-terms" type="checkbox" required><span>Li e aceito os termos de hospedagem e as regras apresentados, e estou ciente da política de privacidade.</span></label>');
+ pol.insertAdjacentHTML("beforeend",requiredDocs.map(d=>'<details class="policy-document"><summary>'+esc(d.title)+' · versão '+esc(d.version)+'</summary><p>'+esc(d.body)+'</p><button type="button" class="text-action" data-download-document="'+esc(d.id)+'">Baixar esta versão (.txt)</button></details>').join('')+'<label class="accept-line"><input id="accept-terms" type="checkbox" required><span>Li e aceito os termos de hospedagem e as regras apresentados, e estou ciente da política de privacidade.</span></label>');
+ pol.querySelectorAll('[data-download-document]').forEach(b=>b.onclick=()=>downloadPolicyDocument(requiredDocs.find(d=>d.id===b.dataset.downloadDocument)));
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
  const pay=$("#payment-options"),terms=state.property.features?.payment_terms||{max_installments:12,no_interest_installments:6};
  const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
@@ -452,6 +454,10 @@ async function performStartPayment(choice){
   if(method==="card"&&(!plan||!quoted.offer_id||quoted.optionId!==state.rate.quote_option_id||quoted.cardBin!==credit_card_bin))
     throw new Error("installment_quote_required");
   if(!$("#accept-cancel")?.checked||!$("#accept-terms")?.checked)throw new Error("policy_acceptance_required");
+  const current=await api("legal_documents");
+  if(current.documents.map(d=>d.id).join()!==(state.config.required_booking_documents||[]).map(d=>d.id).join()){
+   state.config.required_booking_documents=current.documents;renderSummary();throw new Error("policy_version_changed");
+  }
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&(!$("#guarantee-card-consent")?.checked||!$("#guarantee-renewal-consent")?.checked))throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
@@ -465,6 +471,7 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
+  if(e.message==="policy_version_changed"){try{const current=await api("legal_documents");state.config.required_booking_documents=current.documents;renderSummary()}catch{}setFlowError("Os documentos foram atualizados. Leia e aceite a nova versão antes de pagar.");return}
   setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":e.message==="dates_unavailable"?"Essas datas acabaram de ficar indisponíveis.":e.message==="guarantee_consent_required"?"O aceite da garantia e da renovação automática é obrigatório para reservar.":e.message==="policy_acceptance_required"?"Aceite os termos e a política de cancelamento antes de pagar.":e.message==="booking_terms_unavailable"?"Os termos da reserva estão indisponíveis. Tente novamente mais tarde.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){

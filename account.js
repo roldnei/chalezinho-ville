@@ -16,9 +16,13 @@ async function downloadReservationPolicy(id,button){
  button.disabled=true;
  try{
   const result=await api("reservation_policy",{reservation_id:id});
-  const doc=result.documents.find(x=>x.code?.includes("refundable"))||result.documents[0];
-  if(!doc) throw new Error("policy_unavailable");
-  downloadAcceptedPolicy(doc,result.confirmation_code);
+  if(!result.documents.length)throw new Error("policy_unavailable");
+  const host=button.closest('.reservation-detail-copy');
+  host.querySelector('.accepted-documents')?.remove();
+  const section=document.createElement('section');section.className='accepted-documents';
+  section.innerHTML='<h4>Documentos aceitos nesta reserva</h4>'+result.documents.map((d,i)=>'<details><summary>'+esc(d.title)+' · versão '+esc(d.version)+'</summary><p>Aceito em '+esc(fmtDateTime(d.accepted_at))+' (Brasília)</p><p class="legal-body">'+esc(d.body)+'</p><button type="button" data-accepted-download="'+i+'">Baixar versão aceita</button></details>').join('');
+  section.querySelectorAll('[data-accepted-download]').forEach(b=>b.onclick=()=>downloadAcceptedPolicy(result.documents[Number(b.dataset.acceptedDownload)],result.confirmation_code));host.append(section);
+
  }catch{button.textContent="Política indisponível. Contate o atendimento."}
  finally{button.disabled=false}
 }
@@ -309,7 +313,7 @@ function renderReservations(reservations){
   const canShop=r.status==="confirmed"&&Date.parse(r.check_in+"T15:00:00-03:00")>Date.now();
   const experienceAction=canShop?'<button class="reservation-action experience-action" data-experience-shop="'+r.id+'">Adicionar experiência</button>':"";
   const modificationAction=!active&&canShop?'<button class="reservation-action modification-action" data-modify="'+r.id+'" data-property="'+r.property_id+'" data-in="'+r.check_in+'" data-out="'+r.check_out+'">Solicitar alteração</button>':"";
-  const policyAction='<button class="reservation-action" data-download-reservation-policy="'+r.id+'">Baixar política aceita</button>';
+  const policyAction='<button class="reservation-action" data-download-reservation-policy="'+r.id+'">Termos e versões aceitas</button>';
   const reservationActions='<div class="reservation-actions">'+experienceAction+modificationAction+policyAction+'</div>';
   const period=r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/");
   const paymentBadge=paymentUx?'<span class="payment-status-badge '+paymentUx.tone+'">'+esc(paymentUx.label)+'</span>':'';

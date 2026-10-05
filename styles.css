@@ -1836,3 +1836,10 @@ footer{justify-content:space-between!important}
 #property-calendar-connections{margin-top:28px}#property-availability-calendar{margin-bottom:26px}#property-day-detail{overflow-wrap:anywhere}
 .same-day-dialog{max-width:560px;width:calc(100% - 32px);max-height:90vh;overflow:auto;background:#170e0a;color:#f7efe5;border:1px solid #89674d;border-radius:18px;padding:24px}.same-day-dialog::backdrop{background:#000a}.same-day-dialog form,.same-day-dialog label{display:grid;gap:12px}.same-day-dialog input,.same-day-dialog textarea{width:100%;box-sizing:border-box;padding:12px;color:inherit;background:#261811;border:1px solid #89674d}#same-day-queue{border:1px solid #a63431;border-radius:12px;padding:16px;margin-bottom:22px}
 .same-day-priority{display:block;width:100%;background:#842d23;color:#fff;border:0;padding:14px;font-weight:700}.same-day-priority[hidden]{display:none}
+
+/* Legal text is readable and visually secondary to the property presentation. */
+.property-house-rules{max-width:1100px;margin:32px auto;padding:24px clamp(20px,5vw,64px);border-top:1px solid #d8d5d0;color:#49443f;font-size:1rem}
+.property-house-rules h2{font-size:1.35rem;margin-bottom:16px}.property-house-rules li{margin:10px 0}.property-house-rules summary{cursor:pointer;margin-top:16px;text-decoration:underline}.property-house-rules p{line-height:1.7;margin:16px 0}
+.legal-links{display:flex;flex-wrap:wrap;justify-content:center;gap:16px;padding:24px;font-size:.875rem}.legal-links a{color:inherit}
+.legal-body,.policy-document p,.legal-document-form details p{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:1rem}.accepted-documents details{margin:16px 0}.legal-document-form{margin:24px 0}.legal-document-form textarea{width:100%;font-size:1rem}
+.legal-page{max-width:900px;margin:40px auto;padding:24px}.legal-page h1{margin:24px 0}.legal-page p{line-height:1.7}

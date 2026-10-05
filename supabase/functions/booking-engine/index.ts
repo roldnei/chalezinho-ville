@@ -632,7 +632,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(method==="card"&&Number(body?.quoted_total_cents)!==chargedAmount)
     return json({ok:false,error:"installment_quote_changed"},409);
   const requiredPolicyId=option.cancellation_policy_id;
-  const {data:termsRows,error:termsError}=await admin.from("policy_documents").select("id,document_type,code,version,status").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft"]:["active"]);
+  const {data:termsRows,error:termsError}=await admin.from("policy_documents").select("id,document_type,code,version,status,title,body").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft"]:["active"]);
   if(termsError)return json({ok:false,error:"booking_terms_unavailable"},503);
   const requiredTerms=bookingDocuments(termsRows||[],development);
   try{assertBookingConsent(body,needsGuarantee,requiredTerms,requiredPolicyId)}catch(e){return json({ok:false,error:(e as Error).message},400)}
@@ -692,7 +692,7 @@ async function startPayment(req:Request,body:any,development:boolean){
     reservation_id:reservationId,user_id:user.id,document_id:doc.id,
     document_code:doc.code,document_version:doc.version
   })));
-  if(acceptanceError) return json({ok:false,error:"policy_acceptance_failed"},500);
+  if(acceptanceError) return json({ok:false,error:acceptanceError.message?.includes("policy_version_changed")?"policy_version_changed":"policy_acceptance_failed"},409);
 
   const {data:qitems}=await admin.from("quote_experience_items").select("*").eq("quote_id",quote_id);
   if(qitems?.length){
@@ -830,14 +830,14 @@ async function reservationPolicy(req:Request,body:any){
   if(!reservationId) return json({ok:false,error:"missing_data"},400);
   const {data:reservation,error:reservationError}=await admin.from("reservations")
     .select("id,user_id,confirmation_code").eq("id",reservationId).single();
-  if(reservationError||!reservation||reservation.user_id!==user.id) return json({ok:false,error:"not_found"},404);
+  if(reservationError||!reservation||(reservation.user_id!==user.id&&!await userIsAdmin(user))) return json({ok:false,error:"not_found"},404);
   const {data:rows,error}=await admin.from("reservation_policy_acceptances")
-    .select("document_code,document_version,accepted_at,policy_documents(title,body,code,version)")
+    .select("document_code,document_version,accepted_at,snapshot_recorded_at,document_snapshot,policy_documents(title,body,code,version)")
     .eq("reservation_id",reservationId).order("accepted_at");
   if(error) return json({ok:false,error:"policy_unavailable"},500);
   return json({ok:true,confirmation_code:reservation.confirmation_code,documents:(rows||[]).map((a:any)=>({
     code:a.document_code,version:a.document_version,accepted_at:a.accepted_at,
-    title:a.policy_documents?.title||"Política de cancelamento",body:a.policy_documents?.body||""
+    snapshot_recorded_at:a.snapshot_recorded_at,title:a.document_snapshot?.title||a.policy_documents?.title||"Documento",body:a.document_snapshot?.body||a.policy_documents?.body||""
   }))});
 }
 
@@ -1194,6 +1194,21 @@ async function adminHubData(req:Request,body:any){
     channel_periods:channelPeriods,
     channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
   });
+}
+
+async function legalDocuments(req:Request,body:any,development:boolean){
+ const user=await currentUser(req);
+ if(body?.operation==="publish"){
+  if(!development)return json({ok:false,error:"development_only"},403);
+  if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+  const {data,error}=await admin.rpc("publish_booking_document",{p_type:body.document_type,p_title:body.title,p_body:body.body,p_actor:user.id,p_previous_id:body.previous_id||null});
+  if(error)return json({ok:false,error:error.message?.includes("policy_version_changed")?"policy_version_changed":"document_save_failed"},409);
+  return json({ok:true,document_id:data});
+ }
+ const isAdmin=!!user&&await userIsAdmin(user);
+ const {data,error}=await admin.from("policy_documents").select("id,document_type,code,version,title,body,status,effective_at,created_at,published_by").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft","archived"]:["active"]).order("created_at",{ascending:false});
+ if(error)return json({ok:false,error:"booking_terms_unavailable"},503);
+ return json({ok:true,documents:bookingDocuments(data||[],development),...(isAdmin?{history:data||[]}:{} )});
 }
 
 async function adminCancellationPolicyAction(req:Request,body:any,development:boolean){
@@ -2040,6 +2055,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
+    if(action==="legal_documents")return await legalDocuments(req,body,development);
     if(action==="property_media"){
       const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery").eq("active",true).order("id");
       if(error) return json({ok:false,error:"media_unavailable"},500);
