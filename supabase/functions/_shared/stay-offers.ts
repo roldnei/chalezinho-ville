@@ -3,11 +3,13 @@ const fail = (code: string): never => {throw new Error(code)};
 export function experienceComponents(details: Row = {}) {
   const raw = details.components ?? (details.includes || []).map((name: string) => ({name, quantity: 1, frequency: 'arrival'}));
   if (!Array.isArray(raw) || raw.length > 60) fail('invalid_components');
+  const seen=new Set<string>();
   return raw.map((item: Row) => {
     const name = String(item.name || '').trim().slice(0,160), quantity = Number(item.quantity ?? 1);
     const frequency = item.frequency || 'arrival', choices = item.choices || [];
     if (!name || !Number.isInteger(quantity) || quantity < 1 || quantity > 100 || !['arrival','daily','departure'].includes(frequency)
       || !Array.isArray(choices) || choices.length > 12 || choices.some(x => typeof x !== 'string' || !x.trim() || x.length > 100)) fail('invalid_components');
+    const key=name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();if(seen.has(key))fail('invalid_components');seen.add(key);
     return {name, quantity, frequency, choices: [...new Set(choices.map(x => x.trim()))]};
   });
 }

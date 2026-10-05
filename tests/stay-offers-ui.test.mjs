@@ -24,7 +24,7 @@ test('direct property journey keeps complete offer visible; switching requotes l
  const choice=$('[data-component="Bebida"]');choice.value='Vinho';choice.dispatchEvent(new w.Event('change'));$('#step-next').click();await wait(()=>$('#checkout-panel').dataset.step==='3');
  const q=calls.filter(x=>x.action==='quote').at(-1);assert.equal(q.body.experience_preferences[pid].Bebida,'Vinho');assert.equal(q.body.stay_offer_id,oid);
  $('#checkout-stay-mode').value='';$('#checkout-stay-mode').dispatchEvent(new w.Event('change'));assert.equal($('.rate-card'),null,'old discounted prices are removed while recalculating');assert.equal($('#checkout-stay-mode').disabled,true,'repeated changes are blocked until the new quote arrives');await wait(()=>calls.filter(x=>x.action==='quote').at(-1).body.stay_offer_id===undefined);await wait(()=>$('#checkout-panel').dataset.step==='1');await wait(()=>$('.rate-card strong')?.textContent.includes('1.200'));assert.match($('#checkout-offer-context').textContent,/Somente hospedagem/);
- assert.equal(calls.filter(x=>x.action==='quote').at(-1).body.experience_variant_ids.length,0);
+ assert.equal(calls.filter(x=>x.action==='quote').at(-1).body.experience_variant_ids.length,0);assert.equal(new URL(w.location.href).searchParams.get('mode'),'stay','reload retains lodging choice in the URL');assert.equal(new URL(w.location.href).searchParams.has('stay_offer'),false);
  }finally{dom.window.close()}
 });
 test('login resume and reload preserve complete offer and chosen preference',async()=>{

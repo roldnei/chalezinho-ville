@@ -29,5 +29,6 @@ test('preferences use only allowed choices and required choice is enforced befor
  const p={id:'romance',name:'Romance',price_cents:30000,details:{components:[{name:'Bebida',quantity:1,frequency:'arrival',choices:['Vinho','Espumante']}]}};
  const c=compositionSnapshot(p,{Bebida:'Vinho',arbitrary:'ignored'},true);assert.deepEqual(c.preferences,{Bebida:'Vinho'});assert.equal(c.components[0].choice,'Vinho');
  assert.throws(()=>compositionSnapshot(p,{},true),/choice_required/);assert.throws(()=>compositionSnapshot(p,{Bebida:'Gin'}),/invalid_experience_choice/);
+ assert.throws(()=>compositionSnapshot({...p,details:{components:[...p.details.components,{...p.details.components[0],name:'bebida'}]}}),/invalid_components/);
  p.details.components[0].name='Changed';assert.equal(c.components[0].name,'Bebida');
 });

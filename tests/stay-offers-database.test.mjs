@@ -29,6 +29,7 @@ before(async()=>{
  create function checkout_experience_cart_item_atomic(uuid,uuid,int) returns table(charge_id uuid,purchase_mode text,amount_cents bigint,description text,expires_at timestamptz) language sql as $$ select null::uuid,'add'::text,100::bigint,'test'::text,now() $$;
  insert into experience_products(id,name,status,details,price_cents) values('${product}','Romance','active','{"components":[{"name":"Bebida","quantity":1,"frequency":"arrival","choices":["Vinho","Espumante"]},{"name":"Frutas","quantity":2,"frequency":"daily","choices":[]}]}',10000);`);
  await db.exec(await readFile(new URL('../supabase/migrations/20261005201531_romantic_stay_offers.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261005203843_experience_service_day_capacity.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 async function booking(){
@@ -59,4 +60,16 @@ test('date or property changes cancel obsolete services and update preparation',
  const {r,order}=await booking();await db.query("update experience_orders set status='active' where id=$1",[order.id]);await db.query("update reservations set status='confirmed' where id=$1",[r.id]);
  await db.query("update reservations set check_in='2030-01-05',check_out='2030-01-07',property_id=2 where id=$1",[r.id]);
  const active=(await db.query("select * from pms_tasks where reservation_id=$1 and status<>'cancelled'",[r.id])).rows;assert.ok(active.length>0);assert.ok(active.every(t=>t.property_id===2));assert.ok((await one("select count(*)::int n from pms_tasks where reservation_id=$1 and status='cancelled'",[r.id])).n>0);
+});
+
+test('daily capacity counts contracted service dates and preserves prior frequency after catalog edits',async()=>{
+ await db.query("update reservations set status='cancelled'");
+ await db.query("update experience_products set status='active',daily_capacity=1,details=$1 where id=$2",[{components:[{name:'Ambientação',quantity:1,frequency:'arrival',choices:[]}]},product]);
+ const {r}=await booking();await db.query("update reservations set status='confirmed' where id=$1",[r.id]);await db.query("update experience_orders set status='active' where reservation_id=$1",[r.id]);
+ assert.equal((await one("select experience_sale_issue($1,2,'2030-01-02','2030-01-04') as issue",[product])).issue,null,'arrival-only packages do not occupy capacity for the whole stay');
+ assert.equal((await one("select experience_sale_issue($1,2,'2030-01-01','2030-01-03') as issue",[product])).issue,'experience_capacity');
+ await db.query("update experience_products set details=$1 where id=$2",[{components:[{name:'Ambientação',quantity:1,frequency:'daily',choices:[]}]},product]);
+ assert.equal((await one("select experience_sale_issue($1,2,'2030-01-02','2030-01-04') as issue",[product])).issue,null,'catalog changes do not rewrite the first booking service frequency');
+ const {r:daily}=await booking();await db.query("update reservations set status='confirmed' where id=$1",[daily.id]);await db.query("update experience_orders set status='active' where reservation_id=$1",[daily.id]);
+ assert.equal((await one("select experience_sale_issue($1,2,'2030-01-02','2030-01-04') as issue",[product])).issue,'experience_capacity');
 });

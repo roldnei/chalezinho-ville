@@ -495,7 +495,7 @@ function renderSandboxPayment(d){
  clearInterval(window.__quoteTimer);
  $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
- box.innerHTML='<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
+ box.innerHTML=window.VilleOffers.contractMarkup(state.rate?.contract_snapshot)+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
   (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>O cartão de teste foi enviado. Consultando o resultado…</p>')+
   '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
  if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=()=>navigator.clipboard.writeText(pix)}
@@ -568,7 +568,7 @@ function initStayModes(){
  let saved={};try{saved=JSON.parse(sessionStorage.getItem('ville-stay-selection')||'{}')}catch{}
  const q=new URLSearchParams(location.search),code=$('#book-chalet').value;
  const compatible=(state.config.stay_offers||[]).filter(o=>!code||o.property_ids.includes(Number((state.properties||[]).find(p=>p.code===code)?.id)));
- state.offerId=q.get('mode')==='stay'?null:q.get('stay_offer')||saved.offerId||compatible[0]?.id||null;
+ state.offerId=q.get('mode')==='stay'?null:q.get('stay_offer')||(Object.hasOwn(saved,'offerId')?saved.offerId:compatible[0]?.id)||null;
  if(!(state.config.stay_offers||[]).some(o=>o.id===state.offerId))state.offerId=null;
  state.preferences=saved.preferences||{};
  if(!q.has('stay_offer')&&!q.has('mode')){if(saved.check_in)$('#book-in').value=saved.check_in;if(saved.check_out)$('#book-out').value=saved.check_out;if(saved.guests)$('#book-guests').value=saved.guests}
@@ -578,7 +578,7 @@ function initStayModes(){
 }
 function refreshStayOptions(){const code=$("#book-chalet").value,propertyId=Number((state.properties||[]).find(p=>p.code===code)?.id);const compatible=(state.config.stay_offers||[]).filter(o=>!code||o.property_ids.map(Number).includes(propertyId));if(state.offerId&&!compatible.some(o=>o.id===state.offerId))state.offerId=null;const options='<option value="">Somente hospedagem</option>'+compatible.map(o=>'<option value="'+esc(o.id)+'">Com experiência incluída · '+esc(o.name)+'</option>').join('');for(const id of ["#stay-mode","#checkout-stay-mode"])$(id).innerHTML=options;syncStayModes();}
 function syncStayModes(){for(const id of ['#stay-mode','#checkout-stay-mode'])if($(id))$(id).value=state.offerId||'';$('#stay-selection-copy').textContent=selectedOffer()?selectedOffer().description+' O preço inclui hospedagem, limpeza e os pacotes desta oferta.':'Hospedagem e limpeza. Você pode acrescentar pacotes avulsos pelo preço cheio.';renderOfferContext()}
-function persistSelection(){try{sessionStorage.setItem('ville-stay-selection',JSON.stringify({offerId:state.offerId,preferences:state.preferences,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value}))}catch{}}
+function persistSelection(){try{const url=new URL(location.href);if(state.offerId){url.searchParams.set('stay_offer',state.offerId);url.searchParams.delete('mode')}else{url.searchParams.set('mode','stay');url.searchParams.delete('stay_offer')}history.replaceState(null,'',url);sessionStorage.setItem('ville-stay-selection',JSON.stringify({offerId:state.offerId,preferences:state.preferences,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value}))}catch{}}
 function renderOfferContext(){const node=$('#checkout-offer-context');if(node)node.textContent=selectedOffer()?'Com experiência incluída · '+selectedOffer().name:'Somente hospedagem · adicionais avulsos pelo preço cheio'}
 function renderOfferChoices(){
  let node=$('#offer-choices');if(!node){node=document.createElement('div');node.id='offer-choices';$('#experience-options').before(node)}

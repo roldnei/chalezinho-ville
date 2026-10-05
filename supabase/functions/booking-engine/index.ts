@@ -1789,7 +1789,7 @@ async function purchasePostBookingExperience(req:Request,body:any,development:bo
     for(const code of [
       "reservation_not_available","experience_unavailable","experience_lead_time","experience_out_of_stock",
       "experience_already_added","experience_upgrade_not_available","experience_capacity_reached",
-      "experience_payment_already_pending"
+      "experience_payment_already_pending","experience_component_conflict","experience_choice_required","invalid_experience_choice"
     ]) if(msg.includes(code)) return json({ok:false,error:code},409);
     return json({ok:false,error:"experience_charge_failed"},500);
   }
@@ -2219,7 +2219,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
     if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
-    const clientErrors=["same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available","offer_unavailable","offer_duration","offer_period","offer_property_incompatible","package_paused","package_lead_time","package_property_incompatible","package_unavailable","experience_component_conflict","invalid_experience_choice","experience_choice_required"];
+    const clientErrors=["same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available","offer_unavailable","offer_duration","offer_period","offer_property_incompatible","package_paused","package_lead_time","package_property_incompatible","package_unavailable","experience_component_conflict","invalid_experience_choice","experience_choice_required","experience_capacity","package_out_of_stock","package_components_required","experience_not_sold_separately"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
   }
 });
