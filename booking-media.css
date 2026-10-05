@@ -1,0 +1,7 @@
+/* Booking covers are plain images, not positioned carousel slides. Keep the
+   whole photograph visible instead of clipping its original-size top edge. */
+.booking-page .booking-gallery>img{display:block;width:100%;height:100%;object-fit:contain;object-position:center}
+@media(max-width:800px){
+ .booking-page .booking-property>.booking-gallery{aspect-ratio:auto!important}
+ .booking-page .booking-gallery>img{height:auto;max-height:480px;object-fit:contain}
+}
