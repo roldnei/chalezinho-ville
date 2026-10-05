@@ -34,7 +34,7 @@ Na home anterior, o carregamento dinâmico inseria um card genérico extenso ant
 
 ## Verificação
 
-- Testes automatizados de servidor puro e DOM simulam cenários de capacidade, pausa, incompatibilidade, períodos, durações, preço final, cache e passagem para reserva. Essa simulação não equivale a teste visual em navegador.
+- 253 testes automatizados aprovados. Testes de servidor puro e DOM simulam cenários de capacidade, pausa, incompatibilidade, períodos, durações, preço final, cache e passagem para reserva. Essa simulação não equivale a teste visual em navegador.
 - TypeScript, sintaxe JavaScript, diff check e build de preview aprovados.
 - API real de desenvolvimento: 18 cards disponíveis. Exemplo observado: Ville Essenza, 07–09/10/2026, 2 noites, tarifa Não reembolsável, R$ 1.198,14, desconto R$ 63,06. Esse preço é um exemplo temporal de desenvolvimento, não uma promessa fixa.
 - Antes/depois da consulta real: 17 reservas, 18 pagamentos, 20 tarefas, 76 quotes e 148 opções. Hash dos contratos de todas as reservas: c110298ea7609246e5649ff4b88c2483, inalterado.

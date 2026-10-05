@@ -15,7 +15,11 @@
   const track=section.querySelector('.showcase-track'),status=section.querySelector('.showcase-status');
   section.querySelectorAll('[data-direction]').forEach(b=>b.onclick=()=>track.scrollBy({left:Number(b.dataset.direction)*track.clientWidth*.8,behavior:'smooth'}));
   try{
-   const r=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase',{cache:'no-store',headers:{'X-Chalezinho-Env':'development'}}),data=await r.json();if(!r.ok||!data.ok)throw Error('unavailable');
+   const feedStarted=performance.now();
+   let version;try{version=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(offers))))].map(b=>b.toString(16).padStart(2,'0')).join('')}catch{version=String(Date.now())}
+   const feedURL=/^chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(location.hostname)?'/api/stay-showcase?catalog_version='+version:window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase';
+   const r=await fetch(feedURL,{cache:feedURL.startsWith('/api/')?'default':'no-store',headers:{'X-Chalezinho-Env':'development'}}),data=await r.json();if(!r.ok||!data.ok)throw Error('unavailable');
+   section.dataset.feedLoadMs=String(Math.round(performance.now()-feedStarted));
    const cards=data.cards||[];
    if(!cards.length){status.textContent='Nenhuma combinação de dias de semana disponível agora. Consulte suas datas abaixo.';section.querySelector('.showcase-controls').hidden=true;return}
    track.innerHTML=cards.map(c=>{
