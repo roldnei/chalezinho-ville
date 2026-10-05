@@ -1,96 +1,100 @@
-# Estadias com experiências — implementação em desenvolvimento
+# Estadias com experiências — avaliação, implementação e testes
 
-Avaliação e verificação em 5 de outubro de 2026.
+Atualizado em 5 de outubro de 2026 após login e testes autenticados.
 
-## Ambiente confirmado
+## Ambiente e preservação
 
-- Repositório: `roldnei/chalezinho-ville`.
-- Branch isolada: `feature/romantic-stay-offers`, criada sobre `b9fc94499b64de79a40efc4446176f8222019808`.
-- Código verificado: `ba60e4a9bef6a6f1b1bca217a70b79e78c42a29f`.
-- Deployment Preview: https://chalezinho-ville-gmmyquwng-roldneicosta-4140.vercel.app/ — `dpl_9TDZvmmYuyfRvHt4oiQ53qiaJiK7`, READY, sem destino de produção. A Vercel exige sessão ou link temporário de revisão.
-- Banco exclusivo: `chalezinho-ville-finance-dev`, referência `pxfqmnhqodqyaaqeyjgr`.
-- Nenhum deployment ou banco de produção foi alterado.
-- Migrações aplicadas no DEV: `20261005201531_romantic_stay_offers` e `20261005203843_experience_service_day_capacity`.
-- Funções DEV: booking-engine versão 44; pms-operations versão 12. Autenticação existente preservada.
+- Repositório `roldnei/chalezinho-ville`, branch isolada `feature/romantic-stay-offers`.
+- Código final desta rodada: `4534b1a59755c6f86811b3bc655ce0917baef36d`.
+- Preview READY: https://chalezinho-ville-rl8vg5qql-roldneicosta-4140.vercel.app/ — deployment `dpl_Cu7tCo751CeYmjDn2eDC4FHNwjZL`, sem destino de produção. Exige acesso pela Vercel.
+- Banco exclusivo `chalezinho-ville-finance-dev`, referência `pxfqmnhqodqyaaqeyjgr`.
+- Migrações DEV: `20261005201531_romantic_stay_offers`, `20261005203843_experience_service_day_capacity` e `20261005225000_settled_experience_credit`.
+- Funções DEV: booking-engine v45; pms-operations v12. Autenticação existente preservada.
+- Produção não foi alterada. Lançamentos financeiros e contratos anteriores não foram reescritos.
 
-## Avaliação da versão anterior
+As jornadas públicas e autenticadas foram percorridas em https://chalezinho-ville-gmmyquwng-roldneicosta-4140.vercel.app/ com os serviços DEV. A segunda compra já utilizou booking-engine v45. As últimas correções de interface também passaram pelos testes locais e build; a navegação no Preview final parou na proteção de login da Vercel. As capturas autenticadas registram a jornada anterior, não uma inspeção visual completa do novo deployment.
 
-Revalidados pelo código, banco e navegação pública: tarifas sobre diárias do PriceLabs, limpeza, experiências, pagamento, catálogo com imóveis participantes, preparação genérica, páginas públicas parcialmente fixas e ausência de oferta completa na cotação inicial. As comodidades e os documentos versionados já existentes foram preservados.
+## Avaliação revalidada
 
-O PMS e a área do hóspede exigiram autenticação. Sua estrutura e persistência foram avaliadas pelo código e banco, mas o login seguro não produziu uma sessão confirmada no navegador. Não considerar a avaliação visual autenticada concluída.
+Código, banco e telas confirmaram o motor de diárias PriceLabs com tarifas, limpeza, experiências e pagamentos; catálogo vinculado a imóveis; preparação antes genérica; conteúdo público parcialmente fixo e ausência de oferta completa desde a primeira cotação. Comodidades, documentos versionados, cobrança, caução e estornos existentes foram reaproveitados. O login agora permitiu verificar visualmente PMS, cadastro, área do hóspede, compra e financeiro.
 
-## Mudanças entregues
+## Implementação
 
-- Catálogo de estadias completas com pacotes existentes, imóveis participantes, duração flexível, período, fotos, ativação e desconto configurável. Prévia valida incompatibilidades e pacotes pausados.
-- Editor de experiências com componentes, quantidades, frequência, escolhas, imóveis, venda avulsa, uso em ofertas, antecedência, capacidade diária e estoque.
-- Oferta visível na home, páginas individuais, comparação e reserva. Somente hospedagem permanece disponível. Nenhuma regra geral de três noites foi adicionada.
-- Cotação do servidor: tarifa dinâmica + limpeza + pacotes incluídos, menos desconto da oferta identificada explicitamente. Extras avulsos ficam pelo preço cheio; caução e juros usam o módulo existente.
-- Rateio do desconto por componente em centavos com preservação do total. Valores líquidos alimentam reserva, pedidos de experiências e financeiro existentes.
-- Composição, preferências, condições e preços contratados copiados para a reserva e pedidos. Catálogo editado posteriormente não reescreve contratos.
-- Seleção e preferências preservadas na navegação, retomada e recarga. Trocas removem imediatamente preços antigos e aguardam recálculo antes de novos cliques.
-- Preparação automática por eventos, com checklist dos itens e preferências. Frequência define os dias de entrega; alteração e cancelamento retiram tarefas antigas, preservando histórico.
-- Área do hóspede distingue contratação original das experiências atuais. Confirmação exibe a composição contratada.
-- Condições completas de cancelamento em seção expansível. Histórico e aceite dos documentos versionados continuam no fluxo existente.
+- Home, imóvel, comparação e reserva oferecem **Com experiência incluída** e **Somente hospedagem**. A opção acompanha datas, imóvel, preferências e retomada. Duas noites são aceitas conforme disponibilidade e regras; não existe mínimo geral de três noites.
+- PMS integrado: pacotes com fotos, componentes, quantidades, frequência, escolhas, imóveis, antecedência, capacidade, estoque, venda avulsa e uso em ofertas; estadias completas reutilizam esses pacotes e configuram duração, período, fotos, pausa e desconto.
+- Prévia explica configurações incompatíveis antes de salvar. Cadastros novos começam pausados.
+- Servidor calcula diárias na tarifa escolhida + limpeza + experiências incluídas; aplica o percentual da oferta explicitamente selecionada. Avulsos ficam pelo preço cheio, sem desconto retroativo. Caução fica separada; parcelamento usa o módulo existente.
+- Rateio do desconto em centavos preserva o total e a identificação de hospedagem, limpeza e experiências. A composição, preferências, preços e condições são copiados para a reserva e os pedidos; editar o catálogo não altera contratos anteriores.
+- Itens incluídos não reaparecem como adicionais cobrados. Área do hóspede e confirmação apresentam contratação e experiências atuais; os aceites versionados continuam disponíveis.
+- Eventos geram preparação com checklist por componente, dia de entrega, antecedência, prazo e preferências. Mudanças e retirada de serviço cancelam preparos obsoletos sem apagar histórico.
+- Corrigidos três problemas observados nesta rodada: cobrança adicional recém-criada invisível até recarga; cartão oferecido abaixo do mínimo de R$ 5,00; experiência inicial sem vínculo financeiro com seu item contratado. Novos lançamentos possuem esse vínculo e validam a soma antes de enviar a cobrança ao provedor.
+- Cobranças adicionais já pagas deixam de bloquear um crédito de experiência por serem tratadas como pendentes. Cobranças realmente pendentes e atribuição ambígua continuam bloqueadas. Nenhum lançamento antigo foi adivinhado ou modificado.
+- Ajustados contraste/navegação do editor, apresentação dos prazos de preparo e identificação de pagamentos sandbox no financeiro.
 
-## Resultados
+## Evidências obtidas
 
-Typecheck, build com proteção contra produção e **239 testes automatizados aprovados**. Os testes de UI com JSDOM e de Postgres com PGlite são simulações; não substituem homologação do provedor ou navegação autenticada.
+**245 testes automatizados aprovados**, typecheck, sintaxe e build DEV aprovados. JSDOM e PGlite são simulações, não homologação do provedor.
 
-| Cenário | Evidência obtida |
+| Cenário | Resultado e tipo de evidência |
 | --- | --- |
-| Oferta desde home e imóvel | Navegador real: oferta e link com CH1 preservado |
-| Duas noites | Navegador e API: 10–12/11/2026, Signature e Amore disponíveis; Essenza ocupada |
-| Somente hospedagem | API real e UI automatizada: desconto zero e sem inclusões automáticas |
-| Tarifas | API: reembolsável e não reembolsável calculadas; referência não selecionável |
-| 5%, 10% e desativado | Percentual alterado no banco DEV e novas cotações conferidas na API; não foi uma edição visual pelo PMS |
-| Avulso antes do pagamento | API: café com desconto zero; item romântico incluído enviado novamente não duplicou a cobrança |
-| Avulso depois da reserva | RPCs reais de carrinho e checkout no DEV: café pelo preço cheio, sem desconto retroativo. Nenhum pagamento enviado ao provedor |
-| Composição e preparação | Reserva simulada no DEV, cópia persistida e dois checklists de três itens gerados por eventos |
-| Alteração de datas | Banco DEV: preparos antigos cancelados, novos criados; PGlite também cobre troca de imóvel |
-| Pausa/edição | Banco DEV e PGlite: composição contratada permanece igual |
-| Cancelamento | Duas reservas de QA encerradas; zero tarefas novas ativas; histórico preservado |
-| Capacidade e frequência | Postgres simulado: chegada não bloqueia dias seguintes; serviço diário ocupa seus dias; edição do catálogo não muda frequência contratada |
-| Preferências, retomada e cliques | UI automatizada: escolhas obrigatórias, retomada, remoção de preços antigos e bloqueio durante recálculo |
-| Acesso administrativo | API real: edição sem autenticação negada com `403 admin_required` |
-| Responsividade pública | Navegador real com conteúdo em iframe de largura definida; não é um aparelho físico. Seletor do checkout corrigido para caber na largura móvel |
+| Home e página individual | Navegador real: oferta evidente e imóvel preservado ao reservar |
+| Duas noites e tarifas | Navegador/API: 10–12/11/2026; tarifas reembolsável e não reembolsável calculadas; datas ocupadas corretamente indisponíveis |
+| Somente hospedagem e troca de opção | API real e UI simulada: sem inclusões automáticas nem desconto; preços anteriores removidos enquanto recalcula |
+| Cadastro no PMS | Navegador + banco: criada `[DEV] Cadastro de QA — pausado`, Ville Amore, pacote existente, mínimo de duas noites, máximo flexível e 5%; permaneceu pausada |
+| Alterar desconto | PMS real: 10%, desativado e retorno a 5%; banco e novas cotações conferidos |
+| Pacote antes do pagamento | API real: avulso sem desconto; item incluído reenviado não duplicou a cobrança |
+| Compra completa | PagBank sandbox real: Signature R$ 1.518,95 em 6x, reserva `82501E85B9` confirmada |
+| Avulso depois do pagamento | PagBank sandbox real: café R$ 5,00 em 1x; total atualizado R$ 1.523,95; desconto original permaneceu R$ 79,95 |
+| Compra após correção financeira | PagBank sandbox real: Amore R$ 1.256,66 em 1x, reserva `5BD966165D` confirmada; experiência vinculada ao pagamento por R$ 0,95 |
+| Documentos | Navegador e banco: quatro aceites por compra; cancelamento v1.2, hospedagem v1.1, regras v1.1 e privacidade v1.0 |
+| Preparação | Navegador + banco: checklist de três componentes românticos, preparo do café e prazos; geração ocorreu por eventos |
+| Crédito de serviço não prestado | PMS/API/banco: crédito de R$ 0,95 calculado e aprovado; item e preparo cancelados; reserva permaneceu ativa |
+| Alteração de datas/imóvel e catálogo | Banco DEV e PGlite: contratos preservados, preparos anteriores cancelados e novos criados; frequência contratada não muda com o catálogo |
+| Login, retomada, recarga, cliques | Login real e compra autenticada; UI simulada cobre preferências obrigatórias, retomada e bloqueio durante recálculo |
+| Indisponibilidade/antecedência/capacidade | API e Postgres simulado: rejeições reais e ocupação por dia de serviço |
+| Responsividade | Público no navegador desktop em largura móvel por iframe e testes de UI; não equivale a aparelho físico. Revisão visual autenticada móvel final ainda pendente |
 
-### Exemplo de preço conferido
+O café foi temporariamente alterado para R$ 5,00 no DEV para atingir o mínimo do cartão e testar pagamento avulso. Foi restaurado para R$ 1,00 no PMS. O pedido pago preservou seu preço contratado de R$ 5,00. A oferta principal terminou ativa com 5% habilitado.
 
-Ville Signature, 10–12/11/2026, dois hóspedes, tarifa não reembolsável. O pacote demonstrativo custa R$ 1,00 e não representa preço comercial aprovado.
+## Preço demonstrativo conferido
 
-| Composição | Valor |
+Signature, 10–12/11/2026, dois hóspedes, tarifa não reembolsável:
+
+| Componente | Valor |
 | --- | ---: |
 | Hospedagem na tarifa | R$ 1.307,90 |
 | Limpeza | R$ 290,00 |
-| Experiência incluída de teste | R$ 1,00 |
+| Pacote incluído de teste | R$ 1,00 |
 | Total antes do desconto | R$ 1.598,90 |
-| Desconto de 5%, arredondado em centavos | R$ 79,95 |
+| Desconto de 5% | R$ 79,95 |
 | Total antes de juros | R$ 1.518,95 |
-| Com café avulso de teste, pelo preço cheio | R$ 1.519,95 |
-| Com desconto de 10%, sem café | R$ 1.439,01 |
-| Desconto desativado, sem café | R$ 1.598,90 |
+| Desconto de 10%, sem avulso | R$ 1.439,01 |
+| Desconto desativado | R$ 1.598,90 |
 | Somente hospedagem e limpeza | R$ 1.597,90 |
 
-O desconto de 5% foi distribuído em R$ 65,40 na hospedagem, R$ 14,50 na limpeza e R$ 0,05 na experiência incluída. O avulso não recebeu desconto.
+Rateio de 5%: desconto de R$ 65,40 na hospedagem, R$ 14,50 na limpeza e R$ 0,05 na experiência. Pacotes de R$ 1,00 são dados de QA, não preços comerciais aprovados. Não foram inventados vinho, queijos ou frutas que não constam da composição cadastrada.
 
-### Preservação dos dados
+## Estornos: pendência externa concreta
 
-Após migrações e QA: as 13 reservas anteriores continuam presentes, assim como 15 pagamentos, três produtos, dois pedidos anteriores e 11 tarefas anteriores. Foram acrescentadas duas reservas explicitamente identificadas como `[DEV SIMULAÇÃO]`, depois canceladas, e quatro tarefas históricas canceladas. Nenhum pagamento novo foi registrado ou enviado ao PagBank neste QA. Não apagar essas evidências como se fossem reservas comerciais.
+O cancelamento integral da reserva `82501E85B9` calculou R$ 1.523,95, incluindo os dois pagamentos, conforme a política aceita. A aprovação chamou o PagBank sandbox. O provedor retornou **40008**, serviço temporariamente indisponível. Depois de consultar ambas as cobranças e conferir devolução zero, uma única retomada da mesma operação retornou **40005**, chave em uso. A solicitação permaneceu pendente, sem nova chave e sem devolução fictícia.
 
-## Demonstração no PMS após login
+O crédito parcial da reserva `5BD966165D` calculou exatamente **R$ 0,95**, valor líquido contratado. Sua aprovação retirou a experiência e cancelou o preparo por evento. O PagBank sandbox também retornou **40008**. A devolução financeira continua pendente; a hospedagem permanece ativa.
 
-1. Abrir **Pacotes de experiências**. Selecionar um pacote existente, conferir preço cheio, imóveis e componentes. Cada escolha deve listar somente opções que a equipe pode entregar.
-2. Abrir **Estadias completas**, selecionar `[DEV] Chegada romântica`. Conferir imóveis, pacote incluído, duração e percentual. Usar **Ver prévia e conferir configuração** antes de salvar.
-3. Trocar 5% para outro percentual ou desmarcar **Aplicar desconto**. Salvar atualiza consultas novas; reservas anteriores mantêm a composição e preço originais.
-4. Na home ou imóvel, escolher **Consultar datas e preço completo**, selecionar duas noites permitidas e comparar as tarifas. Trocar para somente hospedagem deve retirar inclusões e desconto.
-5. Concluir compra com autenticação e meio de teste. Conferir aceite dos documentos, confirmação, área do hóspede e checklists do PMS. Esta última etapa ainda precisa ser executada no navegador com sessão válida.
+**Nenhum desses estornos foi confirmado pelo provedor.** Retomar pela conciliação existente quando o PagBank permitir; não criar uma nova operação nem marcar sucesso manualmente. A homologação de estorno integral/parcial não está concluída.
 
-## Pendências para homologação completa
+## Preservação e limites restantes
 
-- Login confirmado para verificar visualmente cadastro/salvamento no PMS, área do hóspede e capturas administrativas em desktop e largura móvel.
-- Compra ponta a ponta com pagamento sandbox real, parcelamento retornado pelo provedor, webhook e reserva resultante. As confirmações de QA desta entrega foram simulações no banco, explicitamente auditadas; não são homologação do PagBank.
-- Upgrade e devolução de experiência após pagamento devem ser homologados com transação sandbox elegível no motor financeiro existente. Esta evolução não repetiu a homologação de estorno do provedor.
-- Preços, itens concretos e escolhas comerciais precisam ser aprovados e cadastrados. Foram reutilizados pacotes `[DEV]` existentes de R$ 1,00, sem inventar vinho, queijos ou frutas na oferta comercial.
-- Validação em aparelhos físicos e navegadores móveis. A verificação de largura em iframe utiliza o navegador desktop.
+Após QA: 17 reservas, 18 pagamentos, três produtos, seis pedidos de experiências e 20 tarefas no DEV. As reservas e os pagamentos anteriores foram preservados. Duas reservas anteriores desta implementação foram simulações identificadas e canceladas; duas novas reservas nesta rodada receberam pagamentos sandbox reais. Os três pagamentos novos são exclusivamente sandbox.
 
-O resultado está implementado e disponível para revisão em desenvolvimento; a homologação completa permanece pendente das etapas acima.
+Pendente: conciliação dos estornos acima; upgrade com pagamento sandbox nesta rodada; confirmação final de Pix; inspeção visual da última revisão após login Vercel, especialmente PMS móvel; aparelhos físicos. O BIN de teste deixou disponíveis 1–6 parcelas após consulta; 7–12 com juros não foram homologadas com esse BIN. Uma foto preexistente do catálogo retornou 404 e não foi substituída por imagem inventada.
+
+O link temporário que dispensaria login Vercel foi bloqueado pela revisão automática por ampliar o acesso ao deployment. A proteção permaneceu ativa. O endereço de Preview pode ser aberto com a conta autorizada da Vercel.
+
+## Demonstração repetível
+
+1. PMS → **Pacotes de experiências**: editar pacote existente, componentes e escolhas realmente entregáveis.
+2. **Estadias completas** → **Nova estadia completa**: nome, descrição, imóveis e pacote existente; usar a prévia; salvar pausada; ativar quando a configuração comercial estiver conferida.
+3. Na oferta `[DEV] Chegada romântica`, alterar percentual ou desmarcar **Aplicar desconto**; salvar. Consultas novas mudam, contratos antigos permanecem iguais.
+4. Home ou imóvel → **Com experiência incluída** → datas → tarifa → resumo com inclusões/desconto → pagamento de teste e aceite dos documentos.
+5. **Minhas reservas**: conferir contratação e comprar um pacote avulso pelo preço cheio. PMS → **Operação**: conferir itens, data de entrega, prazo e responsável.
+6. Para as reservas de QA desta rodada, consultar os casos pendentes no financeiro. Não considerar o estorno concluído enquanto a conciliação mostrar zero confirmado.
