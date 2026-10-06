@@ -71,3 +71,12 @@ A dica móvel “Arraste para cima” aparece uma vez por sessão, por aproximad
 Validação: 300 testes passaram (quatro novos), checagens JavaScript/TypeScript e build local DEV aprovados. Os testes novos verificam a cascata de estilos com o CSS real do site, os vínculos de reserva, nomes acessíveis, expiração da dica sem avanço, interrupção ao ler e movimento reduzido. Após alinhar os nomes acessíveis dos controles, os quatro testes específicos foram executados novamente.
 
 A tentativa de abrir o navegador nesta continuação foi recusada pela mesma proteção de credenciais: “native credential state cannot be safely resumed”. Não foi possível obter novas capturas ou conferir visualmente estes ajustes. A prévia DEV será disponibilizada com essa limitação explícita; não se declara teste de tela concluído.
+
+
+## Ajustes de layout e tempo — 6 de outubro de 2026
+
+O CTA usa margens simétricas; a margem da coluna social afeta somente os textos. Curtir, comentar e compartilhar têm apenas ícones visíveis, mantendo nomes acessíveis e a quantidade de curtidas no nome do controle. A reserva usa cabeçalho no fluxo normal e etapas em três colunas, evitando a sobreposição com a marca.
+
+O contorno oval da pausa mostra o tempo restante do ciclo completo das fotos (6,5 s por foto) ou a duração real do vídeo. Pausas, leitura e aba oculta congelam o relógio; retomar preserva o tempo restante. O ciclo nunca muda o reel automaticamente. Quatro novos testes verificam o layout, os controles sociais, o relógio das fotos e o relógio do vídeo.
+
+A abertura da prévia no navegador continua bloqueada: “Browser observation is unavailable because native credential state cannot be safely resumed. Start a new browser runtime to continue.” Portanto estes ajustes ainda não têm validação visual nem novas capturas de tela.
