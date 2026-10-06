@@ -51,3 +51,53 @@
 .villegram-mobile-nav{display:none}.villegram-home-entry{color:inherit;background:transparent;border:1px solid #b59a61;border-radius:6px;padding:8px 12px;min-height:44px;font:inherit;cursor:pointer}
 #villegram-home-status{position:fixed;inset:0;z-index:999;background:#17130f;color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:24px;font:16px 'DM Sans',sans-serif;text-align:center}#villegram-home-status strong{letter-spacing:3px}#villegram-home-status a{color:#eddbac;min-height:44px;padding:12px}#villegram-home-status button{padding:12px;margin:8px}
 @media(max-width:700px){.villegram-mobile-nav{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;inset:auto 0 0;z-index:900;background:#17130f;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-top:1px solid #ffffff25}.villegram-mobile-nav a,.villegram-mobile-nav button{display:flex;align-items:center;justify-content:center;font:14px 'DM Sans',sans-serif;color:#fff;text-decoration:none;padding:6px 3px;min-height:48px;border:0;background:none;text-align:center}body:has(.villegram-mobile-nav){padding-bottom:calc(68px + env(safe-area-inset-bottom))}.villegram-home-loading{overflow:hidden}#villegram h2{font-size:28px}#villegram .vg-purchase:has(.vg-caption-short){padding-left:18px;padding-right:78px}.floating-whatsapp{bottom:82px}}
+
+/* Consistent navigation in the feed and in the conventional mobile home. */
+#villegram,.villegram-mobile-nav{color-scheme:only dark}
+.vg-icon{display:block;width:24px;height:24px;flex:0 0 auto;pointer-events:none}
+#villegram .vg-icon{animation:none;transform:none}
+#villegram .vg-bottom-nav,.villegram-mobile-nav{height:calc(72px + env(safe-area-inset-bottom));box-sizing:border-box;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom));font-family:'DM Sans',sans-serif;letter-spacing:0;text-transform:none}
+#villegram .vg-bottom-nav a,#villegram .vg-bottom-nav button,.villegram-mobile-nav a,.villegram-mobile-nav button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:58px;padding:3px 2px;margin:0;border:0;border-radius:10px;background:transparent;color:#f7f0e7;font:500 12px/1.15 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;text-decoration:none;text-align:center;box-shadow:none;backdrop-filter:none}
+#villegram .vg-bottom-nav .vg-nav-label,.villegram-mobile-nav .vg-nav-label{display:flex;align-items:center;justify-content:center;min-height:28px;max-width:100%;font:inherit;letter-spacing:0;text-transform:none;color:inherit}
+#villegram .vg-bottom-nav .vg-icon,.villegram-mobile-nav .vg-icon{width:23px;height:23px}
+#villegram .vg-bottom-nav [aria-current]{background:#b59a612b;color:#eddbac}
+.villegram-home-entry{display:inline-flex;align-items:center;gap:8px;letter-spacing:0;text-transform:none}
+.villegram-home-entry .vg-icon{width:20px;height:20px}
+
+/* The reservation action has the same format whether rendered as a link or button. */
+#villegram .vg-purchase .vg-primary,#villegram .vg-purchase>a.vg-primary,#villegram .vg-purchase button.vg-primary{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;min-height:54px;margin:10px 0 0;padding:13px 16px;border:1px solid #dfc48b;border-radius:12px;background:#d1b678;color:#21190e;font:600 16px/1.25 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;text-decoration:none;text-align:center;text-shadow:none;box-shadow:0 4px 20px #0003;backdrop-filter:none}
+#villegram .vg-primary .vg-icon{width:22px;height:22px}
+#villegram .vg-primary:hover{background:#dfc48b}
+#villegram a:focus-visible,#villegram button:focus-visible,.villegram-mobile-nav a:focus-visible,.villegram-mobile-nav button:focus-visible{outline:2px solid #eddbac;outline-offset:3px}
+#villegram:has(.vg-caption-short) .vg-social button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:9px 3px;min-height:62px;font:500 11px/1.15 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;overflow-wrap:anywhere}
+#villegram .vg-social button[aria-pressed=true] .vg-icon{fill:#e59185;stroke:#e59185}
+
+/* Large, labelled desktop controls; the mobile controls remain tappable alternatives. */
+#villegram footer{min-height:76px;gap:18px!important}
+#villegram footer .vg-step{display:flex;align-items:center;justify-content:center;gap:10px;min-width:156px;min-height:56px;padding:12px 18px;border:1px solid #ffffff70;border-radius:14px;background:#17130fe6;font:600 15px/1.2 'DM Sans',sans-serif;letter-spacing:0;text-transform:none}
+#villegram footer .vg-step .vg-icon{width:28px;height:28px}
+#villegram footer .vg-step:hover:not(:disabled){background:#b59a613d;border-color:#eddbac}
+#villegram footer .vg-progress{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font:500 14px/1.2 'DM Sans',sans-serif}
+#villegram footer .vg-navigation-help{font:400 12px/1.2 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;color:#e5d5b3}
+#villegram.vg-home footer{bottom:calc(72px + env(safe-area-inset-bottom));min-height:76px}
+#villegram.vg-home .vg-purchase{bottom:calc(157px + env(safe-area-inset-bottom));max-height:calc(100dvh - 255px)}
+#villegram:not(.vg-home) .vg-purchase{bottom:144px}
+
+/* A short teaching gesture moves the current reel only; it never advances the feed. */
+#villegram .vg-swipe-hint{position:absolute;z-index:3;top:23%;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;max-width:calc(100% - 48px);padding:12px 16px;border:1px solid #ffffff60;border-radius:18px;background:#17130fd9;color:#fff;font:500 14px/1.2 'DM Sans',sans-serif;box-shadow:0 8px 28px #0005;pointer-events:none}
+#villegram .vg-swipe-hint .vg-icon{width:30px;height:30px;animation:vg-guide-hand 1.6s ease-in-out 2}
+#villegram .vg-swipe-demo{animation:vg-guide-reel 1.6s ease-in-out 2}
+#villegram.vg-paused .vg-swipe-demo,#villegram.vg-paused .vg-swipe-hint .vg-icon{animation-play-state:paused}
+@keyframes vg-guide-hand{0%,100%{transform:translateY(4px)}45%,65%{transform:translateY(-8px)}}
+@keyframes vg-guide-reel{0%,100%{transform:translateY(0)}45%,65%{transform:translateY(-18px)}}
+@media(max-width:700px){
+ #villegram footer,#villegram.vg-home footer{min-height:64px;gap:12px!important}
+ #villegram footer .vg-step{min-width:48px;width:48px;min-height:48px;padding:10px;border-radius:50%}
+ #villegram footer .vg-step-label{display:none}
+ #villegram footer .vg-step .vg-icon{width:26px;height:26px}
+ #villegram footer .vg-navigation-help{font-size:11px}
+ #villegram.vg-home .vg-purchase{bottom:calc(144px + env(safe-area-inset-bottom));max-height:calc(100dvh - 240px)}
+ body:has(.villegram-mobile-nav){padding-bottom:calc(80px + env(safe-area-inset-bottom))}
+ .floating-whatsapp{bottom:calc(88px + env(safe-area-inset-bottom))}
+}
+@media(prefers-reduced-motion:reduce){#villegram .vg-swipe-demo,#villegram .vg-swipe-hint .vg-icon{animation:none!important;transform:none}}

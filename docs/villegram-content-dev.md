@@ -57,3 +57,17 @@ Verificação DEV após a jornada pública: 17 reservas, 18 pagamentos, hash das
 5. Compressão/transcodificação de vídeos, geração de arquivos de vídeo, recepção/moderação de vídeos de hóspedes e recomendação entre dispositivos não foram implementadas. A composição automática de fotos funciona sem gerar arquivos de vídeo.
 
 Esta entrega representa implementação DEV com validação visual parcial; não está homologada para produção.
+
+## Ajuste de navegação e orientação por gesto — 06/10/2026
+
+Após as capturas enviadas pelo proprietário, a navegação móvel do feed e do site convencional foi uniformizada. Os quatro destinos usam os mesmos rótulos e ícones SVG decorativos: reel, chalé, calendário e conta. O CSS dos links deixa de herdar maiúsculas e espaçamento do menu geral. Curtir, comentar e compartilhar também receberam ícones, mantendo os nomes acessíveis.
+
+“Quero estes dias” usa um formato explícito e consistente de botão, com ícone de calendário, contraste, largura disponível inteira e alvo mínimo de 54 px. O vínculo preserva chalé, oferta e datas. A área reservada à barra inferior foi atualizada para comportar ícones e rótulos.
+
+No computador, os controles têm rótulos “Reel anterior” e “Próximo reel”, ícones maiores e alvo mínimo de 156 × 56 px. No celular, permanecem alternativas tocáveis de 48 × 48 px. Os nomes acessíveis correspondem aos rótulos visíveis.
+
+A dica móvel “Arraste para cima” aparece uma vez por sessão, por aproximadamente quatro segundos. Um ícone de mão e um movimento discreto de 18 px ensinam o gesto no reel atual; a dica NÃO navega para outro item. Interação, legenda/painel, fechamento e aba oculta removem a dica. Preferência por movimento reduzido recebe orientação estática.
+
+Validação: 300 testes passaram (quatro novos), checagens JavaScript/TypeScript e build local DEV aprovados. Os testes novos verificam a cascata de estilos com o CSS real do site, os vínculos de reserva, nomes acessíveis, expiração da dica sem avanço, interrupção ao ler e movimento reduzido. Após alinhar os nomes acessíveis dos controles, os quatro testes específicos foram executados novamente.
+
+A tentativa de abrir o navegador nesta continuação foi recusada pela mesma proteção de credenciais: “native credential state cannot be safely resumed”. Não foi possível obter novas capturas ou conferir visualmente estes ajustes. A prévia DEV será disponibilizada com essa limitação explícita; não se declara teste de tela concluído.
