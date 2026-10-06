@@ -187,6 +187,7 @@ async function openFlow(id){
  state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
+ if(state.fastCheckout)$("#summary-content").innerHTML='<p class="loading-state">Confirmando sua escolha…</p>';
  showStep(state.fastCheckout?5:1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
   await generateQuote(false);renderRates();
@@ -414,6 +415,13 @@ function renderSummary(){
  pol.insertAdjacentHTML("beforeend",requiredDocs.map(d=>'<details class="policy-document"><summary>'+esc(d.title)+' · versão '+esc(d.version)+'</summary><p>'+esc(d.body)+'</p><button type="button" class="text-action" data-download-document="'+esc(d.id)+'">Baixar esta versão (.txt)</button></details>').join('')+'<label class="accept-line"><input id="accept-terms" type="checkbox" required><span>Li e aceito os termos de hospedagem e as regras apresentados, e estou ciente da política de privacidade.</span></label>');
  pol.querySelectorAll('[data-download-document]').forEach(b=>b.onclick=()=>downloadPolicyDocument(requiredDocs.find(d=>d.id===b.dataset.downloadDocument)));
  $("#download-cancel-policy").addEventListener("click",()=>downloadPolicyDocument(doc));
+ if(state.fastCheckout){
+  const documentBox=pol.querySelector('.policy-document');
+  const details=document.createElement('details');details.className='policy-document';
+  const summary=document.createElement('summary');summary.textContent=doc.title+' · versão '+doc.version;
+  details.appendChild(summary);while(documentBox.firstChild)details.appendChild(documentBox.firstChild);documentBox.replaceWith(details);
+ }
+
  const pay=$("#payment-options"),terms=state.property.features?.payment_terms||{max_installments:12,no_interest_installments:6};
  const max=Math.min(Number(terms.max_installments),Math.max(1,Math.floor(total/500)));
  const free=terms.interest_payer==="merchant"?max:Math.min(Number(terms.no_interest_installments),max);
@@ -453,7 +461,8 @@ function renderSummary(){
     $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Escolha uma opção de parcelamento disponível para este cartão.";
   });
   const retryPlans=document.createElement("button");retryPlans.type="button";retryPlans.textContent="Consultar parcelas novamente";retryPlans.onclick=refreshPlans;pay.insertBefore(retryPlans,card);
-  if(enabled.card_enabled)refreshPlans();
+  if(enabled.card_enabled&&(!state.fastCheckout||state.session))refreshPlans();
+  else if(state.fastCheckout&&!state.session)$("#installment-total").textContent="Entre na sua conta para consultar as parcelas e finalizar o pagamento.";
   let previousBin="",binTimer;$("#card-number").addEventListener("input",()=>{
    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
    if(bin===previousBin)return;previousBin=bin;state.installmentQuote=null;
@@ -461,7 +470,7 @@ function renderSummary(){
    if(bin.length===6)binTimer=setTimeout(refreshPlans,300);
   });
   const updateMethod=()=>{const isCard=paymentChoice().method==="card";
-    card.hidden=!guarantee&&!isCard;$("#installment-field").hidden=!isCard;retryPlans.hidden=!isCard;
+    card.hidden=(state.fastCheckout&&!state.session)||(!guarantee&&!isCard);$("#installment-field").hidden=!isCard;retryPlans.hidden=!isCard;
     $("#installments").dispatchEvent(new Event("change"));};
   pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",updateMethod));updateMethod();
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
@@ -599,7 +608,7 @@ async function restoreResume(){
  if(state.quote?.expires_at)startCountdown(state.quote.expires_at);showStep(session?4:3);if(session)renderGuestStep();else await renderLoginStep();
 }
 function directCheckoutError(){
- setCheckoutVisible(false);
+ $("#summary-content").innerHTML="";setCheckoutVisible(false);
  document.documentElement.classList.add('direct-checkout');
  $('#direct-checkout-status').hidden=false;
  $('#direct-checkout-status p').textContent='Esta oferta não está mais disponível nas condições escolhidas. Consulte outras opções para continuar.';
@@ -612,7 +621,7 @@ async function openFastCheckout(){
   const step2=$('.checkout-step[data-step="2"]');
   [...step2.children].filter(n=>n.tagName!=='H3').forEach(n=>extras.appendChild(n));
   $('#summary-content').after(extras);
-  const paymentHeading=$('#payment-options').previousElementSibling;
+  const paymentHeading=$('#guarantee-info');
   for(const n of [3,4]){const section=$('.checkout-step[data-step="'+n+'"]');section.classList.remove('checkout-step');section.classList.add('direct-identity');section.hidden=false;final.insertBefore(section,paymentHeading)}
   $('.direct-identity h3').textContent='Identificação da reserva';
  }
