@@ -60,8 +60,8 @@ test('oval countdown tracks a whole photo cycle and freezes during pause, hidden
  w.document.querySelector('[data-action=next]').click();assert.equal(remaining(),0);d.window.close();
 });
 test('video countdown follows actual playback metadata and keeps its ring when toggling pause',async()=>{
- const {d,w,advance}=await setup({media:[{kind:'video',url:'clip.mp4',duration_seconds:20,poster:'cover.webp'}]}),video=w.document.querySelector('video');Object.defineProperty(video,'duration',{value:20});video.currentTime=5;video.dispatchEvent(new w.Event('loadedmetadata'));
- assert.equal(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset,'25');assert.equal(w.document.querySelector('.vg-pause').title,'15 s restantes nesta apresentação');advance(90000);assert.equal(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset,'25');
+ const {d,w,advance}=await setup({media:[{kind:'video',url:'clip.mp4',duration_seconds:20,poster:'cover.webp'}]}),video=w.document.querySelector('video');assert.equal(w.document.querySelector('.vg-time-ring').hasAttribute('hidden'),true);Object.defineProperty(video,'duration',{value:20});video.currentTime=5;video.dispatchEvent(new w.Event('loadedmetadata'));
+ assert.equal(w.document.querySelector('.vg-time-ring').hasAttribute('hidden'),false);assert.equal(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset,'25');assert.equal(w.document.querySelector('.vg-pause').title,'15 s restantes nesta apresentação');advance(90000);assert.equal(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset,'25');
  w.document.querySelector('[data-action=pause]').click();assert.equal(w.document.querySelector('.vg-pause-symbol').textContent,'▶');assert.ok(w.document.querySelector('.vg-time-ring'));d.window.close();
 });
 test('booking header and steps occupy normal document rows with a bounded three-column layout',async()=>{

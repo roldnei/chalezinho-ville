@@ -21,7 +21,7 @@
  function updateRemaining(){
   if(!modal)return;const video=modal.querySelector("video"),total=video?video.duration*1000:sceneCount*photoDuration;
   const elapsed=video?video.currentTime*1000:clockElapsed;const valid=Number.isFinite(total)&&total>0;
-  const ring=modal.querySelector(".vg-time-ring");if(ring)ring.hidden=!valid;
+  const ring=modal.querySelector(".vg-time-ring");if(ring)ring.toggleAttribute('hidden',!valid);
   const remaining=valid?Math.max(0,total-elapsed):0;const line=modal.querySelector(".vg-time-remaining");
   if(line)line.style.strokeDashoffset=String(valid?100-remaining/total*100:0);
   const b=modal.querySelector(".vg-pause");if(b)b.title=valid?Math.ceil(remaining/1000)+" s restantes nesta apresentação":"Controle da apresentação";
