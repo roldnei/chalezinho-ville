@@ -55,11 +55,12 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
         if (!property.available || !offer.property_ids.map(Number).includes(Number(property.id))) continue;
         const groupKey = property.id + ':' + window.nights+':'+(window as Row).category;
         const rows = grouped.get(groupKey) || [];
-        rows.push({offer, property, ...window}); grouped.set(groupKey, rows);
+        const reservations=Array.isArray(input)?input[1]?.data||[]:[];const gap=reservations.some((r:Row)=>r.property_id===property.id&&r.status==='confirmed'&&r.check_out===window.check_in)&&reservations.some((r:Row)=>r.property_id===property.id&&r.status==='confirmed'&&r.check_in===window.check_out);
+        rows.push({offer, property,gap, ...window}); grouped.set(groupKey, rows);
       }
     }
     // Check backup windows too: an inexpensive date can have no preparation capacity.
-    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 4));
+    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 4));
   }
   const cards: Row[] = [];
   const bounded = candidates.slice(0, 60);

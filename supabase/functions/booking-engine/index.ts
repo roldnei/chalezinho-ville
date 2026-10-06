@@ -2103,6 +2103,19 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
+    if(action==="villegram_offer"){
+      if(!development)return json({ok:false,error:'development_only'},403);
+      const data=await stayOffers.catalog(),offer=data.offers.find((o:any)=>o.id===body.offer_id);
+      if(!offer)return json({ok:false,error:'offer_unavailable'},404);
+      try{
+       const list=await searchData(body.check_in,body.check_out,2,null,development),property=list.find((p:any)=>p.code===body.property_code);
+       if(!property?.available)return json({ok:false,error:'dates_unavailable'},409);
+       const q=await createQuote({property_id:property.id,check_in:body.check_in,check_out:body.check_out,guests:2,stay_offer_id:offer.id},development,null,null,list,false,data);
+       const rate=q.rate_options.filter((r:any)=>r.selectable).sort((a:any,b:any)=>a.total_amount_cents-b.total_amount_cents)[0];
+       if(!rate)return json({ok:false,error:'quote_unavailable'},409);
+       return json({ok:true,card:{offer_id:offer.id,offer_name:offer.name,property_id:property.id,property_code:property.code,property_name:property.name,image:offer.villegram?.photos?.find((p:any)=>p.property_id===property.id)?.url||property.cover_image,check_in:body.check_in,check_out:body.check_out,nights:nights(body.check_in,body.check_out),guests:2,rate_code:rate.code,rate_name:rate.name,total_cents:rate.total_amount_cents,gross_cents:rate.contract_snapshot.gross_cents,discount_cents:rate.contract_snapshot.discount_cents,experiences:q.experiences.map((p:any)=>p.composition),category:isCelebration(body.check_in,body.check_out,offer.showcase)?'celebration':'weekday'}});
+      }catch{return json({ok:false,error:'offer_unavailable'},409)}
+    }
     if(action==="stay_showcase"){
       if(!development)return json({ok:false,error:"development_only"},403);
       const cards=await cachedWeekdayShowcase({catalog:()=>stayOffers.catalog(),today:brazilClock().date,sources:searchSources,search:(start:string,end:string,sources:any)=>searchData(start,end,2,null,development,false,sources),quote:(body:any,list:any[],catalog:any)=>createQuote(body,development,null,null,list,false,catalog)});
