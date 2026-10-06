@@ -1850,3 +1850,15 @@ footer{justify-content:space-between!important}
 html.booking-checkout-open{overflow:hidden;scroll-behavior:auto}
 html.booking-checkout-open body{position:fixed;top:var(--booking-scroll-offset,0px);width:100%;overflow:hidden}
 .booking-modal{overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto}
+
+/* Direct checkout preserves the storefront selection without replaying search. */
+.direct-checkout-status {display:none;max-width:680px;margin:60px auto;padding:24px;}
+.direct-checkout .direct-checkout-status {display:block;}
+.direct-checkout .booking-shell,.direct-checkout .booking-progress,.direct-checkout .offer-context {display:none;}
+.direct-checkout .booking-panel {max-width:760px;}
+.direct-checkout .booking-modal {overflow-anchor:none;}
+#direct-extras {border:1px solid #514635;border-radius:16px;padding:20px;margin:24px 0;}
+#direct-extras summary {cursor:pointer;font-weight:600;}
+#direct-extras .experience-carousel {height:160px;}
+.direct-identity {margin:28px 0;}
+.direct-checkout #policy-box .policy-document p {font-size:14px;line-height:1.7;}

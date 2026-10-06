@@ -10,7 +10,7 @@ function downloadPolicyDocument(doc){
  const link=document.createElement("a");link.href=url;link.download=`chalezinho-politica-${String(doc.code||"cancelamento").replace(/[^a-z0-9_-]/gi,"-")}-v${String(doc.version||"").replace(/[^0-9.]/g,"")}.txt`;
  document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
-const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null,installmentQuote:null,offerId:null,preferences:{}};
+const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null,installmentQuote:null,offerId:null,preferences:{},fastCheckout:false,fastUpdating:false};
 const pagbankSandbox=window.CHALEZINHO_CONFIG.environment==="development";
 let anonymousId="",searchSequence=0;
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
@@ -54,7 +54,15 @@ async function init(){
  if(incoming.has("check_in")&&incoming.has("check_out")){
   $("#book-in").value=incoming.get("check_in");$("#book-out").value=incoming.get("check_out");$("#book-guests").value=incoming.get("guests")||"2";
   await search({scroll:incoming.get("from")!=="showcase"});
-  if(incoming.get("from")==="showcase"){const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);if(rate)$("#rate-options").querySelector(`[data-option="${rate.quote_option_id}"]`)?.click()}}
+  if(incoming.get("from")==="showcase"){
+   state.fastCheckout=true;
+   const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);
+   if(incoming.has("stay_offer")&&state.offerId!==incoming.get("stay_offer")){directCheckoutError();return}
+   if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);
+    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout()}
+    else directCheckoutError();
+   }else directCheckoutError();
+  }
  }else{await restoreResume();await restoreSameDay()}
 }
 async function initChaletFilter(){
@@ -111,7 +119,7 @@ async function closeCheckout(){
  if($("#booking-results").classList.contains("booking-results-hidden")&&state.search)await search();
 }
 function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
-function error(t){$("#booking-error").textContent=t}
+function error(t){$("#booking-error").textContent=t;if(document.documentElement.classList.contains("direct-checkout"))$("#direct-checkout-status p").textContent=t}
 function setFlowError(t){$("#checkout-error").textContent=t}
 
 async function search({scroll=true}={}){
@@ -179,7 +187,7 @@ async function openFlow(id){
  state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
- showStep(1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
+ showStep(state.fastCheckout?5:1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
   await generateQuote(false);renderRates();
  }catch(e){
@@ -193,7 +201,7 @@ function showStep(n){
  $("#checkout-stay-mode").disabled=n===6;renderOfferContext();
  setFlowError("");
  $("#checkout-panel").dataset.step=String(n);$$(".checkout-step").forEach(x=>x.hidden=Number(x.dataset.step)!==n);$$(".progress-dot").forEach(x=>x.classList.toggle("active",Number(x.dataset.dot)<=Math.min(n,5)));
- $("#step-back").hidden=n===1||n===6;$("#step-next").hidden=n===6;
+ $("#step-back").hidden=state.fastCheckout||n===1||n===6;$("#step-next").hidden=n===6;
  $("#step-next").textContent=n===5?(pagbankSandbox?"Ir para pagamento de teste":"Iniciar pagamento de teste"):"Continuar";
 }
 async function generateQuote(withExperiences){
@@ -273,9 +281,9 @@ function bindExperienceControls(){
    for(const p of selectedProducts()) if(p.package_type===product.package_type) delete state.selectedByProduct[p.id];
    state.selectedByProduct[product.id]=b.dataset.variant;state.upsellHandled=false;
    track("experience_added",{property_id:state.property?.id||null,metadata:{source:"booking",product_id:product.id,amount_cents:Number(product.price_cents||0)}});
-   renderExperienceList($("#trip-purpose-initial").value);renderOfferChoices();
+   renderExperienceList($("#trip-purpose-initial").value);renderOfferChoices();if(state.fastCheckout)updateFastQuote();
  }));
- $$("[data-remove]").forEach(b=>b.addEventListener("click",()=>{delete state.selectedByProduct[b.dataset.remove];state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value);renderOfferChoices()}));
+ $$("[data-remove]").forEach(b=>b.addEventListener("click",()=>{delete state.selectedByProduct[b.dataset.remove];state.upsellHandled=false;renderExperienceList($("#trip-purpose-initial").value);renderOfferChoices();if(state.fastCheckout)updateFastQuote()}));
 }
 async function serverUpsellPreview(){
  try{
@@ -381,7 +389,7 @@ async function next(){
   catch{setFlowError("Não foi possível conferir seus dados agora. Tente novamente.");return}
   showStep(4);renderGuestStep();return}
  if(step===4){if(!validateGuest())return;try{await checkPaymentIdentity()}catch(e){setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:"Não foi possível conferir o documento para pagamento. Tente novamente.");return}showStep(5);renderSummary();return}
- if(step===5){await maybeOfferUpsell()}
+ if(step===5){if(state.fastCheckout){await payFastCheckout();return}await maybeOfferUpsell()}
 }
 async function renderLoginStep(){
  const {data:{session}}=await sb.auth.getSession();state.session=session;const box=$("#login-state");
@@ -568,19 +576,82 @@ function startCountdown(exp){
  tick();window.__quoteTimer=setInterval(tick,1000);
 }
 function saveResume(){
- sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({reopen:true,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||""}));
+ sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({reopen:true,fastCheckout:state.fastCheckout,guestName:$("#guest-name").value,guestPhone:$("#guest-phone").value,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||""}));
 }
 async function restoreResume(){
  let saved=null;try{saved=JSON.parse(sessionStorage.getItem("chalezinho_booking_resume")||"null")}catch{}
  if(!saved)return;sessionStorage.removeItem("chalezinho_booking_resume");
  const resumeQuery=new URLSearchParams(location.search);if(resumeQuery.get("resume")!=="1"&&((resumeQuery.get("mode")==="stay"&&saved.offerId)||(resumeQuery.has("stay_offer")&&resumeQuery.get("stay_offer")!==saved.offerId)))return;
- state.offerId=saved.offerId||null;state.preferences=saved.preferences||{};syncStayModes();
+ state.fastCheckout=!!saved.fastCheckout;state.offerId=saved.offerId||null;state.preferences=saved.preferences||{};syncStayModes();
  $("#book-in").value=saved.check_in||"";$("#book-out").value=saved.check_out||"";$("#book-guests").value=saved.guests||"2";state.property=saved.property;state.selectedByProduct=saved.selectedByProduct||{};state.quote=saved.quote;state.rateCode=saved.rateCode;
  state.rate=state.quote?.rate_options?.find(x=>x.code===state.rateCode&&x.selectable)||null;
  const {data:{session}}=await sb.auth.getSession();state.session=session;
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=saved.check_in.split("-").reverse().join("/")+" a "+saved.check_out.split("-").reverse().join("/");
+ if(state.fastCheckout){
+  document.documentElement.classList.add('direct-checkout');
+  $('#guest-name').value=saved.guestName||'';$('#guest-phone').value=saved.guestPhone||'';
+  if(!state.quote||Date.parse(state.quote.expires_at)<=Date.now()){
+   try{await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===state.rateCode&&r.selectable)||null}catch{directCheckoutError();return}
+  }
+  if(!state.rate){directCheckoutError();return}await openFastCheckout();return;
+ }
  if(!state.quote||Date.parse(state.quote.expires_at)<=Date.now()){showStep(1);try{await generateQuote(true);renderRates()}catch(e){setFlowError("Consulte novamente a disponibilidade para continuar.")}return;}
  if(state.quote?.expires_at)startCountdown(state.quote.expires_at);showStep(session?4:3);if(session)renderGuestStep();else await renderLoginStep();
+}
+function directCheckoutError(){
+ setCheckoutVisible(false);
+ document.documentElement.classList.add('direct-checkout');
+ $('#direct-checkout-status').hidden=false;
+ $('#direct-checkout-status p').textContent='Esta oferta não está mais disponível nas condições escolhidas. Consulte outras opções para continuar.';
+}
+async function openFastCheckout(){
+ document.documentElement.classList.add('direct-checkout');$('#direct-checkout-status').hidden=true;
+ const final=$('.checkout-step[data-step="5"]');final.querySelector('h3').textContent='Finalize sua reserva';
+ if(!$('#direct-extras')){
+  const extras=document.createElement('details');extras.id='direct-extras';extras.innerHTML='<summary>Adicionar algo à estadia (opcional)</summary><p>Itens já incluídos no pacote não são oferecidos novamente.</p>';
+  const step2=$('.checkout-step[data-step="2"]');
+  [...step2.children].filter(n=>n.tagName!=='H3').forEach(n=>extras.appendChild(n));
+  $('#summary-content').after(extras);
+  const paymentHeading=$('#payment-options').previousElementSibling;
+  for(const n of [3,4]){const section=$('.checkout-step[data-step="'+n+'"]');section.classList.remove('checkout-step');section.classList.add('direct-identity');section.hidden=false;final.insertBefore(section,paymentHeading)}
+  $('.direct-identity h3').textContent='Identificação da reserva';
+ }
+ showStep(5);renderSummary();renderExperienceStep();
+ // Package preferences are visible even when optional extras stay collapsed.
+ $('#direct-extras').before($('#offer-choices'));
+ await renderLoginStep();renderGuestStep();
+ $('.direct-identity + .direct-identity').hidden=!state.session;
+ $('#step-next').textContent=state.session?'Ir para pagamento de teste':'Entrar para finalizar';
+ track('checkout_started',{property_id:state.property.id,metadata:{source:'direct',rate_code:state.rateCode,total_cents:Number(state.rate.total_amount_cents)}});
+}
+async function updateFastQuote(){
+ if(state.fastUpdating)return;
+ state.fastUpdating=true;$('#step-next').disabled=true;
+ const controls=$$('#direct-extras button, #offer-choices select');controls.forEach(b=>b.disabled=true);
+ try{await refreshQuoteAfterExperiences();if(!state.rate)throw new Error('tariff_unavailable');renderSummary();setFlowError('Reserva atualizada. Confira o total e aceite os termos antes de pagar.')}
+ catch(e){state.rate=null;setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar esta escolha. Remova o adicional ou consulte outras opções.');}
+ finally{state.fastUpdating=false;controls.forEach(b=>b.disabled=false);$('#step-next').disabled=!state.rate;}
+}
+function redirectIdentity(mode){saveResume();location.href='auth.html?mode='+mode+'&return='+encodeURIComponent('reservar.html?resume=1'+(pagbankSandbox?'&pagbank=sandbox':''))}
+async function payFastCheckout(){
+ if(state.fastUpdating||!state.rate)return;
+ if(!validExperienceChoices()){setFlowError('Escolha as preferências dos itens do pacote antes de continuar.');return}
+ if(!state.session){redirectIdentity('login');return}
+ if(!validateGuest())return;
+ $('#step-next').disabled=true;
+ try{
+  const identity=await api('identity_status');
+  if(!identity.complete){redirectIdentity('identify');return}
+  if(!identity.payment_eligible){setFlowError(cpfPaymentMessage);return}
+  if(Date.parse(state.quote.expires_at)<=Date.now()){
+   const code=state.rateCode;await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===code&&r.selectable)||null;
+   if(!state.rate){directCheckoutError();return}
+   renderSummary();setFlowError('O prazo da cotação terminou. Confira o valor atualizado e aceite novamente os termos para pagar.');return;
+  }
+  await refreshQuoteAfterExperiences();if(!state.rate){directCheckoutError();return}
+  state.upsellHandled=true;await maybeOfferUpsell();
+ }catch(e){setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar a reserva agora. Tente novamente.')}
+ finally{$('#step-next').disabled=false}
 }
 function selectedOffer(){return (state.config?.stay_offers||[]).find(o=>o.id===state.offerId)||null}
 function initStayModes(){
@@ -602,8 +673,8 @@ function renderOfferContext(){const node=$('#checkout-offer-context');if(node)no
 function renderOfferChoices(){
  let node=$('#offer-choices');if(!node){node=document.createElement('div');node.id='offer-choices';$('#experience-options').before(node)}
  const products=[...new Set([...(selectedOffer()?.product_ids||[]),...Object.keys(state.selectedByProduct)])].map(id=>(state.config.experience_products||[]).find(p=>p.id===id)).filter(Boolean);
- node.innerHTML=(state.rate?window.VilleOffers.contractMarkup(state.rate.contract_snapshot):'')+'<div class="offer-choice-fields">'+products.flatMap(p=>window.VilleOffers.components(p).filter(c=>c.choices?.length).map((c,i)=>'<label>'+esc(c.name)+' · '+esc(p.name)+'<select data-product="'+p.id+'" data-component="'+esc(c.name)+'" required><option value="">Escolha uma opção</option>'+c.choices.map(choice=>'<option '+(state.preferences[p.id]?.[c.name]===choice?'selected':'')+'>'+esc(choice)+'</option>').join('')+'</select></label>')).join('')+'</div>';
- node.querySelectorAll('select').forEach(select=>select.onchange=()=>{state.preferences[select.dataset.product]??={};state.preferences[select.dataset.product][select.dataset.component]=select.value;persistSelection()});
+ node.innerHTML=(!state.fastCheckout&&state.rate?window.VilleOffers.contractMarkup(state.rate.contract_snapshot):'')+'<div class="offer-choice-fields">'+products.flatMap(p=>window.VilleOffers.components(p).filter(c=>c.choices?.length).map((c,i)=>'<label>'+esc(c.name)+' · '+esc(p.name)+'<select data-product="'+p.id+'" data-component="'+esc(c.name)+'" required><option value="">Escolha uma opção</option>'+c.choices.map(choice=>'<option '+(state.preferences[p.id]?.[c.name]===choice?'selected':'')+'>'+esc(choice)+'</option>').join('')+'</select></label>')).join('')+'</div>';
+ node.querySelectorAll('select').forEach(select=>select.onchange=()=>{state.preferences[select.dataset.product]??={};state.preferences[select.dataset.product][select.dataset.component]=select.value;persistSelection();if(state.fastCheckout)updateFastQuote()});
 }
 function validExperienceChoices(){const ids=[...(selectedOffer()?.product_ids||[]),...Object.keys(state.selectedByProduct)];return ids.every(id=>window.VilleOffers.components((state.config.experience_products||[]).find(p=>p.id===id)||{}).every(c=>!c.choices?.length||c.choices.includes(state.preferences[id]?.[c.name])))}
 init();
