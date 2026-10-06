@@ -80,3 +80,12 @@ O CTA usa margens simétricas; a margem da coluna social afeta somente os textos
 O contorno oval da pausa mostra o tempo restante do ciclo completo das fotos (6,5 s por foto) ou a duração real do vídeo. Pausas, leitura e aba oculta congelam o relógio; retomar preserva o tempo restante. O ciclo nunca muda o reel automaticamente. Quatro novos testes verificam o layout, os controles sociais, o relógio das fotos e o relógio do vídeo.
 
 A abertura da prévia no navegador continua bloqueada: “Browser observation is unavailable because native credential state cannot be safely resumed. Start a new browser runtime to continue.” Portanto estes ajustes ainda não têm validação visual nem novas capturas de tela.
+
+
+## Contador durante a consulta de ofertas — 6 de outubro de 2026
+
+O feed inicial contém seis publicações; três ofertas elegíveis podem chegar depois da consulta de preços. Antes, o total era atualizado internamente sem atualizar o contador do reel já aberto. O primeiro permanecia “1 de 6” e só ao avançar aparecia “2 de 9”.
+
+Agora o total fica oculto enquanto a consulta está pendente (“Reel 1”). Ao receber as ofertas, contador e setas são atualizados no próprio reel, preservando mídia, relógio, pausa, rolagem e painéis abertos. O conteúdo atual e o histórico não mudam de ordem. Dois testes reproduzem a chegada tardia das ofertas com leitura aberta e a atualização dos limites das setas.
+
+O navegador continua recusando observação devido ao estado protegido de credenciais. Estes ajustes não têm novas capturas ou validação visual; os testes usam DOM e serviço simulado.
