@@ -19,8 +19,8 @@ test('reel keeps contract links, escapes comments and cleans lifecycle on close'
  swipe('.vg-primary',300,100);assert.match(w.document.querySelector('footer').textContent,/1 de 2/,'reserve button must not swipe');
  const surface=w.document.querySelector('.vg-content');
  surface.dispatchEvent(new w.MouseEvent('pointerdown',{bubbles:true,clientX:100,clientY:500}));surface.dispatchEvent(new w.MouseEvent('pointermove',{bubbles:true,clientX:100,clientY:460}));
- assert.equal(surface.style.transform,'','controls container must remain still during drag');assert.match(w.document.querySelector('.vg-visual').style.transform,/translateY/,'only the photos follow the gesture');
- surface.dispatchEvent(new w.MouseEvent('pointercancel',{bubbles:true}));assert.equal(w.document.querySelector('.vg-visual').style.transform,'');
+ assert.equal(surface.style.transform,'','controls container must remain still during drag');assert.equal(w.document.querySelector('.vg-controls').closest('.vg-reel'),null,'social controls stay outside the moving reel');assert.ok(w.document.querySelector('.vg-reel .vg-price'),'price belongs to the moving reel');assert.match(w.document.querySelector('.vg-reel').style.transform,/translateY/,'photo and offer follow the gesture as one reel');
+ surface.dispatchEvent(new w.MouseEvent('pointercancel',{bubbles:true}));assert.equal(w.document.querySelector('.vg-reel').style.transform,'');
  swipe('.vg-purchase',500,250);assert.match(w.document.querySelector('footer').textContent,/2 de 2/,'swipe across overlay advances');
  swipe('.vg-content',250,500);assert.match(w.document.querySelector('footer').textContent,/1 de 2/,'swipe down returns');
  const touch=(selector,from,to)=>{const el=w.document.querySelector(selector);for(const [type,y] of [['touchstart',from],['touchend',to]]){const e=new w.Event(type,{bubbles:true});Object.defineProperty(e,type==='touchstart'?'touches':'changedTouches',{value:[{clientX:100,clientY:y}]});el.dispatchEvent(e)}};

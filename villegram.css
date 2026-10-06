@@ -10,3 +10,11 @@
 #villegram .vg-picture,#villegram .vg-purchase>:not(details){touch-action:none}
 
 #villegram .vg-visual{position:absolute;inset:0;will-change:transform}
+
+/* The experience moves as one reel; social actions stay outside that moving layer. */
+#villegram .vg-reel{position:absolute;inset:0;will-change:transform}
+#villegram .vg-purchase{bottom:128px;max-height:calc(100dvh - 210px)}
+#villegram .vg-controls{position:absolute;z-index:2;bottom:68px;left:50%;transform:translateX(-50%);width:min(600px,100%);padding:0 24px}
+#villegram .vg-controls .vg-social{margin-top:0}
+@media(max-width:700px){#villegram .vg-controls{padding:0 20px}}
+@media(max-height:700px){#villegram .vg-controls{bottom:60px}#villegram .vg-purchase{bottom:120px}}
