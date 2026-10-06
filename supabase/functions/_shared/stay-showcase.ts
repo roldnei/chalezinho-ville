@@ -1,3 +1,4 @@
+import {offerIssues} from './stay-offers.ts';
 // Verified against Portaria MGI 11.460/2025, calendar 2026. Local dates belong in PMS.
 const nationalHolidays2026=['2026-01-01','2026-04-03','2026-04-21','2026-05-01','2026-09-07','2026-10-12','2026-11-02','2026-11-15','2026-11-20','2026-12-25'];
 type Row = Record<string, any>;
@@ -43,7 +44,7 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
   const data = await catalog();
   const offers = data.offers.filter((o: Row) => o.status === 'active' && o.showcase?.enabled).slice(0, 10);
   const checked_at = new Date().toISOString();
-  if (!offers.length) return {cards: [], checked_at};
+  if (!offers.length) return {cards: [], offers: [], properties: [], checked_at};
   const horizon = Math.max(...offers.map((o: Row) => showcaseSettings(o.showcase).horizon_days));
   const input = await sources(shift(today, 1), shift(today, horizon + 8));
   const candidates: Row[] = [];
@@ -94,5 +95,7 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
   while (selected.length < 18 && [...groups.values()].some(rows => rows.length)) {
     for (const rows of groups.values()) { if (rows.length && selected.length < 18) selected.push(rows.shift()!); }
   }
-  return {cards: selected, checked_at, horizon_days: horizon};
+  const publicOffers=data.offers.map((o:Row)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products||[],id)])),packages:(data.products||[]).filter((p:Row)=>o.product_ids?.includes(p.id))}));
+  const properties=(Array.isArray(input)?input[0]?.data||[]:[]).map((p:Row)=>({id:p.id,code:p.code,name:p.name,cover_image:p.cover_image,gallery:p.gallery||[]}));
+  return {cards: selected,offers:publicOffers,properties, checked_at, horizon_days: horizon};
 }

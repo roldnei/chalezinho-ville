@@ -4,6 +4,7 @@ import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.
 import {publicProperty} from "../_shared/public-property.ts";
 import {offerIssues,priceStayOffer,compositionSnapshot,experienceComponents} from "../_shared/stay-offers.ts";
 import {cachedWeekdayShowcase} from "../_shared/stay-showcase.ts";
+import {persistentShowcase,showcaseCacheKey} from "../_shared/showcase-cache.ts";
 import {stayOfferService} from "../_shared/stay-offer-service.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
 import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
@@ -281,7 +282,19 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
   });
 }
 
-async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null,persist=true,offerCatalog:any=null){
+// One read snapshot per merchandising batch; actual checkout never uses this context.
+async function showcaseQuoteContext(catalog:any,development:boolean){
+ const ids=[...new Set(catalog.products.flatMap((p:any)=>(p.experience_variants||[]).map((v:any)=>v.id)))];
+ const [variants,eligible,plans,policies]=await Promise.all([
+  admin.from("experience_variants").select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,daily_capacity,inventory,package_type,price_cents,upsell_enabled,details)").in("id",ids),
+  admin.from("experience_property_eligibility").select("product_id,property_id"),
+  admin.from("rate_plans").select("id,code,name,multiplier_bps,selectable,cancellation_policy_id,policy_documents(id,title,body,version,code)").eq("active",true).order("display_order"),
+  development?developmentPolicies():Promise.resolve([])
+ ]);
+ if(variants.error||eligible.error)throw Error("experience_lookup_failed");if(plans.error)throw Error("rate_plan_failed");
+ return {variants:variants.data||[],eligible:eligible.data||[],plans:plans.data||[],policies};
+}
+async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null,persist=true,offerCatalog:any=null,readContext:any=null){
   const {property_id,check_in,check_out,guests}=body||{};
   let experience_variant_ids=Array.isArray(body.experience_variant_ids)?[...new Set(body.experience_variant_ids)]:[];
   let offer:any=null;
@@ -310,13 +323,13 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   let experienceTotal=0;
   const expSnapshots:any[]=[];
   if(Array.isArray(experience_variant_ids)&&experience_variant_ids.length){
-    const {data:variants,error}=await admin.from("experience_variants")
+    const {data:variants,error}=!persist&&readContext?{data:readContext.variants.filter((v:any)=>experience_variant_ids.includes(v.id)),error:null}:await admin.from("experience_variants")
       .select("id,code,name,price_cents,active,product_id,experience_products!inner(id,code,name,status,minimum_lead_hours,daily_capacity,inventory,package_type,price_cents,upsell_enabled,details)")
       .in("id",experience_variant_ids);
     if(error) throw new Error("experience_lookup_failed");
     if(variants?.length!==experience_variant_ids.length)throw Error("experience_unavailable");
     const productIds=[...new Set((variants||[]).map((v:any)=>v.product_id))];
-    const {data:eligibleRows}=await admin.from("experience_property_eligibility").select("product_id").eq("property_id",property.id).in("product_id",productIds);
+    const {data:eligibleRows}=!persist&&readContext?{data:readContext.eligible.filter((r:any)=>Number(r.property_id)===Number(property.id)&&productIds.includes(r.product_id))}:await admin.from("experience_property_eligibility").select("product_id").eq("property_id",property.id).in("product_id",productIds);
     const eligible=new Set((eligibleRows||[]).map((x:any)=>String(x.product_id)));
     const seenPackageTypes=new Set<string>();
     const seenComponents=new Set<string>();
@@ -365,11 +378,11 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     if(error) throw new Error("quote_experience_failed");
   }
 
-  const {data:plans,error:ple}=await admin.from("rate_plans")
+  const {data:plans,error:ple}=!persist&&readContext?{data:readContext.plans,error:null}:await admin.from("rate_plans")
     .select("id,code,name,multiplier_bps,selectable,cancellation_policy_id,policy_documents(id,title,body,version,code)")
     .eq("active",true).order("display_order");
   if(ple) throw new Error("rate_plan_failed");
-  const policyAssignments=development?await developmentPolicies():[];
+  const policyAssignments=!persist&&readContext?readContext.policies:development?await developmentPolicies():[];
 
   const inserted:any[]=[];
   const display:any[]=[];
@@ -2118,8 +2131,13 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     }
     if(action==="stay_showcase"){
       if(!development)return json({ok:false,error:"development_only"},403);
-      const cards=await cachedWeekdayShowcase({catalog:()=>stayOffers.catalog(),today:brazilClock().date,sources:searchSources,search:(start:string,end:string,sources:any)=>searchData(start,end,2,null,development,false,sources),quote:(body:any,list:any[],catalog:any)=>createQuote(body,development,null,null,list,false,catalog)});
-      return json({ok:true,...cards});
+      const started=performance.now();
+      const catalog=await stayOffers.catalog(),today=brazilClock().date,key=await showcaseCacheKey(today,catalog),catalogMs=performance.now()-started;
+      let context:Promise<any>|null=null;
+      const build=()=>cachedWeekdayShowcase({catalog:async()=>catalog,today,sources:searchSources,search:(start:string,end:string,sources:any)=>searchData(start,end,2,null,development,false,sources),quote:async(body:any,list:any[],catalog:any)=>{context ||= showcaseQuoteContext(catalog,development);return createQuote(body,development,null,null,list,false,catalog,await context)}});
+      const runtime=(globalThis as any).EdgeRuntime;
+      const cards=await persistentShowcase({admin,key,build,background:runtime?.waitUntil?(work:Promise<any>)=>runtime.waitUntil(work):null});
+      const response=json({ok:true,...cards});response.headers.set("Server-Timing",`catalog;dur=${catalogMs.toFixed(1)},showcase;dur=${(performance.now()-started).toFixed(1)}`);return response;
     }
     if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
     if(action==="villegram")return await villegram(req,body,development);

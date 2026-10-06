@@ -9,6 +9,7 @@
  async function boot(){
   const version=++bootVersion;
   if(!document.querySelector('.hero,[data-property-code],#property-detail'))return;
+  if(document.querySelector('.hero')&&!document.querySelector('main[data-property-code],#property-detail')&&window.VilleShowcase){await window.VilleShowcase.load([]);return}
   try{
    const res=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_offers',{cache:'no-store',headers:{'X-Chalezinho-Env':'development'}});
    if(!res.ok)throw Error("offer_catalog_unavailable");const {offers=[]}=await res.json();
