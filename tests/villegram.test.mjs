@@ -21,8 +21,8 @@ test('reel keeps contract links, escapes comments and cleans lifecycle on close'
  swipe('.vg-content',250,500);assert.match(w.document.querySelector('footer').textContent,/1 de 2/,'swipe down returns');
  const touch=(selector,from,to)=>{const el=w.document.querySelector(selector);for(const [type,y] of [['touchstart',from],['touchend',to]]){const e=new w.Event(type,{bubbles:true});Object.defineProperty(e,type==='touchstart'?'touches':'changedTouches',{value:[{clientX:100,clientY:y}]});el.dispatchEvent(e)}};
  touch('summary',500,200);assert.match(w.document.querySelector('footer').textContent,/1 de 2/,'reading controls must not change reel');
- touch('.vg-content',500,200);assert.match(w.document.querySelector('footer').textContent,/2 de 2/,'touch scroll gesture advances without pointer capture');
- touch('.vg-content',200,500);assert.match(w.document.querySelector('footer').textContent,/1 de 2/);
+ touch('.vg-content',500,455);assert.match(w.document.querySelector('footer').textContent,/2 de 2/,'touch scroll gesture advances without pointer capture');
+ touch('.vg-content',455,500);assert.match(w.document.querySelector('footer').textContent,/1 de 2/);
  w.document.querySelector('.vg-content').dispatchEvent(new w.WheelEvent('wheel',{deltaY:150,bubbles:true,cancelable:true}));assert.match(w.document.querySelector('footer').textContent,/2 de 2/);
  w.Villegram.close();assert.equal(w.document.querySelector('#villegram'),null);assert.equal(w.document.documentElement.style.overflow,'');dom.window.close();
 });

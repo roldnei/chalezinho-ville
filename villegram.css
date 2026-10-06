@@ -5,3 +5,6 @@
 
 /* Vertical native scrolling remains available inside reading panels. */
 #villegram .vg-content{touch-action:pan-y}
+
+/* Photo and non-reading overlays own the vertical gesture from the first touch. */
+#villegram .vg-picture,#villegram .vg-purchase>:not(details){touch-action:none}

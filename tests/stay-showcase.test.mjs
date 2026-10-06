@@ -48,3 +48,15 @@ test('storefront preview never persists quote rows or enables payments',async()=
  assert.match(engine,/createQuote\(body,development,null,null,list,false,catalog,await context\)/);
  assert.match(engine,/if\(persist&&expSnapshots.length\)/);assert.match(engine,/if\(persist&&inserted.length\)/);
 });
+
+test('first visit reserves storefront space and consumes the early request without a second fetch',async()=>{
+ const dom=new JSDOM('<main><section class="hero"></section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;
+ try{
+  w.VilleOffers={esc:s=>String(s),label:c=>c.name};w.CHALEZINHO_CONFIG={bookingEngine:'https://api',environment:'development'};
+  let finish;w.VilleShowcasePrefetch=new Promise(resolve=>finish=resolve);w.fetch=()=>{throw Error('duplicate request')};
+  w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));const loading=w.VilleShowcase.load([]);
+  assert.equal(w.document.querySelector('.showcase-track').getAttribute('aria-busy'),'true');assert.equal(w.document.querySelectorAll('.showcase-placeholder').length,3);
+  finish({ok:true,json:async()=>({ok:true,cards:[],offers:[],checked_at:new Date().toISOString()})});await loading;
+  assert.equal(w.document.querySelector('.showcase-track').getAttribute('aria-busy'),'false');assert.equal(w.document.querySelectorAll('.showcase-placeholder').length,0);
+ }finally{w.close()}
+});

@@ -29,12 +29,13 @@
  const interactive=e=>e.target.closest('a,button,details,input,textarea,.vg-sheet');
  content.onpointerdown=e=>{if(e.pointerType==='touch')return;if(!interactive(e)&&e.isPrimary!==false)gesture={x:e.clientX,y:e.clientY,id:e.pointerId}};
  content.onpointermove=e=>{if(!gesture||gesture.id!==e.pointerId)return;const dy=e.clientY-gesture.y,dx=e.clientX-gesture.x;if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){content.setPointerCapture?.(e.pointerId);if(!reduced.matches)content.style.transform='translateY('+Math.max(-100,Math.min(100,dy*.35))+'px)'}};
- content.onpointerup=e=>{if(!gesture)return;const dy=e.clientY-gesture.y,dx=e.clientX-gesture.x;gesture=null;content.style.transform='';if(Math.abs(dy)>65&&Math.abs(dy)>Math.abs(dx)*1.2)navigate(dy<0?1:-1)};
+ content.onpointerup=e=>{if(!gesture)return;const dy=e.clientY-gesture.y,dx=e.clientX-gesture.x;gesture=null;content.style.transform='';if(Math.abs(dy)>40&&Math.abs(dy)>Math.abs(dx)*1.2)navigate(dy<0?1:-1)};
  content.onpointercancel=()=>{gesture=null;content.style.transform=''};
  let touchGesture=null;
  content.addEventListener('touchstart',e=>{touchGesture=!interactive(e)&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null},{passive:true});
- content.addEventListener('touchend',e=>{if(!touchGesture)return;const start=touchGesture;touchGesture=null;const t=e.changedTouches[0];if(!t)return;const dy=t.clientY-start.y,dx=t.clientX-start.x;if(Math.abs(dy)>65&&Math.abs(dy)>Math.abs(dx)*1.2)navigate(dy<0?1:-1)},{passive:true});
- content.addEventListener('touchcancel',()=>{touchGesture=null},{passive:true});
+ content.addEventListener('touchmove',e=>{if(!touchGesture||e.touches.length!==1)return;const dy=e.touches[0].clientY-touchGesture.y,dx=e.touches[0].clientX-touchGesture.x;if(Math.abs(dy)>6&&Math.abs(dy)>Math.abs(dx)){if(e.cancelable)e.preventDefault();if(!reduced.matches)content.style.transform='translateY('+Math.max(-100,Math.min(100,dy*.35))+'px)'}},{passive:false});
+ content.addEventListener('touchend',e=>{if(!touchGesture)return;const start=touchGesture;touchGesture=null;content.style.transform='';const t=e.changedTouches[0];if(!t)return;const dy=t.clientY-start.y,dx=t.clientX-start.x;if(Math.abs(dy)>40&&Math.abs(dy)>Math.abs(dx)*1.2)navigate(dy<0?1:-1)},{passive:true});
+ content.addEventListener('touchcancel',()=>{touchGesture=null;content.style.transform=''},{passive:true});
  content.addEventListener('wheel',e=>{if(interactive(e)||!modal.querySelector('.vg-sheet').hidden)return;e.preventDefault();const now=Date.now();if(now<wheelLockedUntil)return;if(now-wheelAt>250)wheelTotal=0;if(now-wheelAt<700&&wheelTotal===Infinity)return;wheelAt=now;wheelTotal+=e.deltaY;if(Math.abs(wheelTotal)>80){wheelLockedUntil=now+800;navigate(wheelTotal>0?1:-1);wheelTotal=Infinity}},{passive:false});
  modal.querySelectorAll('.vg-scene img').forEach(img=>{const orient=()=>{img.classList.toggle('vg-wide',img.naturalWidth>img.naturalHeight);img.parentElement.style.backgroundImage='url("'+img.currentSrc+'")'};img.onload=orient;if(img.complete&&img.naturalWidth)orient()});
  if(swipeDirection&&!reduced.matches){content.style.setProperty('--vg-enter-offset',swipeDirection>0?'100%':'-100%');content.classList.add('vg-enter')}swipeDirection=0;
