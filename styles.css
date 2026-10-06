@@ -1883,3 +1883,7 @@ html.booking-checkout-open body{position:fixed;top:var(--booking-scroll-offset,0
 .booking-shell>.reservation-steps span:first-child {color:#fff;font-weight:600;}
 .booking-results-screen .booking-shell>.reservation-steps span {color:#c5b59a;font-weight:400;}
 .booking-results-screen .booking-shell>.reservation-steps span:nth-child(2),.booking-panel[data-step="2"] .reservation-steps span:nth-child(2),.booking-panel[data-step="5"] .reservation-steps span:nth-child(3) {color:#fff;font-weight:600;}
+
+.review-purpose{display:grid;gap:8px;margin-bottom:24px}.review-purpose select{width:100%;padding:14px;font:inherit}.direct-checkout .review-purpose{display:none}
+
+.booking-dates-arrival .booking-intro,.booking-dates-arrival .booking-search,.booking-dates-arrival .booking-confidence{display:none}.booking-dates-arrival #booking-results{display:block!important}.booking-dates-arrival #booking-list:empty::before{content:"Consultando estadias para suas datas…"}

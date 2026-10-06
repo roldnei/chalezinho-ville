@@ -49,7 +49,7 @@ async function init(){
  await initChaletFilter();
  initStayModes();
  initTripPurpose();
- $("#change-dates").onclick=()=>document.body.classList.remove("booking-results-screen");
+ $("#change-dates").onclick=()=>{document.body.classList.remove("booking-results-screen");document.documentElement.classList.remove("booking-dates-arrival")};
  window.addEventListener("beforeunload",()=>{if(state.property&&!$("#checkout-modal").hidden&&Number($("#checkout-panel").dataset.step)<6)saveResume()});
  renderDevBanner();
  const incoming=new URLSearchParams(location.search);
@@ -79,7 +79,7 @@ async function initChaletFilter(){
  select.value=[...select.options].some(o=>o.value===requested)?requested:"";
  select.addEventListener("change",async()=>{
   const url=new URL(location.href);if(select.value)url.searchParams.set("chalet",select.value);else url.searchParams.delete("chalet");history.replaceState(null,"",url);
-  refreshStayOptions();persistSelection();if(state.search)await search();
+  refreshStayOptions();persistSelection();
  });
 }
 function setCheckoutVisible(visible){
@@ -122,7 +122,7 @@ async function closeCheckout(){
  if($("#booking-results").classList.contains("booking-results-hidden")&&state.search)await search();
 }
 function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
-function error(t){$("#booking-error").textContent=t;if(document.documentElement.classList.contains("direct-checkout"))$("#direct-checkout-status p").textContent=t}
+function error(t){$("#booking-error").textContent=t;if(t&&!state.search&&document.documentElement.classList.contains("booking-dates-arrival"))$("#booking-list").textContent=t;if(document.documentElement.classList.contains("direct-checkout"))$("#direct-checkout-status p").textContent=t}
 function setFlowError(t){$("#checkout-error").textContent=t}
 
 async function search({scroll=true}={}){
@@ -130,7 +130,8 @@ async function search({scroll=true}={}){
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
  if(!bi||!bo||bo<=bi)return error("Escolha datas válidas.");
  error("Consultando disponibilidade e valores...");
- $("#booking-results").classList.add("booking-results-hidden");
+ document.body.classList.add("booking-results-screen");$("#booking-results").classList.remove("booking-results-hidden");
+ $("#booking-period").textContent=bi.split('-').reverse().join('/')+' → '+bo.split('-').reverse().join('/');$('#availability-count').textContent='Consultando disponibilidade…';$('#booking-list').innerHTML='<p role="status">Buscando estadias para suas datas…</p>';
  track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
@@ -141,7 +142,7 @@ async function search({scroll=true}={}){
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
   state.search=d.listings;document.body.classList.add("booking-results-screen");renderResults(d.listings,{scroll});error("");
   track("search_completed",{metadata:{nights:nights(bi,bo),guests,available_count:d.listings.filter(x=>x.available).length}});
- }catch(e){if(sequence===searchSequence)error("Não foi possível consultar agora. Tente novamente.");}
+ }catch(e){if(sequence===searchSequence){$('#availability-count').textContent='Consulta indisponível';$('#booking-list').innerHTML='<p role="status">Não foi possível consultar agora. Use “Alterar datas e motivo da viagem” para tentar novamente.</p>';error("Não foi possível consultar agora. Tente novamente.");}}
 }
 function renderResults(list,{scroll=true}={}){
  const code=$("#book-chalet").value;
@@ -220,9 +221,11 @@ function initTripPurpose(){
  const purpose=$("#trip-purpose-initial");
  let saved={};try{saved=JSON.parse(sessionStorage.getItem('ville-stay-selection')||'{}')}catch{}
  const previous=purpose.value||saved.purpose;purpose.innerHTML='<option value="">Sem preferência</option>'+(state.config.purposes||[]).map(x=>'<option value="'+x.code+'">'+x.label+'</option>').join("");
- purpose.value=previous||new URLSearchParams(location.search).get("purpose")||"";purpose.onchange=persistSelection;
+ purpose.value=new URLSearchParams(location.search).get("purpose")??previous??"";
+ const review=$('#trip-purpose-review');review.innerHTML=purpose.innerHTML;review.value=purpose.value;
+ const change=e=>{if(state.fastUpdating){e.target.value=purpose.value;return}purpose.value=e.target.value;review.value=purpose.value;persistSelection();refreshStayOptions();if(state.property&&!$('#checkout-modal').hidden)renderExperienceStep()};purpose.onchange=change;review.onchange=change;
 }
-function renderExperienceStep(){renderOfferChoices();renderExperienceList($("#trip-purpose-initial").value);}
+function renderExperienceStep(){$('#trip-purpose-review').value=$('#trip-purpose-initial').value;renderOfferChoices();renderExperienceList($("#trip-purpose-initial").value);}
 function eligibleExperienceProducts(purpose=""){
  const checkIn=$("#book-in")?.value||"";
  const checkInAt=checkIn?Date.parse(checkIn+"T15:00:00-03:00"):Infinity;
@@ -234,7 +237,7 @@ function eligibleExperienceProducts(purpose=""){
   .filter(p=>(p.experience_media||[]).length>=1)
   .filter(p=>p.inventory==null||Number(p.inventory)>0)
   .filter(p=>(p.experience_property_eligibility||[]).some(e=>Number(e.property_id)===Number(state.property.id)))
-  .filter(p=>!purpose||!(p.travel_purposes||[]).length||(p.travel_purposes||[]).includes(purpose));
+  .filter(p=>state.selectedByProduct[p.id]||!purpose||!(p.travel_purposes||[]).length||(p.travel_purposes||[]).includes(purpose));
 }
 function primaryVariant(p){
  return (p.experience_variants||[]).filter(v=>v.active).sort((a,b)=>a.display_order-b.display_order)[0]||null;
@@ -649,14 +652,14 @@ function directCheckoutError(){
 function renderReview(){renderSelectionSummary();renderCheckoutRates();renderExperienceStep();$('#step-next').disabled=!state.rateConfirmed;}
 async function openFastCheckout(){
  state.stage='review';refreshStayOptions();
- if(state.entrySource==='showcase')document.documentElement.classList.add('direct-checkout');
+ document.documentElement.classList.toggle('direct-checkout',state.entrySource==='showcase');
  $('#direct-checkout-status').hidden=true;$('#direct-extras').before($('#summary-content'));$('#direct-extras').before($('#offer-choices'));
- $('#authenticated-finalization').hidden=true;showStep(2);renderReview();
+ $('#authenticated-finalization').hidden=true;$('#direct-extras').open=state.entrySource!=='showcase';showStep(2);renderReview();
 }
 async function updateFastQuote(){
  if(state.fastUpdating)return;
  state.fastUpdating=true;$('#step-next').disabled=true;
- const controls=$$('#direct-extras button, #offer-choices select, #checkout-rate-options input, #checkout-stay-mode');controls.forEach(b=>b.disabled=true);
+ const controls=$$('#direct-extras button, #offer-choices select, #checkout-rate-options input, #checkout-stay-mode, #trip-purpose-review');controls.forEach(b=>b.disabled=true);
  try{await refreshQuoteAfterExperiences();if(!state.rate)throw new Error('tariff_unavailable');if(state.stage==='review')renderReview();else renderSummary();setFlowError('Reserva atualizada. Confira o total e aceite os termos antes de pagar.')}
  catch(e){state.rate=null;setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar esta escolha. Remova o adicional ou consulte outras opções.');}
  finally{state.fastUpdating=false;controls.forEach(b=>b.disabled=false);$('#step-next').disabled=!state.rate||!state.rateConfirmed;}
@@ -701,7 +704,7 @@ function initStayModes(){
   const code=state.rateCode,confirmed=state.rateConfirmed;state.fastUpdating=true;$('#step-next').disabled=true;$('#checkout-stay-mode').disabled=true;
   try{await generateQuote(false);state.rate=state.quote.rate_options.find(r=>r.code===code&&r.selectable)||state.quote.rate_options.find(r=>r.selectable)||null;state.rateCode=state.rate?.code;state.rateConfirmed=confirmed&&state.rateCode===code;if(!state.rate)throw Error('tariff_unavailable');renderReview()}
   catch(e){state.rate=null;$('#summary-content').textContent='';$('#checkout-rate-options').textContent='';setFlowError(window.VilleOffers.issues[e.message]||'Esta experiência não está disponível. Escolha outra opção.')}finally{state.fastUpdating=false;$('#checkout-stay-mode').disabled=false;$('#step-next').disabled=!state.rate||!state.rateConfirmed}
- }else if($('#book-in').value&&$('#book-out').value)await search();
+ }
  }}
  refreshStayOptions();syncStayModes();
 }
