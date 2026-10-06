@@ -38,7 +38,7 @@ test('login resume and reload preserve complete offer and chosen preference',asy
 test('dated storefront opens finalization directly with the advertised offer and tariff',async()=>{
  const {dom,w,calls,scrolls}=await setup(null,'https://qa.example/reservar.html?chalet=CH1&stay_offer='+oid+'&check_in=2030-01-01&check_out=2030-01-03&guests=2&rate=non_refundable&from=showcase');
  try{const $=s=>w.document.querySelector(s);await wait(()=>$('#login-state a')&&$('#checkout-panel').dataset.step==='5');
- assert.match($('#summary-content').textContent,/1.235,00/);assert.match($('#summary-content').textContent,/Não reembolsável/);assert.match($('#summary-content').textContent,/Chegada preparada/);
+ assert.match($('#summary-content').textContent,/1.235,00/);assert.match($('#summary-content').textContent,/Tarifa a escolher/);assert.match($('#summary-content').textContent,/Chegada preparada/);
  assert.equal($('#checkout-modal').hidden,false);assert.equal(calls.filter(c=>c.action==='quote').at(-1).body.stay_offer_id,oid);
  assert.deepEqual(scrolls,[]);assert.equal($('#step-back').hidden,true);assert.equal($('#direct-extras').open,false);assert.equal($('#experience-options [data-package="'+pid+'"]'),null,'included package is never resold');assert.ok($('#offer-choices').closest('[data-step="5"]'),'required package preferences share checkout');assert.ok($('#login-state').closest('[data-step="5"]'));
  assert.equal($('#checkout-rate-options input:checked'),null,'no cancellation tariff is selected by the site');assert.equal($('#step-next').disabled,true);assert.equal($('input[type=checkbox]').id,'accept-all');assert.equal(w.document.querySelectorAll('input[type=checkbox]').length,1);
