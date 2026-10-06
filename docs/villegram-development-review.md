@@ -20,7 +20,7 @@ Implementação no projeto existente, branch `feature/romantic-stay-offers`. Ban
 
 | Verificação | Evidência / alcance |
 |---|---|
-| Testes automatizados | 257 testes aprovados; tipos TypeScript, sintaxe e build com bloqueio de produção. Incluem simulações JSDOM/serviços; não representam homologação de pagamento. |
+| Testes automatizados | 259 testes aprovados; tipos TypeScript, sintaxe e build com bloqueio de produção. Incluem simulações JSDOM/serviços; não representam homologação de pagamento. |
 | Feed real do DEV | 18 cards, três imóveis, duas/três noites; 10 oportunidades de comemoração com desconto zero. |
 | Valor real | Essenza, 7–9/10/2026, duas noites: bruto 126120, desconto 6306, total 119814 centavos; igual no feed, na reconsulta do link compartilhado e na tarifa não reembolsável da reserva aberta pelo Villegram no navegador. |
 | Navegador desktop | Home e página Essenza abrem oferta, composição, preço, pausa/continuação, próximas ofertas, comentários públicos, compartilhamento e áudio por toque. |
