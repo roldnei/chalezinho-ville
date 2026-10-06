@@ -1,3 +1,5 @@
+// Verified against Portaria MGI 11.460/2025, calendar 2026. Local dates belong in PMS.
+const nationalHolidays2026=['2026-01-01','2026-04-03','2026-04-21','2026-05-01','2026-09-07','2026-10-12','2026-11-02','2026-11-15','2026-11-20','2026-12-25'];
 type Row = Record<string, any>;
 let cached: {key: string; until: number; result: Promise<Row>} | null = null;
 /** Short isolate-local cache avoids repeatedly fetching calendars on the home page.
@@ -18,7 +20,7 @@ export function showcaseSettings(input: Row = {}) {
   const holidays=Array.isArray(input.holidays)?input.holidays:[];if(holidays.length>100||holidays.some((d:any)=>typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw Error('invalid_showcase');
   return {enabled: input.enabled === true, nights, horizon_days,celebrations:input.celebrations===true,celebration_discount:input.celebration_discount===true,holidays};
 }
-export function isCelebration(start:string,end:string,settings:Row={}){for(let d=start;d<end;d=shift(d,1)){const day=new Date(d+'T12:00:00Z').getUTCDay();if(day<1||day>4||settings.holidays?.includes(d))return true}return false}
+export function isCelebration(start:string,end:string,settings:Row={}){for(let d=start;d<end;d=shift(d,1)){const day=new Date(d+'T12:00:00Z').getUTCDay();if(day<1||day>4||nationalHolidays2026.includes(d)||settings.holidays?.includes(d))return true}return false}
 function shift(date: string, n: number) {
   const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
 }
@@ -60,7 +62,7 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
       }
     }
     // Check backup windows too: an inexpensive date can have no preparation capacity.
-    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 4));
+    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 2));
   }
   const cards: Row[] = [];
   const bounded = candidates.slice(0, 60);

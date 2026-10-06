@@ -287,7 +287,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   let offer:any=null;
   if(body.stay_offer_id){
     const catalog=offerCatalog||await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
-    if(offer?.showcase?.celebrations&&isCelebration(body.check_in,body.check_out,offer.showcase)&&!offer.showcase.celebration_discount)offer={...offer,discount_enabled:false};
+    if(offer?.showcase&&isCelebration(body.check_in,body.check_out,offer.showcase)&&!offer.showcase.celebration_discount)offer={...offer,discount_enabled:false};
     if(!offer)throw Error("offer_unavailable");
     const issues=offerIssues(offer,catalog.products,Number(property_id),{check_in,check_out});
     if(issues.length)throw Error(issues[0]);

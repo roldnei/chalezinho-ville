@@ -72,4 +72,4 @@ function applyPropertyMedia(properties){
   const hero=container.querySelector('.detail-hero');if(hero){VilleImages.background(hero,images[0].url);const closing=container.querySelector('.detail-closing');if(closing)VilleImages.background(closing,images[0].url,true);const gallery=container.querySelector('.detail-gallery');if(gallery){gallery.replaceChildren();images.forEach(item=>{const figure=document.createElement('figure'),img=document.createElement('img');VilleImages.set(img,item.url);img.alt=item.alt||p.name;img.loading='lazy';figure.append(img);gallery.append(figure)})}}
  });
 }
-function isPropertyImage(url){return typeof url==='string' && (/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=[0-9]+)?$/.test(url)||url.startsWith(window.CHALEZINHO_CONFIG.supabaseUrl+'/storage/v1/object/public/property-media/'))}
+function isPropertyImage(url){return typeof url==='string' && (/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=[0-9]+)?$/.test(url)||(url.startsWith(window.CHALEZINHO_CONFIG.supabaseUrl+'/storage/v1/object/public/property-media/')||url.startsWith(window.CHALEZINHO_CONFIG.supabaseUrl+'/storage/v1/object/public/experience-media/')))}
