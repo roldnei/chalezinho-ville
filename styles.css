@@ -1872,3 +1872,14 @@ html.booking-checkout-open body{position:fixed;top:var(--booking-scroll-offset,0
 .checkout-rate-choice input {width:20px;height:20px;flex-shrink:0;}
 .guarantee-notice {line-height:1.7;padding:16px;border:1px solid #514635;border-radius:12px;}
 @media(max-width:480px){.checkout-rate-choice {padding:14px;gap:8px;}.checkout-rate-choice strong {font-size:14px;}}
+
+.reservation-steps {display:flex;gap:12px;justify-content:space-between;margin:16px 0 30px;font-size:13px;color:#c5b59a;}
+.booking-results-screen .booking-intro,.booking-results-screen .booking-search,.booking-results-screen .booking-confidence {display:none;}
+#checkout-login {display:grid;gap:16px;margin:20px 0;}
+#checkout-login label {display:grid;gap:8px;}
+#checkout-login input {padding:14px;background:#29241e;color:#fff;border:1px solid #766348;}
+#final-selection {border:1px solid #514635;padding:16px;border-radius:12px;}
+
+.booking-shell>.reservation-steps span:first-child {color:#fff;font-weight:600;}
+.booking-results-screen .booking-shell>.reservation-steps span {color:#c5b59a;font-weight:400;}
+.booking-results-screen .booking-shell>.reservation-steps span:nth-child(2),.booking-panel[data-step="2"] .reservation-steps span:nth-child(2),.booking-panel[data-step="5"] .reservation-steps span:nth-child(3) {color:#fff;font-weight:600;}
