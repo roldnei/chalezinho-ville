@@ -15,8 +15,10 @@ export function showcaseSettings(input: Row = {}) {
   const horizon_days = Number(input.horizon_days ?? 60);
   if (!nights.length || nights.length > 4 || nights.some(n => !Number.isInteger(n) || n < 1 || n > 7)
     || !Number.isInteger(horizon_days) || horizon_days < 14 || horizon_days > 90) throw Error('invalid_showcase');
-  return {enabled: input.enabled === true, nights, horizon_days};
+  const holidays=Array.isArray(input.holidays)?input.holidays:[];if(holidays.length>100||holidays.some((d:any)=>typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw Error('invalid_showcase');
+  return {enabled: input.enabled === true, nights, horizon_days,celebrations:input.celebrations===true,celebration_discount:input.celebration_discount===true,holidays};
 }
+export function isCelebration(start:string,end:string,settings:Row={}){for(let d=start;d<end;d=shift(d,1)){const day=new Date(d+'T12:00:00Z').getUTCDay();if(day<1||day>4||settings.holidays?.includes(d))return true}return false}
 function shift(date: string, n: number) {
   const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
 }
@@ -28,9 +30,8 @@ export function weekdayWindows(today: string, settings: Row, offer: Row) {
       if (nights < offer.min_nights || offer.max_nights && nights > offer.max_nights
         || offer.start_date && check_in < offer.start_date || offer.end_date && check_out > offer.end_date) continue;
       // Every occupied night must be Monday–Thursday. Friday checkout is allowed.
-      if (Array.from({length: nights}, (_, i) => new Date(shift(check_in, i) + 'T12:00:00Z').getUTCDay())
-        .some(day => day < 1 || day > 4)) continue;
-      result.push({check_in, check_out, nights});
+      const celebration=isCelebration(check_in,check_out,settings);if(celebration&&!settings.celebrations)continue;
+      result.push({check_in, check_out, nights,...(celebration?{category:'celebration'}:{})});
     }
   }
   return result;
@@ -52,7 +53,7 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
       if (!searches.has(key)) searches.set(key, search(window.check_in, window.check_out, input));
       for (const property of await searches.get(key)!) {
         if (!property.available || !offer.property_ids.map(Number).includes(Number(property.id))) continue;
-        const groupKey = property.id + ':' + window.nights;
+        const groupKey = property.id + ':' + window.nights+':'+(window as Row).category;
         const rows = grouped.get(groupKey) || [];
         rows.push({offer, property, ...window}); grouped.set(groupKey, rows);
       }
@@ -69,8 +70,10 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
         const rate = q.rate_options.filter((r: Row) => r.selectable && Number.isSafeInteger(r.total_amount_cents))
           .sort((a: Row, b: Row) => a.total_amount_cents - b.total_amount_cents)[0];
         if (!rate) return null;
-        return {offer_id: c.offer.id, offer_name: c.offer.name, property_id: c.property.id, property_code: c.property.code,
-          property_name: c.property.name, image: c.offer.media?.[0] || c.property.cover_image,
+        const media=c.offer.villegram?.photos?.filter((m:Row)=>m.property_id===Number(c.property.id));
+        const reservations=Array.isArray(input)?input[1]?.data||[]:[];const gap=reservations.some((r:Row)=>r.property_id===c.property.id&&r.status==='confirmed'&&r.check_out===c.check_in)&&reservations.some((r:Row)=>r.property_id===c.property.id&&r.status==='confirmed'&&r.check_in===c.check_out);
+        return {category:c.category||'weekday',gap, demand_reason:gap?'Intervalo livre entre reservas confirmadas. Avaliação por calendário, sem histórico suficiente de procura.':'Sugestão por regras de calendário. Não representa previsão de baixa demanda; histórico de procura insuficiente.',offer_id: c.offer.id, offer_name: c.offer.name, property_id: c.property.id, property_code: c.property.code,
+          property_name: c.property.name, image: media?.[0]?.url || c.offer.media?.[0] || c.property.cover_image,
           check_in: c.check_in, check_out: c.check_out, nights: c.nights, guests: 2,
           rate_code: rate.code, rate_name: rate.name, total_cents: rate.total_amount_cents,
           gross_cents: rate.contract_snapshot.gross_cents, discount_cents: rate.contract_snapshot.discount_cents,
@@ -80,9 +83,9 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
     cards.push(...results.filter(Boolean));
   }
   // Keep two- and three-night choices visible, rather than letting one duration dominate.
-  const groups = new Map<number, Row[]>();
-  for (const c of cards.sort((a, b) => a.total_cents - b.total_cents || a.check_in.localeCompare(b.check_in))) {
-    const rows = groups.get(c.nights) || []; rows.push(c); groups.set(c.nights, rows);
+  const groups = new Map<string, Row[]>();
+  for (const c of cards.sort((a, b) => Number(b.gap)-Number(a.gap)||Number(a.category==='celebration')-Number(b.category==='celebration')||a.total_cents - b.total_cents || a.check_in.localeCompare(b.check_in))) {
+    const key=c.property_id+':'+c.offer_id+':'+c.nights+':'+c.category;const rows = groups.get(key) || []; rows.push(c); groups.set(key, rows);
   }
   const selected: Row[] = [];
   while (selected.length < 18 && [...groups.values()].some(rows => rows.length)) {

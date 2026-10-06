@@ -18,11 +18,17 @@ export function stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl}
   if(error||properties?.length!==offer.property_ids.length)return json({ok:false,error:'offer_property_incompatible'},400);
   const prefix=projectUrl+'/storage/v1/object/public/experience-media/';
   if(offer.media.some((x:any)=>typeof x!=='string'||!(x.startsWith(prefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)$/.test(x))))return json({ok:false,error:'invalid_offer_photo'},400);
+  const vg=offer.villegram;
+  if(vg.photos.some((p:any)=>!offer.property_ids.includes(p.property_id)||!(p.url.startsWith(prefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=\d+)?$/.test(p.url))))return json({ok:false,error:'invalid_villegram_media'},400);
+  if(vg.audio&&!vg.audio.url.startsWith(projectUrl+'/storage/v1/object/public/villegram-audio/'))return json({ok:false,error:'invalid_audio'},400);
+  const replacements=Array.isArray(body.media_replacements)?body.media_replacements:[];
+  if(replacements.length>30||replacements.some((m:any)=>typeof m.old!=='string'||typeof m.url!=='string'||!m.url.startsWith(prefix)||!(m.old.startsWith(prefix)||/^assets\/[a-zA-Z0-9._-]+\.(webp|jpg|jpeg|png|avif)(\?v=\d+)?$/.test(m.old))))return json({ok:false,error:'invalid_media_replacement'},400);
   const issues=[...new Set(offer.property_ids.flatMap(id=>offerIssues({...offer,status:'active'},data.products,id)))];
   if(body.operation==='preview')return json({ok:true,offer,issues,packages:data.products.filter((x:any)=>offer.product_ids.includes(x.id))});
   if(offer.status==='active'&&issues.length)return json({ok:false,error:'offer_not_ready',issues},409);
   const result=body.id?await admin.from('stay_offers').update({...offer,updated_at:new Date().toISOString()}).eq('id',body.id).eq('updated_at',body.updated_at||'').select().maybeSingle():await admin.from('stay_offers').insert(offer).select().single();
   if(result.error||!result.data)return json({ok:false,error:body.id?'offer_conflict':'offer_save_failed'},409);
+  for(const m of replacements){const r=await admin.rpc('villegram_replace_media',{p_old:m.old,p_new:m.url});if(r.error)return json({ok:false,error:'media_sync_failed'},500)}
   await admin.from('audit_events').insert({actor_user_id:user.id,action:'stay_offer_saved',entity_type:'stay_offer',entity_id:result.data.id,new_value:offer});
   return json({ok:true,offer:result.data});
  }

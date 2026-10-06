@@ -22,6 +22,11 @@
     const inclusions=o.packages?.flatMap(components)||[];
     return `<article>${photos[0]?`<img src="${esc(photos[0])}" alt="${esc(o.name)}" loading="lazy">`:''}<div><small>COM EXPERIÊNCIA INCLUÍDA</small><h3>${esc(o.name)}</h3><p>${esc(o.description)}</p><ul>${inclusions.map(c=>`<li>${esc(label(c))}</li>`).join('')}</ul>${o.discount_enabled&&o.discount_bps?`<p class="offer-saving">${o.discount_bps/100}% de desconto na hospedagem, limpeza e pacotes desta oferta.</p>`:''}<a class="primary-action" href="reservar.html?stay_offer=${encodeURIComponent(o.id)}${code?'&chalet='+encodeURIComponent(code):''}">Consultar datas e preço completo</a></div></article>`;
    }).join('')}</div>${!available.length?'<p>Este imóvel não tem estadias completas ativas no momento.</p>':''}<a class="stay-only-link" href="reservar.html?mode=stay${code?'&chalet='+encodeURIComponent(code):''}">Prefiro somente hospedagem →</a><p class="offer-help">Também é possível acrescentar pacotes avulsos pelo preço cheio. A duração segue as regras do imóvel e da oferta.</p>`;
+   if(property&&window.Villegram){
+    const feed=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase',{headers:{'X-Chalezinho-Env':'development'}}).then(r=>r.json()).catch(()=>({cards:[]}));
+    const cards=(feed.cards||[]).filter(c=>c.property_id===property.id);await window.Villegram.configure(cards,offers);
+    section.querySelectorAll('article').forEach((article,i)=>{const c=cards.find(c=>c.offer_id===available[i]?.id);if(!c)return;const b=document.createElement('button');b.type='button';b.className='villegram-watch';b.textContent='▶ Assistir no Villegram · '+(c.total_cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});b.onclick=()=>window.Villegram.open(c);article.querySelector('div').append(b)});
+   }
    if(version!==bootVersion)return;document.querySelector('#estadias-completas')?.remove();
    const main=document.querySelector('main[data-property-code],#property-detail')||document.querySelector('main');
    const hero=main?.querySelector('.detail-hero');if(hero)hero.after(section);else{const target=document.querySelector('#experiencias,#estadias-completas');if(target)target.replaceWith(section);else document.querySelector('.hero')?.after(section)}

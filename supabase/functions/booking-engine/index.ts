@@ -1,3 +1,5 @@
+import {isCelebration} from "../_shared/stay-showcase.ts";
+import {villegramService} from "../_shared/villegram.ts";
 import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
 import {publicProperty} from "../_shared/public-property.ts";
 import {offerIssues,priceStayOffer,compositionSnapshot,experienceComponents} from "../_shared/stay-offers.ts";
@@ -41,6 +43,7 @@ const admin = createClient(projectUrl, serviceKey, {auth:{persistSession:false,a
 const {reservationRefundAction,reservationRefundStatus,reservationCancelRequest}=reservationRefundService({admin,currentUser,userIsAdmin,json});
 
 const experienceCredit=experienceCreditService({admin,currentUser,userIsAdmin,json});
+const villegram=villegramService({admin,currentUser,userIsAdmin,json});
 const stayOffers=stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl});
 
 async function developmentPolicies(){
@@ -284,6 +287,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   let offer:any=null;
   if(body.stay_offer_id){
     const catalog=offerCatalog||await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
+    if(offer?.showcase?.celebrations&&isCelebration(body.check_in,body.check_out,offer.showcase)&&!offer.showcase.celebration_discount)offer={...offer,discount_enabled:false};
     if(!offer)throw Error("offer_unavailable");
     const issues=offerIssues(offer,catalog.products,Number(property_id),{check_in,check_out});
     if(issues.length)throw Error(issues[0]);
@@ -2105,6 +2109,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
       return json({ok:true,...cards});
     }
     if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
+    if(action==="villegram")return await villegram(req,body,development);
     if(action==="stay_offer_action")return await stayOffers.action(req,body,development);
     if(action==="legal_documents")return await legalDocuments(req,body,development);
     if(action==="property_media"){
