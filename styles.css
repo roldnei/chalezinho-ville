@@ -1862,3 +1862,13 @@ html.booking-checkout-open body{position:fixed;top:var(--booking-scroll-offset,0
 #direct-extras .experience-carousel {height:160px;}
 .direct-identity {margin:28px 0;}
 .direct-checkout #policy-box .policy-document p {font-size:14px;line-height:1.7;}
+
+#checkout-rate-options {border:0;padding:0;margin:20px 0 32px;}
+#checkout-rate-options legend {font-size:20px;font-weight:600;}
+.checkout-rate-choice {display:flex;align-items:center;gap:12px;border:1px solid #766348;border-radius:12px;padding:18px;margin-top:16px;cursor:pointer;}
+.checkout-rate-choice:has(input:checked) {border-color:#dba969;background:#30251a;}
+.checkout-rate-choice span {flex:1;}
+.checkout-rate-choice small {display:block;font-size:12px;margin-top:6px;color:#b5a68f;}
+.checkout-rate-choice input {width:20px;height:20px;flex-shrink:0;}
+.guarantee-notice {line-height:1.7;padding:16px;border:1px solid #514635;border-radius:12px;}
+@media(max-width:480px){.checkout-rate-choice {padding:14px;gap:8px;}.checkout-rate-choice strong {font-size:14px;}}

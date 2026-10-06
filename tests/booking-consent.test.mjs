@@ -22,9 +22,9 @@ test('development drafts never substitute active terms or become production term
 });
 import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
-test('checkout stops before payment when any checkbox is absent, with no preselected consent',async()=>{
+test('checkout stops before payment without its single explicit acceptance',async()=>{
  const source=readFileSync('booking.js','utf8');
- const w=new JSDOM('<input id="accept-cancel" type="checkbox"><input id="accept-terms" type="checkbox"><input id="guarantee-card-consent" type="checkbox"><input id="guarantee-renewal-consent" type="checkbox">',{runScripts:'outside-only'}).window;
+ const w=new JSDOM('<input id="accept-all" type="checkbox">',{runScripts:'outside-only'}).window;
  let payments=0;
  Object.assign(w,{$:s=>w.document.querySelector(s),state:{property:{guarantee_amount_cents:50000},upsellHandled:true},paymentChoice:()=>({method:'pix'}),setFlowError:()=>{},performStartPayment:async()=>{payments++}});
  w.eval(source.slice(source.indexOf('async function maybeOfferUpsell(){'),source.indexOf('async function refreshQuoteAfterExperiences')));
@@ -33,4 +33,11 @@ test('checkout stops before payment when any checkbox is absent, with no presele
   for(const absent of inputs){inputs.forEach(i=>i.checked=i!==absent);await w.maybeOfferUpsell();assert.equal(payments,0)}
   inputs.forEach(i=>i.checked=true);await w.maybeOfferUpsell();assert.equal(payments,1);
  }finally{w.close()}
+});
+
+test('single acceptance records each document and both guarantee authorizations without implicit consent',()=>{
+ const source=readFileSync('booking.js','utf8');const w=new JSDOM('<input id="accept-all" type="checkbox">',{runScripts:'outside-only'}).window;
+ Object.assign(w,{$:s=>w.document.querySelector(s),state:{property:{guarantee_amount_cents:50000},rate:{cancellation_policy:{id:'cancel'}},config:{required_booking_documents:docs}}});
+ w.eval(source.slice(source.indexOf('function bookingConsentPayload(){'),source.indexOf('async function performStartPayment')));
+ try{const input=w.document.querySelector('input');assert.throws(()=>assertBookingConsent(w.bookingConsentPayload(),true,docs,'cancel'),/consent_required/);input.checked=true;assert.doesNotThrow(()=>assertBookingConsent(w.bookingConsentPayload(),true,docs,'cancel'));assert.deepEqual(Array.from(w.bookingConsentPayload().accepted_document_ids),accepted.accepted_document_ids);input.checked=false;assert.equal(w.bookingConsentPayload().guarantee_renewal_consent,false)}finally{w.close()}
 });
