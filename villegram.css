@@ -2,3 +2,4 @@
 /* Public page headers and footers have positioning rules; reset them inside this dialog. */
 #villegram header{position:static;inset:auto;width:auto;height:auto;background:#17130f;z-index:auto;transform:none;margin:0}#villegram footer{position:static;inset:auto;width:auto;height:auto;margin:0;border:0;background:#17130f;transform:none}#villegram .vg-purchase h3{font-family:'DM Sans',sans-serif}#villegram .vg-sheet textarea{min-height:90px}
 #villegram footer{flex-direction:row!important;align-items:center!important;justify-content:center!important;gap:12px!important;padding:8px 16px!important;min-height:60px;flex-shrink:0}#villegram .vg-sheet{width:auto!important;max-width:none!important}#villegram .vg-purchase{width:auto!important}
+#villegram [hidden]{display:none!important}
