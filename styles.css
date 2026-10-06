@@ -1845,3 +1845,8 @@ footer{justify-content:space-between!important}
 .legal-page{max-width:900px;margin:40px auto;padding:24px}.legal-page h1{margin:24px 0}.legal-page p{line-height:1.7}
 
 .property-house-rules{color:#ded3c2;border-top-color:rgba(255,255,255,.16)}.property-house-rules h2{color:#f3ebdf}.property-house-rules a{color:inherit}
+
+/* Keep checkout scrolling isolated from the page and asynchronous quote updates. */
+html.booking-checkout-open{overflow:hidden;scroll-behavior:auto}
+html.booking-checkout-open body{position:fixed;top:var(--booking-scroll-offset,0px);width:100%;overflow:hidden}
+.booking-modal{overscroll-behavior:contain;overflow-anchor:none;scroll-behavior:auto}

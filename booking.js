@@ -53,7 +53,7 @@ async function init(){
  const incoming=new URLSearchParams(location.search);
  if(incoming.has("check_in")&&incoming.has("check_out")){
   $("#book-in").value=incoming.get("check_in");$("#book-out").value=incoming.get("check_out");$("#book-guests").value=incoming.get("guests")||"2";
-  await search();
+  await search({scroll:incoming.get("from")!=="showcase"});
   if(incoming.get("from")==="showcase"){const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);if(rate)$("#rate-options").querySelector(`[data-option="${rate.quote_option_id}"]`)?.click()}}
  }else{await restoreResume();await restoreSameDay()}
 }
@@ -72,35 +72,49 @@ async function initChaletFilter(){
   refreshStayOptions();persistSelection();if(state.search)await search();
  });
 }
+function setCheckoutVisible(visible){
+ const modal=$("#checkout-modal"),root=document.documentElement;
+ if(visible&&modal.hidden){
+  modal.dataset.pageScroll=String(window.scrollY||0);
+  root.style.setProperty('--booking-scroll-offset',`-${window.scrollY||0}px`);
+  root.classList.add('booking-checkout-open');
+  modal.scrollTop=0;
+ }
+ modal.hidden=!visible;
+ if(!visible&&root.classList.contains('booking-checkout-open')){
+  root.classList.remove('booking-checkout-open');root.style.removeProperty('--booking-scroll-offset');
+  window.scrollTo({top:Number(modal.dataset.pageScroll||0),behavior:'instant'});
+ }
+}
 async function closeCheckout(){
  const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
  if(step===6&&active?.provider==="pagbank_sandbox"){
-  $("#checkout-modal").hidden=true;setFlowError("");return;
+  setCheckoutVisible(false);setFlowError("");return;
  }
  if(step===6&&active?.payment_id&&active.status==="awaiting_payment"){
   btn.disabled=true;setFlowError("Encerrando a tentativa de pagamento e liberando as datas…");
   try{
    await api("cancel_pending_payment",{payment_id:active.payment_id});
    state.activePayment=null;state.quote=null;state.rate=null;state.rateCode=null;state.selectedByProduct={};state.upsellHandled=false;
-   clearInterval(window.__quoteTimer);$("#checkout-modal").hidden=true;$("#upsell-modal").hidden=true;setFlowError("");
+   clearInterval(window.__quoteTimer);setCheckoutVisible(false);$("#upsell-modal").hidden=true;setFlowError("");
    await search();
   }catch(e){
    if(e.message==="payment_not_cancellable"){
-    $("#checkout-modal").hidden=true;setFlowError("");
+    setCheckoutVisible(false);setFlowError("");
    }else{
     setFlowError("Não foi possível encerrar a tentativa agora. Tente novamente antes de fechar.");
    }
   }finally{btn.disabled=false}
   return;
  }
- $("#checkout-modal").hidden=true;
+ setCheckoutVisible(false);
  if($("#booking-results").classList.contains("booking-results-hidden")&&state.search)await search();
 }
 function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
 function error(t){$("#booking-error").textContent=t}
 function setFlowError(t){$("#checkout-error").textContent=t}
 
-async function search(){
+async function search({scroll=true}={}){
  const sequence=++searchSequence;
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
  if(!bi||!bo||bo<=bi)return error("Escolha datas válidas.");
@@ -114,11 +128,11 @@ async function search(){
   const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
   if(sequence!==searchSequence)return;
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
-  state.search=d.listings;renderResults(d.listings);error("");
+  state.search=d.listings;renderResults(d.listings,{scroll});error("");
   track("search_completed",{metadata:{nights:nights(bi,bo),guests,available_count:d.listings.filter(x=>x.available).length}});
  }catch(e){if(sequence===searchSequence)error("Não foi possível consultar agora. Tente novamente.");}
 }
-function renderResults(list){
+function renderResults(list,{scroll=true}={}){
  const code=$("#book-chalet").value;
  if(code)list=list.filter(p=>p.code===code);
  const box=$("#booking-list");box.innerHTML="";$("#booking-results").classList.remove("booking-results-hidden");
@@ -143,7 +157,7 @@ function renderResults(list){
   box.appendChild(a);
  });
  box.querySelectorAll("[data-id]").forEach(b=>b.addEventListener("click",async()=>{if(b.dataset.stayOnly){state.offerId=null;syncStayModes();persistSelection();await search();}const p=state.search.find(x=>x.id===Number(b.dataset.id));return p?.requestable?openSameDayRequest(p.id):openFlow(Number(b.dataset.id))}));
- $("#booking-results").scrollIntoView({behavior:"smooth"});
+ if(scroll&&$("#checkout-modal").hidden)$("#booking-results").scrollIntoView({behavior:"smooth"});
 }
 
 async function openSameDayRequest(propertyId){
@@ -164,7 +178,7 @@ async function restoreSameDay(){
 async function openFlow(id){
  state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
- $("#checkout-modal").hidden=false;$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
+ setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
  showStep(1);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
   await generateQuote(false);renderRates();
@@ -564,7 +578,7 @@ async function restoreResume(){
  $("#book-in").value=saved.check_in||"";$("#book-out").value=saved.check_out||"";$("#book-guests").value=saved.guests||"2";state.property=saved.property;state.selectedByProduct=saved.selectedByProduct||{};state.quote=saved.quote;state.rateCode=saved.rateCode;
  state.rate=state.quote?.rate_options?.find(x=>x.code===state.rateCode&&x.selectable)||null;
  const {data:{session}}=await sb.auth.getSession();state.session=session;
- $("#checkout-modal").hidden=false;$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=saved.check_in.split("-").reverse().join("/")+" a "+saved.check_out.split("-").reverse().join("/");
+ setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=saved.check_in.split("-").reverse().join("/")+" a "+saved.check_out.split("-").reverse().join("/");
  if(!state.quote||Date.parse(state.quote.expires_at)<=Date.now()){showStep(1);try{await generateQuote(true);renderRates()}catch(e){setFlowError("Consulte novamente a disponibilidade para continuar.")}return;}
  if(state.quote?.expires_at)startCountdown(state.quote.expires_at);showStep(session?4:3);if(session)renderGuestStep();else await renderLoginStep();
 }
