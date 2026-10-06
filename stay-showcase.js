@@ -17,7 +17,7 @@
   try{
    const feedStarted=performance.now();
    let version;try{version=[...new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(offers))))].map(b=>b.toString(16).padStart(2,'0')).join('')}catch{version=String(Date.now())}
-   const feedURL=/^chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(location.hostname)?'/api/stay-showcase?catalog_version='+version:window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase';
+   const feedURL=(location.hostname==='chalezinho-ville-git-feature-romantic-fdde70-roldneicosta-4140.vercel.app'||/^chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(location.hostname))?'/api/stay-showcase?catalog_version='+version:window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase';
    const r=await fetch(feedURL,{cache:feedURL.startsWith('/api/')?'default':'no-store',headers:{'X-Chalezinho-Env':'development'}}),data=await r.json();if(!r.ok||!data.ok)throw Error('unavailable');
    section.dataset.feedLoadMs=String(Math.round(performance.now()-feedStarted));
    offers=data.offers||offers;form.elements.stay_offer.innerHTML=offers.map(o=>`<option value="${esc(o.id)}">Com experiência · ${esc(o.name)}</option>`).join('')+'<option value="">Somente hospedagem</option>';

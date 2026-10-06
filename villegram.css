@@ -2,3 +2,6 @@
 
 /* Story and prices share one flow so viewport height and font size never overlap. */
 #villegram .vg-purchase .vg-story{position:static;inset:auto;padding:0;margin:0 0 10px}#villegram .vg-purchase .vg-story h2{font-size:clamp(24px,4vw,36px);line-height:1.1}#villegram .vg-purchase{max-height:calc(100dvh - 150px);overflow:auto;scrollbar-width:thin}#villegram .vg-purchase .vg-story small{font-size:12px}#villegram .vg-purchase .vg-story p{margin:5px 0}
+
+/* Vertical native scrolling remains available inside reading panels. */
+#villegram .vg-content{touch-action:pan-y}

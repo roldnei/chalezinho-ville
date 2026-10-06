@@ -6,7 +6,7 @@
  const reduced=matchMedia('(prefers-reduced-motion: reduce)');
  const booking=(c,mode='complete')=>{const q=new URLSearchParams({chalet:c.property_code,guests:String(c.guests||2)});if(mode!=='stay')q.set('stay_offer',c.offer_id);else q.set('mode','stay');if(mode!=='dates'){q.set('check_in',c.check_in);q.set('check_out',c.check_out);q.set('rate',c.rate_code);q.set('from','showcase')}return 'reservar.html?'+q};
  const shareURL=c=>{const q=new URLSearchParams({villegram:c.offer_id,chalet:c.property_code,check_in:c.check_in,check_out:c.check_out});return new URL('api/villegram?'+q,location.href).href};
- async function session(){const C=window.CHALEZINHO_CONFIG;if(!window.supabase)return null;window.villegramAuth ||= window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);return(await window.villegramAuth.auth.getSession()).data.session}
+ async function session(){const C=window.CHALEZINHO_CONFIG;if(!window.supabase){const sdk=document.querySelector('script[src*="supabase-js"]');if(sdk)await new Promise(resolve=>{const timeout=setTimeout(resolve,10000);const done=()=>{clearTimeout(timeout);resolve()};sdk.addEventListener('load',done,{once:true});sdk.addEventListener('error',done,{once:true})});}if(!window.supabase)return null;window.villegramAuth ||= window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);return(await window.villegramAuth.auth.getSession()).data.session}
  async function interaction(body){const s=await session(),C=window.CHALEZINHO_CONFIG;const r=await fetch(C.bookingEngine,{method:'POST',headers:{'Content-Type':'application/json','X-Chalezinho-Env':'development',...(s?{Authorization:'Bearer '+s.access_token}:{})},body:JSON.stringify({action:'villegram',...body})});const d=await r.json();if(!r.ok||!d.ok)throw Object.assign(Error(d.error),{status:r.status});return d}
  function message(text){if(modal)modal.querySelector('.vg-status').textContent=text}
  function signin(){location.href='auth.html?mode=login&return='+encodeURIComponent('/index.html'+new URL(shareURL(cards[index])).search)}
@@ -27,10 +27,14 @@
  const picture=modal.querySelector('.vg-picture');pictureVisible=true;visibilityObserver?.disconnect();if(window.IntersectionObserver){visibilityObserver=new IntersectionObserver(entries=>{pictureVisible=entries[0].isIntersecting;synchronize()},{threshold:.1});visibilityObserver.observe(picture)}// Swipe the full reel, while keeping buttons and reading panels independently usable.
  const content=modal.querySelector('.vg-content');let gesture=null,wheelTotal=0,wheelAt=0;
  const interactive=e=>e.target.closest('a,button,details,input,textarea,.vg-sheet');
- content.onpointerdown=e=>{if(!interactive(e)&&e.isPrimary!==false)gesture={x:e.clientX,y:e.clientY,id:e.pointerId}};
+ content.onpointerdown=e=>{if(e.pointerType==='touch')return;if(!interactive(e)&&e.isPrimary!==false)gesture={x:e.clientX,y:e.clientY,id:e.pointerId}};
  content.onpointermove=e=>{if(!gesture||gesture.id!==e.pointerId)return;const dy=e.clientY-gesture.y,dx=e.clientX-gesture.x;if(Math.abs(dy)>12&&Math.abs(dy)>Math.abs(dx)){content.setPointerCapture?.(e.pointerId);if(!reduced.matches)content.style.transform='translateY('+Math.max(-100,Math.min(100,dy*.35))+'px)'}};
  content.onpointerup=e=>{if(!gesture)return;const dy=e.clientY-gesture.y,dx=e.clientX-gesture.x;gesture=null;content.style.transform='';if(Math.abs(dy)>65&&Math.abs(dy)>Math.abs(dx)*1.2)navigate(dy<0?1:-1)};
  content.onpointercancel=()=>{gesture=null;content.style.transform=''};
+ let touchGesture=null;
+ content.addEventListener('touchstart',e=>{touchGesture=!interactive(e)&&e.touches.length===1?{x:e.touches[0].clientX,y:e.touches[0].clientY}:null},{passive:true});
+ content.addEventListener('touchend',e=>{if(!touchGesture)return;const start=touchGesture;touchGesture=null;const t=e.changedTouches[0];if(!t)return;const dy=t.clientY-start.y,dx=t.clientX-start.x;if(Math.abs(dy)>65&&Math.abs(dy)>Math.abs(dx)*1.2)navigate(dy<0?1:-1)},{passive:true});
+ content.addEventListener('touchcancel',()=>{touchGesture=null},{passive:true});
  content.addEventListener('wheel',e=>{if(interactive(e)||!modal.querySelector('.vg-sheet').hidden)return;e.preventDefault();const now=Date.now();if(now<wheelLockedUntil)return;if(now-wheelAt>250)wheelTotal=0;if(now-wheelAt<700&&wheelTotal===Infinity)return;wheelAt=now;wheelTotal+=e.deltaY;if(Math.abs(wheelTotal)>80){wheelLockedUntil=now+800;navigate(wheelTotal>0?1:-1);wheelTotal=Infinity}},{passive:false});
  modal.querySelectorAll('.vg-scene img').forEach(img=>{const orient=()=>{img.classList.toggle('vg-wide',img.naturalWidth>img.naturalHeight);img.parentElement.style.backgroundImage='url("'+img.currentSrc+'")'};img.onload=orient;if(img.complete&&img.naturalWidth)orient()});
  if(swipeDirection&&!reduced.matches){content.style.setProperty('--vg-enter-offset',swipeDirection>0?'100%':'-100%');content.classList.add('vg-enter')}swipeDirection=0;

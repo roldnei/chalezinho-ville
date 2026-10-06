@@ -4,7 +4,7 @@ export default async function handler(req,res){
  if(req.method!=='GET')return res.status(405).json({ok:false,error:'method_not_allowed'});
  if(process.env.VERCEL_ENV!=='preview')return res.status(403).json({ok:false,error:'development_only'});
  const host=String(req.headers.host||'');
- if(!/^chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(host))return res.status(403).json({ok:false,error:'development_only'});
+ if(!(host==='chalezinho-ville-git-feature-romantic-fdde70-roldneicosta-4140.vercel.app'||/^chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(host)))return res.status(403).json({ok:false,error:'development_only'});
  try{
   const r=await fetch('https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine?action=stay_showcase',{headers:{Origin:'https://'+host,'X-Chalezinho-Env':'development'},signal:AbortSignal.timeout(45000)});
   const timing=r.headers.get('server-timing');if(timing)res.setHeader('Server-Timing',timing);
