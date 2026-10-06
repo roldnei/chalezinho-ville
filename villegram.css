@@ -8,3 +8,5 @@
 
 /* Photo and non-reading overlays own the vertical gesture from the first touch. */
 #villegram .vg-picture,#villegram .vg-purchase>:not(details){touch-action:none}
+
+#villegram .vg-visual{position:absolute;inset:0;will-change:transform}
