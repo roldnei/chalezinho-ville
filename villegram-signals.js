@@ -1,0 +1,22 @@
+(()=>{
+ const uuid=()=>crypto.randomUUID(),read=(k,f)=>{try{return JSON.parse(sessionStorage.getItem(k))||f}catch{return f}},write=(k,v)=>{try{sessionStorage.setItem(k,JSON.stringify(v))}catch{}};
+ const optedOut=()=>navigator.globalPrivacyControl||navigator.doNotTrack==='1';
+ let visitor;try{visitor=localStorage.getItem('villegram-visitor')||uuid();if(!optedOut())localStorage.setItem('villegram-visitor',visitor)}catch{visitor=uuid()}
+ let visit=read('villegram-session',{});if(!visit.id||Date.now()-(visit.last||0)>1800000)visit={id:uuid()};visit.last=Date.now();if(!optedOut())write('villegram-session',visit);
+ let queue=optedOut()?[]:read('villegram-signals-queue',[]),view=null,start=null,sending=false;
+ const endpoint=()=>window.CHALEZINHO_CONFIG.supabaseUrl+'/functions/v1/villegram-content';
+ function elapsed(){return Math.min(7200000,(view?.active_ms||0)+(start===null?0:Math.max(0,performance.now()-start)))}
+ function persist(){if(view)write('villegram-active-view',{...view,active_ms:Math.round(elapsed()),at:Date.now()});write('villegram-signals-queue',queue.slice(-200));}
+ function enqueue(kind,sequence=0){if(optedOut()||!view)return;queue.push({event_id:uuid(),publication_id:view.publication_id,visitor_id:visitor,session_id:visit.id,view_id:view.view_id,kind,active_ms:Math.round(elapsed()),sequence,loop:view.loop||0});persist();}
+ async function flush(){persist();if(sending||!queue.length)return;sending=true;const batch=queue.slice(0,25);try{const r=await fetch(endpoint(),{method:'POST',headers:{'Content-Type':'application/json','X-Chalezinho-Env':'development'},body:JSON.stringify({operation:'signals',events:batch}),keepalive:true});if(r.ok){const sent=new Set(batch.map(e=>e.event_id));queue=queue.filter(e=>!sent.has(e.event_id));persist();}else if(r.status===404||r.status===400){queue=queue.slice(batch.length);persist()}}catch{}finally{sending=false}}
+ function active(value){if(!view)return;if(value&&!document.hidden){if(start===null)start=performance.now()}else if(start!==null){view.active_ms=Math.round(elapsed());start=null;persist()}}
+ function begin(publication,restored=false){end(false);if(!publication?.id)return;const saved=read('villegram-active-view',{});view=restored&&saved.publication_id===publication.id&&Date.now()-(saved.at||0)<1800000?{...saved}:{publication_id:publication.id,view_id:uuid(),active_ms:0,shown:false,sequence:0,loop:0,completed:false};start=null;}
+ function end(passed=true){if(!view)return;active(false);if(passed&&view.shown&&view.active_ms<2000)enqueue('skip');if(view.shown){enqueue('progress',++view.sequence);flush()}view=null;start=null;}
+ function mark(kind){if(!view)return;enqueue(kind);if(['like','property_open','experience_open','dates_query','reservation_start'].includes(kind)){
+  const interest=read('villegram-interest',{});interest[view.publication_id]??={};interest[view.publication_id][kind]=(interest[view.publication_id][kind]||0)+1;write('villegram-interest',interest);
+ }if(['property_open','experience_open','dates_query','reservation_start'].includes(kind)){write('villegram-attribution',{publication_id:view.publication_id,visitor_id:visitor,session_id:visit.id,view_id:view.view_id,at:Date.now()});flush()}}
+ function complete(){if(!view||!view.shown)return;if(!view.completed){view.completed=true;enqueue('complete')}else{view.loop=(view.loop||0)+1;enqueue('repeat',view.loop)}}
+ setInterval(()=>{if(!view||start===null||document.hidden)return;const ms=elapsed();if(ms>=800&&!view.shown){view.shown=true;enqueue('view');flush()}if(ms>=15000*(view.sequence+1)&&view.shown){enqueue('progress',++view.sequence);flush()}persist();},500);
+ document.addEventListener('visibilitychange',()=>{if(document.hidden){active(false);flush()}});window.addEventListener('pagehide',()=>{active(false);if(view?.shown)enqueue('progress',++view.sequence);flush()});setInterval(flush,15000);
+ window.VillegramSignals={begin,end,active,mark,complete,flush,snapshot:()=>view?{...view,active_ms:Math.round(elapsed())}:null,interest:()=>read('villegram-interest',{}),declare(values){write('villegram-declared',values)},declared:()=>read('villegram-declared',{}),attribution(){const a=read('villegram-attribution',null);return !optedOut()&&a&&Date.now()-a.at<86400000?a:null}};
+})();

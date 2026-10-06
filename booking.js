@@ -132,7 +132,7 @@ async function search({scroll=true}={}){
  error("Consultando disponibilidade e valores...");
  document.body.classList.add("booking-results-screen");$("#booking-results").classList.remove("booking-results-hidden");
  $("#booking-period").textContent=bi.split('-').reverse().join('/')+' → '+bo.split('-').reverse().join('/');$('#availability-count').textContent='Consultando disponibilidade…';$('#booking-list').innerHTML='<p role="status">Buscando estadias para suas datas…</p>';
- track("search_started",{metadata:{nights:nights(bi,bo),guests}});
+ window.VillegramSignals?.mark("dates_query");track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
   if(state.offerId)q.set("stay_offer_id",state.offerId);
@@ -188,7 +188,7 @@ async function restoreSameDay(){
 }
 
 async function openFlow(id){
- state.fastCheckout=true;state.rateConfirmed=false;state.stage="review";state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
+ state.fastCheckout=true;state.rateConfirmed=false;state.stage="review";state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};const desiredExperience=new URLSearchParams(location.search).get('experience');const desired=(state.config?.experience_products||[]).find(p=>p.id===desiredExperience);const variant=desired?.experience_variants?.find(v=>v.active);if(!state.offerId&&desired&&variant)state.selectedByProduct[desired.id]=variant.id;state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
  if(state.fastCheckout)$("#summary-content").innerHTML='<p class="loading-state">Confirmando sua escolha…</p>';
@@ -538,7 +538,8 @@ async function performStartPayment(choice){
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#accept-all")?.checked)throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{access_session_id:accessSessionId(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  const d=await api("start_payment",{access_session_id:accessSessionId(),villegram_attribution:window.VillegramSignals?.attribution(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  const attribution=window.VillegramSignals?.attribution();if(attribution&&d.reservation_id)fetch(C.supabaseUrl+'/functions/v1/villegram-content',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+state.session.access_token},body:JSON.stringify({operation:'attribute',reservation_id:d.reservation_id,attribution}),keepalive:true}).catch(()=>{});
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");
