@@ -36,8 +36,13 @@ function accessSessionId(){
 }
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 
+async function flushVillegramAttribution(){
+ if(!state.session?.access_token)return;
+ try{const pending=JSON.parse(sessionStorage.getItem('villegram-pending-reservation')||'null');if(!pending)return;if(Date.now()-pending.at>86400000){sessionStorage.removeItem('villegram-pending-reservation');return}const r=await fetch(C.supabaseUrl+'/functions/v1/villegram-content',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+state.session.access_token},body:JSON.stringify({operation:'attribute',reservation_id:pending.reservation_id,attribution:pending.attribution}),signal:AbortSignal.timeout(10000),keepalive:true});if(r.ok||r.status===404)sessionStorage.removeItem('villegram-pending-reservation')}catch{}
+}
+setInterval(flushVillegramAttribution,30000);
 async function init(){
- const {data:{session}}=await sb.auth.getSession();state.session=session;
+ const {data:{session}}=await sb.auth.getSession();state.session=session;flushVillegramAttribution();
  try{let last=null;for(let attempt=1;attempt<=3;attempt++){try{state.config=await api("config");last=null;break}catch(e){last=e;if(attempt<3)await new Promise(resolve=>setTimeout(resolve,600*attempt))}}if(last)throw last}catch(e){error("Não foi possível carregar as configurações de reserva. Tente atualizar a página.");return}
  const today=new Date();today.setMinutes(today.getMinutes()-today.getTimezoneOffset());const min=today.toISOString().slice(0,10);
  $("#book-in").min=min;$("#book-out").min=min;
@@ -539,7 +544,7 @@ async function performStartPayment(choice){
   if(hasGuarantee&&!$("#accept-all")?.checked)throw new Error("guarantee_consent_required");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
   const d=await api("start_payment",{access_session_id:accessSessionId(),villegram_attribution:window.VillegramSignals?.attribution(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
-  const attribution=window.VillegramSignals?.attribution();if(attribution&&d.reservation_id)fetch(C.supabaseUrl+'/functions/v1/villegram-content',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+state.session.access_token},body:JSON.stringify({operation:'attribute',reservation_id:d.reservation_id,attribution}),keepalive:true}).catch(()=>{});
+  const attribution=window.VillegramSignals?.attribution();if(attribution&&d.reservation_id){try{sessionStorage.setItem('villegram-pending-reservation',JSON.stringify({reservation_id:d.reservation_id,attribution,at:Date.now()}))}catch{}flushVillegramAttribution();}
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
   showStep(6);setFlowError("");

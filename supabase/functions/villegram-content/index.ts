@@ -13,7 +13,7 @@ async function generate(force=false){const s=await settings();if(!s.enabled&&!fo
  try{const c=await catalog(),rows=generatePublications(c.properties,c.products,c.offers,s,now);if(!rows.length)return {created:0};const saved=await admin.from('villegram_publications').upsert(rows,{onConflict:'source_key',ignoreDuplicates:true}).select('id');if(saved.error)throw Error('generation_failed');return {created:saved.data?.length||0};}
  catch(e){await admin.from('villegram_automation').update({last_generated_at:s.last_generated_at}).eq('last_generated_at',now.toISOString());throw e;}
 }
-async function resolveMedia(posts:any[]){return Promise.all(posts.map(async p=>({...p,media:await Promise.all(p.media.map(async(m:any)=>{const out={...m};for(const [path,key] of [[m.path,'url'],[m.poster_path,'poster']])if(path){const r=await admin.storage.from('villegram-media').createSignedUrl(path,1800);if(r.error)throw Error('media_unavailable');out[key]=r.data.signedUrl;}return out;}))})));}
+async function resolveMedia(posts:any[]){return Promise.all(posts.map(async p=>({...p,media:await Promise.all(p.media.map(async(m:any)=>{const out={...m};for(const [path,key] of [[m.path,'url'],[m.poster_path,'poster']])if(path){const r=await admin.storage.from('villegram-media').createSignedUrl(path,1800);if(r.error){out[key]=null;out.unavailable=true}else out[key]=r.data.signedUrl;}return out;}))})));}
 async function paginated(table:string,columns:string,days:number){const rows:any[]=[];for(let n=0;n<100000;n+=1000){const r=await admin.from(table).select(columns).gte('created_at',new Date(Date.now()-days*86400000).toISOString()).order('created_at').order('id').range(n,n+999);if(r.error)throw Error('report_unavailable');rows.push(...r.data||[]);if(r.data!.length<1000)return rows;}throw Error('report_volume_limit');}
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
@@ -22,7 +22,7 @@ Deno.serve(async req=>{
  try{
  const query=new URL(req.url).searchParams,body=req.method==='POST'?await req.json():{},op=body.operation||query.get('operation')||'feed';
  if(op==='feed'||op==='generate_due'){
-  await generate();if(op==='generate_due')return json({ok:true});
+  if(op==='generate_due'){await generate();return json({ok:true})}try{await generate()}catch{console.warn('villegram_generation_unavailable')}
   const [c,s,posts]=await Promise.all([catalog(),settings(),admin.from('villegram_publications').select('*').eq('status','published').order('featured',{ascending:false}).order('display_order').order('created_at').limit(200)]);if(posts.error)throw Error('feed_unavailable');
   const eligible=(posts.data||[]).filter(p=>eligiblePublication(p,c.properties,c.products,c.offers));return json({ok:true,publications:await resolveMedia(eligible),...c,max_offers:s.max_offers,checked_at:new Date().toISOString()});
  }

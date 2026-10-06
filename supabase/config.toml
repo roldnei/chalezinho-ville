@@ -1,2 +1,6 @@
 [functions.pagbank-webhook]
 verify_jwt = false
+
+# DEV-only function authenticates all team/social writes inside its handler.
+[functions.villegram-content]
+verify_jwt = false
