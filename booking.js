@@ -572,9 +572,14 @@ function renderSandboxPayment(d){
  }}
  const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
   try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
-   if(s.manual_review){$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
-   if(s.reservation_status==="confirmed"){$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html#reservas">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
-   if(["refused","cancelled","expired"].includes(s.payment_status)){$("#sandbox-payment-result").textContent="Pagamento não aprovado. Faça uma nova consulta para tentar outra reserva.";clearInterval(window.__pagbankPoll)}
+   if(s.manual_review){setFlowError("");$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
+   if(s.reservation_status==="confirmed"){setFlowError("");$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html#reservas">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
+   if(["refused","cancelled","expired"].includes(s.payment_status)){
+    setFlowError("");state.activePayment.status=s.payment_status;$("#quote-countdown").textContent="Pagamento não aprovado · reserva não confirmada";
+    $("#sandbox-payment-result").innerHTML='Pagamento não aprovado. Consulte novamente a disponibilidade antes de tentar outro pagamento. <button type="button" id="sandbox-new-search">Consultar novamente</button>';
+    $("#sandbox-new-search").onclick=async()=>{state.activePayment=null;state.quote=null;state.rate=null;state.rateCode=null;state.rateConfirmed=false;sessionStorage.removeItem('chalezinho_booking_resume');setCheckoutVisible(false);await search()};
+    clearInterval(window.__pagbankPoll);
+   }
   }catch{ /* The provider may still be processing; the webhook is authoritative. */ }};
  clearInterval(window.__pagbankPoll);tick();window.__pagbankPoll=setInterval(tick,5000);
 }
