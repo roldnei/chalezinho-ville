@@ -120,3 +120,11 @@ Teste visual desta versão continua pendente: nova tentativa de abrir o editor D
 ### Status de envio compacto
 
 Após a captura do usuário, o aviso saiu de dentro da imagem: fica no fluxo normal logo abaixo da prévia, antes das instruções, sem sobrepor os controles. Retirados fundo, sombra, moldura e espaçamento excessivo; barra de 2 px e texto de 12 px. Confirmação mantém desaparecimento automático; erro e nova tentativa continuam acessíveis. Os 28 testes do editor passaram. Conferida posição no DOM fora da cena; aparência em navegador ainda não validada devido ao bloqueio da sessão já registrado.
+
+## Primeira etapa inteiramente na cena (07/10/2026)
+
+Avançar passa a ser uma seta circular de 46 px no canto inferior direito da cena; miniaturas de 44 × 58 px ficam no canto inferior esquerdo, com rolagem e ordenação por arraste/teclado preservadas. No vídeo, ficam acima dos controles nativos. Adicionar e menu contextual ficam no topo. Capa e opções adicionais ficam no menu, não abaixo da imagem. A biblioteca de fotos da equipe continua acessível em um diálogo próprio. Voltar da legenda restaura a navegação na cena e o foco.
+
+Instruções, rodapé, Opções da cena e sugestão de chalé deixaram de ocupar a área abaixo da prévia na primeira etapa. O chalé sugerido continua preenchido para revisão na publicação. Avisos de envio/erro são compactos e temporários quando resolvidos, dentro da cena numa região separada dos controles; erros não são descartados. Etapas posteriores mantêm os campos e ações necessários para legenda e publicação. Sem mudança de backend, schema, reservas ou PROD.
+
+Validação: **374 testes passaram**; 29 do editor passaram novamente após ajuste final de foco. Cobertura adicional acompanha entrada pela biblioteca, avanço/retorno, localização dos controles, capa e salvamento. Sintaxe e diff check passaram. Teste visual e captura desta versão continuam pendentes pelo bloqueio da sessão de credenciais do navegador na nuvem; testes DOM não comprovam aparência ou gesto em Android real.

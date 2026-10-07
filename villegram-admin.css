@@ -33,3 +33,28 @@ body.vg-admin-page #vg-media-delete{display:flex;align-items:center;gap:10px;bor
 @media(prefers-reduced-motion:no-preference){#vg-media-menu:not([hidden]){animation:vg-media-reveal .16s ease-out}@keyframes vg-media-reveal{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}}
 
 .vg-composer-workspace.is-media-stage{grid-template-columns:1fr;gap:14px}.vg-composer-workspace.is-media-stage .vg-composer-preview{position:relative;margin-inline:auto}.vg-composer-workspace.is-media-stage .vg-composer-panels{width:100%;max-width:520px;min-width:0;margin-inline:auto}
+
+/* Media step: the canvas contains navigation, ordering and contextual actions. */
+.vg-canvas-step .vg-composer-workspace{gap:0}.vg-canvas-step .vg-composer-panels{display:none}.vg-canvas-step .vg-composer-preview{margin-bottom:0}
+#vg-composer-screen #vg-media-list{position:absolute;left:12px;right:78px;bottom:12px;z-index:8;margin:0;min-width:0}
+#vg-composer-screen .vg-media-strip{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;max-width:100%;padding:5px 2px;scrollbar-width:none;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;align-items:flex-end}
+#vg-composer-screen .vg-media-strip::-webkit-scrollbar{display:none}
+body.vg-admin-page #vg-composer-screen .vg-media-strip button{width:44px;height:58px;min-width:44px;min-height:44px;flex:0 0 44px;padding:0;border:1px solid #ffffff70;border-radius:9px;background:#1119;overflow:hidden;box-shadow:0 2px 7px #0004}
+body.vg-admin-page #vg-composer-screen .vg-media-strip button[aria-pressed=true]{border:2px solid #fff;outline:0}
+#vg-composer-screen .vg-media-strip img{width:100%;height:100%;object-fit:cover}#vg-composer-screen .vg-media-strip button>span:not(.vg-media-grip){font-size:9px;line-height:1.4}#vg-composer-screen .vg-media-grip{display:none}
+#vg-scene-next-slot{position:absolute;right:12px;bottom:21px;z-index:8}
+body.vg-admin-page #vg-scene-next-slot #vg-step-next{width:46px;height:46px;min-width:46px;min-height:46px;padding:0;display:grid;place-items:center;border-radius:50%;background:#f1ece2e8;border:1px solid #ffffff60;color:#191b20;box-shadow:0 2px 8px #0003;backdrop-filter:blur(10px)}
+#vg-scene-next-slot #vg-step-next span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}#vg-scene-next-slot #vg-step-next svg{width:23px;height:23px}
+#vg-composer-screen #vg-media-controls,#vg-composer-screen.is-video #vg-media-controls{top:12px;left:12px;right:auto;bottom:auto;gap:6px}
+body.vg-admin-page #vg-media-controls button{width:44px;height:44px;padding:0;min-width:44px}body.vg-admin-page #vg-media-add>span:first-child{font-size:24px;font-weight:400}
+#vg-composer-screen.is-video #vg-media-list{bottom:60px}#vg-composer-screen.is-video #vg-scene-next-slot{bottom:70px}
+#vg-composer-screen #vg-media-menu,#vg-composer-screen.is-video #vg-media-menu{top:62px;bottom:auto;left:12px;right:auto;max-width:calc(100% - 24px);max-height:calc(100% - 160px);overflow-y:auto}
+#vg-scene-extra{display:grid;gap:3px}body.vg-admin-page #vg-scene-extra button{background:transparent;border:0;border-radius:10px;min-height:44px;padding:9px 12px;font-size:12px;justify-content:flex-start}
+#vg-scene-notices{position:absolute;top:173px;left:12px;right:12px;z-index:10;pointer-events:none;max-height:calc(100% - 276px);overflow:auto}
+#vg-scene-notices #vg-upload-feedback{margin:0;padding:5px 8px;background:#111b;border-radius:7px;pointer-events:auto}#vg-scene-notices #vg-upload-status{color:#eee;font-size:11px}
+#vg-scene-notices #vg-editor-message{margin:6px 0 0;padding:5px 8px;border-radius:7px;background:#111c;color:#eee;font:400 12px/1.4 'DM Sans',sans-serif;pointer-events:auto}
+#vg-scene-notices #vg-editor-message:empty,#vg-scene-notices:empty{display:none}
+body.vg-admin-page #vg-scene-library{position:absolute;left:12px;top:173px;z-index:7;min-height:44px;padding:8px 12px;border:1px solid #ffffff30;border-radius:22px;background:#161a20cc;color:#fff;font-size:12px}
+#vg-composer-screen:has(#vg-upload-feedback:not([hidden])) #vg-scene-library,#vg-composer-screen:has(#vg-editor-message:not(:empty)) #vg-scene-library{visibility:hidden}
+#vg-source-library{width:min(540px,calc(100% - 32px));max-height:80dvh;padding:18px;border:1px solid #ffffff30;border-radius:20px;background:#17191e;color:#f5f3ed;overflow:auto}#vg-source-library::backdrop{background:#000a}#vg-source-close{margin-top:14px}
+#vg-source-library:not([open]),#vg-scene-next-slot[hidden],#vg-media-list[hidden]{display:none!important}
