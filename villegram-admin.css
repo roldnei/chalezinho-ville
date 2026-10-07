@@ -58,3 +58,18 @@ body.vg-admin-page #vg-scene-library{position:absolute;left:12px;top:173px;z-ind
 #vg-composer-screen:has(#vg-upload-feedback:not([hidden])) #vg-scene-library,#vg-composer-screen:has(#vg-editor-message:not(:empty)) #vg-scene-library{visibility:hidden}
 #vg-source-library{width:min(540px,calc(100% - 32px));max-height:80dvh;padding:18px;border:1px solid #ffffff30;border-radius:20px;background:#17191e;color:#f5f3ed;overflow:auto}#vg-source-library::backdrop{background:#000a}#vg-source-close{margin-top:14px}
 #vg-source-library:not([open]),#vg-scene-next-slot[hidden],#vg-media-list[hidden]{display:none!important}
+
+/* Compact scene controls share the circular next action; framing lives in More. */
+body.vg-admin-page #vg-composer-screen :is(#vg-media-add,#vg-media-options,.vg-text-tools button){display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;border-radius:50%;border:1px solid #ffffff35;background:#24283080;backdrop-filter:blur(12px);box-shadow:0 2px 8px #0002;color:#fff;font:500 19px/1 'DM Sans',sans-serif;letter-spacing:0}
+body.vg-admin-page #vg-composer-screen #vg-media-options{font-size:17px;letter-spacing:1px}
+#vg-composer-screen .vg-text-tools{top:12px;right:12px;gap:7px}#vg-composer-screen .vg-text-tools button>span{display:none}
+body.vg-admin-page #vg-composer-screen #vg-media-menu #vg-scene-tools{position:static;inset:auto;display:flex;gap:5px;margin:4px 0;padding:4px 0;border-block:1px solid #ffffff18;pointer-events:auto}
+#vg-composer-screen #vg-media-menu .vg-scene-tools>div{justify-content:flex-start;gap:5px;flex-wrap:wrap}
+body.vg-admin-page #vg-composer-screen #vg-media-menu .vg-scene-tools button{border:0;border-radius:22px;background:#ffffff09;min-height:44px;min-width:44px;padding:8px 11px;font-size:12px;box-shadow:none}
+body.vg-admin-page #vg-composer-screen #vg-media-menu .vg-scene-tools>div+div button{border-radius:50%;width:44px;height:44px;padding:0;font-size:19px}
+#vg-composer-screen #vg-scene-extra [data-cover]{display:none}
+body.vg-admin-page #vg-post-form .vg-composer-steps{gap:5px;padding:6px 0 8px;margin-bottom:14px;border:0}
+body.vg-admin-page #vg-post-form .vg-composer-steps button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;padding:7px 3px;min-height:56px;border:0;border-radius:0;background:transparent;box-shadow:none;color:#a9aaa9;font:500 11px/1.25 'DM Sans',sans-serif}
+body.vg-admin-page #vg-post-form .vg-composer-steps button svg{width:20px;height:20px}
+body.vg-admin-page #vg-post-form .vg-composer-steps button[aria-current=step]{color:#f0ece4;background:transparent}
+body.vg-admin-page #vg-post-form .vg-composer-steps button[aria-current=step]:after{height:2px;left:35%;right:35%;bottom:0;background:#e7d7b7}
