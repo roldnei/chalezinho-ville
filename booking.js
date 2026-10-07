@@ -58,6 +58,7 @@ async function init(){
  window.addEventListener("beforeunload",()=>{if(state.property&&!$("#checkout-modal").hidden&&Number($("#checkout-panel").dataset.step)<6)saveResume()});
  renderDevBanner();
  const incoming=new URLSearchParams(location.search);
+ if(incoming.has("check_in")&&incoming.has("check_out")&&await restoreResume(true))return;
  if(incoming.has("check_in")&&incoming.has("check_out")){
   $("#book-in").value=incoming.get("check_in");$("#book-out").value=incoming.get("check_out");$("#book-guests").value=incoming.get("guests")||"2";
   await search({scroll:incoming.get("from")!=="showcase"});
@@ -564,11 +565,15 @@ function renderSandboxPayment(d){
  box.innerHTML=window.VilleOffers.contractMarkup(state.rate?.contract_snapshot)+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
   (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>O cartão de teste foi enviado. Consultando o resultado…</p>')+
   '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
- if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=()=>navigator.clipboard.writeText(pix)}
+ if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=async()=>{
+  const button=$("#sandbox-copy-pix");
+  try{await navigator.clipboard.writeText(pix);button.textContent="Pix copiado";}
+  catch{button.textContent="Selecione e copie o código Pix";$("#sandbox-pix-code").focus();$("#sandbox-pix-code").select();}
+ }}
  const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
   try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
    if(s.manual_review){$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
-   if(s.reservation_status==="confirmed"){$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
+   if(s.reservation_status==="confirmed"){$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html#reservas">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
    if(["refused","cancelled","expired"].includes(s.payment_status)){$("#sandbox-payment-result").textContent="Pagamento não aprovado. Faça uma nova consulta para tentar outra reserva.";clearInterval(window.__pagbankPoll)}
   }catch{ /* The provider may still be processing; the webhook is authoritative. */ }};
  clearInterval(window.__pagbankPoll);tick();window.__pagbankPoll=setInterval(tick,5000);
@@ -615,11 +620,14 @@ function startCountdown(exp){
  tick();window.__quoteTimer=setInterval(tick,1000);
 }
 function saveResume(){
- sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({reopen:true,fastCheckout:state.fastCheckout,stage:state.stage,entrySource:state.entrySource,rateConfirmed:state.rateConfirmed,guestName:$("#guest-name").value,guestPhone:$("#guest-phone").value,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||""}));
+ sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({entryUrl:location.pathname+location.search,reopen:true,fastCheckout:state.fastCheckout,stage:state.stage,entrySource:state.entrySource,rateConfirmed:state.rateConfirmed,guestName:$("#guest-name").value,guestPhone:$("#guest-phone").value,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||""}));
 }
-async function restoreResume(){
+async function restoreResume(matchingEntry=false){
  let saved=null;try{saved=JSON.parse(sessionStorage.getItem("chalezinho_booking_resume")||"null")}catch{}
- if(!saved)return;sessionStorage.removeItem("chalezinho_booking_resume");
+ if(!saved?.property||!saved.check_in||!saved.check_out)return false;
+ // A new link must not inherit the composition of a different stay in this tab.
+ if(matchingEntry&&saved.entryUrl!==location.pathname+location.search)return false;
+ sessionStorage.removeItem("chalezinho_booking_resume");
  const resumeQuery=new URLSearchParams(location.search);if(resumeQuery.get("resume")!=="1"&&((resumeQuery.get("mode")==="stay"&&saved.offerId)||(resumeQuery.has("stay_offer")&&resumeQuery.get("stay_offer")!==saved.offerId)))return;
  state.fastCheckout=true;state.stage=saved.stage||"review";state.entrySource=saved.entrySource||(saved.fastCheckout?"showcase":"manual");state.rateConfirmed=saved.rateConfirmed===true;state.offerId=saved.offerId||null;state.preferences=saved.preferences||{};syncStayModes();
  $("#book-in").value=saved.check_in||"";$("#book-out").value=saved.check_out||"";$("#book-guests").value=saved.guests||"2";state.property=saved.property;state.selectedByProduct=saved.selectedByProduct||{};state.quote=saved.quote;state.rateCode=saved.rateCode;
@@ -631,9 +639,9 @@ async function restoreResume(){
   $('#trip-purpose-initial').value=saved.purpose||'';
   $('#guest-name').value=saved.guestName||'';$('#guest-phone').value=saved.guestPhone||'';
   if(!state.quote||Date.parse(state.quote.expires_at)<=Date.now()){
-   try{await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===state.rateCode&&r.selectable)||null}catch{directCheckoutError();return}
+   try{await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===state.rateCode&&r.selectable)||null}catch{directCheckoutError();return true}
   }
-  if(!state.rate){directCheckoutError();return}if(state.stage==="finalize"&&state.rateConfirmed)await openFinalization();else await openFastCheckout();return;
+  if(!state.rate){directCheckoutError();return true}if(state.stage==="finalize"&&state.rateConfirmed)await openFinalization();else await openFastCheckout();return true;
  }
 
 }

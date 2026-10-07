@@ -51,6 +51,26 @@ test('direct checkout never substitutes an unavailable advertised tariff',async(
  const {dom,w}=await setup(null,directURL.replace('rate=non_refundable','rate=unavailable'));try{await wait(()=>w.document.querySelector('#direct-checkout-status p').textContent.includes('não está mais disponível'));assert.equal(w.document.querySelector('#checkout-modal').hidden,true);assert.equal(w.document.querySelector('#summary-content').textContent,'')}finally{dom.window.close()}
 });
 
+test('reload of the same offer preserves extras, explicit tariff and preferences; another offer link does not',async()=>{
+ const a=await setup(null,directURL);let saved,url;
+ try{const $=s=>a.w.document.querySelector(s);await wait(()=>$('#checkout-rate-options input'));choose(a.w,'refundable');
+  const choice=$('[data-component="Bebida"]');choice.value='Espumante';choice.dispatchEvent(new a.w.Event('change'));await wait(()=>!$('#step-next').disabled);
+  $('#experience-options [data-package="breakfast"]').click();await wait(()=>!$('#step-next').disabled);
+  a.w.dispatchEvent(new a.w.Event('beforeunload'));saved=a.w.sessionStorage.getItem('chalezinho_booking_resume');url=a.w.location.href;
+ }finally{a.dom.window.close()}
+ const b=await setup(saved,url);
+ try{const $=s=>b.w.document.querySelector(s);await wait(()=>$('#checkout-rate-options input'));
+  assert.equal($('#checkout-rate-options input:checked').value,'refundable');assert.equal($('[data-component="Bebida"]').value,'Espumante');
+  assert.ok($('#experience-options [data-remove="breakfast"]'));assert.match($('#summary-content').textContent,/1.435,00/);
+  assert.equal(b.calls.filter(c=>c.action==='quote').length,0);
+ }finally{b.dom.window.close()}
+ const c=await setup(saved,url.replace('check_in=2030-01-01','check_in=2030-02-01').replace('check_out=2030-01-03','check_out=2030-02-03'));
+ try{const $=s=>c.w.document.querySelector(s);await wait(()=>$('#checkout-rate-options input'));
+  assert.equal($('#checkout-rate-options input:checked'),null);assert.equal($('#experience-options [data-remove="breakfast"]'),null);
+  assert.equal($('#book-in').value,'2030-02-01');assert.match($('#summary-content').textContent,/1.235,00/);
+ }finally{c.dom.window.close()}
+});
+
 test('dates submitted on home skip repeated date screen and preserve purpose until an explicit choice',async()=>{const {dom,w,calls}=await setup(null,'https://qa.example/reservar.html?check_in=2030-01-01&check_out=2030-01-03&guests=1&purpose=romantic&from=dates&mode=stay');try{const $=s=>w.document.querySelector(s);await wait(()=>$('.booking-select'));assert.equal(w.document.body.classList.contains('booking-results-screen'),true);assert.equal($('#trip-purpose-initial').value,'romantic');assert.equal($('#book-guests').value,'1');assert.equal($('#checkout-modal').hidden,true);$('#change-dates').click();const searches=calls.filter(c=>c.action==='search').length;$('#trip-purpose-initial').value='';$('#trip-purpose-initial').dispatchEvent(new w.Event('change'));await new Promise(r=>setTimeout(r,20));assert.equal(w.document.body.classList.contains('booking-results-screen'),false);assert.equal(calls.filter(c=>c.action==='search').length,searches);assert.equal($('#checkout-modal').hidden,true)}finally{dom.window.close()}});
 
 test('one-night search does not offer a two-night package and purpose changes survive reload URL',async()=>{const {dom,w}=await setup(null,'https://qa.example/reservar.html?check_in=2030-01-01&check_out=2030-01-02&purpose=romantic&from=dates&mode=stay');try{const $=s=>w.document.querySelector(s);await wait(()=>$('.booking-select'));$('.booking-select').click();await wait(()=>$('#checkout-rate-options input'));assert.equal($('#checkout-stay-mode').options.length,1);$('#trip-purpose-review').value='';$('#trip-purpose-review').dispatchEvent(new w.Event('change'));assert.equal(new URL(w.location.href).searchParams.get('purpose'),'');assert.equal($('#checkout-panel').dataset.step,'2');assert.equal($('#checkout-modal').hidden,false)}finally{dom.window.close()}});
