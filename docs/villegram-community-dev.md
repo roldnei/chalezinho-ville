@@ -136,3 +136,9 @@ Adicionar, opções e Aa usam círculos de 44 px com fundo translúcido e nomes 
 ### Estado vazio sem controles de edição
 
 Sem mídia, a seta de avanço, as etapas, miniaturas e ferramentas ficam ocultas. Ao carregar mídia aparecem novamente; remover a última restaura o estado vazio. Biblioteca da equipe usa ícone de galeria com nome acessível, disponível para escolher a primeira foto. Os 40 testes de editor/texto passaram, incluindo verificações do estado vazio/carregado e retorno ao vazio. Sintaxe e diff check passaram. Sem alteração de backend ou PROD; validação visual continua pendente pelo bloqueio da sessão do navegador.
+
+### Enquadramento direto na cena
+
+O comando Preencher saiu do menu de três pontos e usa um ícone circular de enquadramento no canto direito, abaixo de Aa. O nome acessível e a dica alternam entre Mostrar foto inteira e Preencher a cena. Fica oculto sem mídia e nas etapas seguintes. Fotos novas enviadas ou escolhidas da biblioteca entram com fit cover; mídia existente conserva seu enquadramento e vídeos mantêm o padrão anterior. A alternância mantém zoom e deslocamento.
+
+Validação: 41 testes de editor/texto passaram, cobrindo upload e biblioteca com preenchimento inicial, alternância fora do menu, persistência do enquadramento ao reabrir, navegação e remoção da última mídia. Sintaxe e diff check passaram. Sem backend, banco ou PROD alterados. Aparência em navegador continua sem nova validação devido ao bloqueio de retomada segura da sessão de credenciais já registrado.

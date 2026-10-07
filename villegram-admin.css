@@ -59,7 +59,7 @@ body.vg-admin-page #vg-scene-library{position:absolute;left:12px;top:173px;z-ind
 #vg-source-library{width:min(540px,calc(100% - 32px));max-height:80dvh;padding:18px;border:1px solid #ffffff30;border-radius:20px;background:#17191e;color:#f5f3ed;overflow:auto}#vg-source-library::backdrop{background:#000a}#vg-source-close{margin-top:14px}
 #vg-source-library:not([open]),#vg-scene-next-slot[hidden],#vg-media-list[hidden]{display:none!important}
 
-/* Compact scene controls share the circular next action; framing lives in More. */
+/* Compact scene controls share the circular next action; secondary adjustments live in More. */
 body.vg-admin-page #vg-composer-screen :is(#vg-media-add,#vg-media-options,.vg-text-tools button){display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;border-radius:50%;border:1px solid #ffffff35;background:#24283080;backdrop-filter:blur(12px);box-shadow:0 2px 8px #0002;color:#fff;font:500 19px/1 'DM Sans',sans-serif;letter-spacing:0}
 body.vg-admin-page #vg-composer-screen #vg-media-options{font-size:17px;letter-spacing:1px}
 #vg-composer-screen .vg-text-tools{top:12px;right:12px;gap:7px}#vg-composer-screen .vg-text-tools button>span{display:none}
@@ -77,3 +77,7 @@ body.vg-admin-page #vg-post-form .vg-composer-steps button[aria-current=step]:af
 body.vg-admin-page #vg-composer-screen #vg-scene-library{top:12px;left:12px;width:44px;height:44px;min-width:44px;min-height:44px;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid #ffffff35;background:#24283080;backdrop-filter:blur(12px);box-shadow:0 2px 8px #0002;color:#fff}
 body.vg-admin-page #vg-composer-screen.has-media #vg-scene-library{top:66px}#vg-scene-library svg{width:22px;height:22px}
 body.vg-admin-page #vg-post-form .vg-composer-steps[hidden]{display:none!important}
+
+/* Framing stays directly available beside the scene, separate from More. */
+body.vg-admin-page #vg-composer-screen #vg-scene-fit{position:absolute;top:66px;right:12px;z-index:7;display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;border-radius:50%;border:1px solid #ffffff35;background:#24283080;backdrop-filter:blur(12px);box-shadow:0 2px 8px #0002;color:#fff}
+#vg-scene-fit svg{width:22px;height:22px}#vg-scene-fit[data-fit=cover] rect{fill:#ffffff20}
