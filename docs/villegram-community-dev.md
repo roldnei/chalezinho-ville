@@ -82,3 +82,7 @@ A captura do usuário revelou validação HTML rejeitando @ e maiúsculas antes 
 - Pendentes: salvar avatar e perfil em uma mesma ação pela UI autenticada, upload/rascunho/publicação/reabertura do texto pela UI autenticada, gesto multitouch real e falhas de rede. Cobertura automatizada não substitui esses passos.
 - API DEV real: feed HTTP 200 com 11 publicações; tentativa anônima de salvar perfil HTTP 401. Nenhuma credencial exposta.
 - `villegram-stories-qa.html` é um ensaio de componentes sem escrita no banco; não substitui a jornada completa da conta autenticada.
+
+## Refinamento visual dos controles sociais (07/10/2026)
+
+Ações de perfil com superfícies planas, ação principal clara, ícones SVG consistentes e navegação em cinco colunas com indicador de seleção. Abas permanecem nomeadas e operáveis por teclado; Postagens conserva o nome acessível Minhas postagens. Cabeçalho Ville Reels compacto e ação de tela inteira com nome acessível no celular. Ajuste restrito à conta/comunidade; não altera banco ou reserva. Os 16 testes da comunidade e a análise sintática passaram. Nova captura visual pendente: o navegador recusou observação por estado de credenciais nativas, inclusive após reiniciar o runtime uma vez.
