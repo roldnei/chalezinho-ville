@@ -3,6 +3,11 @@ type Row=Record<string,any>;
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 export const publicationTypes=['property','experience','offer','trust'];
 export const signalTypes=['view','progress','complete','repeat','skip','like','share','comment','property_open','experience_open','inclusions_open','dates_query','reservation_start'];
+export function textLayersInput(raw:unknown){
+ if(raw==null)return [];
+ if(!Array.isArray(raw)||raw.length>5)throw Error('invalid_text_layers');
+ return raw.map(t=>{if(!t||typeof t.text!=='string'||!t.text.trim()||t.text.length>280||!/^#[0-9a-f]{6}$/i.test(t.color)||!(t.background==='transparent'||/^#[0-9a-f]{6}$/i.test(t.background))||!['x','y','size'].every(k=>typeof t[k]==='number'&&Number.isFinite(t[k]))||t.x<5||t.x>95||t.y<5||t.y>95||t.size<3||t.size>9)throw Error('invalid_text_layers');return {text:t.text.trim(),x:t.x,y:t.y,size:t.size,color:t.color,background:t.background};});
+}
 export function publicationInput(raw:Row,projectUrl:string){
  const stay_selection=staySelectionInput(raw.stay_selection);
  const type=raw.type,caption=String(raw.caption||'').trim(),title=String(raw.title||'').trim();
@@ -19,7 +24,7 @@ export function publicationInput(raw:Row,projectUrl:string){
   if(['offset_x','offset_y'].some(key=>!Number.isFinite(Number(m[key]??0))||Math.abs(Number(m[key]??0))>300))throw Error('invalid_media');
   if(m.path&&!(m.kind==='video'?/\.(mp4|webm)$/i:/\.(webp|jpg)$/i).test(m.path))throw Error('invalid_media');
   if(m.kind==='video'&&(!path(m.poster_path)||!(/\.(webp|jpg)$/i).test(m.poster_path)||!Number.isFinite(Number(m.duration))||Number(m.duration)<=0||Number(m.duration)>120||!Number.isSafeInteger(Number(m.bytes))||Number(m.bytes)<=0||Number(m.bytes)>50*1024*1024))throw Error('invalid_video');
-  return {kind:m.kind,path:null,url:null,poster_path:null,...(m.path?{path:m.path}:{url:m.url}),...(m.poster_path?{poster_path:m.poster_path}:{}),fit:m.fit||'contain',position:Number(m.position??50),position_x:Number(m.position_x??50),zoom:Number(m.zoom??1),offset_x:Number(m.offset_x??0),offset_y:Number(m.offset_y??0),alt:String(m.alt||title).slice(0,160),...(m.kind==='video'?{duration:Number(m.duration),bytes:Number(m.bytes)}:{})};
+  return {...(m.text_layers?.length?{text_layers:textLayersInput(m.text_layers)}:(textLayersInput(m.text_layers),{})),kind:m.kind,path:null,url:null,poster_path:null,...(m.path?{path:m.path}:{url:m.url}),...(m.poster_path?{poster_path:m.poster_path}:{}),fit:m.fit||'contain',position:Number(m.position??50),position_x:Number(m.position_x??50),zoom:Number(m.zoom??1),offset_x:Number(m.offset_x??0),offset_y:Number(m.offset_y??0),alt:String(m.alt||title).slice(0,160),...(m.kind==='video'?{duration:Number(m.duration),bytes:Number(m.bytes)}:{})};
  });
  if(normalized.some(m=>m.kind==='video')&&normalized.length!==1)throw Error('one_video_required');
  const cover_index=Number(raw.cover_index||0),display_order=Number(raw.display_order||0),cta=raw.cta||({property:'property',experience:'experience',offer:'offer',trust:'dates'} as Row)[type];

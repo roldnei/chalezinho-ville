@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
 import {JSDOM} from 'jsdom';
-import {profileInput,guestInput,mentionHandles,communityPublic,communityOperation} from '../supabase/functions/_shared/villegram-community.ts';
+import {profileInput,guestInput,mentionHandles,communityPublic,communityOperation,avatarBytes} from '../supabase/functions/_shared/villegram-community.ts';
 const owner='4069a585-7cc6-48ad-9263-567358a45c0c',other='11111111-1111-4111-8111-111111111111',staff='22222222-2222-4222-8222-222222222222',dev='https://pxfqmnhqodqyaaqeyjgr.supabase.co';
 const draft={title:'Meu momento',caption:'Café no chalé',status:'published',property_id:1,media:[{kind:'photo',path:owner+'/'+other+'.webp'}],cover_index:0};
 const db=new PGlite();
@@ -87,7 +87,7 @@ test('private storage only permits own paths and requires guest eligibility for 
 });
 
 const tick=()=>new Promise(r=>setTimeout(r,20));
-async function communityPage(file,query,responses){const dom=new JSDOM(await readFile(new URL('../'+file,import.meta.url),'utf8'),{url:dev+'/'+file+query,runScripts:'outside-only'}),w=dom.window,calls=[];w.CHALEZINHO_CONFIG={supabaseUrl:dev,supabaseKey:'public-key'};w.AbortSignal.timeout=()=>undefined;w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'test',user:{id:owner}}}})}})};w.fetch=async(_url,opts)=>{const b=JSON.parse(opts.body);calls.push(b);return {ok:true,json:async()=>({ok:true,...await responses(b)})}};w.eval(await readFile(new URL('../villegram-community.js',import.meta.url),'utf8'));await tick();return {dom,w,calls}}
+async function communityPage(file,query,responses){const dom=new JSDOM(await readFile(new URL('../'+file,import.meta.url),'utf8'),{url:dev+'/'+file+query,runScripts:'outside-only'}),w=dom.window,calls=[];w.CHALEZINHO_CONFIG={supabaseUrl:dev,supabaseKey:'public-key'};w.AbortSignal.timeout=()=>undefined;w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'test',user:{id:owner}}}})}})};w.fetch=async(_url,opts)=>{const b=JSON.parse(opts.body);calls.push(b);return {ok:true,json:async()=>({ok:true,...await responses(b)})}};w.URL.revokeObjectURL=()=>{};w.URL.createObjectURL=()=>"blob:avatar";w.eval(await readFile(new URL('../villegram-community.js',import.meta.url),'utf8'));await tick();return {dom,w,calls}}
 
 test('public profile follows and unfollows through explicit actions; public text is escaped',async()=>{
  let following=false;const {dom,w,calls}=await communityPage('villegram-perfil.html','?perfil=amiga',b=>{if(b.operation==='community_follow'){following=b.following;return {}}return {profile:{id:other,handle:'amiga',display_name:'<script>bad</script>',bio:'Viagem'},followers:following?1:0,following:0,is_following:following,is_self:false,publications:[]}});
@@ -114,13 +114,36 @@ test('profile accepts @ and uppercase before native validation, normalizes the A
  const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
  const {dom,w,calls}=await communityPage('conta.html','',b=>{if(b.operation==='community_save_profile'){state.profile={id:owner,...b.profile};return {profile:state.profile}}return state});
  const d=w.document,f=d.querySelector('#community-profile-form'),handle=f.elements.handle;
- assert.equal(d.querySelector('#community-avatar-file').disabled,true);
+ assert.equal(d.querySelector('#community-avatar-file').disabled,false);
  f.elements.display_name.value='Rolds';f.elements.bio.value='Minha viagem';f.elements.is_public.checked=true;
  for(const value of ['@Rolds','Rolds','rolds','@a12345678901234567890123']){handle.value=value;assert.equal(f.checkValidity(),true,value)}
  for(const value of ['@ab','@1rolds','@@rolds','nome com espaço','a1234567890123456789012345']){handle.value=value;assert.equal(f.checkValidity(),false,value)}
  handle.value=' @Rolds ';handle.dispatchEvent(new w.Event('blur'));assert.equal(handle.value,'rolds');
  handle.value='@Rolds';f.requestSubmit();await tick();
  assert.equal(calls.find(c=>c.operation==='community_save_profile').profile.handle,'rolds');
- assert.equal(d.querySelector('#community-avatar-file').disabled,false);assert.match(d.querySelector('#community-avatar-help').textContent,/envio começa/);
+ assert.equal(d.querySelector('#community-avatar-file').disabled,false);assert.match(d.querySelector('#community-avatar-help').textContent,/Tudo será salvo/);
  dom.window.close();
+});
+
+test('avatar crop waits for the single profile save and account opens in Watch, not own posts',async()=>{
+ const state={profile:{id:owner,handle:'hospede',display_name:'Hóspede',is_public:true},allowed:true,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w,calls}=await communityPage('conta.html','',b=>{if(b.operation==='community_save_profile'){state.profile={...state.profile,...b.profile};return {profile:state.profile}}return state});const d=w.document;
+ assert.equal(d.querySelector('[data-community-panel=watch]').hidden,false);assert.equal(d.querySelector('[data-community-panel=moments]').hidden,true);assert.match(d.querySelector('iframe').src,/view=reels&embed=community/);
+ d.querySelector('#community-edit-profile').click();const f=d.querySelector('#community-profile-form');w.VillegramAvatar={crop:async()=>new w.Blob(['RIFFtestWEBPtest'],{type:'image/webp'})};const input=d.querySelector('#community-avatar-file');Object.defineProperty(input,'files',{value:[new w.File(['image'],'test.jpg',{type:'image/jpeg'})]});input.dispatchEvent(new w.Event('change'));await tick();
+ assert.equal(calls.some(c=>c.operation==='community_save_profile'),false);assert.equal(d.querySelector('#community-avatar-pending').hidden,false);assert.ok(input.compareDocumentPosition(f.querySelector('[type=submit]')) & w.Node.DOCUMENT_POSITION_FOLLOWING);
+ f.requestSubmit();await tick();await tick();assert.equal(calls.filter(c=>c.operation==='community_save_profile').length,1);assert.equal(calls.find(c=>c.operation==='community_save_profile').profile.avatar_data,w.btoa('RIFFtestWEBPtest'));assert.equal(d.querySelector('#community-avatar-pending').hidden,true);
+ d.querySelector('[data-community-tab=moments]').click();assert.equal(d.querySelector('[data-community-panel=watch]').hidden,true);dom.window.close();
+});
+
+test('avatar server validates size/type, derives own path, and removes upload if profile save fails',async()=>{
+ const data=btoa('RIFF0000WEBP0000');assert.equal(avatarBytes(data).length,16);for(const input of ['x',btoa('<svg>bad</svg>'),'a'.repeat(1400001)])assert.throws(()=>avatarBytes(input),/invalid_avatar/);
+ const uploaded=[],removed=[],written=[];
+ function database(fail=false){return {
+  from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},upsert(v){this.write=v;written.push(v);return this},single(){return this},then(resolve){return Promise.resolve(table==='reservations'||table==='villegram_invites'?{data:[],error:null}:this.write?{data:this.write,error:fail?{code:'23505'}:null}:{data:null,error:null}).then(resolve)}}},
+  storage:{from(){return {upload:async(path,bytes)=>{uploaded.push({path,bytes});return {error:null}},remove:async paths=>{removed.push(...paths);return {error:null}}}}}
+ };}
+
+ const body={profile:{handle:'novo',display_name:'Novo',bio:'',is_public:true,avatar_data:data,avatar_path:other+'/foreign.webp'}};
+ const result=await communityOperation({db:database(),u:{id:owner},op:'community_save_profile',body,isAdmin:false});assert.equal(result.status,200);assert.ok(uploaded[0].path.startsWith(owner+'/'));assert.equal(written[0].avatar_path,uploaded[0].path);assert.equal(removed.length,0);
+ const failed=await communityOperation({db:database(true),u:{id:owner},op:'community_save_profile',body,isAdmin:false});assert.equal(failed.body.error,'handle_taken');assert.equal(removed[0],uploaded[1].path);
 });

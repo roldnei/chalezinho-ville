@@ -7,6 +7,11 @@ export function profileInput(raw:Row={}){
  if(!/^[a-z][a-z0-9_]{2,23}$/.test(handle)||['admin','villegram','chalezinho','equipe','suporte'].includes(handle)||!display_name||display_name.length>60||bio.length>240||typeof raw.is_public!=='boolean')throw Error('invalid_profile');
  return {handle,display_name,bio,is_public:raw.is_public,avatar_path:raw.avatar_path||null};
 }
+export function avatarBytes(value:unknown){
+ if(typeof value!=='string'||!value||value.length>1400000||!/^[A-Za-z0-9+/]+={0,2}$/.test(value))throw Error('invalid_avatar');
+ let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(value),c=>c.charCodeAt(0))}catch{throw Error('invalid_avatar')}
+ if(bytes.length>1024*1024||bytes.length<16||String.fromCharCode(...bytes.slice(0,4))!=='RIFF'||String.fromCharCode(...bytes.slice(8,12))!=='WEBP')throw Error('invalid_avatar');return bytes;
+}
 export function guestInput(raw:Row,projectUrl:string,userId:string){
  // Guest author, source, moderation, commercial links and dates are server-controlled.
  const value=publicationInput({...raw,type:raw.property_id?'property':'trust',cta:raw.property_id?'property':'dates',status:raw.status==='archived'?'archived':raw.status==='draft'?'draft':'pending_review',offer_id:null,experience_id:null,stay_selection:null,display_order:0,featured:false,published_at:null,expires_at:null},projectUrl);
@@ -61,10 +66,11 @@ export async function communityOperation(ctx:any){
  }
  if(op==='community_save_profile'){
   const value=profileInput(body.profile),rights=await eligible();
-  if(value.avatar_path){if(!/\.(webp|jpg)$/i.test(value.avatar_path))return fail('invalid_avatar');await mediaExists(value.avatar_path);}
-  const previous=await mine();
+  const previous=await mine();let uploaded:string|null=null;
+  if(body.profile.avatar_data){const bytes=avatarBytes(body.profile.avatar_data);uploaded=u.id+'/'+crypto.randomUUID()+'.webp';const result=await db.storage.from('villegram-media').upload(uploaded,bytes,{contentType:'image/webp',upsert:false});if(result.error)return fail('avatar_upload_failed',503);value.avatar_path=uploaded;}
+  else if(value.avatar_path){if(!/\.(webp|jpg)$/i.test(value.avatar_path))return fail('invalid_avatar');await mediaExists(value.avatar_path);}
   const r=await db.from('villegram_profiles').upsert({...value,id:u.id,can_post:rights.allowed,updated_at:new Date().toISOString(),consented_at:previous?.consented_at||(value.is_public?new Date().toISOString():null)}).select().single();
-  if(r.error)return fail(r.error.code==='23505'?'handle_taken':'profile_save_failed',409);return ok({profile:r.data});
+  if(r.error){if(uploaded)await db.storage.from('villegram-media').remove([uploaded]);return fail(r.error.code==='23505'?'handle_taken':'profile_save_failed',409)}return ok({profile:r.data});
  }
  if(op==='community_follow'){
   if(typeof body.following!=='boolean'||body.user_id===u.id)return fail('invalid_follow');

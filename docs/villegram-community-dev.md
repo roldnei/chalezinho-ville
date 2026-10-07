@@ -68,3 +68,11 @@ Falta teste visual em viewport de celular e gestos multitouch: a superfície atu
 ## Correção do formulário de perfil
 
 A captura do usuário revelou validação HTML rejeitando @ e maiúsculas antes da normalização já aceita pelo servidor. O formulário agora aceita ambos, normaliza ao sair do campo e antes do envio, explica o formato e impede escolher avatar até salvar e ativar o perfil. Botões sociais recebem estilos explícitos e as instruções deixam de herdar espaçamento editorial. Cobertura reproduz @Rolds pelo formulário real JSDOM, limites válidos/inválidos e liberação do avatar. Validação visual dessa correção continua pendente por indisponibilidade da sessão de navegador.
+
+## Avatar, composição na cena e Assistir (07/10/2026)
+
+- Avatar: recorte circular com arraste, pinça, botões e teclado. Gera WebP quadrado 512 × 512 e mostra prévia circular; só envia no Salvar perfil, agora abaixo da foto. API autenticada valida tamanho/tipo, gera pasta pelo usuário e remove o novo arquivo se o perfil falhar. Não precisa criar um perfil público antes de escolher a foto.
+- Texto por cena: ferramenta Aa, até cinco blocos de 280 caracteres, posição, tamanho, cor e fundo transparente/colorido. Arraste e teclado; edição/exclusão; metadados validados no servidor. O texto fica fora da transformação da foto e é mostrado no feed sem abrir a legenda. Descrição complementar continua acessível. Mídias e publicações anteriores são preservadas.
+- Meu Villegram começa em Assistir, com o feed real incorporado e botão Ville Reels/tela inteira. Minhas postagens tem aba própria. Esconder o player pausa mídia e contagem; navegar por links sai do quadro para a página correspondente.
+- Backend DEV v11 ACTIVE (hash 607952abe85057a688d42e6c275b3c42ef2b8cdd4b475f0505b79e6627ffd284). Nenhuma migração, alteração de política ou implantação PROD.
+- Testes focados: 42 passaram. Verificação visual e suíte completa em andamento. `villegram-stories-qa.html` é um ensaio de componentes sem escrita no banco; não substitui teste da conta autenticada.

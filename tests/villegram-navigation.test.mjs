@@ -15,7 +15,7 @@ async function setup({mobile=false,reduced=false,media=null}={}){
  w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}})}})};
  w.setTimeout=(fn,ms)=>{timers.set(ms,fn);return ms};w.clearTimeout=ms=>timers.delete(ms);
  w.VilleOffers={label:i=>i.name};w.fetch=async()=>({ok:true,json:async()=>({ok:true,publications:[],properties:[],products:[],offers:[],max_offers:3,likes:0,comments:[]})});
- w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));
+ w.eval(await readFile(new URL('../villegram-text.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));
  w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));
  await new Promise(r=>setTimeout(r,10));
  const current=media?{...card,publication:{...publication,media}}:card;w.Villegram.configurePublications([current,{...card,publication_id:'other',publication:{...publication,id:'other'}}],[],[]);
