@@ -132,3 +132,7 @@ Validação: **374 testes passaram**; 29 do editor passaram novamente após ajus
 ### Ferramentas discretas sobre a foto
 
 Adicionar, opções e Aa usam círculos de 44 px com fundo translúcido e nomes acessíveis. O rótulo visual Texto foi retirado. Capa, enquadramento e zoom foram movidos para dentro do menu de opções, mantendo pinça e arraste diretos. Etapas no topo usam ícones pequenos e indicador de seleção sem blocos de fundo. A especificidade dos estilos foi ajustada para impedir que o estilo genérico dos botões restaurasse os retângulos vistos na captura do usuário. Os 40 testes focados no editor/texto passaram; diff check passou. Sem alterações de lógica, backend ou PROD. Conferência visual desta versão segue pendente pelo bloqueio da sessão do navegador.
+
+### Estado vazio sem controles de edição
+
+Sem mídia, a seta de avanço, as etapas, miniaturas e ferramentas ficam ocultas. Ao carregar mídia aparecem novamente; remover a última restaura o estado vazio. Biblioteca da equipe usa ícone de galeria com nome acessível, disponível para escolher a primeira foto. Os 40 testes de editor/texto passaram, incluindo verificações do estado vazio/carregado e retorno ao vazio. Sintaxe e diff check passaram. Sem alteração de backend ou PROD; validação visual continua pendente pelo bloqueio da sessão do navegador.

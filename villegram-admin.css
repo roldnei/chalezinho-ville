@@ -73,3 +73,7 @@ body.vg-admin-page #vg-post-form .vg-composer-steps button{display:flex;flex-dir
 body.vg-admin-page #vg-post-form .vg-composer-steps button svg{width:20px;height:20px}
 body.vg-admin-page #vg-post-form .vg-composer-steps button[aria-current=step]{color:#f0ece4;background:transparent}
 body.vg-admin-page #vg-post-form .vg-composer-steps button[aria-current=step]:after{height:2px;left:35%;right:35%;bottom:0;background:#e7d7b7}
+
+body.vg-admin-page #vg-composer-screen #vg-scene-library{top:12px;left:12px;width:44px;height:44px;min-width:44px;min-height:44px;display:grid;place-items:center;padding:0;border-radius:50%;border:1px solid #ffffff35;background:#24283080;backdrop-filter:blur(12px);box-shadow:0 2px 8px #0002;color:#fff}
+body.vg-admin-page #vg-composer-screen.has-media #vg-scene-library{top:66px}#vg-scene-library svg{width:22px;height:22px}
+body.vg-admin-page #vg-post-form .vg-composer-steps[hidden]{display:none!important}
