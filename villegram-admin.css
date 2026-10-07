@@ -24,9 +24,6 @@ body.vg-admin-page #vg-media-options{margin-left:auto;min-width:44px;letter-spac
 #vg-composer-screen.is-video #vg-media-menu{bottom:116px}
 body.vg-admin-page #vg-media-delete{display:flex;align-items:center;gap:10px;border:0;border-radius:14px;background:transparent;color:#ffb8b2;padding:12px;font:500 14px/1.25 'DM Sans',sans-serif;min-height:48px}
 #vg-media-delete svg{width:22px;height:22px}
-#vg-upload-feedback{position:static;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:4px;margin:8px 2px 0;padding:0;border:0;background:none;box-shadow:none}
-#vg-upload-feedback progress{display:block;grid-column:1/-1;width:100%;height:2px;margin:0;accent-color:#e7d7b7;border:0;border-radius:6px;overflow:hidden}#vg-upload-feedback progress::-webkit-progress-bar{background:#ffffff20}#vg-upload-feedback progress::-webkit-progress-value{background:#e7d7b7}#vg-upload-feedback progress::-moz-progress-bar{background:#e7d7b7}
-#vg-upload-feedback p{margin:0;font:400 12px/1.4 'DM Sans',sans-serif;color:#b7babf}#vg-upload-feedback[data-state=success] p:before{content:'✓ ';color:#b6c9b5}#vg-upload-feedback[data-state=error] p{color:#efb4ab}body.vg-admin-page #vg-upload-retry{margin:0;font-size:12px;min-height:44px;padding:8px 10px}
 #vg-composer-empty[hidden],#vg-media-controls[hidden],#vg-media-controls button[hidden],#vg-media-menu[hidden],#vg-upload-feedback[hidden],#vg-upload-progress[hidden],#vg-upload-retry[hidden]{display:none!important}
 .vg-admin-media>.vg-media-card{margin-top:12px}.vg-media-card summary{font:400 13px/1.5 'DM Sans',sans-serif;color:#a9aaa9;cursor:pointer}#vg-reorder-status:empty{display:none}
 #vg-composer-screen video{-webkit-touch-callout:none}
@@ -51,7 +48,6 @@ body.vg-admin-page #vg-media-controls button{width:44px;height:44px;padding:0;mi
 #vg-composer-screen #vg-media-menu,#vg-composer-screen.is-video #vg-media-menu{top:62px;bottom:auto;left:12px;right:auto;max-width:calc(100% - 24px);max-height:calc(100% - 160px);overflow-y:auto}
 #vg-scene-extra{display:grid;gap:3px}body.vg-admin-page #vg-scene-extra button{background:transparent;border:0;border-radius:10px;min-height:44px;padding:9px 12px;font-size:12px;justify-content:flex-start}
 #vg-scene-notices{position:absolute;top:173px;left:12px;right:12px;z-index:10;pointer-events:none;max-height:calc(100% - 276px);overflow:auto}
-#vg-scene-notices #vg-upload-feedback{margin:0;padding:5px 8px;background:#111b;border-radius:7px;pointer-events:auto}#vg-scene-notices #vg-upload-status{color:#eee;font-size:11px}
 #vg-scene-notices #vg-editor-message{margin:6px 0 0;padding:5px 8px;border-radius:7px;background:#111c;color:#eee;font:400 12px/1.4 'DM Sans',sans-serif;pointer-events:auto}
 #vg-scene-notices #vg-editor-message:empty,#vg-scene-notices:empty{display:none}
 body.vg-admin-page #vg-scene-library{position:absolute;left:12px;top:173px;z-index:7;min-height:44px;padding:8px 12px;border:1px solid #ffffff30;border-radius:22px;background:#161a20cc;color:#fff;font-size:12px}
@@ -81,3 +77,16 @@ body.vg-admin-page #vg-post-form .vg-composer-steps[hidden]{display:none!importa
 /* Framing stays directly available beside the scene, separate from More. */
 body.vg-admin-page #vg-composer-screen #vg-scene-fit{position:absolute;top:66px;right:12px;z-index:7;display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;margin:0;border-radius:50%;border:1px solid #ffffff35;background:#24283080;backdrop-filter:blur(12px);box-shadow:0 2px 8px #0002;color:#fff}
 #vg-scene-fit svg{width:22px;height:22px}#vg-scene-fit[data-fit=cover] rect{fill:#ffffff20}
+
+/* The upload indicator floats at the center; successful uploads leave no banner. */
+#vg-composer-screen #vg-upload-feedback{position:absolute;inset:50% auto auto 50%;transform:translate(-50%,-50%);z-index:12;display:grid;place-items:center;margin:0;padding:0;border:0;background:none;box-shadow:none;pointer-events:none}
+#vg-upload-spinner{display:grid;place-items:center;width:64px;height:64px;padding:8px;border-radius:50%;background:#15181d88;backdrop-filter:blur(10px);box-shadow:0 4px 20px #0002}
+#vg-upload-spinner svg{width:48px;height:48px;overflow:visible;animation:vg-upload-spin 1s linear infinite}
+#vg-upload-spinner circle{stroke-width:2.5;stroke-linecap:round}.vg-spinner-track{stroke:#ffffff26}.vg-spinner-arc{stroke:#f5eddd;stroke-dasharray:34 86}
+#vg-composer-screen #vg-upload-feedback progress,#vg-upload-feedback:not([data-state=error]) #vg-upload-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+#vg-composer-screen #vg-upload-feedback[data-state=error]{width:max-content;max-width:calc(100% - 32px);gap:8px;padding:12px 16px;border:1px solid #ffffff20;border-radius:16px;background:#15181de8;backdrop-filter:blur(12px);pointer-events:auto}
+#vg-upload-feedback[data-state=error] #vg-upload-status{margin:0;color:#f4d9d5;font:400 12px/1.45 'DM Sans',sans-serif;text-align:center}
+body.vg-admin-page #vg-upload-retry{margin:0;font-size:12px;min-height:44px;padding:8px 12px}
+#vg-composer-screen.is-uploading #vg-composer-empty{visibility:hidden}
+@keyframes vg-upload-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#vg-upload-spinner svg{animation:none}}

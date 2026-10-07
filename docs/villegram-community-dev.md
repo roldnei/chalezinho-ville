@@ -148,3 +148,9 @@ Validação: 41 testes de editor/texto passaram, cobrindo upload e biblioteca co
 Corrigido o comando que alterava apenas object-fit e conservava deslocamento/zoom: ao preencher, zera offsets, recentraliza posição e origem e restaura zoom 1 com cover. Quando a cena tem ajuste manual, o ícone oferece Preencher, mesmo se o modo anterior já era cover; após preencher, outro toque mostra a foto inteira. Não muda rascunhos existentes até tocar na ferramenta.
 
 42 testes de editor/texto passaram, incluindo regressão com foto em cover deslocada e ampliada, preenchimento em um toque, persistência e alternância para foto inteira. Sintaxe e diff check passaram. Nova tentativa de observação pelo navegador retornou o mesmo bloqueio de retomada segura de credenciais; sem validação visual ou captura nova. Sem alterações de backend ou PROD.
+
+### Carregamento circular no centro da cena
+
+A barra horizontal e a faixa visual Mídia enviada foram substituídas por um aro fino animado, centralizado na prévia, sobre um disco translúcido de 64 px. Some ao concluir; confirmação permanece apenas para leitores de tela antes de ser limpa. Preparação/envio usam o mesmo indicador. O progresso numérico continua disponível na semântica nativa; movimento reduzido desativa a rotação. Falhas exibem aviso compacto e Tentar novamente, sem spinner. A chamada vazia para adicionar mídia se oculta enquanto carrega.
+
+42 testes de editor/texto passaram, incluindo envio pendente, progresso, sucesso, novo envio e falha/repetição. Sintaxe e diff check passaram. Sem alteração de backend ou PROD. Validação visual e captura continuam pendentes pelo bloqueio da sessão do navegador registrado anteriormente.
