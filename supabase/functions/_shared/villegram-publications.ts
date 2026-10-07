@@ -6,7 +6,7 @@ export const signalTypes=['view','progress','complete','repeat','skip','like','s
 export function textLayersInput(raw:unknown){
  if(raw==null)return [];
  if(!Array.isArray(raw)||raw.length>5)throw Error('invalid_text_layers');
- return raw.map(t=>{if(!t||typeof t.text!=='string'||!t.text.trim()||t.text.length>280||!/^#[0-9a-f]{6}$/i.test(t.color)||!(t.background==='transparent'||/^#[0-9a-f]{6}$/i.test(t.background))||!['x','y','size'].every(k=>typeof t[k]==='number'&&Number.isFinite(t[k]))||t.x<5||t.x>95||t.y<5||t.y>95||t.size<3||t.size>9)throw Error('invalid_text_layers');return {text:t.text.trim(),x:t.x,y:t.y,size:t.size,color:t.color,background:t.background};});
+ return raw.map(t=>{if(!t||typeof t.text!=='string'||!t.text.trim()||t.text.length>280||!/^#[0-9a-f]{6}$/i.test(t.color)||!(t.background==='transparent'||/^#[0-9a-f]{6}$/i.test(t.background))||!['x','y','size'].every(k=>typeof t[k]==='number'&&Number.isFinite(t[k]))||t.x<5||t.x>95||t.y<5||t.y>95||t.size<3||t.size>9)throw Error('invalid_text_layers');if(['bold','italic','strike'].some(k=>t[k]!==undefined&&typeof t[k]!=='boolean'))throw Error('invalid_text_layers');return {text:t.text.trim(),x:t.x,y:t.y,size:t.size,color:t.color,background:t.background,...Object.fromEntries(['bold','italic','strike'].filter(k=>t[k]!==undefined).map(k=>[k,t[k]]))};});
 }
 export function publicationInput(raw:Row,projectUrl:string){
  const stay_selection=staySelectionInput(raw.stay_selection);

@@ -86,3 +86,11 @@ A captura do usuário revelou validação HTML rejeitando @ e maiúsculas antes 
 ## Refinamento visual dos controles sociais (07/10/2026)
 
 Ações de perfil com superfícies planas, ação principal clara, ícones SVG consistentes e navegação em cinco colunas com indicador de seleção. Abas permanecem nomeadas e operáveis por teclado; Postagens conserva o nome acessível Minhas postagens. Cabeçalho Ville Reels compacto e ação de tela inteira com nome acessível no celular. Ajuste restrito à conta/comunidade; não altera banco ou reserva. Os 16 testes da comunidade e a análise sintática passaram. Nova captura visual pendente: o navegador recusou observação por estado de credenciais nativas, inclusive após reiniciar o runtime uma vez.
+
+## Texto direto na cena (07/10/2026)
+
+O painel de texto que cobria a foto foi removido. Aa cria um bloco vazio perto do centro da imagem, com foco/cursor para digitar. Toque abre uma barra contextual em semicírculo: fonte, fundo (incluindo transparente), negrito, itálico, tachado e exclusão; lápis permite voltar à digitação. Arraste reposiciona, pinça ajusta tamanho dentro de limites, teclado oferece Enter/setas/+/-/Delete/Escape. Concluir ou tocar fora encerra a digitação sem um formulário separado; avançar também confirma o texto. Colagem é somente texto; limites e estilos são validados pelo servidor. Publicações anteriores mantêm a formatação original.
+
+Validação: 364 testes passaram; 30 focados no editor/cenas, incluindo foco, remoção de vazios, colagem sem HTML, eventos de dois ponteiros para pinça, isolamento dos gestos da foto e ciclo salvar/editar/excluir com estilos. Verificação sintática e TypeScript passaram. Supabase DEV villegram-content v12 ACTIVE (1d853b65e025a55093c8e59f70e8a6de88701c60886742e67353ba1d2bc0fc23), feed real respondeu HTTP 200 com 11 posts. Demais arquivos remotos da função conferidos iguais antes da atualização. Sem migração ou mudança de autenticação.
+
+Teste visual desta alteração pendente: navegador na nuvem recusou observação por estado de credenciais nativas mesmo após reiniciar o runtime. Não há nova captura nem validação de teclado Android, menu em tela pequena ou pinça em telefone físico. Os testes de ponteiros em JSDOM não substituem essa verificação.
