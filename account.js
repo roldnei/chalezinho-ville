@@ -35,14 +35,14 @@ const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confir
 const fmtDateTime=v=>v?new Date(v).toLocaleString("pt-BR",{timeZone:"America/Sao_Paulo",day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"}):"—";
 setInterval(()=>{if(session&&!document.hidden)renderSameDayRequests()},30000);
 async function renderSameDayRequests(){
- let host=$('#same-day-requests');if(!host){host=document.createElement('section');host.id='same-day-requests';host.className='account-section';$('.account-hero').after(host)}
+ let host=$('#same-day-requests');if(!host){host=document.createElement('section');host.id='same-day-requests';host.className='account-section';($('#account-private')||$('.account-hero').parentElement).prepend(host)}
  try{const {requests}=await api('same_day_request',{operation:'list'});const labels={pending:'Aguardando aprovação',approved:'Aprovado — conclua o pagamento',rejected:'Pedido recusado',expired:'Pedido expirado',booked:'Reserva criada'};
  host.innerHTML=`<h2>Pedidos de reserva para hoje</h2><button type="button" id="refresh-same-day">Atualizar pedidos</button>${requests.map(r=>`<article class="account-reservation"><h3>${esc(properties.find(p=>Number(p.id)===Number(r.property_id))?.name||'Imóvel')}</h3><p>${esc(r.check_in)} a ${esc(r.check_out)} · ${r.guests} hóspedes</p><p>Chegada prevista: ${r.estimated_arrival_time?esc(r.estimated_arrival_time):'Não informada'} · horário de Guarapari</p><strong>${labels[r.status]||esc(r.status)}</strong><p>${esc(r.decision_note||'')}</p>${r.status==='approved'?`<p>Conclua até ${fmtDateTime(r.expires_at)}. Valores e disponibilidade serão consultados novamente.</p><a class="primary-action" href="reservar.html?approved_request=${encodeURIComponent(r.id)}&pagbank=sandbox">Escolher tarifa e pagar</a>`:''}</article>`).join('')||'<p>Nenhum pedido enviado.</p>'}`;$('#refresh-same-day').onclick=renderSameDayRequests;
  }catch{host.innerHTML='<p>Não foi possível consultar seus pedidos. Atualize a página.</p>'}
 }
 
 async function boot({afterRefundRefresh=false}={}){
- const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return=conta.html";return}
+ const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return="+encodeURIComponent("conta.html"+location.search+location.hash);return}
  $("#account-email").textContent=session.user.email||"";
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),

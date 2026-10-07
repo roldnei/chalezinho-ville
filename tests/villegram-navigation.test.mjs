@@ -22,7 +22,7 @@ async function setup({mobile=false,reduced=false,media=null}={}){
  w.Villegram.openHome(current);return {d,w,timers,advance(ms){now+=ms;intervals.get(100)?.()}};
 }
 test('feed and conventional home use the same named icons and reset inherited navigation formatting',async()=>{
- const {d,w}=await setup();const expected=['Villegram','Chalés','Escolher datas','Minha conta'];
+ const {d,w}=await setup();const expected=['Villegram','Chalés','Escolher datas','Meu Villegram'];
  for(const selector of ['.vg-bottom-nav','.villegram-mobile-nav']){
   const items=[...w.document.querySelector(selector).children];assert.deepEqual(items.map(e=>e.textContent),expected);
   for(const e of items){assert.equal(e.querySelectorAll('svg').length,1);assert.equal(e.querySelector('svg').getAttribute('aria-hidden'),'true');const style=w.getComputedStyle(e);assert.equal(style.textTransform,'none');assert.equal(style.letterSpacing,'0');assert.equal(style.fontFamily,'"DM Sans", sans-serif')}
@@ -84,3 +84,7 @@ test('photo playback respects the saved order even when a different photo is sel
 });
 
 test('the feed retains free photo translation as well as zoom',async()=>{const {d,w}=await setup({media:[{kind:'photo',url:'assets/photo.webp',fit:'contain',offset_x:20,offset_y:-10,zoom:1}]});assert.equal(w.document.querySelector('.vg-media-frame').style.transform,'translate(20%, -10%) scale(1)');d.window.close()});
+
+test('following entry sends the current session and keeps login optional for discovery',async()=>{
+ for(const logged of [true,false]){const dom=new JSDOM('<header><nav></nav></header><main><div class="hero"></div></main>',{url:'https://dev.local/index.html?feed=following',runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,calls=[];w.CHALEZINHO_CONFIG={supabaseUrl:'https://dev.supabase.co'};w.matchMedia=()=>({matches:true,addEventListener(){}});w.AbortSignal.timeout=()=>undefined;w.Villegram={session:async()=>logged?{access_token:'test-session'}:null,configurePublications(){}};w.fetch=async(_url,options)=>{calls.push(options);return {ok:logged,status:logged?200:401,json:async()=>logged?{ok:true,publications:[],properties:[],products:[],offers:[],max_offers:3}:{ok:false,error:'authentication_required'}}};w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));await new Promise(r=>setTimeout(r,20));assert.equal(JSON.parse(calls[0].body).feed,'following');if(logged){assert.equal(calls[0].headers.Authorization,'Bearer test-session');assert.match(w.document.querySelector('#villegram-empty-status').textContent,/quem você segue/)}else{assert.match(w.document.querySelector('#villegram-home-status').textContent,/Entre para ver/);assert.match(w.document.querySelector('#villegram-home-status').innerHTML,/Descobrir sem login/)}dom.window.close()}
+});
