@@ -13,7 +13,7 @@ async function editor(){const d=new JSDOM(await readFile(new URL('../villegram-a
  w.VillegramMedia={editor:async()=>new Blob(['photo'],{type:'image/webp'})};w.URL.createObjectURL=()=>url+'/preview.webp';w.eval(await readFile(new URL('../villegram-admin.js',import.meta.url),'utf8'));await tick();return {d,w,rows,saved};}
 test('manual editor saves draft, retains identity during edit, publishes and archives',async()=>{
  const {d,w,saved}=await editor(),f=w.document.querySelector('#vg-post-form');f.elements.property_id.value='1';f.elements.title.value='Manual';f.elements.caption.value='Foto real';w.document.querySelector('[data-photo]').click();
- f.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:f.querySelector('[name=draft]')}));await tick();assert.equal(saved[0].publication.status,'draft');assert.equal(w.document.querySelector('#vg-editor-message').textContent,'Rascunho salvo.');
+ f.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:f.querySelector('[name=draft]')}));await tick();assert.equal(saved[0].publication.status,'draft');assert.match(w.document.querySelector('#vg-editor-message').textContent,/Rascunho salvo/);
  f.elements.caption.value='Legenda editada';f.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:f.querySelector('[name=published]')}));await tick();assert.equal(saved[1].id,uid);assert.equal(saved[1].updated_at,'revision-1');assert.equal(saved[1].publication.status,'published');assert.equal(saved[1].publication.caption,'Legenda editada');
  w.document.querySelector('#vg-archive').click();await tick();assert.equal(saved[2].publication.status,'archived');assert.equal(saved[2].id,uid);d.window.close();
 });
@@ -21,4 +21,20 @@ test('retrying a failed video poster upload preserves the already uploaded video
  const {d,w}=await editor();let videoUploads=0,posterUploads=0,fail=true;w.VillegramUpload={inspect:async()=>({url:'blob:video',video:{duration:4}}),poster:async()=>new Blob(['poster']),upload:async(_sb,_file,path)=>{if(path.endsWith('.mp4'))videoUploads++;else{posterUploads++;if(fail){fail=false;throw Error('upload failed')}}}};
  const input=w.document.querySelector('#vg-upload');Object.defineProperty(input,'files',{value:[new w.File(['video'],'real.mp4',{type:'video/mp4'})]});input.dispatchEvent(new w.Event('change'));await tick();assert.equal(w.document.querySelector('#vg-upload-retry').hidden,false);assert.equal(videoUploads,1);
  w.document.querySelector('#vg-upload-retry').click();await tick();assert.equal(videoUploads,1);assert.equal(posterUploads,2);assert.equal(w.document.querySelectorAll('#vg-media-list video').length,1);d.window.close();
+});
+
+test('native publication clicks and Enter preserve published status during subsequent edits',async()=>{
+ const {d,w,saved}=await editor(),f=w.document.querySelector('#vg-post-form');f.elements.property_id.value='1';f.elements.title.value='Publicação';f.elements.caption.value='Cena real';w.document.querySelector('[data-photo]').click();
+ f.querySelector('[name=published]').click();await tick();assert.equal(saved[0].publication.status,'published');assert.equal(w.document.querySelector('#vg-post-status').textContent,'Publicada');assert.equal(f.querySelector('[name=draft]').hidden,true);assert.equal(f.querySelector('[name=published]').textContent,'Salvar alterações');
+ const link=w.document.querySelector('#vg-view-post');assert.equal(link.hidden,false);assert.equal(new URL(link.href).searchParams.get('publication'),uid);
+ f.elements.caption.value='Legenda corrigida';f.requestSubmit();await tick();assert.equal(saved[1].publication.status,'published');assert.equal(saved[1].publication.caption,'Legenda corrigida');assert.equal(saved[1].id,uid);assert.equal(saved[1].updated_at,'revision-1');
+ // A stale caller selecting the old draft action must also preserve publication.
+ f.dispatchEvent(new w.SubmitEvent('submit',{bubbles:true,cancelable:true,submitter:f.querySelector('[name=draft]')}));await tick();assert.equal(saved[2].publication.status,'published');
+ w.document.querySelector('#vg-archive').click();await tick();assert.equal(saved[3].publication.status,'archived');assert.equal(link.hidden,true);assert.equal(w.document.querySelector('#vg-post-status').textContent,'Arquivada');d.window.close();
+});
+test('uploaded video can be published by clicking the actual button and saved edits keep the file identity',async()=>{
+ const {d,w,saved}=await editor(),f=w.document.querySelector('#vg-post-form');w.VillegramUpload={inspect:async()=>({url:'blob:video',video:{duration:9.7}}),poster:async()=>new Blob(['poster'],{type:'image/webp'}),upload:async()=>{}};
+ f.elements.property_id.value='1';f.elements.title.value='Vinho no SPA aquecido?';f.elements.caption.value='Vídeo real do imóvel';const input=w.document.querySelector('#vg-upload');Object.defineProperty(input,'files',{value:[new w.File(['video'],'real.mp4',{type:'video/mp4'})]});input.dispatchEvent(new w.Event('change'));await tick();
+ assert.match(w.document.querySelector('#vg-upload-status').textContent,/Mídia enviada/);assert.equal(saved.length,0);f.querySelector('[name=published]').click();await tick();assert.equal(saved[0].publication.status,'published');const file=saved[0].publication.media[0];assert.equal(file.kind,'video');assert.ok(file.path.endsWith('.mp4'));assert.ok(file.poster_path.endsWith('.webp'));
+ f.elements.caption.value='Nova legenda';f.querySelector('[name=published]').click();await tick();assert.equal(saved[1].publication.status,'published');assert.equal(saved[1].publication.media[0].path,file.path);d.window.close();
 });

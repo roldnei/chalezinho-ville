@@ -89,3 +89,12 @@ O feed inicial contém seis publicações; três ofertas elegíveis podem chegar
 Agora o total fica oculto enquanto a consulta está pendente (“Reel 1”). Ao receber as ofertas, contador e setas são atualizados no próprio reel, preservando mídia, relógio, pausa, rolagem e painéis abertos. O conteúdo atual e o histórico não mudam de ordem. Dois testes reproduzem a chegada tardia das ofertas com leitura aberta e a atualização dos limites das setas.
 
 O navegador continua recusando observação devido ao estado protegido de credenciais. Estes ajustes não têm novas capturas ou validação visual; os testes usam DOM e serviço simulado.
+
+
+## Publicação manual após upload — 7 de outubro UTC / 6 de outubro em São Paulo
+
+O vídeo manual “Vinho no SPA aquecido?” foi enviado integralmente (39.856.960 bytes, 9,706521 s) e recebeu uma capa privada. A auditoria registrou três salvamentos publicados e dois salvamentos posteriores como rascunho. O último retirou a publicação do feed. Os vínculos permaneciam ativos.
+
+O editor mostra o estado atual e um link direto ao reel. Quando o registro já está publicado, oferece “Salvar alterações” e preserva esse estado inclusive ao enviar o formulário com Enter; salvar rascunho fica disponível para registros não publicados. Arquivar continua sendo uma ação explícita. A mensagem de sucesso usa o estado devolvido pelo servidor. Dois novos testes usam o clique dos botões reais e envio nativo do formulário no DOM, incluindo upload de vídeo, edição e arquivamento.
+
+A publicação existente foi recolocada em published somente no DEV por pedido de recuperação do usuário, mantendo mídia, texto, vínculos, datas e identidade. A alteração foi auditada e protegida pela versão updated_at, validade dos vínculos, permissão do autor e existência dos dois arquivos no Storage. Não houve mudança de esquema ou de contratos. A reprodução visual do vídeo continua pendente enquanto o navegador estiver bloqueado.
