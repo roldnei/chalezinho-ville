@@ -104,3 +104,15 @@ A formatação agora usa intervalos de caracteres dentro da caixa ativa: fonte, 
 Validação: **368 testes passaram**, sendo 34 do editor/cenas. Análise sintática, TypeScript e `git diff --check` passaram. Supabase DEV villegram-content **v13 ACTIVE**, hash b51f59bec99842c6de62cb9434a57adc9ff4f5ba6abad66228ec16be18892ac6. Todos os arquivos remotos conferidos contra o commit base antes de atualizar apenas o validador de mídia. PROD não alterado.
 
 **Pendente:** teste visual desta versão em celular/computador e seleção nativa de palavras/teclado Android. O navegador na nuvem continua recusando observação por estado de credenciais nativas, mesmo após reinicialização do runtime. Não há nova captura e não se declara a aparência validada. Testes JSDOM de seleção e ponteiros não substituem gestos reais nem a jornada autenticada de upload/publicação.
+
+## Mídia diretamente na cena (07/10/2026)
+
+Prévia vazia é um botão acessível para escolher vídeo ou fotos. O seletor duplicado abaixo da imagem foi removido. Com fotos, Adicionar fica sobre a cena; no limite de oito ou com um vídeo, o botão é ocultado. A primeira etapa fica centrada na prévia e nas miniaturas. Opções secundárias da capa/ordem ficam recolhidas.
+
+Progresso e status aparecem sobre a prévia durante envio. Ao concluir, a barra some imediatamente e a confirmação desaparece após 2,5 segundos. Uma nova operação cancela o temporizador anterior. Falhas permanecem visíveis com nova tentativa quando há envio retomável; nenhuma falha é ocultada automaticamente. O envio continua separado de salvar/publicar/aprovar.
+
+Segurar a foto ou a área de imagem do vídeo por 550 ms abre a lixeira; só tocar na lixeira remove a mídia selecionada da composição. Movimento maior que dez pixels, segundo dedo, cancelamento ou troca de cena cancelam a espera. Ferramentas de texto e controles do vídeo não disparam a lixeira. Botão de opções e teclado são alternativas acessíveis. Remover preserva a capa remanescente e devolve o estado vazio quando era a última mídia. Não apaga arquivos no armazenamento nem publica a alteração automaticamente.
+
+Validação: **373 testes passaram**, incluindo cinco casos novos de seleção/envio/temporizadores/retry, toque longo, pan/pinça/cancelamento, vídeo e preservação da capa. Os 39 testes focados no editor/cenas passaram; análise sintática e diff check passaram. Sem alteração de banco, backend ou PROD.
+
+Teste visual desta versão continua pendente: nova tentativa de abrir o editor DEV após reiniciar o navegador retornou “Browser observation is unavailable because native credential state cannot be safely resumed”. Sem novas capturas, upload real pela UI ou validação de toque longo em telefone físico. A cobertura automatizada não substitui essa etapa.
