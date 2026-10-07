@@ -55,6 +55,17 @@ export async function communityOperation(ctx:any){
   return ok({profile:{id:p.id,handle:p.handle,display_name:p.display_name,bio:p.bio,avatar_url},followers:followers.count,following:following.count,is_following:!!self.data,is_self:u?.id===p.id,publications:await resolveMedia(await communityPublic(db,posts.data||[]))});
  }
  if(!u||u.is_anonymous)return fail('authentication_required',401);
+ if(op==='community_review_status'){
+  if(!isAdmin)return ok({can_moderate:false});
+  const r=await db.from('villegram_publications').select('id',{count:'exact',head:true}).eq('source','guest_submission').eq('status','pending_review');
+  if(r.error)throw Error('community_unavailable');return ok({can_moderate:true,pending_count:r.count||0});
+ }
+ if(op==='community_review_queue'){
+  if(!isAdmin)return fail('admin_required',403);
+  const page=body.page??0;if(!Number.isSafeInteger(page)||page<0||page>10000)return fail('invalid_page');
+  const r=await db.from('villegram_publications').select('*',{count:'exact'}).eq('source','guest_submission').eq('status','pending_review').order('created_at').order('id').range(page*50,page*50+49);
+  if(r.error)throw Error('community_unavailable');return ok({publications:await resolveMedia(r.data||[]),total:r.count||0,page});
+ }
  if(op==='community_me'){
   const [profile,rights,posts,notifications,mentions,invites]=await Promise.all([mine(),eligible(),db.from('villegram_publications').select('*').eq('author_id',u.id).eq('source','guest_submission').order('created_at',{ascending:false}).limit(100),db.from('villegram_notifications').select('id,kind,actor_id,publication_id,created_at,read_at').eq('user_id',u.id).order('created_at',{ascending:false}).limit(60),db.from('villegram_mentions').select('publication_id,status').eq('user_id',u.id).neq('status','removed'),db.from('villegram_invites').select('id,expires_at,accepted_by,revoked_at').eq('inviter_id',u.id).order('created_at',{ascending:false}).limit(10)]);
   for(const r of [posts,notifications,mentions,invites])if(r.error)throw Error('community_unavailable');
