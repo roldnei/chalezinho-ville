@@ -102,3 +102,25 @@ test('Meu Villegram saves opt-in profile, accepts mentions, reads notifications 
  d.querySelector('[data-community-tab="activity"]').click();d.querySelector('#community-mark-read').click();await tick();assert.equal(d.querySelector('#community-notification-count').textContent,'');
  d.querySelector('[data-community-tab="people"]').click();d.querySelector('#community-invite-create').click();await tick();assert.equal(d.querySelector('#community-invite-result').hidden,false);assert.equal(new URL(d.querySelector('#community-invite-link').value).searchParams.get('convite'),owner+other);dom.window.close();
 });
+
+test('public people API awaits database builders and returns safe fields; service errors stay failures',async()=>{
+ const person={id:owner,handle:'hospede',display_name:'Nome público',bio:'Olá',avatar_path:'private/path',is_public:true};
+ function database(error=null){return {from(){return {select(){return this},eq(){return this},ilike(){return this},order(){return this},limit(){return this},then(resolve){return Promise.resolve({data:[person],error}).then(resolve)}}}};}
+ const result=await communityOperation({db:database(),u:null,op:'community_people',body:{search:'hosp'},isAdmin:false});assert.equal(result.status,200);assert.equal(result.body.people[0].handle,'hospede');assert.equal(result.body.people[0].avatar_path,undefined);assert.equal(result.body.people[0].is_public,undefined);
+ await assert.rejects(communityOperation({db:database({message:'unavailable'}),u:null,op:'community_people',body:{search:'hosp'}}),/community_unavailable/);
+});
+
+test('profile accepts @ and uppercase before native validation, normalizes the API value and explains avatar eligibility',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w,calls}=await communityPage('conta.html','',b=>{if(b.operation==='community_save_profile'){state.profile={id:owner,...b.profile};return {profile:state.profile}}return state});
+ const d=w.document,f=d.querySelector('#community-profile-form'),handle=f.elements.handle;
+ assert.equal(d.querySelector('#community-avatar-file').disabled,true);
+ f.elements.display_name.value='Rolds';f.elements.bio.value='Minha viagem';f.elements.is_public.checked=true;
+ for(const value of ['@Rolds','Rolds','rolds','@a12345678901234567890123']){handle.value=value;assert.equal(f.checkValidity(),true,value)}
+ for(const value of ['@ab','@1rolds','@@rolds','nome com espaço','a1234567890123456789012345']){handle.value=value;assert.equal(f.checkValidity(),false,value)}
+ handle.value=' @Rolds ';handle.dispatchEvent(new w.Event('blur'));assert.equal(handle.value,'rolds');
+ handle.value='@Rolds';f.requestSubmit();await tick();
+ assert.equal(calls.find(c=>c.operation==='community_save_profile').profile.handle,'rolds');
+ assert.equal(d.querySelector('#community-avatar-file').disabled,false);assert.match(d.querySelector('#community-avatar-help').textContent,/envio começa/);
+ dom.window.close();
+});

@@ -37,7 +37,7 @@ export async function communityOperation(ctx:any){
  const fail=(code:string,status=400)=>({body:{ok:false,error:code},status});
  const ok=(data:Row={})=>({body:{ok:true,...data},status:200});
  const mine=async()=>{const r=await db.from('villegram_profiles').select('*').eq('id',u.id).maybeSingle();if(r.error)throw Error('community_unavailable');return r.data;};
- const check=async(r:any)=>{if(r.error)throw Error('community_unavailable');return r.data;};
+ const check=async(query:any)=>{const r=await query;if(r.error)throw Error('community_unavailable');return r.data;};
  const mediaExists=async(path:string)=>{if(!new RegExp('^'+u.id+'/[a-f0-9-]{36}\\.(webp|jpg|mp4|webm)$','i').test(path))throw Error('invalid_media_owner');const [folder,name]=path.split('/'),r=await db.storage.from('villegram-media').list(folder,{search:name,limit:1});if(r.error||!r.data?.some((f:Row)=>f.name===name))throw Error('invalid_media_upload');};
  const eligible=async()=>{const r=await db.from('reservations').select('property_id').eq('user_id',u.id).eq('status','confirmed').limit(30);if(r.error)throw Error('community_unavailable');const invite=await db.from('villegram_invites').select('id').eq('accepted_by',u.id).limit(1);if(invite.error)throw Error('community_unavailable');return {allowed:!!r.data?.length||!!invite.data?.length||isAdmin,property_ids:[...new Set((r.data||[]).map((v:Row)=>v.property_id))]};};
  if(op==='community_profile'||op==='community_people'){

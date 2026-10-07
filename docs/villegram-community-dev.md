@@ -2,11 +2,13 @@
 
 ## Estado em 7 de outubro de 2026
 
-Implementação concluída no código. **Migração DEV aplicada e função DEV v9 implantada; validação da prévia em andamento.** A chamada para executar a migração DEV foi recusada pela aprovação automática (`SQL execution was declined`), sem justificativa adicional. A consulta após a recusa retornou `to_regclass('public.villegram_profiles') = null`: a migração não foi aplicada. Não foi tentado outro caminho de escrita para contornar a recusa.
+Código e migração implantados exclusivamente em DEV. Validação automatizada e jornada pública no navegador concluídas; testes visuais autenticados e em celular ainda pendentes.
 
-Após nova autorização do usuário, a migração foi aplicada em 07/10/2026. As funções SQL conferidas são SECURITY INVOKER e sem execução por authenticated. A função villegram-content DEV v9 está ACTIVE, hash ed086d21c3a12e202de70fa2cc3512ecbe400baddea84a32e936e39314d6c587. Os avisos de segurança após a migração continuam sendo os anteriores: tabelas service-only com RLS sem políticas e proteção de senhas vazadas desativada. PROD não foi acessado nem alterado.
+Migração aplicada em 07/10/2026 em `pxfqmnhqodqyaaqeyjgr`. As funções SQL são SECURITY INVOKER, sem execução por authenticated. Função `villegram-content` DEV v10 ACTIVE, hash `09f1f98f1f4bdff2b025305e0ea23fd7e950893aa0e705535088b6a7923a5868`. Sem novos avisos de segurança de nível warning/error. Tabelas service-only têm RLS sem políticas deliberadamente; o aviso anterior de proteção de senhas vazadas não foi alterado. PROD não foi alterado.
 
-Base remota conferida: `feature/romantic-stay-offers`, HEAD `cb3e43b4646ac6cb1a11f788a12c28adf72d4321`. Os quatro arquivos da função `villegram-content` DEV v8 correspondem exatamente à base local. Conferir novamente antes da implantação, para preservar avanços concorrentes.
+Base remota preservada: `cb3e43b4646ac6cb1a11f788a12c28adf72d4321`. Comunidade publicada no commit `4710b2b86a959d566267b30488676448853a279d` da branch `feature/romantic-stay-offers`.
+
+Prévia frontend verificada: https://chalezinho-ville-bdfd6usgt-roldneicosta-4140.vercel.app/ — deployment `dpl_5Jq4tFK4VDtA2rSLVMppryr9xsGn`, READY, target preview. Assets conta, comunidade, editor e perfil conferidos contra o código. A correção v10 abaixo altera somente backend e teste.
 
 ## O que o código implementa
 
@@ -35,19 +37,34 @@ Limites: 8 fotos ou 1 vídeo; vídeo até 120 segundos/50 MiB; fotos de entrada 
 
 ## Validação realizada
 
-350 testes automatizados passaram (336 anteriores + 14 novos), além de verificação JavaScript, TypeScript, build DEV e `git diff --check`.
+352 testes automatizados passaram (336 anteriores + 16 novos), além de verificação JavaScript, TypeScript, build DEV e `git diff --check`.
 
 Cobertura nova executa a migração e as funções reais em Postgres/PGlite: isolamento de escrita/leitura e mídia, publicação moderada, conflitos de edição, propriedade de publicações, novo aceite de marcação após edição, idempotência de notificações, convite único/expirado/autoconvite. Testes de interface JSDOM exercitam o editor de hóspede com upload e envio para aprovação, perfil público, seguir/deixar de seguir, aceite de marcação, notificações lidas, criação de convite, navegação privada de reservas e entrada autenticada no feed Seguindo. JSDOM não substitui teste visual.
 
-O navegador virtual voltou a abrir nesta retomada; acesso à prévia está sendo autenticado pela Vercel.
-
 O teste de curtida revelou e corrigiu uma referência a `new.id` ausente na tabela de likes. O teste de Storage utiliza também a política preexistente da equipe e suas permissões de leitura em `profiles`.
 
-Tentativa real no navegador virtual: reset da sessão e abertura da conta DEV falharam com `Browser observation is unavailable because native credential state cannot be safely resumed. Start a new browser runtime to continue.` Não há capturas novas nem alegação de aprovação visual/autenticada. A prévia anterior permanece em https://chalezinho-ville-o8xp3ir8b-roldneicosta-4140.vercel.app/ e não contém esta comunidade.
+A API DEV publicada revelou um erro no helper `check`: faltava aguardar a consulta Supabase antes de ler data/error. Corrigido na v10 e coberto por teste que executa um query builder thenable e verifica dados públicos e propagação de falha. Após a correção: people 200, perfil inexistente 404, feed anônimo 200 com 11 publicações; guest_list, moderation e following sem autenticação retornaram 401.
 
-## Para concluir após liberar a migração
+Teste transacional no banco DEV executou a RPC real de moderação, verificou publicação, notificação e auditoria e terminou com ROLLBACK, sem manter registros de teste.
 
-1. Revalidar HEAD remoto e função DEV. Aplicar a migração exclusivamente em `pxfqmnhqodqyaaqeyjgr` e verificar RLS, grants, funções e advisors. A consulta anterior à implantação só apontava avisos já existentes de RLS sem políticas em tabelas service-only e proteção contra senhas vazadas desativada; não alterar configurações de Auth por este trabalho.
-2. Implantar `villegram-content` com o novo `_shared/villegram-community.ts` e dependências preservadas. Verificar feed anônimo, operações privadas sem token e fluxo autenticado com contas de teste autorizadas; limpar os registros de teste.
-3. Publicar commit em preview Vercel, sem target produção, e verificar versão e assets servidos.
-4. Em navegador funcional, testar celular e computador: opt-in, avatar, perfil, upload/falha/retry, pinça/arraste/ordenação, rascunho, moderação, edição após publicação, marcação aceita/removida, seguir, Seguindo vazio/erro, convite, desativação de perfil e retorno ao reel. Testar também acesso às reservas e preservação do checkout. Registrar capturas reais.
+### Navegador real — computador
+
+- Home convencional; entrada no Villegram; vídeo; pausa/retomada; legenda completa; comentários abertos; compartilhamento com cópia do link (sem enviar mensagens).
+- Navegação entre reels com total estável (1 de 11, 2 de 11); alternância dos controles som ligado/desligado. Não foi verificada reprodução audível.
+- Datas 16–19/11/2026, dois hóspedes, motivo Romântico; navegação direta aos resultados durante o carregamento; indisponibilidade de Signature/Essenza e Amore disponível.
+- Composição Amore: ambas as tarifas inicialmente desmarcadas, totais completos R$ 2.086,40 / R$ 1.936,70. Seleção explícita de cada tarifa.
+- Motivo alterado para Descanso; sugestões atualizadas. Café da manhã DEV acrescentou R$ 1,00 a ambas as tarifas; remoção restaurou valores anteriores.
+- Etapa final exigiu login e exibiu chalé, datas, tarifa selecionada e total preservados antes do login. Nenhum pagamento ou aceite contratual realizado.
+- Capturas reais: `villegram-dev-feed-20261007.jpg` e `villegram-dev-reserva-20261007.jpg`, entregues separadamente.
+
+### Pendências concretas
+
+A solicitação segura browserAuth para a conta DEV expirou por timeout, e a navegação explícita de verificação também não respondeu. O resultado do login é desconhecido; não foi tentada entrada de credenciais por outro meio. A comunidade não está declarada validada visualmente de ponta a ponta.
+
+Falta testar com conta DEV autenticada: opt-in/avatar/perfil, upload/falha/retry, pinça/arraste/ordenação, rascunho, moderação, edição após publicação, marcação aceita/removida, seguir, Seguindo vazio/erro, convite e desativação. Confirmar também preservação após login e retorno ao mesmo reel. Testes JSDOM e Postgres desses fluxos passaram, mas não substituem a jornada real.
+
+Falta teste visual em viewport de celular e gestos multitouch: a superfície atual do navegador não expõe ajuste de viewport/multitouch. Não foi simulada captura móvel nem declarada aprovação dessa jornada. Testes de conexão lenta/erros de mídia também permanecem pendentes na interface real.
+
+## Correção do formulário de perfil
+
+A captura do usuário revelou validação HTML rejeitando @ e maiúsculas antes da normalização já aceita pelo servidor. O formulário agora aceita ambos, normaliza ao sair do campo e antes do envio, explica o formato e impede escolher avatar até salvar e ativar o perfil. Botões sociais recebem estilos explícitos e as instruções deixam de herdar espaçamento editorial. Cobertura reproduz @Rolds pelo formulário real JSDOM, limites válidos/inválidos e liberação do avatar. Validação visual dessa correção continua pendente por indisponibilidade da sessão de navegador.
