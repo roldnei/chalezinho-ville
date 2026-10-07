@@ -82,3 +82,5 @@ test('the feed preserves zoom and both scene coordinates outside its motion anim
 test('photo playback respects the saved order even when a different photo is selected as the cover',async()=>{
  const {d,w}=await setup();w.Villegram.close();const ordered={...card,publication:{...publication,cover_index:1,media:[{kind:'photo',url:'assets/first.webp'},{kind:'photo',url:'assets/cover.webp'}]}};w.Villegram.configurePublications([ordered],[],[]);w.Villegram.openHome(ordered);assert.deepEqual([...w.document.querySelectorAll('.vg-scene img')].map(i=>i.getAttribute('src')),['assets/first.webp','assets/cover.webp']);d.window.close();
 });
+
+test('the feed retains free photo translation as well as zoom',async()=>{const {d,w}=await setup({media:[{kind:'photo',url:'assets/photo.webp',fit:'contain',offset_x:20,offset_y:-10,zoom:1}]});assert.equal(w.document.querySelector('.vg-media-frame').style.transform,'translate(20%, -10%) scale(1)');d.window.close()});

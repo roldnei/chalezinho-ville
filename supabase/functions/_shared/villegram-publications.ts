@@ -14,9 +14,10 @@ export function publicationInput(raw:Row,projectUrl:string){
  const path=(v:any)=>typeof v==='string'&&/^[a-f0-9-]{36}\/[a-f0-9-]{36}\.(webp|mp4|webm|jpg)$/i.test(v);
  const normalized=media.map((m:Row)=>{
   if(!['photo','video'].includes(m.kind)||m.path&&!path(m.path)||!m.path&&!safeURL(m.url)||m.kind==='video'&&!m.path||!['contain','cover'].includes(m.fit||'contain')||!Number.isFinite(Number(m.position??50))||Number(m.position??50)<0||Number(m.position??50)>100||!Number.isFinite(Number(m.position_x??50))||Number(m.position_x??50)<0||Number(m.position_x??50)>100||!Number.isFinite(Number(m.zoom??1))||Number(m.zoom??1)<1||Number(m.zoom??1)>3)throw Error('invalid_media');
+  if(['offset_x','offset_y'].some(key=>!Number.isFinite(Number(m[key]??0))||Math.abs(Number(m[key]??0))>300))throw Error('invalid_media');
   if(m.path&&!(m.kind==='video'?/\.(mp4|webm)$/i:/\.(webp|jpg)$/i).test(m.path))throw Error('invalid_media');
   if(m.kind==='video'&&(!path(m.poster_path)||!(/\.(webp|jpg)$/i).test(m.poster_path)||!Number.isFinite(Number(m.duration))||Number(m.duration)<=0||Number(m.duration)>120||!Number.isSafeInteger(Number(m.bytes))||Number(m.bytes)<=0||Number(m.bytes)>50*1024*1024))throw Error('invalid_video');
-  return {kind:m.kind,path:null,url:null,poster_path:null,...(m.path?{path:m.path}:{url:m.url}),...(m.poster_path?{poster_path:m.poster_path}:{}),fit:m.fit||'contain',position:Number(m.position??50),position_x:Number(m.position_x??50),zoom:Number(m.zoom??1),alt:String(m.alt||title).slice(0,160),...(m.kind==='video'?{duration:Number(m.duration),bytes:Number(m.bytes)}:{})};
+  return {kind:m.kind,path:null,url:null,poster_path:null,...(m.path?{path:m.path}:{url:m.url}),...(m.poster_path?{poster_path:m.poster_path}:{}),fit:m.fit||'contain',position:Number(m.position??50),position_x:Number(m.position_x??50),zoom:Number(m.zoom??1),offset_x:Number(m.offset_x??0),offset_y:Number(m.offset_y??0),alt:String(m.alt||title).slice(0,160),...(m.kind==='video'?{duration:Number(m.duration),bytes:Number(m.bytes)}:{})};
  });
  if(normalized.some(m=>m.kind==='video')&&normalized.length!==1)throw Error('one_video_required');
  const cover_index=Number(raw.cover_index||0),display_order=Number(raw.display_order||0),cta=raw.cta||({property:'property',experience:'experience',offer:'offer',trust:'dates'} as Row)[type];
