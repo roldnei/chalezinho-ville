@@ -1,0 +1,49 @@
+/* Shared Ville interface: keep photography and brand typography; unify controls. */
+:root{--ville-surface:#1b1c1f;--ville-panel:#111214;--ville-field:#202125;--ville-border:#ffffff24;--ville-ink:#f5f3ed;--ville-muted:#a9aaa9;--ville-accent:#e7d7b7;--ville-radius:13px}
+body :is(.primary-action,.secondary-action,.booking-cta,.detail-consult,.chalet-detail-link,.chalet-learn,.button.light){display:inline-flex;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;min-height:46px;border-radius:var(--ville-radius);padding:13px 20px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;line-height:1.35;letter-spacing:0;text-transform:none;text-decoration:none;box-shadow:none}
+body :is(.primary-action,.booking-cta,.detail-consult,.chalet-detail-link,.button.light){background:#eee9de;color:#191a1c;border:1px solid transparent}
+body :is(.secondary-action,.chalet-learn){background:var(--ville-surface);color:var(--ville-ink);border:1px solid var(--ville-border)}
+body :is(.auth-card,.account-section,.ops-card,.ops-settings-form,.booking-panel,.experience-admin-form,.stay-admin-form){border-color:var(--ville-border);border-radius:18px;background:var(--ville-panel)}
+:is(body.account-page,body.booking-page,body.vg-admin-page,body.admin-body) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=hidden]):not([type=file]),select,textarea),body :is(.account-form,.auth-card,.booking-panel,.ops-card,.vg-admin-page) :is(select,textarea){border:1px solid var(--ville-border);border-radius:12px;background:var(--ville-field);color:var(--ville-ink);font-family:'DM Sans',sans-serif;font-size:16px;line-height:1.4;padding:12px 14px;box-sizing:border-box;max-width:100%;min-width:0;box-shadow:none;color-scheme:dark}
+:is(body.account-page,body.booking-page,body.admin-body) form :is(button:not(.primary-action):not(.modal-close):not(.text-action):not(.danger-action)),body .ops-actions button{font-family:'DM Sans',sans-serif;line-height:1.3;border-radius:12px;background:var(--ville-surface);border:1px solid var(--ville-border);color:var(--ville-ink);min-height:44px;padding:11px 15px;box-shadow:none}
+:is(body.account-page,body.booking-page,body.admin-body) form button[type=submit],body .ops-actions button.primary-action{background:#eee9de;color:#191a1c;border-color:transparent;font-weight:600}
+:is(body.account-page,body.booking-page,body.admin-body) :is(.secondary-action,.text-action){font-family:'DM Sans',sans-serif;letter-spacing:0;text-transform:none;text-underline-offset:4px}
+body :is(.rate-card,.variant-btn,.experience-option){border-radius:14px;border-color:var(--ville-border);background:var(--ville-panel)}
+body :is(.rate-card.selected,.variant-btn.selected){background:#27251f;border-color:var(--ville-accent);outline:1px solid var(--ville-accent)}
+body :is(.auth-card,.account-section,.ops-card) :is(h2,h3){font-family:'DM Sans',sans-serif;letter-spacing:-.4px;font-weight:600}
+body :is(.primary-action,.secondary-action,.booking-cta,.detail-consult,.chalet-detail-link,.button.light):focus-visible{outline:3px solid var(--ville-accent);outline-offset:3px}
+/* Composer: all stages share the account's restrained control hierarchy. */
+body.vg-admin-page{background:#0c0d0f;color:var(--ville-ink)}
+body.vg-admin-page :is(form,.vg-automation,.vg-report,#vg-publications-library){background:var(--ville-panel);border-color:var(--ville-border);border-radius:20px}
+body.vg-admin-page :is(h1,h2,h3){font-family:'DM Sans',sans-serif;font-weight:600;letter-spacing:-.6px}
+body.vg-admin-page button:not(.vg-text-sticker):not(.vg-text-swatch){border-color:var(--ville-border);background:var(--ville-surface);color:var(--ville-ink);border-radius:12px;font-weight:500;box-shadow:none}
+body.vg-admin-page :is(.primary-action,button.primary-action){background:#eee9de;color:#191a1c;border-color:transparent;font-weight:600}
+body.vg-admin-page #vg-composer-cta{display:flex;align-items:center;justify-content:center;background:#eee9de;color:#191a1c;border:0;border-radius:12px;font:600 14px/1.3 'DM Sans',sans-serif;min-height:44px;box-shadow:none}
+body.vg-admin-page .vg-composer-steps{gap:0;border-bottom:1px solid var(--ville-border);margin-bottom:22px;padding-bottom:0}
+body.vg-admin-page .vg-composer-steps button{position:relative;border:0;border-radius:0;background:transparent;color:var(--ville-muted);padding:14px 6px;min-height:50px}
+body.vg-admin-page .vg-composer-steps button[aria-current=step]{color:var(--ville-ink);background:transparent}
+body.vg-admin-page .vg-composer-steps button[aria-current=step]:after{content:'';position:absolute;bottom:-1px;left:18%;right:18%;height:2px;background:var(--ville-accent);border-radius:2px}
+body.vg-admin-page .vg-destination-summary{border:1px solid var(--ville-border);border-radius:12px;background:#1c1d20;padding:12px 14px;color:#d4d5d2}
+body.vg-admin-page .vg-composer-footer{background:var(--ville-panel);border-color:var(--ville-border)}
+body.vg-admin-page :is(.vg-step-intro,#vg-preview-note,.vg-author-line,.vg-composer-footer p){color:var(--ville-muted)}
+body.vg-admin-page #vg-archive{background:transparent;color:#e2a6a6;border-color:#e2a6a630}
+body.vg-admin-page .vg-upload-button{background:#ffffff03;border-color:#ffffff40;border-radius:16px}
+body.vg-admin-page .vg-scene-tools button{background:#191b20e8;border:1px solid #ffffff30;border-radius:50px}
+body.vg-admin-page #vg-post-status{background:#ffffff08;border-color:var(--ville-border);color:#d9d6ce}
+body.vg-admin-page .vg-editor-actions{gap:8px}
+body.vg-admin-page .vg-editor-actions button{font-size:14px;min-height:46px}
+@media(max-width:700px){body.vg-admin-page main{padding:18px 12px 40px}body.vg-admin-page form{padding:16px}body.vg-admin-page .vg-composer-steps button{font-size:12px}body.vg-admin-page .vg-editor-actions [name=published]{min-height:50px}body.vg-admin-page .vg-composer-footer p{font-size:11px}}
+@media(hover:hover){body :is(.primary-action,.secondary-action,.detail-consult,.chalet-detail-link):hover{filter:brightness(1.08)}}
+/* Selection toolbar: a small Ville signature arc, not a form overlay. */
+body.vg-admin-page .vg-text-orbit{filter:drop-shadow(0 8px 16px #0007)}
+body.vg-admin-page .vg-text-orbit:before{content:'';position:absolute;inset:21px 20px 17px;border:1px solid #e7d7b74d;border-bottom:0;border-radius:140px 140px 0 0;pointer-events:none}
+body.vg-admin-page .vg-text-orbit button{border-radius:50%;background:#1b1e24f2;border:1px solid #ffffff40;color:#faf8f2;backdrop-filter:blur(16px);box-shadow:inset 0 1px 0 #ffffff14,0 3px 8px #0003}
+body.vg-admin-page .vg-text-orbit button[aria-pressed=true]{background:#e7d7b7;border-color:#e7d7b7;color:#1b1b1b}
+body.vg-admin-page .vg-text-orbit [data-delete]{color:#f3aaa5}
+body.vg-admin-page .vg-text-orbit [data-text-edit]{background:#eee9de;color:#191a1c}
+.vg-text-scope{position:absolute;left:50%;top:66px;transform:translateX(-50%);white-space:nowrap;max-width:150px;padding:4px 9px;border-radius:20px;background:#0c0f13e8;color:#e7d7b7;font:500 10px/1.2 'DM Sans',sans-serif;letter-spacing:.2px;pointer-events:none}
+body.vg-admin-page .vg-text-tools button{border-radius:30px;background:#1b1e24e8}
+body.vg-admin-page .vg-text-swatches{background:#1b1e24f5;border-color:#ffffff30;border-radius:18px;backdrop-filter:blur(16px)}
+body.vg-admin-page .vg-text-edit-stage .vg-text-sticker.is-selected{outline:1px dashed #e7d7b7aa;outline-offset:5px}
+body.vg-admin-page .vg-text-edit-stage .vg-text-sticker[contenteditable=true]{touch-action:pan-y;cursor:text}
+.vg-text-run{font-size:inherit;line-height:inherit;border-radius:.12em;box-decoration-break:clone;-webkit-box-decoration-break:clone}

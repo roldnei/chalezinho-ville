@@ -94,3 +94,13 @@ O painel de texto que cobria a foto foi removido. Aa cria um bloco vazio perto d
 Validação: 364 testes passaram; 30 focados no editor/cenas, incluindo foco, remoção de vazios, colagem sem HTML, eventos de dois ponteiros para pinça, isolamento dos gestos da foto e ciclo salvar/editar/excluir com estilos. Verificação sintática e TypeScript passaram. Supabase DEV villegram-content v12 ACTIVE (1d853b65e025a55093c8e59f70e8a6de88701c60886742e67353ba1d2bc0fc23), feed real respondeu HTTP 200 com 11 posts. Demais arquivos remotos da função conferidos iguais antes da atualização. Sem migração ou mudança de autenticação.
 
 Teste visual desta alteração pendente: navegador na nuvem recusou observação por estado de credenciais nativas mesmo após reiniciar o runtime. Não há nova captura nem validação de teclado Android, menu em tela pequena ou pinça em telefone físico. Os testes de ponteiros em JSDOM não substituem essa verificação.
+
+## Controles compartilhados e formatação por seleção (07/10/2026)
+
+`ui-controls.css` padroniza superfícies, campos, botões, foco e estados de seleção nas páginas existentes: conta, editor (todas as etapas), reserva, chalés e administração. Mantém fotografia e tipografia editorial pública. No editor, etapas recebem indicador discreto, CTA claro, ações secundárias neutras e menu de texto com arco, superfícies translúcidas e indicação de escopo.
+
+A formatação agora usa intervalos de caracteres dentro da caixa ativa: fonte, fundo, negrito, itálico e tachado afetam somente o trecho selecionado. Sem seleção de palavras, afetam a caixa ativa. Seleção é preservada ao tocar nas ferramentas/cores e descartada ao trocar de caixa. Inserções e exclusões reposicionam os intervalos; salvar/editar e feed preservam o resultado. Servidor rejeita intervalos sobrepostos, fora dos limites e estilos inválidos. Exclusão continua removendo a caixa ativa inteira. Nenhuma alteração no schema, políticas, contratos, preços ou integração financeira.
+
+Validação: **368 testes passaram**, sendo 34 do editor/cenas. Análise sintática, TypeScript e `git diff --check` passaram. Supabase DEV villegram-content **v13 ACTIVE**, hash b51f59bec99842c6de62cb9434a57adc9ff4f5ba6abad66228ec16be18892ac6. Todos os arquivos remotos conferidos contra o commit base antes de atualizar apenas o validador de mídia. PROD não alterado.
+
+**Pendente:** teste visual desta versão em celular/computador e seleção nativa de palavras/teclado Android. O navegador na nuvem continua recusando observação por estado de credenciais nativas, mesmo após reinicialização do runtime. Não há nova captura e não se declara a aparência validada. Testes JSDOM de seleção e ponteiros não substituem gestos reais nem a jornada autenticada de upload/publicação.
