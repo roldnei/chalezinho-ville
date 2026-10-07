@@ -105,3 +105,17 @@ A inspeção posterior mostrou que a capa enviada estava completamente preta (2.
 A capa foi gravada em um novo caminho no bucket privado, mantendo o original, e vinculada ao mesmo reel com proteção updated_at e auditoria. O reparo único foi executado pela implantação administrativa DEV da função; esse código provisório foi retirado em seguida. A função villegram-content está na versão 5, com o código normal anterior e as verificações de administrador preservadas. Não foi criado endpoint de reparo ou liberado o bucket.
 
 A geração de capas do editor passa a aguardar o seek de um quadro após o início do vídeo, verificar dimensões e rejeitar canvas completamente preto com mensagem explícita. 309 testes passaram e o build DEV passou. A compatibilidade de reprodução do HEVC em todos os navegadores e a jornada visual de publicação continuam sem validação no navegador bloqueado; não foi implementada conversão automática de vídeos para H.264.
+
+## Editor visual em etapas — 7 de outubro UTC / 6 de outubro em São Paulo
+
+A interface de publicação foi reorganizada sobre o editor existente, sem alteração de schema, permissões, API ou registros. O fluxo inicia em **Mídia e capa**, segue para **Legenda** e termina em **Publicar**. As etapas têm botões, foco acessível e alternativa de voltar; falta de mídia ou de título/legenda impede avançar. A validação mostra a etapa do campo que falta, em vez de tentar focar campos escondidos.
+
+Uma composição vertical permanece visível no computador e precede os controles no celular. Título, legenda e CTA se atualizam sem reconstruir a mídia ou reiniciar o vídeo. O vídeo usa controles nativos e começa sem som. Essa composição é uma aproximação visual: a prévia existente “Ver como visitante” continua consultando o servidor para conferir oferta, inclusões e preço atual.
+
+Miniaturas selecionam a mídia em edição; os ajustes exibem apenas essa mídia. A seleção de capa, ordem das fotos, cena inteira, preenchimento vertical, posição e instante da capa continuam usando os arquivos e metadados existentes. Foi corrigido o tratamento de posição 0 no feed, para preservar o alinhamento escolhido no editor. Um upload ou salvamento pendente bloqueia operações concorrentes no compositor; a conclusão ou falha libera os controles e mantém a possibilidade de retomar o upload existente.
+
+A etapa final mostra os vínculos pertinentes ao tipo/ação (sem apagar vínculos adicionais já salvos), descreve o destino do botão e recolhe ordem, destaque e validade em “Mais opções”. “Minhas publicações” abre a biblioteca para edição, mantendo filtro e arquivamento. A edição de uma publicação já publicada preserva esse estado; rascunho e publicação usam a mesma identidade de registro.
+
+Cobertura nova: voltar entre etapas conserva legenda, capa, mídia e enquadramento; validação e foco; prévia não reinicia vídeo ao escrever ou navegar; biblioteca e edição de publicação existente; upload lento e erro de reprodução; alinhamento do feed corresponde ao editor. São 313 testes automatizados, usando DOM/serviço simulado para o compositor. Não são testes de navegador.
+
+Limitações concretas: não foram implementados corte da duração, trilha musical, filtros, transições editáveis nem conversão automática de HEVC/HDR. A tentativa de retomar a observação do navegador retornou “native credential state cannot be safely resumed”. A interface ainda não tem homologação visual em celular/computador nem novas capturas reais; não se declara a jornada de tela validada.

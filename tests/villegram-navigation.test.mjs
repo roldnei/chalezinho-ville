@@ -70,3 +70,7 @@ test('booking header and steps occupy normal document rows with a bounded three-
  for(const steps of w.document.querySelectorAll('.reservation-steps')){const style=w.getComputedStyle(steps);assert.equal(style.position,'static');assert.equal(style.display,'grid');assert.equal(style.gridTemplateColumns,'repeat(3,minmax(0,1fr))');assert.equal(style.textTransform,'none');assert.equal(style.letterSpacing,'0')}
  d.window.close();
 });
+
+test('feed preserves the exact top alignment selected in the composer for photos and videos',async()=>{
+ for(const kind of ['photo','video']){const {d,w}=await setup({media:[{kind,url:'assets/media.'+(kind==='photo'?'webp':'mp4'),position:0,fit:'cover',duration:9}]});const scene=w.document.querySelector('.vg-visual '+(kind==='photo'?'img':'video'));assert.equal(scene.style.objectPosition,'50% 0%');assert.equal(scene.style.objectFit,'cover');d.window.close()}
+});
