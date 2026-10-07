@@ -1,27 +1,30 @@
+import {staySelectionInput} from './villegram-stay.ts';
 type Row=Record<string,any>;
 const uuid=(v:unknown)=>typeof v==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(v);
 export const publicationTypes=['property','experience','offer','trust'];
 export const signalTypes=['view','progress','complete','repeat','skip','like','share','comment','property_open','experience_open','inclusions_open','dates_query','reservation_start'];
 export function publicationInput(raw:Row,projectUrl:string){
+ const stay_selection=staySelectionInput(raw.stay_selection);
  const type=raw.type,caption=String(raw.caption||'').trim(),title=String(raw.title||'').trim();
  const status=raw.status||'draft',media=raw.media,property_id=raw.property_id?Number(raw.property_id):null,experience_id=raw.experience_id||null,offer_id=raw.offer_id||null;
  if(!publicationTypes.includes(type)||!['draft','published','archived','pending_review'].includes(status)||!title||title.length>140||!caption||caption.length>3000||!Array.isArray(media)||media.length<1||media.length>8)throw Error('invalid_publication');
  if(property_id!==null&&(!Number.isSafeInteger(property_id)||property_id<1)||experience_id&&!uuid(experience_id)||offer_id&&!uuid(offer_id))throw Error('invalid_link');
- if(type==='property'&&!property_id||type==='experience'&&!experience_id||type==='offer'&&!offer_id)throw Error('link_required');
+ if(type==='property'&&!property_id||type==='experience'&&!experience_id||type==='offer'&&!offer_id&&!stay_selection)throw Error('link_required');
  const safeURL=(url:any)=>typeof url==='string'&&(/^assets\/[a-zA-Z0-9._/-]+\.(webp|jpg|jpeg|png|avif)$/.test(url)||url.startsWith(projectUrl+'/storage/v1/object/public/property-media/')||url.startsWith(projectUrl+'/storage/v1/object/public/experience-media/'));
  const path=(v:any)=>typeof v==='string'&&/^[a-f0-9-]{36}\/[a-f0-9-]{36}\.(webp|mp4|webm|jpg)$/i.test(v);
  const normalized=media.map((m:Row)=>{
-  if(!['photo','video'].includes(m.kind)||m.path&&!path(m.path)||!m.path&&!safeURL(m.url)||m.kind==='video'&&!m.path||!['contain','cover'].includes(m.fit||'contain')||!Number.isFinite(Number(m.position??50))||Number(m.position??50)<0||Number(m.position??50)>100)throw Error('invalid_media');
+  if(!['photo','video'].includes(m.kind)||m.path&&!path(m.path)||!m.path&&!safeURL(m.url)||m.kind==='video'&&!m.path||!['contain','cover'].includes(m.fit||'contain')||!Number.isFinite(Number(m.position??50))||Number(m.position??50)<0||Number(m.position??50)>100||!Number.isFinite(Number(m.position_x??50))||Number(m.position_x??50)<0||Number(m.position_x??50)>100||!Number.isFinite(Number(m.zoom??1))||Number(m.zoom??1)<1||Number(m.zoom??1)>3)throw Error('invalid_media');
   if(m.path&&!(m.kind==='video'?/\.(mp4|webm)$/i:/\.(webp|jpg)$/i).test(m.path))throw Error('invalid_media');
   if(m.kind==='video'&&(!path(m.poster_path)||!(/\.(webp|jpg)$/i).test(m.poster_path)||!Number.isFinite(Number(m.duration))||Number(m.duration)<=0||Number(m.duration)>120||!Number.isSafeInteger(Number(m.bytes))||Number(m.bytes)<=0||Number(m.bytes)>50*1024*1024))throw Error('invalid_video');
-  return {kind:m.kind,path:null,url:null,poster_path:null,...(m.path?{path:m.path}:{url:m.url}),...(m.poster_path?{poster_path:m.poster_path}:{}),fit:m.fit||'contain',position:Number(m.position??50),alt:String(m.alt||title).slice(0,160),...(m.kind==='video'?{duration:Number(m.duration),bytes:Number(m.bytes)}:{})};
+  return {kind:m.kind,path:null,url:null,poster_path:null,...(m.path?{path:m.path}:{url:m.url}),...(m.poster_path?{poster_path:m.poster_path}:{}),fit:m.fit||'contain',position:Number(m.position??50),position_x:Number(m.position_x??50),zoom:Number(m.zoom??1),alt:String(m.alt||title).slice(0,160),...(m.kind==='video'?{duration:Number(m.duration),bytes:Number(m.bytes)}:{})};
  });
  if(normalized.some(m=>m.kind==='video')&&normalized.length!==1)throw Error('one_video_required');
  const cover_index=Number(raw.cover_index||0),display_order=Number(raw.display_order||0),cta=raw.cta||({property:'property',experience:'experience',offer:'offer',trust:'dates'} as Row)[type];
- if(!Number.isInteger(cover_index)||cover_index<0||cover_index>=media.length||!Number.isInteger(display_order)||Math.abs(display_order)>10000||!['property','experience','offer','dates'].includes(cta)||cta==='property'&&!property_id||cta==='experience'&&!experience_id||cta==='offer'&&!offer_id)throw Error('invalid_action');
+ if(!Number.isInteger(cover_index)||cover_index<0||cover_index>=media.length||!Number.isInteger(display_order)||Math.abs(display_order)>10000||!['property','experience','offer','dates'].includes(cta)||cta==='property'&&!property_id||cta==='experience'&&!experience_id||cta==='offer'&&!offer_id&&!stay_selection)throw Error('invalid_action');
  const published_at=raw.published_at||null,expires_at=raw.expires_at||null;
  if([published_at,expires_at].some(x=>x&&!Number.isFinite(Date.parse(x)))||published_at&&expires_at&&Date.parse(expires_at)<=Date.parse(published_at))throw Error('invalid_period');
- return {type,title,caption,status,media:normalized,property_id,experience_id,offer_id,cta,cover_index,display_order,featured:raw.featured===true,published_at,expires_at};
+ if(stay_selection&&!property_id)throw Error('invalid_stay_selection');
+ return {stay_selection,type,title,caption,status,media:normalized,property_id,experience_id,offer_id,cta,cover_index,display_order,featured:raw.featured===true,published_at,expires_at};
 }
 export function automationInput(raw:Row={}){
  const frequency_hours=Number(raw.frequency_hours??24),max_offers=Number(raw.max_offers??3);

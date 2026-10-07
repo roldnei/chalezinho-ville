@@ -74,3 +74,11 @@ test('booking header and steps occupy normal document rows with a bounded three-
 test('feed preserves the exact top alignment selected in the composer for photos and videos',async()=>{
  for(const kind of ['photo','video']){const {d,w}=await setup({media:[{kind,url:'assets/media.'+(kind==='photo'?'webp':'mp4'),position:0,fit:'cover',duration:9}]});const scene=w.document.querySelector('.vg-visual '+(kind==='photo'?'img':'video'));assert.equal(scene.style.objectPosition,'50% 0%');assert.equal(scene.style.objectFit,'cover');d.window.close()}
 });
+
+test('the feed preserves zoom and both scene coordinates outside its motion animation',async()=>{
+ for(const kind of ['photo','video']){const {d,w}=await setup({media:[{kind,url:'assets/media.'+(kind==='photo'?'webp':'mp4'),position:100,position_x:0,zoom:1.5,fit:'cover',duration:9}]});const scene=w.document.querySelector('.vg-visual '+(kind==='photo'?'img':'video')),frame=scene.closest('.vg-media-frame');assert.equal(scene.style.objectPosition,'0% 100%');assert.equal(frame.style.transform,'scale(1.5)');assert.equal(frame.style.transformOrigin,'0% 100%');d.window.close()}
+});
+
+test('photo playback respects the saved order even when a different photo is selected as the cover',async()=>{
+ const {d,w}=await setup();w.Villegram.close();const ordered={...card,publication:{...publication,cover_index:1,media:[{kind:'photo',url:'assets/first.webp'},{kind:'photo',url:'assets/cover.webp'}]}};w.Villegram.configurePublications([ordered],[],[]);w.Villegram.openHome(ordered);assert.deepEqual([...w.document.querySelectorAll('.vg-scene img')].map(i=>i.getAttribute('src')),['assets/first.webp','assets/cover.webp']);d.window.close();
+});

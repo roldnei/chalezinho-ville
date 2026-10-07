@@ -1,3 +1,4 @@
+import {villegramStayQuote} from '../_shared/villegram-stay.ts';
 import {isCelebration} from "../_shared/stay-showcase.ts";
 import {villegramService} from "../_shared/villegram.ts";
 import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
@@ -2116,6 +2117,12 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         experience_products:productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
+    }
+    if(action==="villegram_quote"){
+      // Public read-only merchandising also serves this project's server-side feed.
+      if(req.headers.get('x-chalezinho-env')!=='development'||new URL(projectUrl).hostname!=='pxfqmnhqodqyaaqeyjgr.supabase.co')return json({ok:false,error:'development_only'},403);
+      try{return json(await villegramStayQuote(body,{search:(start:string,end:string,guests:number)=>searchData(start,end,guests,null,true),quote:(input:any,list:any[])=>createQuote(input,true,null,null,list,false)}))}
+      catch(e){return json({ok:false,error:(e as Error).message||'quote_unavailable'},409)}
     }
     if(action==="villegram_offer"){
       if(!development)return json({ok:false,error:'development_only'},403);

@@ -1,3 +1,4 @@
+import {resolvePublicationStay} from '../_shared/villegram-stay.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2';
 import {publicationInput,automationInput,eligiblePublication,generatePublications,signalInput,summarizePublications,recordVillegramBooking} from '../_shared/villegram-publications.ts';
 import {commentText} from '../_shared/villegram.ts';
@@ -14,6 +15,7 @@ async function generate(force=false){const s=await settings();if(!s.enabled&&!fo
  catch(e){await admin.from('villegram_automation').update({last_generated_at:s.last_generated_at}).eq('last_generated_at',now.toISOString());throw e;}
 }
 async function resolveMedia(posts:any[]){return Promise.all(posts.map(async p=>({...p,media:await Promise.all(p.media.map(async(m:any)=>{const out={...m};for(const [path,key] of [[m.path,'url'],[m.poster_path,'poster']])if(path){const r=await admin.storage.from('villegram-media').createSignedUrl(path,1800);if(r.error){out[key]=null;out.unavailable=true}else out[key]=r.data.signedUrl;}return out;}))})));}
+async function resolveStays(posts:any[]){const out:any[]=[];for(let i=0;i<posts.length;i+=4){const batch=await Promise.all(posts.slice(i,i+4).map(async p=>{try{return await resolvePublicationStay(p,projectUrl)}catch{return null}}));out.push(...batch.filter(Boolean))}return out;}
 async function paginated(table:string,columns:string,days:number){const rows:any[]=[];for(let n=0;n<100000;n+=1000){const r=await admin.from(table).select(columns).gte('created_at',new Date(Date.now()-days*86400000).toISOString()).order('created_at').order('id').range(n,n+999);if(r.error)throw Error('report_unavailable');rows.push(...r.data||[]);if(r.data!.length<1000)return rows;}throw Error('report_volume_limit');}
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
@@ -24,7 +26,7 @@ Deno.serve(async req=>{
  if(op==='feed'||op==='generate_due'){
   if(op==='generate_due'){await generate();return json({ok:true})}try{await generate()}catch{console.warn('villegram_generation_unavailable')}
   const [c,s,posts]=await Promise.all([catalog(),settings(),admin.from('villegram_publications').select('*').eq('status','published').order('featured',{ascending:false}).order('display_order').order('created_at').limit(200)]);if(posts.error)throw Error('feed_unavailable');
-  const eligible=(posts.data||[]).filter(p=>eligiblePublication(p,c.properties,c.products,c.offers));return json({ok:true,publications:await resolveMedia(eligible),...c,max_offers:s.max_offers,checked_at:new Date().toISOString()});
+  const eligible=(posts.data||[]).filter(p=>eligiblePublication(p,c.properties,c.products,c.offers));return json({ok:true,publications:await resolveMedia(await resolveStays(eligible)),...c,max_offers:s.max_offers,checked_at:new Date().toISOString()});
  }
  if(op==='signals'){
   if(!Array.isArray(body.events)||body.events.length<1||body.events.length>25)return json({ok:false,error:'invalid_signals'},400);
@@ -54,12 +56,13 @@ Deno.serve(async req=>{
  if(op==='generate')return json({ok:true,...await generate(true)});
  if(op==='save'||op==='preview'){
   const value=publicationInput(body.publication,projectUrl),c=await catalog();
+  let stayCard=null;if(value.stay_selection&&(value.status==='published'||op==='preview')){try{stayCard=(await resolvePublicationStay(value,projectUrl)).stay_card}catch{return json({ok:false,error:'stay_unavailable'},409)}}
   if(value.property_id&&!c.properties.some(p=>p.id===value.property_id)||value.experience_id&&!c.products.some(p=>p.id===value.experience_id)||value.offer_id&&!c.offers.some(p=>p.id===value.offer_id))return json({ok:false,error:'invalid_link'},400);
   // Uploaded paths belong to this editor's author. An edit may retain the original author's files.
   const existing=body.id?await admin.from('villegram_publications').select('*').eq('id',body.id).maybeSingle():{data:null,error:null};if(body.id&&(!existing.data||existing.error))return json({ok:false,error:'publication_unavailable'},404);
   for(const m of value.media)for(const path of [m.path,m.poster_path].filter(Boolean)){if(!path.startsWith(u!.id+'/')&&!existing.data?.media.some((x:any)=>x.path===path||x.poster_path===path))return json({ok:false,error:'invalid_media_owner'},400);const [folder,name]=path.split('/');const files=await admin.storage.from('villegram-media').list(folder,{search:name,limit:1});if(files.error||!files.data?.some(f=>f.name===name))return json({ok:false,error:'media_upload_incomplete'},409);}
   if(value.status==='published'){value.published_at ||= new Date().toISOString();if(!eligiblePublication(value,c.properties,c.products,c.offers,Math.max(Date.now(),Date.parse(value.published_at))))return json({ok:false,error:'link_unavailable'},409);}
-  if(op==='preview')return json({ok:true,publication:(await resolveMedia([{...existing.data,...value}]))[0],...c});
+  if(op==='preview')return json({ok:true,publication:(await resolveMedia([{...existing.data,...value,...(stayCard?{stay_card:stayCard}:{})}]))[0],...c});
   const r=body.id?await admin.from('villegram_publications').update({...value,updated_at:new Date().toISOString()}).eq('id',body.id).eq('updated_at',body.updated_at||'').select().maybeSingle():await admin.from('villegram_publications').insert({...value,source:'manual',author_id:u!.id,author_name:'Equipe Chalezinho Ville'}).select().single();if(r.error||!r.data)return json({ok:false,error:body.id?'edit_conflict':'save_failed'},409);
   await admin.from('audit_events').insert({actor_user_id:u!.id,action:'villegram_publication_saved',entity_type:'villegram_publication',entity_id:r.data.id,new_value:{status:r.data.status,type:r.data.type}});return json({ok:true,publication:(await resolveMedia([r.data]))[0]});
  }

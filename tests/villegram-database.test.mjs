@@ -12,6 +12,8 @@ before(async()=>{
  create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);
  create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;`);
  await db.exec(await readFile(new URL('../supabase/migrations/20261006170228_villegram_publications.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261007033341_villegram_stay_selection.sql',import.meta.url),'utf8'));
+ await db.exec('insert into properties(id) values(1)');
  await db.query(`insert into villegram_publications(id,title,caption,type,media,cta,source_key) values($1,'Ville','Fotos reais','trust','[{"kind":"photo","url":"assets/real.webp"}]','dates','trust:test')`,[id]);
 });
 after(()=>db.close());
@@ -35,4 +37,11 @@ test('invalid publication cover/status and client payment signals fail in the da
  await assert.rejects(db.exec(`update villegram_publications set status='published' where id='${id}'`));
  await assert.rejects(db.exec(`update villegram_publications set cover_index=1 where id='${id}'`));
  await assert.rejects(db.exec(`insert into villegram_signals(id,publication_id,visitor_id,session_id,view_id,kind) values(gen_random_uuid(),'${id}','${id}','${id}','${id}','payment_confirmed')`));
+});
+
+test('fixed stay metadata requires exact choices and rejects stored prices or malformed dates',async()=>{
+ const value={check_in:'2026-11-16',check_out:'2026-11-19',guests:2,rate_code:'refundable'};
+ await db.query('update villegram_publications set property_id=1,stay_selection=$1 where id=$2',[JSON.stringify(value),id]);
+ for(const extra of [{total_cents:1},{check_in:null},{rate_code:null},{check_in:'2026-02-30'},{check_out:value.check_in},{guests:2.5},{rate_code:'cheapest'}])await assert.rejects(db.query('update villegram_publications set stay_selection=$1 where id=$2',[JSON.stringify({...value,...extra}),id]));
+ assert.deepEqual((await db.query('select stay_selection from villegram_publications where id=$1',[id])).rows[0].stay_selection,value);
 });
