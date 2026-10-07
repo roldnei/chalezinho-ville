@@ -38,3 +38,10 @@ test('uploaded video can be published by clicking the actual button and saved ed
  assert.match(w.document.querySelector('#vg-upload-status').textContent,/Mídia enviada/);assert.equal(saved.length,0);f.querySelector('[name=published]').click();await tick();assert.equal(saved[0].publication.status,'published');const file=saved[0].publication.media[0];assert.equal(file.kind,'video');assert.ok(file.path.endsWith('.mp4'));assert.ok(file.poster_path.endsWith('.webp'));
  f.elements.caption.value='Nova legenda';f.querySelector('[name=published]').click();await tick();assert.equal(saved[1].publication.status,'published');assert.equal(saved[1].publication.media[0].path,file.path);d.window.close();
 });
+
+test('cover generation seeks a decoded frame and rejects a black canvas instead of uploading it',async()=>{
+ const d=new JSDOM('',{url,runScripts:'outside-only',pretendToBeVisual:true}),w=d.window;let dark=false;
+ w.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){},getImageData(){return {data:Uint8ClampedArray.from([dark?0:50,0,0,255])}}});w.HTMLCanvasElement.prototype.toBlob=function(callback){callback(new w.Blob(['cover'],{type:'image/webp'}))};w.eval(await readFile(new URL('../villegram-upload.js',import.meta.url),'utf8'));
+ const video=w.document.createElement('video');let time=0;Object.defineProperties(video,{readyState:{value:2},duration:{value:9.7},videoWidth:{value:2160},videoHeight:{value:3840},currentTime:{get:()=>time,set:value=>{time=value;Promise.resolve().then(()=>video.dispatchEvent(new w.Event('seeked')))}}});
+ const cover=await w.VillegramUpload.poster(video);assert.equal(time,.5);assert.equal(cover.type,'image/webp');dark=true;await assert.rejects(w.VillegramUpload.poster(video,1),/capa ficou preta/);assert.equal(time,1);d.window.close();
+});
