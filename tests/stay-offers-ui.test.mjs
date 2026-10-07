@@ -20,6 +20,18 @@ async function wait(fn){for(let i=0;i<100;i++){if(fn())return;await new Promise(
 const directURL='https://qa.example/reservar.html?chalet=CH1&stay_offer='+oid+'&check_in=2030-01-01&check_out=2030-01-03&guests=2&rate=non_refundable&from=showcase';
 function choose(w,code='non_refundable'){const radio=w.document.querySelector('#checkout-rate-options input[value='+code+']');radio.checked=true;radio.dispatchEvent(new w.Event('change'))}
 async function login(w){w.document.querySelector('#checkout-login-email').value='qa@example.test';w.document.querySelector('#checkout-login-password').value='fixture-password';w.document.querySelector('#checkout-login').dispatchEvent(new w.Event('submit',{cancelable:true}));await wait(()=>!w.document.querySelector('#authenticated-finalization').hidden)}
+test('experience entry includes the selected extra in the first tariff comparison',async()=>{
+ const {dom,w,calls}=await setup(null,'https://qa.example/reservar.html?chalet=CH1&experience=breakfast');
+ try{const $=s=>w.document.querySelector(s);
+  $('#book-in').value='2030-01-01';$('#book-out').value='2030-01-03';$('#book-search').click();await wait(()=>$('.booking-select'));
+  $('.booking-select').click();await wait(()=>$('#checkout-rate-options input'));
+  assert.deepEqual(calls.find(c=>c.action==='quote').body.experience_variant_ids,['breakfast-variant']);
+  assert.ok($('[data-remove="breakfast"]'));assert.equal($('#checkout-rate-options input:checked'),null);
+  choose(w,'refundable');assert.match($('#summary-content').textContent,/1.400,00/);
+  $('[data-remove="breakfast"]').click();await wait(()=>$('#summary-content').textContent.includes('1.350,00'));
+ }finally{dom.window.close()}
+});
+
 test('manual journey asks purpose with dates and combines package, tariff and extras before common login',async()=>{
  const {dom,w,calls}=await setup();try{const $=s=>w.document.querySelector(s);
  assert.equal($('#stay-mode').value,'');assert.ok($('#trip-purpose-initial').closest('.booking-search'));

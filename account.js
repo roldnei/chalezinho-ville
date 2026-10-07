@@ -518,6 +518,7 @@ async function startChargePayment(){
 }
 function renderPostBookingPagBankPayment(payment){
  const box=$("#post-payment-sim");
+ $("#post-payment-message").textContent="";
  const isModification=activeCharge?.kind==="modification";
  box.innerHTML='<div class="post-charge-summary"><span>PagBank sandbox · '+(payment.method==="card"?"Cartão":"Pix")+'</span><strong>'+brlC(payment.amount_cents||activeCharge?.amount_cents)+'</strong></div>'+
   (payment.pix_code?'<p>Pix copia e cola de teste:</p><textarea readonly aria-label="Pix copia e cola">'+esc(payment.pix_code)+'</textarea>':'')+

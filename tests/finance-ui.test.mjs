@@ -35,6 +35,27 @@ async function setup(captured=false,withoutGuarantee=false,overrides={}){
  await new Promise(r=>setTimeout(r,10));
  return {dom,w,calls,hub};
 }
+test('refund reconciliation refreshes confirmed totals and does not deny a partial confirmation',async()=>{
+ const {w,dom}=await setup();
+ const originalFetch=w.fetch;
+ w.fetch=async(url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.action!=='reservation_refund_action')return originalFetch(url,options);
+  const result={ok:true,cancellation_id:'case-partial',status:'pending_provider',refund_due_cents:163040,
+   confirmed_cents:body.operation==='reconcile'?100:0,provider_issue:'pagbank_refund_temporarily_unavailable',calculation:{allocations:[]}};
+  return {ok:true,json:async()=>result};
+ };
+ w.document.querySelector('[data-cancel-reservation]').click();
+ const form=w.document.querySelector('#refund-prepare');Object.defineProperty(form,'reason',{value:form.elements.reason});
+ form.elements.reason.value='Homologação de conciliação parcial';
+ form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await new Promise(r=>setTimeout(r,20));
+ w.document.querySelector('#refund-reconcile').click();await new Promise(r=>setTimeout(r,20));
+ const text=w.document.querySelector('#admin-modal-content').textContent.replace(/\s/g,' ');
+ assert.match(text,/Confirmado no financeiro: R\$ 1,00/);assert.match(text,/Restante: R\$ 1\.629,40/);
+ assert.doesNotMatch(text,/Nenhum valor foi confirmado/);assert.ok(w.document.querySelector('#refund-reconcile'));
+ dom.window.close();
+});
+
 test('reservation opens guarantee and financial history through actual buttons',async()=>{
  const {w,dom,calls}=await setup();
  assert.ok(calls.some(c=>c.action==='reservation_finance'));

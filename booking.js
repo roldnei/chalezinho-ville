@@ -200,7 +200,7 @@ async function openFlow(id){
  if(state.fastCheckout)$("#summary-content").innerHTML='<p class="loading-state">Confirmando sua escolha…</p>';
  showStep(2);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
-  await generateQuote(false);state.rate=state.quote.rate_options.find(r=>r.selectable)||null;state.rateCode=state.rate?.code||null;if(state.rate)await openFastCheckout();
+  await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.selectable)||null;state.rateCode=state.rate?.code||null;if(state.rate)await openFastCheckout();
  }catch(e){
   if(e.message==="minimum_stay"){
     const min=Number(e.data?.min_stay||state.property?.min_stay||1);
