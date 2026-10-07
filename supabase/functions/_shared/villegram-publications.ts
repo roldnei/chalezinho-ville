@@ -10,7 +10,9 @@ export function publicationInput(raw:Row,projectUrl:string){
  if(!publicationTypes.includes(type)||!['draft','published','archived','pending_review'].includes(status)||!title||title.length>140||!caption||caption.length>3000||!Array.isArray(media)||media.length<1||media.length>8)throw Error('invalid_publication');
  if(property_id!==null&&(!Number.isSafeInteger(property_id)||property_id<1)||experience_id&&!uuid(experience_id)||offer_id&&!uuid(offer_id))throw Error('invalid_link');
  if(type==='property'&&!property_id||type==='experience'&&!experience_id||type==='offer'&&!offer_id&&!stay_selection)throw Error('link_required');
- const safeURL=(url:any)=>typeof url==='string'&&(/^assets\/[a-zA-Z0-9._/-]+\.(webp|jpg|jpeg|png|avif)$/.test(url)||url.startsWith(projectUrl+'/storage/v1/object/public/property-media/')||url.startsWith(projectUrl+'/storage/v1/object/public/experience-media/'));
+ // Catalog photos may carry a cache version, e.g. cover.webp?v=2.
+ // Keep the original URL while validating the asset path separately from its query.
+ const safeURL=(url:any)=>typeof url==='string'&&((/^assets\/[a-zA-Z0-9._/-]+\.(webp|jpg|jpeg|png|avif)(\?[a-zA-Z0-9._~%=&+-]*)?$/.test(url)&&!url.split('?')[0].split('/').some(segment=>segment==='.'||segment==='..'))||url.startsWith(projectUrl+'/storage/v1/object/public/property-media/')||url.startsWith(projectUrl+'/storage/v1/object/public/experience-media/'));
  const path=(v:any)=>typeof v==='string'&&/^[a-f0-9-]{36}\/[a-f0-9-]{36}\.(webp|mp4|webm|jpg)$/i.test(v);
  const normalized=media.map((m:Row)=>{
   if(!['photo','video'].includes(m.kind)||m.path&&!path(m.path)||!m.path&&!safeURL(m.url)||m.kind==='video'&&!m.path||!['contain','cover'].includes(m.fit||'contain')||!Number.isFinite(Number(m.position??50))||Number(m.position??50)<0||Number(m.position??50)>100||!Number.isFinite(Number(m.position_x??50))||Number(m.position_x??50)<0||Number(m.position_x??50)>100||!Number.isFinite(Number(m.zoom??1))||Number(m.zoom??1)<1||Number(m.zoom??1)>3)throw Error('invalid_media');

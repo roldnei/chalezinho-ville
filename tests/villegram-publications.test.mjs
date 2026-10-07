@@ -50,3 +50,10 @@ test('fixed-date reels open their quoted dates and tariff directly, with or with
  w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));await new Promise(r=>setTimeout(r,20));assert.equal(w.document.querySelector('#villegram-home-status'),null);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 1');assert.match(w.document.querySelector('.vg-price').textContent,offer_id?/1.200,00/:/1.000,00/);const params=new URL(w.document.querySelector('.vg-primary').href).searchParams;assert.equal(params.get('check_in'),selected.check_in);assert.equal(params.get('check_out'),selected.check_out);assert.equal(params.get('guests'),'2');assert.equal(params.get('rate'),'refundable');assert.equal(params.get('from'),'showcase');if(offer_id)assert.equal(params.get('stay_offer'),offer_id);else{assert.equal(params.has('stay_offer'),false);assert.equal(params.get('mode'),'stay')}d.window.close();
  }
 });
+
+test('automatic catalog photos with cache versions survive generation and preview validation',()=>{
+ const cover='assets/ch1-capa-casal-spa.webp?v=2',settings=automationInput({auto_publish:true});const generated=generatePublications([{id:1,name:'Ville Signature',summary:'Piscina e SPA',gallery:[cover,'assets/01-piscina.webp']}],[],[],settings);
+ const property=generated.find(p=>p.type==='property'),normalized=publicationInput(property,url);assert.equal(normalized.media[0].url,cover);assert.equal(normalized.media[1].url,'assets/01-piscina.webp');
+ for(const source of ['assets/photo.webp?v=2&size=large','assets/photo.jpg?v=2026-10-07','assets/sub/photo.png?version=abc%20def'])assert.equal(publicationInput({...post,media:[{kind:'photo',url:source}]},url).media[0].url,source);
+ for(const source of ['assets/../private/photo.webp?v=2','assets/./photo.webp?v=2','assets/photo.svg?v=2','https://outside.example/photo.webp?v=2','//outside.example/photo.webp?v=2','assets/photo.webp?v=2#x','javascript:alert(1)?v=2'])assert.throws(()=>publicationInput({...post,media:[{kind:'photo',url:source}]},url),/invalid_media/);
+});
