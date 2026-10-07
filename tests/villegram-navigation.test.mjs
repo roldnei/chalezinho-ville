@@ -64,6 +64,14 @@ test('video countdown follows actual playback metadata and keeps its ring when t
  assert.equal(w.document.querySelector('.vg-time-ring').hasAttribute('hidden'),false);assert.equal(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset,'25');assert.equal(w.document.querySelector('.vg-pause').title,'15 s restantes nesta apresentação');advance(90000);assert.equal(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset,'25');
  w.document.querySelector('[data-action=pause]').click();assert.equal(w.document.querySelector('.vg-pause-symbol').textContent,'▶');assert.ok(w.document.querySelector('.vg-time-ring'));d.window.close();
 });
+
+test('late video events after moving to a photo do not crash or attribute completion to the new reel',async()=>{
+ const {d,w}=await setup({media:[{kind:'video',url:'clip.mp4',duration_seconds:20}]});
+ const video=w.document.querySelector('video'),errors=[];let completions=0;
+ w.addEventListener('error',e=>{errors.push(e.error);e.preventDefault()});w.VillegramSignals={complete(){completions++},end(){},begin(){},active(){},flush(){},interest:()=>({}),declared:()=>({})};
+ w.document.querySelector('[data-action=next]').click();await new Promise(r=>setTimeout(r,0));assert.equal(w.document.querySelector('video'),null);
+ video.dispatchEvent(new w.Event('timeupdate'));assert.equal(errors.length,0);assert.equal(completions,0);d.window.close();
+});
 test('booking header and steps occupy normal document rows with a bounded three-column layout',async()=>{
  const html=await readFile(new URL('../reservar.html',import.meta.url),'utf8'),d=new JSDOM(html);for(const file of ['styles.css','booking-layout.css']){const style=d.window.document.createElement('style');style.textContent=await readFile(new URL('../'+file,import.meta.url),'utf8');d.window.document.head.append(style)}
  const w=d.window;assert.ok(w.document.querySelector('link[href^="booking-layout.css"]'));assert.equal(w.getComputedStyle(w.document.querySelector('.detail-header')).position,'relative');

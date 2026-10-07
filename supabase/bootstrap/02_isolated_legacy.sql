@@ -159,14 +159,7 @@ select id,'assets/05-suite.webp','Suíte preparada para a experiência',50
 from public.experience_products p where p.code='dev_romantic'
 and not exists(select 1 from public.experience_media m where m.product_id=p.id and m.media_url='assets/05-suite.webp');
 
-insert into public.experience_media(product_id,media_url,alt_text,display_order)
-select id,'assets/02-cozinha.webp','Ambiente para café da manhã',40
-from public.experience_products p where p.code='dev_breakfast'
-and not exists(select 1 from public.experience_media m where m.product_id=p.id and m.media_url='assets/02-cozinha.webp');
-insert into public.experience_media(product_id,media_url,alt_text,display_order)
-select id,'assets/ch2-01-cafe.webp','Café preparado no chalé',50
-from public.experience_products p where p.code='dev_breakfast'
-and not exists(select 1 from public.experience_media m where m.product_id=p.id and m.media_url='assets/ch2-01-cafe.webp');
+-- Breakfast keeps its three existing photographs; obsolete asset paths are not seeded.
 
 insert into public.experience_media(product_id,media_url,alt_text,display_order)
 select id,'assets/experiencia-flores.webp','Decoração romântica com flores',20

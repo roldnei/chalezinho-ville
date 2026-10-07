@@ -33,7 +33,7 @@
 #villegram:has(.vg-caption-short) .vg-controls{left:auto;right:12px;top:38%;bottom:auto;transform:none;width:68px;padding:0}
 #villegram:has(.vg-caption-short) .vg-social{flex-direction:column;gap:12px}
 #villegram:has(.vg-caption-short) .vg-social button{padding:10px 2px;font-size:12px;border:0;background:#0007;border-radius:12px;min-height:48px}
-#villegram:has(.vg-caption-short) .vg-status{position:fixed;left:20px;right:20px;bottom:125px;background:#17130fea;border-radius:8px;padding:8px}
+#villegram:has(.vg-caption-short) .vg-status{position:fixed;left:20px;right:76px;top:calc(160px + env(safe-area-inset-top));bottom:auto;background:#17130fea;border-radius:8px;padding:8px;pointer-events:none}
 #villegram .vg-bottom-nav{position:absolute;inset:auto 0 0;display:grid;grid-template-columns:repeat(4,1fr);gap:3px;background:#111;border-top:1px solid #ffffff25;padding:6px 8px calc(6px + env(safe-area-inset-bottom));z-index:4}
 #villegram .vg-bottom-nav a,#villegram .vg-bottom-nav button{display:flex;align-items:center;justify-content:center;min-height:48px;padding:6px 3px;text-decoration:none;border:0;border-radius:8px;background:transparent;color:#fff;font-size:14px;letter-spacing:0;text-transform:none;text-align:center}
 #villegram .vg-bottom-nav [aria-current]{background:#b59a6125;color:#eddbac}
