@@ -142,3 +142,9 @@ Sem mídia, a seta de avanço, as etapas, miniaturas e ferramentas ficam ocultas
 O comando Preencher saiu do menu de três pontos e usa um ícone circular de enquadramento no canto direito, abaixo de Aa. O nome acessível e a dica alternam entre Mostrar foto inteira e Preencher a cena. Fica oculto sem mídia e nas etapas seguintes. Fotos novas enviadas ou escolhidas da biblioteca entram com fit cover; mídia existente conserva seu enquadramento e vídeos mantêm o padrão anterior. A alternância mantém zoom e deslocamento.
 
 Validação: 41 testes de editor/texto passaram, cobrindo upload e biblioteca com preenchimento inicial, alternância fora do menu, persistência do enquadramento ao reabrir, navegação e remoção da última mídia. Sintaxe e diff check passaram. Sem backend, banco ou PROD alterados. Aparência em navegador continua sem nova validação devido ao bloqueio de retomada segura da sessão de credenciais já registrado.
+
+### Preencher sem bordas deslocadas
+
+Corrigido o comando que alterava apenas object-fit e conservava deslocamento/zoom: ao preencher, zera offsets, recentraliza posição e origem e restaura zoom 1 com cover. Quando a cena tem ajuste manual, o ícone oferece Preencher, mesmo se o modo anterior já era cover; após preencher, outro toque mostra a foto inteira. Não muda rascunhos existentes até tocar na ferramenta.
+
+42 testes de editor/texto passaram, incluindo regressão com foto em cover deslocada e ampliada, preenchimento em um toque, persistência e alternância para foto inteira. Sintaxe e diff check passaram. Nova tentativa de observação pelo navegador retornou o mesmo bloqueio de retomada segura de credenciais; sem validação visual ou captura nova. Sem alterações de backend ou PROD.
