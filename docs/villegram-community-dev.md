@@ -116,3 +116,7 @@ Segurar a foto ou a área de imagem do vídeo por 550 ms abre a lixeira; só toc
 Validação: **373 testes passaram**, incluindo cinco casos novos de seleção/envio/temporizadores/retry, toque longo, pan/pinça/cancelamento, vídeo e preservação da capa. Os 39 testes focados no editor/cenas passaram; análise sintática e diff check passaram. Sem alteração de banco, backend ou PROD.
 
 Teste visual desta versão continua pendente: nova tentativa de abrir o editor DEV após reiniciar o navegador retornou “Browser observation is unavailable because native credential state cannot be safely resumed”. Sem novas capturas, upload real pela UI ou validação de toque longo em telefone físico. A cobertura automatizada não substitui essa etapa.
+
+### Status de envio compacto
+
+Após a captura do usuário, o aviso saiu de dentro da imagem: fica no fluxo normal logo abaixo da prévia, antes das instruções, sem sobrepor os controles. Retirados fundo, sombra, moldura e espaçamento excessivo; barra de 2 px e texto de 12 px. Confirmação mantém desaparecimento automático; erro e nova tentativa continuam acessíveis. Os 28 testes do editor passaram. Conferida posição no DOM fora da cena; aparência em navegador ainda não validada devido ao bloqueio da sessão já registrado.

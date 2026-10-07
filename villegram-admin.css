@@ -24,9 +24,9 @@ body.vg-admin-page #vg-media-options{margin-left:auto;min-width:44px;letter-spac
 #vg-composer-screen.is-video #vg-media-menu{bottom:116px}
 body.vg-admin-page #vg-media-delete{display:flex;align-items:center;gap:10px;border:0;border-radius:14px;background:transparent;color:#ffb8b2;padding:12px;font:500 14px/1.25 'DM Sans',sans-serif;min-height:48px}
 #vg-media-delete svg{width:22px;height:22px}
-#vg-upload-feedback{position:absolute;z-index:14;left:12px;right:12px;bottom:18px;border:1px solid #ffffff30;border-radius:16px;padding:14px;background:#191d24f2;backdrop-filter:blur(18px);box-shadow:0 6px 18px #0004}
-#vg-upload-feedback progress{display:block;width:100%;height:4px;margin:0 0 10px;accent-color:#e7d7b7;border:0;border-radius:6px;overflow:hidden}#vg-upload-feedback progress::-webkit-progress-bar{background:#ffffff20}#vg-upload-feedback progress::-webkit-progress-value{background:#e7d7b7}#vg-upload-feedback progress::-moz-progress-bar{background:#e7d7b7}
-#vg-upload-feedback p{margin:0;font:400 13px/1.5 'DM Sans',sans-serif;color:#eee}#vg-upload-feedback[data-state=error]{border-color:#d98d825e}body.vg-admin-page #vg-upload-retry{margin:10px 0 0;font-size:13px;min-height:40px;padding:9px 12px}
+#vg-upload-feedback{position:static;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:10px;row-gap:4px;margin:8px 2px 0;padding:0;border:0;background:none;box-shadow:none}
+#vg-upload-feedback progress{display:block;grid-column:1/-1;width:100%;height:2px;margin:0;accent-color:#e7d7b7;border:0;border-radius:6px;overflow:hidden}#vg-upload-feedback progress::-webkit-progress-bar{background:#ffffff20}#vg-upload-feedback progress::-webkit-progress-value{background:#e7d7b7}#vg-upload-feedback progress::-moz-progress-bar{background:#e7d7b7}
+#vg-upload-feedback p{margin:0;font:400 12px/1.4 'DM Sans',sans-serif;color:#b7babf}#vg-upload-feedback[data-state=success] p:before{content:'✓ ';color:#b6c9b5}#vg-upload-feedback[data-state=error] p{color:#efb4ab}body.vg-admin-page #vg-upload-retry{margin:0;font-size:12px;min-height:44px;padding:8px 10px}
 #vg-composer-empty[hidden],#vg-media-controls[hidden],#vg-media-controls button[hidden],#vg-media-menu[hidden],#vg-upload-feedback[hidden],#vg-upload-progress[hidden],#vg-upload-retry[hidden]{display:none!important}
 .vg-admin-media>.vg-media-card{margin-top:12px}.vg-media-card summary{font:400 13px/1.5 'DM Sans',sans-serif;color:#a9aaa9;cursor:pointer}#vg-reorder-status:empty{display:none}
 #vg-composer-screen video{-webkit-touch-callout:none}
