@@ -230,7 +230,7 @@ function initTripPurpose(){
  const previous=purpose.value||saved.purpose;purpose.innerHTML='<option value="">Sem preferência</option>'+(state.config.purposes||[]).map(x=>'<option value="'+x.code+'">'+x.label+'</option>').join("");
  purpose.value=new URLSearchParams(location.search).get("purpose")??previous??"";
  const review=$('#trip-purpose-review');review.innerHTML=purpose.innerHTML;review.value=purpose.value;
- const change=e=>{if(state.fastUpdating){e.target.value=purpose.value;return}purpose.value=e.target.value;review.value=purpose.value;persistSelection();refreshStayOptions();if(state.property&&!$('#checkout-modal').hidden)renderExperienceStep()};purpose.onchange=change;review.onchange=change;
+ const change=e=>{if(state.fastUpdating){e.target.value=purpose.value;return}purpose.value=e.target.value;review.value=purpose.value;persistSelection();refreshStayOptions();if(state.property&&!$('#checkout-modal').hidden){renderExperienceStep();if(state.rate)renderSelectionSummary()}};purpose.onchange=change;review.onchange=change;
 }
 function renderExperienceStep(){$('#trip-purpose-review').value=$('#trip-purpose-initial').value;renderOfferChoices();renderExperienceList($("#trip-purpose-initial").value);}
 function eligibleExperienceProducts(purpose=""){
