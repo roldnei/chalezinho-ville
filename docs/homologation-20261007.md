@@ -173,3 +173,16 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - Cotação CH3 17–19/11 expirou naturalmente: aviso explícito observado. Voltar aos chalés e escolher a estadia renovou prazo de 15 minutos, preservou datas/motivo e exigiu nova escolha explícita de tarifa. Não alterado relógio. Evidências qa-cotacao-expirada-naturalmente.png e qa-cotacao-renovada-naturalmente.png.
 - Suíte completa da versão a7e120: 396 testes aprovados, zero falhas/ignorados, log outputs/homologation-20261007-tests-round12.txt. A mudança posterior desta rodada é somente a mensagem de saldo da caução.
 - Capturas desta rodada: viewport nativo 1280×720; não equivalem a Android físico. Banco/funções não alterados nesta rodada. Homologação global ainda não concluída, especialmente estornos de cartão.
+
+## Continuidade 08/10 — conferências adicionais
+
+- HEAD remoto permanece 214deca1344a0de05d861c0695232ad7613cdd40. Prévia https://chalezinho-ville-4e7wcxxdo-roldneicosta-4140.vercel.app/ conferida.
+- Portal DEV autenticado: ORDE_276FD15D-D5BF-422E-B220-9C2293154CAD / CHAR_74EC1251-4A36-4F45-B9B8-FA222DF09AEC mostra caução R$ 500,00, Pago, consistente com a consulta da API. Captura qa-portal-caucao-integral-confirmada.png. Não é pagamento de diária.
+- Reteste da mensagem na conta do hóspede: captura integral mostra Sem saldo a liberar. Captura qa-caucao-integral-hospede-corrigida.png. Consulta de pedidos apresentou falha transitória explícita e recuperou após reload, sem falsa lista vazia durante falha.
+- Troca de cartão sintético da garantia f1f6a0b7-843b-4f2a-844b-5f6ad5198296 / reserva A6D3B69F79 concluída pela interface com consentimentos. Tela informou sucesso, banco manteve pending, sem autorização/captura antecipada. Captura qa-cartao-caucao-atualizado.png. Não comprova aprovação futura desse novo cartão.
+- Nova revisão visual em 360×800 (painel compartilhar), 412×915 (legenda) e 1440×900 (home), sem sobreposição nos estados capturados. Arquivos qa-final-360-compartilhar.png, qa-final-412-legenda.png, qa-final-1440-home.png. São viewports emulados, não Android físico.
+- Compartilhamento: URL exibida correta, painel pausa no mesmo reel. Copiar link informou sucesso, mas clipboard/colagem pelo navegador integrado devolveram URL anterior. Resultado da cópia NÃO aprovado; possível limitação de clipboard do navegador, causa não isolada. Nenhum comentário enviado durante o teste de colagem.
+- Documentos da reserva 0D88FF9D57: política não reembolsável 1.2, termos 1.2, regras 1.1, privacidade 1.0; conteúdo/aceite de 07/10 23:54 visíveis. Botão de download acionado, mas evento download não chegou ao navegador controlado em 10s: arquivo não comprovado.
+- account.js passou sintaxe; TypeScript das quatro funções passou novamente. Nenhuma mudança adicional de código/banco.
+- Cadastro real por e-mail autorizado para roldneicosta+homologacao@gmail.com, formulário preenchido com identidade fictícia, senha e envio aguardando usuário. Não substituir confirmação de e-mail por confirmação administrativa.
+- Usuário reincluiu um teste de estorno de hospedagem ao final; não executado nesta continuidade. Não reenviar operações incertas com nova chave.
