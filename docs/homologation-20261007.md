@@ -2,6 +2,12 @@
 
 ## Continuação após novo login no PagBank
 
+- Resumo com hóspedes/motivo retestado após login e troca Descanso → Praia, prévia 09c8033a. Captura qa-resumo-hospede-motivo-corrigido.png.
+- Nova reserva legítima de teste pela home: 7DACD19663 / 0b2b90ff-9581-43b5-9c66-abe945c9924c, CH1 09–11/10, reembolsável R$ 2.130,80, cartão sandbox 1x aprovado. Não alteradas datas de reservas existentes.
+- Caução 11aa2ab3-5646-439f-8af5-c7d6e841980c: autorização R$ 500, cobertura do checkout confirmada. Ocorrência sintética com foto/recibo enviada, aprovada e capturada pela interface em R$ 180. Pedido ORDE_BB75D5AC-1E00-478D-AAFB-668FE1712A34, cobrança CHAR_B7C6B76C-7547-435F-87C1-9665CA4AA1A2. Portal mudou de Autorizado para Pago; ainda mostra total original R$ 500. Consulta autenticada ao provedor em 08/10 02:48:56 UTC confirmou paid_cents=18000, refunded_cents=0. Evidência qa-caucao-parcial-180-provedor.json. Saldo não capturado R$ 320, liberação ainda NÃO confirmada.
+- Estorno parcial de R$ 30 da captura solicitado uma vez pela interface: pendente, código 40008, confirmado zero. Não reenviado.
+- Encontrado ao iniciar outro cenário: fechar recibo pago não descartava a retomada, reabrindo a cobrança anterior na próxima busca. Corrigido encerramento apenas para estados definitivos; resultado incerto preserva recuperação. Teste novo passou junto aos cinco de retomada. Reteste visual pendente da prévia.
+
 - Suíte consolidada da versão a6d5f85e: 395 testes aprovados, zero falhas. Reteste em 360 px confirmou recibo independente após reload e clique para a reserva correta A6D3B69F79, saldo zero.
 - Portal DEV autenticado: pedidos ORDE_88DF8F5E-2130-4180-8FA1-7BF471FED5E6 (6x, R$ 1.267,11), ORDE_9C8A6C18-4E0A-43BA-B500-8584C09F6505 (1x, R$ 2.008,40) e ORDE_421AC1B3-8076-416D-A872-AF82CB84C2B0 (12x, R$ 362,29) continuam como Pago. Não há confirmação de devolução desses cartões. Nenhuma operação incerta foi reenviada.
 - PIX ORDE_8004D581-8E5C-44EC-9780-1411D02A31B2 aparece Cancelado, coerente com estorno confirmado de R$ 1,00 no DEV. O status isolado Cancelado não foi usado como única prova de estorno.

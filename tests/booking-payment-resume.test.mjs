@@ -6,6 +6,20 @@ const source=readFileSync(new URL('../booking.js',import.meta.url),'utf8');
 const functions=source.slice(source.indexOf('function saveResume(){'),source.indexOf('function renderCheckoutRates(){'));
 const renderer=source.slice(source.indexOf('function renderSandboxPayment(d){'),source.indexOf('function renderMockPayment(d){'));
 const html=readFileSync(new URL('../reservar.html',import.meta.url),'utf8');
+const closer=source.slice(source.indexOf('async function closeCheckout(){'),source.indexOf('function renderDevBanner(){'));
+test('closing a paid receipt permits a new search but an uncertain payment retains recovery',async()=>{
+ for(const status of ['paid','awaiting_payment']){
+  const {dom,w}=fixture();try{
+   w.eval(closer);w.$('#checkout-panel').dataset.step='6';
+   w.state.activePayment={provider:'pagbank_sandbox',payment_id:'qa',status};
+   w.setFlowError=()=>{};let searches=0;w.search=async()=>{searches++};
+   await w.closeCheckout();
+   assert.equal(searches,status==='paid'?1:0);
+   assert.equal(w.sessionStorage.getItem('chalezinho_booking_resume')!==null,status!=='paid');
+   assert.equal(w.state.activePayment===null,status==='paid');
+  }finally{dom.window.close()}
+ }
+});
 function fixture(session={user:{id:'guest'}}){
  const dom=new JSDOM(html,{url:'https://qa.example/reservar.html?resume=1',runScripts:'outside-only'}),w=dom.window,calls=[];
  w.$=s=>w.document.querySelector(s);w.state={};w.sb={auth:{getSession:async()=>({data:{session}})}};

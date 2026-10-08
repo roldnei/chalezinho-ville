@@ -106,7 +106,13 @@ function setCheckoutVisible(visible){
 async function closeCheckout(){
  const btn=$("#checkout-close"),step=Number($("#checkout-panel").dataset.step||1),active=state.activePayment;
  if(step===6&&active?.provider==="pagbank_sandbox"){
-  setCheckoutVisible(false);setFlowError("");return;
+  setCheckoutVisible(false);setFlowError("");
+  if(['paid','refused','cancelled','expired'].includes(active.status)){
+   clearInterval(window.__pagbankPoll);sessionStorage.removeItem('chalezinho_booking_resume');
+   state.activePayment=null;state.paymentView=null;state.quote=null;state.rate=null;state.rateCode=null;state.rateConfirmed=false;
+   await search();
+  }
+  return;
  }
  if(step===6&&active?.payment_id&&active.status==="awaiting_payment"){
   btn.disabled=true;setFlowError("Encerrando a tentativa de pagamento e liberando as datas…");
