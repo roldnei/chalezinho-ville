@@ -122,3 +122,12 @@ test('rejected authenticated like forces an actual login instead of redirecting 
  const {d,w}=await setup();let target='';w.VillegramContent.navigate=url=>target=url;w.villegramAuth={auth:{getSession:async()=>({data:{session:{access_token:'expired'}}})}};w.VillegramContent.request=async()=>{throw Object.assign(Error('authentication_required'),{status:401})};
  w.document.querySelector('[data-action=like]').click();await new Promise(r=>setTimeout(r,0));assert.equal(new URL(target,'https://dev.local').searchParams.get('reauthenticate'),'1');d.window.close();
 });
+
+test('leaving a later reel updates this history entry and restores the same publication after rebuilding the feed',async()=>{
+ const {d,w}=await setup();w.history.replaceState(null,'','/index.html?publication='+id);
+ w.document.querySelector('[data-action=next]').click();await new Promise(r=>setTimeout(r,0));w.Villegram.remember();
+ assert.equal(new URL(w.location.href).searchParams.get('publication'),'other');assert.equal(w.history.state.villegramPosition.id,'other');assert.deepEqual(Array.from(w.history.state.villegramPosition.order),[id,'other']);
+ const publicPosts=[{...publication,id:'other'},publication];w.Villegram.close();w.fetch=async()=>({ok:true,json:async()=>({ok:true,publications:publicPosts.map(p=>({...p,type:'trust',cta:'property'})),properties:[],products:[],offers:[],max_offers:3,likes:0,comments:[]})});
+ w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
+ assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');assert.equal(new URL(w.location.href).searchParams.get('publication'),'other');d.window.close();
+});
