@@ -109,3 +109,11 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - Fixture de anfitrião `c2e7acf3-dee9-45fc-a27c-dd06eee6065a`, exclusivamente DEV, escopo CH1 e sem finanças/gestão de equipe/edição de anúncios. E-mail confirmado administrativamente para fixture, sem alegar teste de entrega real.
 - Navegador mostrou apenas CH1 nas reservas e a própria pessoa em Equipe. API hub retornou property_ids/reservation_property_ids/task_property_ids `[1]`; pagamentos/cobranças/garantias vazios; listing list HTTP 403 `listing_access_denied`. Evidência externa `outputs/qa-host-api-scope.json`.
 - Corrigidos links administrativos visíveis ao anfitrião sem acesso e rótulo “Próxima” em reserva passada ainda sem entrada registrada. São ajustes de apresentação, sem mudar autorização ou status de reserva. Oito testes de escopo/PMS passaram; reteste da apresentação depende da próxima prévia.
+
+## Rodada 9 — concorrência real entre duas contas
+
+- Duas sessões em prévias DEV, uma com hóspede e outra com anfitrião fictícios, partiram das entradas reais e cotaram CH3, 20–22/12/2026, duas pessoas, tarifa reembolsável R$ 2.234,00. Nenhuma tarifa veio previamente selecionada.
+- Primeira sessão gerou PIX sandbox: reserva `293DA17BE1` / `3b429156-8fc5-4953-bfa2-eaa645151cbd`, pagamento `5a0914d6-e743-48f8-a626-bd538de94743`, aguardando pagamento. Segunda sessão foi inicialmente barrada por passaporte sem CPF; a identificação exclusivamente fictícia foi ajustada para CPF de teste, preservando as contas reais.
+- Segunda tentativa às 00:37:51 UTC de 08/10 recebeu `occupied`, confirmado pelo evento `payment_failed`. Consulta ao banco mostrou somente a primeira reserva/pagamento nesse chalé/período. Nenhuma duplicação ou segunda cobrança.
+- **Erro de apresentação:** `occupied` caía em mensagem genérica. Incluído no tratamento de indisponibilidade, orientando voltar e escolher outro chalé/período. Sintaxe validada; reteste visual da mensagem depende da prévia seguinte.
+- A disputa testada é entre duas cotações abertas antes do primeiro bloqueio; não equivale a disparo simultâneo no mesmo milissegundo. PIX permanece de teste, sem simular pagamento no banco.
