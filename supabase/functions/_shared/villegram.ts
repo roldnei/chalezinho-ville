@@ -43,9 +43,9 @@ export function villegramService({admin,currentUser,userIsAdmin,json}:Row){
   }else if(op!=='list')return json({ok:false,error:'invalid_operation'},400);
   const [likes,comments,mine]=await Promise.all([
    admin.from('villegram_likes').select('user_id',{count:'exact',head:true}).eq('offer_id',id),
-   admin.from('villegram_comments').select('id,display_name,body,created_at,status').eq('offer_id',id).eq('status','visible').order('created_at',{ascending:false}).limit(50),
+   admin.from('villegram_comments').select('id,display_name,body,created_at,status',{count:'exact'}).eq('offer_id',id).eq('status','visible').order('created_at',{ascending:false}).limit(50),
    user?admin.from('villegram_likes').select('offer_id').eq('offer_id',id).eq('user_id',user.id).maybeSingle():Promise.resolve({data:null,error:null})]);
   if(likes.error||comments.error||mine.error)return json({ok:false,error:'interaction_failed'},500);
-  return json({ok:true,likes:likes.count||0,liked:!!mine.data,comments:comments.data||[],can_moderate:!!manager});
+  return json({ok:true,likes:likes.count||0,liked:!!mine.data,comments_count:comments.count||0,comments:comments.data||[],can_moderate:!!manager});
  };
 }

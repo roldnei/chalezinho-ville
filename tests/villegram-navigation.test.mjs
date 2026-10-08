@@ -45,10 +45,10 @@ test('desktop navigation is labelled and enlarged; reduced motion receives a sta
  const reduced=await setup({mobile:true,reduced:true});assert.ok(reduced.w.document.querySelector('.vg-swipe-hint'));assert.equal(reduced.w.document.querySelector('.vg-swipe-demo'),null);reduced.d.window.close();
 });
 
-test('primary action uses equal reel gutters and social actions remain icon-only with accessible names',async()=>{
+test('primary action uses equal reel gutters and social actions display counts with accessible names',async()=>{
  const {d,w}=await setup();await new Promise(r=>setTimeout(r,0));const purchase=w.document.querySelector('.vg-purchase'),style=w.getComputedStyle(purchase);
  assert.equal(style.paddingLeft,style.paddingRight);assert.equal(w.getComputedStyle(purchase.querySelector('.vg-story')).paddingRight,'56px');assert.equal(w.getComputedStyle(purchase.querySelector('.vg-primary')).justifyContent,'center');
- for(const action of ['like','comments','share']){const b=w.document.querySelector('[data-action='+action+']');assert.equal(b.textContent,'');assert.equal(b.querySelectorAll('svg').length,1);assert.ok(b.getAttribute('aria-label'));assert.equal(w.getComputedStyle(b).minHeight,'48px')}
+ for(const action of ['like','comments','share']){const b=w.document.querySelector('[data-action='+action+']');assert.equal(b.textContent,action==='share'?'':'0');assert.equal(b.querySelectorAll('svg').length,1);assert.ok(b.getAttribute('aria-label'));assert.equal(w.getComputedStyle(b).minHeight,'48px')}
  w.document.querySelector('[data-action=comments]').click();assert.equal(w.document.querySelector('.vg-sheet').hidden,false);d.window.close();
 });
 test('oval countdown tracks a whole photo cycle and freezes during pause, hidden tabs and reading',async()=>{
@@ -130,4 +130,9 @@ test('leaving a later reel updates this history entry and restores the same publ
  const publicPosts=[{...publication,id:'other'},publication];w.Villegram.close();w.fetch=async()=>({ok:true,json:async()=>({ok:true,publications:publicPosts.map(p=>({...p,type:'trust',cta:'property'})),properties:[],products:[],offers:[],max_offers:3,likes:0,comments:[]})});
  w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));await new Promise(r=>setTimeout(r,0));await new Promise(r=>setTimeout(r,0));
  assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');assert.equal(new URL(w.location.href).searchParams.get('publication'),'other');d.window.close();
+});
+
+test('social totals use server count beyond page size and comments show escaped author and Brasilia timestamp',async()=>{
+ const {d,w}=await setup();w.VillegramContent.request=async()=>({likes:12,comments_count:71,liked:false,comments:[{display_name:'Ana <teste>',body:'Olá <script>',created_at:'2026-10-08T21:40:00Z'}]});w.document.querySelector('[data-action=comments]').click();await new Promise(r=>setTimeout(r,0));
+ assert.equal(w.document.querySelector('[data-action=like] .vg-social-count').textContent,'12');assert.equal(w.document.querySelector('[data-action=comments] .vg-social-count').textContent,'71');assert.equal(w.document.querySelector('.vg-comment strong').textContent,'Ana <teste>');assert.match(w.document.querySelector('.vg-comment time').textContent,/08\/10\/2026.*18:40.*Brasília/);assert.equal(w.document.querySelector('.vg-comment script'),null);assert.equal(w.document.querySelector('.vg-comment time').dateTime,'2026-10-08T21:40:00.000Z');d.window.close();
 });
