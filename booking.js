@@ -197,7 +197,7 @@ async function openFlow(id){
  state.fastCheckout=true;state.rateConfirmed=false;state.stage="review";state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};const desiredExperience=new URLSearchParams(location.search).get('experience');const desired=(state.config?.experience_products||[]).find(p=>p.id===desiredExperience);const variant=desired?.experience_variants?.find(v=>v.active);if(!state.offerId&&desired&&variant)state.selectedByProduct[desired.id]=variant.id;state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
- if(state.fastCheckout)$("#summary-content").innerHTML='<p class="loading-state">Confirmando sua escolha…</p>';
+ if(state.fastCheckout){$('#checkout-rate-options')?.remove();$("#summary-content").innerHTML='<p class="loading-state">Confirmando sua escolha…</p>'}
  showStep(2);$("#rate-options").innerHTML='<div class="loading-state">Preparando as tarifas…</div>';setFlowError("");
  try{
   await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.selectable)||null;state.rateCode=state.rate?.code||null;if(state.rate)await openFastCheckout();
