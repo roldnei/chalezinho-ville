@@ -82,3 +82,13 @@ Os estados acima são históricos. A homologação global continua em execução
 “Bloqueada para conclusão” nesta matriz indica cobertura incompleta, não necessariamente impedimento técnico. Não se trata de aprovação de produção. Nenhuma função ou migration foi publicada nesta rodada.
 
 Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`, `qa-412-cartao-1x-refundavel.png`, `qa-412-avatar-recorte.png`, `qa-412-perfil-publico.png`, `qa-412-momento-devolvido.png`, `qa-estorno-refundavel-40008.png`, `qa-motor-previa-real.png`. As capturas com prefixo 412 foram feitas na prévia e2636277 com viewport 412×915; painel/motor/estorno usam a prévia a7e77f9c e viewport nativo da aba. Não são Android físico.
+
+## Rodada 6
+
+- Prévia `c9b48cae`: https://chalezinho-ville-4itvdiikn-roldneicosta-4140.vercel.app/. Navegador 1440×900 confirmou conciliação corrigida: R$ 1,00 devolvido e R$ 1.629,40 pendente, código 40005 sem botão para criar nova devolução. Captura `qa-1440-conciliacao-corrigida.png`.
+- Publicação manual fictícia apareceu no feed; hóspede comentou e a apresentação permaneceu pausada. Administrador arquivou a publicação. Reload do endereço público exibiu aviso de indisponibilidade e feed alternativo, sem o conteúdo arquivado. Captura anterior ao arquivamento `qa-412-publicacao-equipe.png`.
+- Estadia `[QA 20261007] Estadia sintética pausada` criada e editada pela interface, somente CH2, café incluído, mínimo de duas noites, desconto/vitrine desativados. Reload preservou essas opções. Permanece pausada.
+- Experiência `[QA 20261007] Pacote fictício pausado` criada pela interface, R$ 2,00, um item fictício, somente CH2, foto sintética. Permanece pausada.
+- **Erro reproduzido:** upload de arquivo acima de 10 MB exibia “Fotos adicionadas”, apesar de não adicionar foto. Corrigido preservando erro e quantidade realmente enviada. Durante upload, salvar/trocar cadastro/ativar/excluir ficam indisponíveis; falha de rede restaura controles. Adicionado nome acessível ao seletor de experiência.
+- Suíte completa após correção: **390 testes aprovados, zero falhas** em 44 s (`outputs/homologation-20261007-tests-round6.txt`). Dois testes novos cobrem rejeição por tamanho e falha de rede com restauração de controles. Reteste visual da correção de upload pendente da próxima prévia.
+- Hóspede tentou abrir admin.html: interface informou acesso restrito, sem carregar reservas administrativas. Isso não substitui auditoria de autorização da API.

@@ -1,7 +1,7 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-let session=null,data=null,current=null,mediaItems=[],draftKey=crypto.randomUUID();
+let session=null,data=null,current=null,mediaItems=[],draftKey=crypto.randomUUID(),uploading=false;
 
 async function api(action,body=null){
   const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};
@@ -42,6 +42,7 @@ function renderPicker(){
   if(current?.id) $("#experience-picker").value=current.id;
 }
 function selectExperience(id){
+  if(uploading)return;
   current=id?(data.products||[]).find(p=>p.id===id)||null:null;
   draftKey=current?.id||crypto.randomUUID();
   mediaItems=(current?.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order).map(m=>({id:m.id||null,media_url:m.media_url,alt_text:m.alt_text||current?.name||"",display_order:m.display_order||0}));
@@ -84,22 +85,31 @@ function renderPhotos(){
 }
 function normalizeMedia(){mediaItems=mediaItems.map((m,i)=>({...m,display_order:(i+1)*10}))}
 async function uploadPhotos(e){
-  const files=[...(e.target.files||[])];if(!files.length)return;
+  const files=[...(e.target.files||[])];if(!files.length||uploading)return;
+  uploading=true;
+  const controls=['#save-experience','#experience-picker','#new-experience','#toggle-status','#delete-experience','#photo-upload'].map($);
+  const disabled=controls.map(el=>el.disabled);controls.forEach(el=>el.disabled=true);
+  const errors=[];let added=0;
   $("#admin-message").textContent="Enviando fotos…";
+  try{
   for(let i=0;i<files.length;i++){
     const file=files[i];
-    if(file.size>10*1024*1024){$("#admin-message").textContent="Uma das imagens ultrapassa 10 MB.";continue}
+    if(file.size>10*1024*1024){errors.push(file.name+": a imagem ultrapassa 10 MB.");continue}
     const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]+/g,"-"),path=draftKey+"/"+Date.now()+"-"+i+"-"+safe;
     const {error}=await sb.storage.from("experience-media").upload(path,file,{upsert:false});
-    if(error){$("#admin-message").textContent="Falha ao enviar "+file.name+": "+error.message;continue}
+    if(error){errors.push("Falha ao enviar "+file.name+": "+error.message);continue}
     const {data:u}=sb.storage.from("experience-media").getPublicUrl(path);
     mediaItems.push({id:null,media_url:u.publicUrl,alt_text:$("#exp-name").value.trim()||"Experiência Chalezinho Ville",display_order:(mediaItems.length+1)*10});
+    added++;
   }
+  }catch(err){errors.push("Falha no envio. Tente novamente: "+err.message)}
+  finally{uploading=false;controls.forEach((el,i)=>el.disabled=disabled[i]);}
   e.target.value="";normalizeMedia();renderPhotos();
-  if(!$("#admin-message").textContent.startsWith("Falha")) $("#admin-message").textContent="Fotos adicionadas. Clique em Salvar no final para confirmar as alterações.";
+  $("#admin-message").textContent=[added?added+" foto(s) adicionada(s). Clique em Salvar para confirmar.":"Nenhuma foto foi adicionada.",...errors].join(' ');
 }
 async function save(e){
   e.preventDefault();
+  if(uploading){$("#admin-message").textContent="Aguarde o envio das fotos antes de salvar.";return}
   const name=$("#exp-name").value.trim(),price=Math.round(Number($("#exp-price").value||0)*100);
   if(!name){$("#admin-message").textContent="Informe o nome da experiência.";return}
   if(price<=0){$("#admin-message").textContent="Informe o preço.";return}
