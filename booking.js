@@ -578,7 +578,7 @@ function renderSandboxPayment(d){
   try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
    if(s.manual_review||s.reservation_status==="confirmed"||["refused","cancelled","expired"].includes(s.payment_status))$("#sandbox-provider-progress")?.remove();
    if(s.manual_review){setFlowError("");$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
-   if(s.reservation_status==="confirmed"){setFlowError("");$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html#reservas">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
+   if(s.reservation_status==="confirmed"){setFlowError("");$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a class="primary-action inline" href="conta.html#reservas">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
    if(["refused","cancelled","expired"].includes(s.payment_status)){
     setFlowError("");state.activePayment.status=s.payment_status;$("#quote-countdown").textContent="Pagamento não aprovado · reserva não confirmada";
     $("#sandbox-payment-result").innerHTML='Pagamento não aprovado. Consulte novamente a disponibilidade antes de tentar outro pagamento. <button class="primary-action" type="button" id="sandbox-new-search">Consultar novamente</button>';
