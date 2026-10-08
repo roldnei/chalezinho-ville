@@ -43,6 +43,6 @@ by("pane-signup")?.addEventListener("submit",async e=>{e.preventDefault();msg("C
 by("pane-recover")?.addEventListener("submit",async e=>{e.preventDefault();msg("Enviando instruções…");const callback=DEV_BASE+"/auth-callback.html?next="+encodeURIComponent("auth.html?mode=reset&return="+encodeURIComponent(returnTarget));const {error}=await sb.auth.resetPasswordForEmail(by("recover-email").value.trim(),{redirectTo:callback});if(error)return msg(authMessage(error,"recover"));msg("Se o e-mail estiver cadastrado, enviaremos o link de recuperação.",true)});
 by("pane-reset")?.addEventListener("submit",async e=>{e.preventDefault();const p=by("reset-password").value;if(p.length<8)return msg("Use pelo menos 8 caracteres.");const {error}=await sb.auth.updateUser({password:p});if(error)return msg(authMessage(error,"reset"));msg("Senha alterada.",true);setTimeout(()=>location.href=returnTarget,700)});
 window.VilleAuthBoot?.ready();
-sb.auth.getSession().then(({data})=>{if(data.session&&mode==="login")location.href=returnTarget;if(!data.session&&mode==="identify")show("login")}).catch(()=>msg("Não foi possível recuperar a sessão. Entre novamente."));
+sb.auth.getSession().then(({data})=>{if(data.session&&mode==="login"&&qs.get("reauthenticate")!=="1")location.href=returnTarget;if(!data.session&&mode==="identify")show("login")}).catch(()=>msg("Não foi possível recuperar a sessão. Entre novamente."));
 }catch{window.VilleAuthBoot?.fail("initialization")}
 })();

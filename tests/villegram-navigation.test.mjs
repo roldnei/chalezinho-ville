@@ -99,3 +99,26 @@ test('following entry sends the current session and keeps login optional for dis
 
  test('embedded booking and login navigation leave the player frame',async()=>{const {d,w}=await setup();const parent={location:{href:''}};Object.defineProperty(w,'parent',{value:parent,configurable:true});w.document.documentElement.classList.add('villegram-embed');w.VillegramContent.navigate('reservar.html?check_in=2026-11-16');assert.equal(parent.location.href,'reservar.html?check_in=2026-11-16');w.VillegramContent.navigate('auth.html?mode=login');assert.equal(parent.location.href,'auth.html?mode=login');d.window.close()});
  test('scene text appears outside the photo transform and changes with the scene',async()=>{const {d,w,advance}=await setup({media:[{kind:'photo',url:'a.webp',zoom:2,text_layers:[{text:'Meu momento',x:40,y:30,size:6,color:'#ffffff',background:'transparent'}]},{kind:'photo',url:'b.webp',text_layers:[{text:'Outra cena',x:50,y:60,size:5,color:'#ff0000',background:'#111111'}]}]});const scenes=w.document.querySelectorAll('.vg-scene');assert.equal(scenes[0].querySelector('.vg-text-sticker').textContent,'Meu momento');assert.equal(scenes[0].querySelector('.vg-media-frame .vg-text-sticker'),null);advance(6500);assert.ok(scenes[1].classList.contains('is-visible'));assert.equal(scenes[1].querySelector('.vg-text-sticker').textContent,'Outra cena');d.window.close()});
+
+test('comment survives login return on the same publication and is sent only after explicit resubmission',async()=>{
+ const {d,w}=await setup();let target='',signedIn=false,sends=0;
+ w.VillegramContent.navigate=url=>target=url;
+ w.villegramAuth={auth:{getSession:async()=>({data:{session:signedIn?{access_token:'test'}:null}})}};
+ w.VillegramContent.request=async body=>{if(body.operation==='comment')sends++;return {likes:0,comments:[]}};
+ const settle=()=>new Promise(r=>setTimeout(r,0));
+ w.document.querySelector('[data-action=comments]').click();await settle();
+ const input=w.document.querySelector('textarea');input.value='Teste de retorno';input.dispatchEvent(new w.Event('input'));
+ w.document.querySelector('.vg-sheet form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();
+ assert.equal(sends,0);const ret=new URL(target,'https://dev.local').searchParams.get('return');assert.match(ret,/publication=/);assert.match(ret,/resume_social=comments/);
+ signedIn=true;w.history.replaceState(null,'',ret);w.Villegram.openHome(card);await settle();await settle();
+ assert.equal(w.document.querySelector('textarea').value,'Teste de retorno');assert.equal(sends,0);assert.equal(w.document.querySelector('.vg-sheet').hidden,false);
+ w.document.querySelector('.vg-sheet form').dispatchEvent(new w.Event('submit',{cancelable:true}));await settle();assert.equal(sends,1);assert.equal(w.sessionStorage.getItem('villegram-comment:'+id),null);d.window.close();
+});
+test('like asks for login before sending and returns to the selected publication',async()=>{
+ const {d,w}=await setup();let target='',likes=0;w.VillegramContent.navigate=url=>target=url;w.VillegramContent.request=async body=>{if(body.operation==='like')likes++;return {likes:0,comments:[]}};
+ w.document.querySelector('[data-action=like]').click();await new Promise(r=>setTimeout(r,0));assert.equal(likes,0);assert.match(new URL(target,'https://dev.local').searchParams.get('return'),/resume_social=like/);d.window.close();
+});
+test('rejected authenticated like forces an actual login instead of redirecting a stale session back',async()=>{
+ const {d,w}=await setup();let target='';w.VillegramContent.navigate=url=>target=url;w.villegramAuth={auth:{getSession:async()=>({data:{session:{access_token:'expired'}}})}};w.VillegramContent.request=async()=>{throw Object.assign(Error('authentication_required'),{status:401})};
+ w.document.querySelector('[data-action=like]').click();await new Promise(r=>setTimeout(r,0));assert.equal(new URL(target,'https://dev.local').searchParams.get('reauthenticate'),'1');d.window.close();
+});
