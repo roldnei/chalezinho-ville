@@ -48,3 +48,37 @@ Executar entradas reais, conferir estados no navegador, cruzar operações finan
 - Suíte completa após correções de vídeo: 382 testes aprovados, zero falhas; log `outputs/homologation-20261007-tests-final.txt`. As jornadas completas continuam em execução, sem homologação global.
 
 Viewport emulado não equivale a Android físico. Nenhuma jornada completa está aprovada ainda. Cadastro/recuperação por e-mail precisam de observação própria; a fixture não substitui esses testes.
+
+## Rodadas 3–5 — atualização de 7/10, 21h10 de São Paulo
+
+Os estados acima são históricos. A homologação global continua em execução.
+
+- Commits de correção publicados em DEV: `a7b33ba6` (vídeo/mídia), `d84da153` (primeira cotação com experiência, conciliação exibida e mensagem de pagamento), `e2636277` (recusa definitiva permite nova consulta sem aviso de cobrança incerta).
+- Última prévia verificada nesta rodada: https://chalezinho-ville-rfkefcj38-roldneicosta-4140.vercel.app/ (`e2636277ca15363e5f746dc225ef5a7ad6cd7076`).
+- Suíte completa: **388 testes aprovados, zero falhas**, `outputs/homologation-20261007-tests-round4.txt`. Ajuste adicional remove o texto transitório após resultado definitivo e aplica o estilo do site à nova consulta; quatro testes focados passaram.
+- Reserva `A3A4AE758C`: pagamento base de R$ 1.267,11 em 6x também observado no Portal DEV PagBank como Pago, pedido `ORDE_88DF8F5E-2130-4180-8FA1-7BF471FED5E6`. A sessão expirou novamente ao abrir outro pedido.
+- Alteração dessa reserva para 05–07/12: diferença principal R$ 321,86, juros R$ 40,43, total R$ 362,29 em 12x. Cartão aprovado; datas só mudaram após pagamento. Total contratado/recebido R$ 1.630,40, saldo zero. PIX anterior da diferença foi recusado, sem alterar a estadia.
+- Cancelamento da tarifa não reembolsável dentro da janela comercial gratuita prevista no documento 1.2: PIX do adicional devolveu R$ 1,00, confirmado. Cartões R$ 1.267,11 e R$ 362,29 retornaram HTTP 400 / código 40008; nova tentativa preservando a chave retornou HTTP 409 / código 40005. Permanecem incertos, sem declarar estorno concluído. Não repetir com nova chave.
+- Entrada pela experiência café reproduziu primeira cotação sem adicional. Corrigida e retestada no navegador: CH1 14–16/12 com café R$ 1,00, total reembolsável R$ 2.009,40. Cartão recusado gerou pagamento `fac30909-75db-4154-ab4b-c2945dfbbaee`, reserva `F827519812`, não confirmada. Correção da recusa retestada em 412×915; nova consulta funcionou.
+- Nova hospedagem simples, mesmas datas, tarifa reembolsável explicitamente escolhida: reserva `3FE63C8A42` / `ce6e4063-294a-4ea2-b7d9-e1104a7a53f8`, R$ 2.008,40 em 1x. Pagamento `9e4e90ef-d768-4fe7-8a13-193fb65b05f8`, cobrança `CHAR_D81465EA-940A-4AA5-AFFD-3FBD3615793D`: paid/confirmed no banco e aprovado na tela. Link de sucesso abriu Minhas reservas.
+- Cancelamento dessa tarifa reembolsável solicitado pelo hóspede e aprovado pelo administrador pela interface. Em **08/10/2026 00:06:07 UTC** (07/10 21:06:07 São Paulo), tentativa retornou exatamente `pagbank_charge_operation_http_400_code_40008`. Estorno `5434e8f6-1901-4793-95ae-6554c456b92a`, solicitado 200840 centavos, confirmado zero, estado `uncertain`. A reserva permanece ativa. Não há corpo bruto do provedor nesta evidência; o código vem do registro de tentativa do backend.
+- Avatar: upload da imagem sintética vertical, recorte, zoom e salvamento único com perfil observados. Perfil público mostrou avatar, nome, @ e bio, sem contatos/documentos/reservas.
+- Momento `97488a91-b378-4d8d-8cb1-76c676b5e6f6`: aprovado anteriormente; edição da legenda e reenvio colocaram novamente em aprovação. Aviso administrativo atualizou para 1 sem apagar a composição da equipe. Abrir fila não aprovou. Devolução com motivo arquivou o momento, removeu a pendência e notificou o hóspede. Minhas postagens mostrou motivo e link Editar.
+- Motor automático: Gerar agora não criou duplicatas e preservou nove publicações existentes. Prévia de Signature abriu. Publicação manual sintética da equipe salva como publicada (`57f9d9ff-9082-45bd-ae17-5247fce5f9a4`); conferência no feed/arquivamento ainda pendente.
+
+### Matriz atual — sem aprovação indevida de jornadas completas
+
+| Jornada | Resultado atual | Pendências concretas |
+| --- | --- | --- |
+| 1. Villegram visitante | Bloqueada para conclusão da homologação | Parte observada; faltam feed vazio, falhas de serviço, compartilhar e todos os retornos/origens |
+| 2. Site convencional | Bloqueada para conclusão da homologação | Home/consulta/experiência testadas; completar limites, indisponibilidade e navegação de volta |
+| 3. Composição A–F | Bloqueada para conclusão da homologação | A, pacote, adicional, reload e oferta observados; falta matriz completa de trocas e duas origens |
+| 4. Login/finalização | Bloqueada para conclusão da homologação | Login e preservação testados; e-mail real, recuperação e sessão expirada não comprovados nesta rodada |
+| 5. Pagamento/pós-reserva | Reprovada | Estorno de cartão não confirmado (40008/40005); concorrência/garantia e análise ainda incompletas |
+| 6. Comunidade | Bloqueada para conclusão da homologação | Foto/perfil/rascunho/moderação observados; vídeos, falha de upload, seguir/marcar e gestos completos pendentes |
+| 7. Aprovação | Bloqueada para conclusão da homologação | Aprovar/devolver/notificar e composição preservada observados; disputa de versão, paginação e falha de serviço pendentes |
+| 8. Operação/conteúdo | Bloqueada para conclusão da homologação | Motor e publicação manual observados; edição de catálogo, atribuição e eventual proprietário pendentes |
+
+“Bloqueada para conclusão” nesta matriz indica cobertura incompleta, não necessariamente impedimento técnico. Não se trata de aprovação de produção. Nenhuma função ou migration foi publicada nesta rodada.
+
+Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`, `qa-412-cartao-1x-refundavel.png`, `qa-412-avatar-recorte.png`, `qa-412-perfil-publico.png`, `qa-412-momento-devolvido.png`, `qa-estorno-refundavel-40008.png`, `qa-motor-previa-real.png`. As capturas com prefixo 412 foram feitas na prévia e2636277 com viewport 412×915; painel/motor/estorno usam a prévia a7e77f9c e viewport nativo da aba. Não são Android físico.

@@ -563,7 +563,7 @@ function renderSandboxPayment(d){
  $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
  box.innerHTML=window.VilleOffers.contractMarkup(state.rate?.contract_snapshot)+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
-  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p>O cartão de teste foi enviado. Consultando o resultado…</p>')+
+  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p id="sandbox-provider-progress">O cartão de teste foi enviado. Consultando o resultado…</p>')+
   '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
  if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=async()=>{
   const button=$("#sandbox-copy-pix");
@@ -572,11 +572,12 @@ function renderSandboxPayment(d){
  }}
  const tick=async()=>{if(state.activePayment?.payment_id!==d.payment.id)return;
   try{const s=await api("pagbank_sandbox_status",{payment_id:d.payment.id});
+   if(s.manual_review||s.reservation_status==="confirmed"||["refused","cancelled","expired"].includes(s.payment_status))$("#sandbox-provider-progress")?.remove();
    if(s.manual_review){setFlowError("");$("#sandbox-payment-result").textContent="Pagamento requer conferência manual. Entre em contato antes de tentar novamente.";clearInterval(window.__pagbankPoll);return}
    if(s.reservation_status==="confirmed"){setFlowError("");$("#quote-countdown").textContent="Reserva confirmada";state.activePayment.status='paid';$("#sandbox-payment-result").innerHTML='Pagamento aprovado no sandbox. Reserva confirmada. <a href="conta.html#reservas">Ver em Minhas Reservas →</a>';clearInterval(window.__pagbankPoll);return}
    if(["refused","cancelled","expired"].includes(s.payment_status)){
     setFlowError("");state.activePayment.status=s.payment_status;$("#quote-countdown").textContent="Pagamento não aprovado · reserva não confirmada";
-    $("#sandbox-payment-result").innerHTML='Pagamento não aprovado. Consulte novamente a disponibilidade antes de tentar outro pagamento. <button type="button" id="sandbox-new-search">Consultar novamente</button>';
+    $("#sandbox-payment-result").innerHTML='Pagamento não aprovado. Consulte novamente a disponibilidade antes de tentar outro pagamento. <button class="primary-action" type="button" id="sandbox-new-search">Consultar novamente</button>';
     $("#sandbox-new-search").onclick=async()=>{state.activePayment=null;state.quote=null;state.rate=null;state.rateCode=null;state.rateConfirmed=false;sessionStorage.removeItem('chalezinho_booking_resume');setCheckoutVisible(false);await search()};
     clearInterval(window.__pagbankPoll);
    }
