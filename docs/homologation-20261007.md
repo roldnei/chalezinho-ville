@@ -100,3 +100,12 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - Editor 360×800: MP4 inválido e MP4 MPEG-4 Part 2 rejeitados como formato não reconhecido. Não basta extensão MP4. Vídeo sintético H.264/yuv420p 360×640, 3 segundos, foi aceito, enviado e decodificado com readyState 4 e sem erro. Prévia visual mostrou padrão de cores, controles e duração. Rascunho de vídeo iniciado.
 - **Erro reproduzido:** após rejeição do vídeo, aviso central interceptava o clique no botão de novo envio; Enter no botão funcionava. CSS corrigido para o aviso não interceptar cliques, mantendo botão de retry interativo. Reteste após publicação ainda necessário.
 - Capturas reais `qa-360-video-invalido.png` e `qa-360-video-h264.png`. Vídeos gerados localmente para teste, sem pessoas/dados reais. Nenhum teste em Android físico.
+
+## Rodada 8 — texto, retomada e anfitrião
+
+- Prévia `01615f49`: https://chalezinho-ville-k82eo9whk-roldneicosta-4140.vercel.app/. Erro de vídeo novamente provocado; novo clique no centro do botão abriu seletor e foto válida concluiu upload. Correção de interceptação retestada.
+- Duas fotos: Alt+seta reordenou preservando capa; remover exigiu ação explícita em Opções da mídia. Zoom/restauração e texto na cena testados. Duas caixas mantiveram estilos independentes: primeira dourada/negrito/fundo escuro, segunda branca/normal/transparente. Seleção de “Se” na segunda caixa aplicou negrito somente a esse trecho. Setas e + alteraram posição/tamanho. Rascunho salvo. Captura `qa-360-retomada-textos.png`. Não comprova pinça/arraste em Android físico.
+- Vídeo H.264 salvo como rascunho, recarregado, localizado na biblioteca e reaberto com mídia/legenda preservadas.
+- Fixture de anfitrião `c2e7acf3-dee9-45fc-a27c-dd06eee6065a`, exclusivamente DEV, escopo CH1 e sem finanças/gestão de equipe/edição de anúncios. E-mail confirmado administrativamente para fixture, sem alegar teste de entrega real.
+- Navegador mostrou apenas CH1 nas reservas e a própria pessoa em Equipe. API hub retornou property_ids/reservation_property_ids/task_property_ids `[1]`; pagamentos/cobranças/garantias vazios; listing list HTTP 403 `listing_access_denied`. Evidência externa `outputs/qa-host-api-scope.json`.
+- Corrigidos links administrativos visíveis ao anfitrião sem acesso e rótulo “Próxima” em reserva passada ainda sem entrada registrada. São ajustes de apresentação, sem mudar autorização ou status de reserva. Oito testes de escopo/PMS passaram; reteste da apresentação depende da próxima prévia.
