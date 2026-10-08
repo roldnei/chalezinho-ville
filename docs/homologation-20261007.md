@@ -92,3 +92,11 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - **Erro reproduzido:** upload de arquivo acima de 10 MB exibia “Fotos adicionadas”, apesar de não adicionar foto. Corrigido preservando erro e quantidade realmente enviada. Durante upload, salvar/trocar cadastro/ativar/excluir ficam indisponíveis; falha de rede restaura controles. Adicionado nome acessível ao seletor de experiência.
 - Suíte completa após correção: **390 testes aprovados, zero falhas** em 44 s (`outputs/homologation-20261007-tests-round6.txt`). Dois testes novos cobrem rejeição por tamanho e falha de rede com restauração de controles. Reteste visual da correção de upload pendente da próxima prévia.
 - Hóspede tentou abrir admin.html: interface informou acesso restrito, sem carregar reservas administrativas. Isso não substitui auditoria de autorização da API.
+
+## Rodada 7 — retomada e vídeos
+
+- Prévia `d6c0911f`: https://chalezinho-ville-2bk3lweui-roldneicosta-4140.vercel.app/. Reteste visual em 1440×900: arquivo acima de 10 MB mostra rejeição, foto válida seguinte enviada, controles desabilitados durante envio e liberados depois, salvamento confirmado. Captura `qa-1440-upload-limite-corrigido.png`.
+- Logout administrativo levou ao login e removeu dados. Login como hóspede no mesmo domínio não mostrou links de administração; nova entrada em admin.html foi bloqueada, sem reapresentar dados administrativos anteriores. Rota de moderação com hóspede retornou `admin_required` e não expôs fila/contagem.
+- Editor 360×800: MP4 inválido e MP4 MPEG-4 Part 2 rejeitados como formato não reconhecido. Não basta extensão MP4. Vídeo sintético H.264/yuv420p 360×640, 3 segundos, foi aceito, enviado e decodificado com readyState 4 e sem erro. Prévia visual mostrou padrão de cores, controles e duração. Rascunho de vídeo iniciado.
+- **Erro reproduzido:** após rejeição do vídeo, aviso central interceptava o clique no botão de novo envio; Enter no botão funcionava. CSS corrigido para o aviso não interceptar cliques, mantendo botão de retry interativo. Reteste após publicação ainda necessário.
+- Capturas reais `qa-360-video-invalido.png` e `qa-360-video-h264.png`. Vídeos gerados localmente para teste, sem pessoas/dados reais. Nenhum teste em Android físico.
