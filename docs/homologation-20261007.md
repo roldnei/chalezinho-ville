@@ -194,3 +194,9 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - Cenário C: fechar recibo → mesmo período → CH3 → retirar pacote → adicionar café avulso de R$ 1 → não reembolsável explícita → cartão 1x. Reserva 3E3960C445 / a5411038-2e56-4d41-b6c5-0dd0f2f207be, R$ 1.409,70, pagamento 14deeb7b-8c0e-4840-8389-144663a6387e, charge CHAR_A9504394-0F82-43C7-AAF9-CCE651DD222C, pedido ORDE_0889DCF7-A983-49A1-85D9-1EFB5E788311. Confirmada/paid e portal Pago. Desconto de pacote removido, hospedagem/limpeza R$ 1.408,70 e café R$ 1 separados. Capturas qa-cenario-c-avulso-pago.png e qa-cenario-c-portal-pago.png.
 - Cenários B/C executados na prévia 214deca (4e7wcxxdo), cuja diferença para 7406694 é apenas mensagem administrativa de janela da caução. A–F têm compras concluídas nas rodadas executadas; isso não elimina demais limites de homologação.
 - Para o teste final solicitado de estorno da hospedagem, selecionada a cobrança 1b48d65f-1580-4c1b-98f0-1a0d8e497d7e de R$ 1.723,30 da reserva 0D88FF9D57, distinta da caução. Conferência de pedidos pendentes antes do envio; nenhuma tentativa nova executada nesta rodada. Cadastro/e-mail ainda aguardando usuário.
+
+## Cadastro real por e-mail — 08/10, 17h25 São Paulo
+
+- Usuário submeteu cadastro roldneicosta+homologacao@gmail.com na interface. Auth /signup retornou 200 às 20:25:07 UTC; auth.users cde8e1af-d37e-43ff-afd9-01c1a882ed7c criado, confirmation_sent_at 20:25:06 UTC, email_confirmed_at ainda nulo na consulta.
+- Segundo envio às 20:25:27 UTC recebeu 429 over_email_send_rate_limit, com espera remanescente de 39 segundos. Não é prova de falha do primeiro cadastro; confirmação por link ainda pendente do usuário.
+- Usuário não percebeu mensagem no topo após submissão. Ajustada função de mensagens para trazer resposta à área visível; não alterados limite, SMTP nem autenticação. Senha não acessada nem reencaminhada pelo agente.
