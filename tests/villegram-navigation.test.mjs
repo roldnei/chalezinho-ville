@@ -22,7 +22,7 @@ async function setup({mobile=false,reduced=false,media=null}={}){
  w.Villegram.openHome(current);return {d,w,timers,advance(ms){now+=ms;intervals.get(100)?.()}};
 }
 test('feed and conventional home use the same named icons and reset inherited navigation formatting',async()=>{
- const {d,w}=await setup();const expected=['Villegram','Chalés','Escolher datas','Meu Villegram'];
+ const {d,w}=await setup();const expected=['Villegram','Chalés','Escolher datas','Minha conta'];
  for(const selector of ['.vg-bottom-nav','.villegram-mobile-nav']){
   const items=[...w.document.querySelector(selector).children];assert.deepEqual(items.map(e=>e.textContent),expected);
   for(const e of items){assert.equal(e.querySelectorAll('svg').length,1);assert.equal(e.querySelector('svg').getAttribute('aria-hidden'),'true');const style=w.getComputedStyle(e);assert.equal(style.textTransform,'none');assert.equal(style.letterSpacing,'0');assert.equal(style.fontFamily,'"DM Sans", sans-serif')}
