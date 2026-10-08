@@ -336,7 +336,7 @@ function renderReservations(reservations){
     finance.innerHTML='<h4>Financeiro desta reserva</h4>'+lines.map(([label,value])=>
      '<div class="reservation-breakdown-row"><span>'+label+'</span><strong>'+brlC(value)+'</strong></div>').join('')+
      (f.guarantees||[]).map(g=>'<p>Caução: autorizada '+brlC(g.authorized_cents)+', utilizada '+brlC(g.captured_cents)+
-       ', estornada '+brlC(g.refunded_cents)+'. '+(g.release_confirmed?'Liberação confirmada: '+brlC(g.released_cents)+'.':!g.authorized_cents&&!g.captured_cents?'Sem bloqueio de limite confirmado.':'Liberação ainda não confirmada.')+'</p>').join('')+
+       ', estornada '+brlC(g.refunded_cents)+'. '+(g.release_confirmed?'Liberação confirmada: '+brlC(g.released_cents)+'.':g.captured_cents>0&&g.uncaptured_cents===0?'Sem saldo a liberar · captura integral.':!g.authorized_cents&&!g.captured_cents?'Sem bloqueio de limite confirmado.':'Liberação ainda não confirmada.')+'</p>').join('')+
      (f.incidents||[]).map(i=>'<p>Ocorrência: '+esc(i.description)+' · '+brlC(i.requested_capture_cents)+
        ' · '+esc(({approved:'Aprovada',no_charge:'Sem cobrança',pending:'Em análise'})[i.decision]||i.status)+'</p>').join('');
    }catch{loaded=false;finance.textContent='Resumo financeiro temporariamente indisponível. ';
