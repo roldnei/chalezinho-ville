@@ -425,6 +425,10 @@ function renderSelectionSummary(){
  const experiences=state.quote?.experiences||[];
  const expRows=experiences.map(e=>'<div class="summary-line"><span>'+e.product+'</span><strong>'+brlC(state.rate?.contract_snapshot?.lines?.find(l=>l.key===e.product_id)?.net_cents??e.price_cents)+'</strong></div>').join("");
  $("#summary-content").innerHTML=window.VilleOffers.contractMarkup(state.rate.contract_snapshot)+'<div class="booking-breakdown"><div class="summary-line"><span>Hospedagem e limpeza · '+stayNights()+' noites<small>'+brlC(perNight)+' por noite</small></span><strong>'+brlC(stay)+'</strong></div>'+expRows+'<div class="summary-total"><span>'+(state.fastCheckout&&!state.rateConfirmed?'TOTAL DA TARIFA EXIBIDA · ESCOLHA SUA TARIFA':'TOTAL DA RESERVA')+'</span><strong>'+brlC(total)+'</strong></div></div><div class="summary-line summary-meta"><span>'+state.property.name+'</span><span>'+(state.fastCheckout&&!state.rateConfirmed?'Tarifa a escolher':state.rate.name)+'</span></div><div class="summary-line summary-meta"><span>Datas</span><span>'+$("#book-in").value.split("-").reverse().join("/")+' → '+$("#book-out").value.split("-").reverse().join("/")+'</span></div>';
+ const guests=Number($('#book-guests').value)||2;
+ const purposeCode=$('#trip-purpose-initial').value;
+ const purpose=(state.config?.purposes||[]).find(p=>p.code===purposeCode)?.label;
+ $('#summary-content').insertAdjacentHTML('beforeend','<div class="summary-line summary-meta"><span>Hóspedes</span><span>'+guests+(guests===1?' hóspede':' hóspedes')+'</span></div>'+(purpose?'<div class="summary-line summary-meta"><span>Motivo da viagem</span><span>'+esc(purpose)+'</span></div>':''));
 }
 function renderSummary(){
  renderSelectionSummary();

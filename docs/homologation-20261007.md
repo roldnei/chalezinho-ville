@@ -1,5 +1,15 @@
 # Homologação DEV — 7 de outubro de 2026
 
+## Continuação após novo login no PagBank
+
+- Suíte consolidada da versão a6d5f85e: 395 testes aprovados, zero falhas. Reteste em 360 px confirmou recibo independente após reload e clique para a reserva correta A6D3B69F79, saldo zero.
+- Portal DEV autenticado: pedidos ORDE_88DF8F5E-2130-4180-8FA1-7BF471FED5E6 (6x, R$ 1.267,11), ORDE_9C8A6C18-4E0A-43BA-B500-8584C09F6505 (1x, R$ 2.008,40) e ORDE_421AC1B3-8076-416D-A872-AF82CB84C2B0 (12x, R$ 362,29) continuam como Pago. Não há confirmação de devolução desses cartões. Nenhuma operação incerta foi reenviada.
+- PIX ORDE_8004D581-8E5C-44EC-9780-1411D02A31B2 aparece Cancelado, coerente com estorno confirmado de R$ 1,00 no DEV. O status isolado Cancelado não foi usado como única prova de estorno.
+- Pedido mais recente ORDE_59EEE66B-7A5C-48D3-B8B0-F79874BAF315 confirmado no portal como Pago, 1x, R$ 1.362,87.
+- Capturas reais: qa-portal-cartao-6x-ainda-pago.png, qa-portal-reembolsavel-ainda-pago.png, qa-portal-12x-pago.png, qa-portal-pix-cancelado.png e qa-portal-1x-pago.png, em outputs do workspace. Portal no viewport nativo da aba.
+- Home → datas 17–19/11 → um hóspede → motivo Descanso → Amore → tarifa reembolsável explícita → finalização: motivo preservado, dois imóveis ocupados bloqueados. Identificada ausência de quantidade de hóspedes e motivo no resumo final. Acrescentados esses dados sem alterar cotação/preço/política. Sintaxe e nove testes focados passaram; reteste visual na nova prévia pendente.
+- Histórico do portal nas páginas 1 e 2 mostrou pedidos/consultas, sem log de cancelamento correspondente às tentativas de 07/10. Isso não prova ausência de requisição, nem fornece corpo bruto de erro. Mantidos os códigos registrados no backend.
+
 Em execução. Não constitui aprovação para produção.
 
 Base remota conferida: `feature/romantic-stay-offers`, `0d97d9ac3caa41c4bb992dd7ecd59a7671309ee0`.
