@@ -71,7 +71,7 @@ async function init(){
     else directCheckoutError();
    }else directCheckoutError();
   }
- }else{await restoreResume();await restoreSameDay()}
+ }else{if(!await restoreResume())await restoreSameDay()}
 }
 async function initChaletFilter(){
  const select=$("#book-chalet"),requested=new URLSearchParams(location.search).get("chalet")||"";
@@ -194,6 +194,7 @@ async function restoreSameDay(){
 }
 
 async function openFlow(id){
+ state.activePayment=null;state.paymentView=null;clearInterval(window.__pagbankPoll);
  state.fastCheckout=true;state.rateConfirmed=false;state.stage="review";state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};const desiredExperience=new URLSearchParams(location.search).get('experience');const desired=(state.config?.experience_products||[]).find(p=>p.id===desiredExperience);const variant=desired?.experience_variants?.find(v=>v.active);if(!state.offerId&&desired&&variant)state.selectedByProduct[desired.id]=variant.id;state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
@@ -559,6 +560,9 @@ async function performStartPayment(choice){
   setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":["dates_unavailable","occupied"].includes(e.message)?"Essas datas acabaram de ficar indisponíveis. Volte e escolha outro chalé ou período.":e.message==="guarantee_consent_required"?"O aceite da garantia e da renovação automática é obrigatório para reservar.":e.message==="policy_acceptance_required"?"Aceite os termos e a política de cancelamento antes de pagar.":e.message==="booking_terms_unavailable"?"Os termos da reserva estão indisponíveis. Tente novamente mais tarde.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
+ // Keep only the public payment receipt; never persist card data or credentials.
+ state.paymentView={payment:{id:d.payment.id,amount_cents:d.payment.amount_cents,pix_code:d.payment.pix_code||null},confirmation_code:d.confirmation_code};
+ if(state.property&&state.session?.user?.id){try{saveResume()}catch{setFlowError('Não foi possível guardar a retomada nesta aba. Acompanhe esta cobrança em Minha conta.')}}
  clearInterval(window.__quoteTimer);
  $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
@@ -626,20 +630,34 @@ function startCountdown(exp){
  tick();window.__quoteTimer=setInterval(tick,1000);
 }
 function saveResume(){
- sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({entryUrl:location.pathname+location.search,reopen:true,fastCheckout:state.fastCheckout,stage:state.stage,entrySource:state.entrySource,rateConfirmed:state.rateConfirmed,guestName:$("#guest-name").value,guestPhone:$("#guest-phone").value,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||""}));
+ sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({entryUrl:location.pathname+location.search,reopen:true,fastCheckout:state.fastCheckout,stage:state.stage,entrySource:state.entrySource,rateConfirmed:state.rateConfirmed,guestName:$("#guest-name").value,guestPhone:$("#guest-phone").value,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||"",payment:state.activePayment?.provider==='pagbank_sandbox'?{id:state.activePayment.payment_id,userId:state.session?.user?.id,view:state.paymentView}:null}));
 }
 async function restoreResume(matchingEntry=false){
  let saved=null;try{saved=JSON.parse(sessionStorage.getItem("chalezinho_booking_resume")||"null")}catch{}
  if(!saved?.property||!saved.check_in||!saved.check_out)return false;
  // A new link must not inherit the composition of a different stay in this tab.
  if(matchingEntry&&saved.entryUrl!==location.pathname+location.search)return false;
+ const {data:{session}}=await sb.auth.getSession();state.session=session;
+ if(saved.payment?.id){
+  if(!session){
+   setCheckoutVisible(true);showStep(6);
+   $('#mock-payment').innerHTML='<p>Há uma cobrança em acompanhamento. Entre na mesma conta para consultar o resultado antes de tentar novamente.</p><a href="auth.html?return='+encodeURIComponent('reservar.html?resume=1')+'">Entrar e consultar pagamento</a>';
+   return true;
+  }
+  if(saved.payment.userId!==session.user.id){sessionStorage.removeItem('chalezinho_booking_resume');return false}
+ }
  sessionStorage.removeItem("chalezinho_booking_resume");
  const resumeQuery=new URLSearchParams(location.search);if(resumeQuery.get("resume")!=="1"&&((resumeQuery.get("mode")==="stay"&&saved.offerId)||(resumeQuery.has("stay_offer")&&resumeQuery.get("stay_offer")!==saved.offerId)))return;
  state.fastCheckout=true;state.stage=saved.stage||"review";state.entrySource=saved.entrySource||(saved.fastCheckout?"showcase":"manual");state.rateConfirmed=saved.rateConfirmed===true;state.offerId=saved.offerId||null;state.preferences=saved.preferences||{};syncStayModes();
  $("#book-in").value=saved.check_in||"";$("#book-out").value=saved.check_out||"";$("#book-guests").value=saved.guests||"2";state.property=saved.property;state.selectedByProduct=saved.selectedByProduct||{};state.quote=saved.quote;state.rateCode=saved.rateCode;
  state.rate=state.quote?.rate_options?.find(x=>x.code===state.rateCode&&x.selectable)||null;
- const {data:{session}}=await sb.auth.getSession();state.session=session;
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=saved.check_in.split("-").reverse().join("/")+" a "+saved.check_out.split("-").reverse().join("/");
+ if(saved.payment?.id){
+  state.activePayment={payment_id:saved.payment.id,provider:'pagbank_sandbox',status:'awaiting_payment'};
+  showStep(6);
+  renderSandboxPayment({payment:{...saved.payment.view?.payment,id:saved.payment.id},confirmation_code:saved.payment.view?.confirmation_code||'Consultando cobrança de teste'});
+  return true;
+ }
  if(state.fastCheckout){
   if(state.entrySource==='showcase')document.documentElement.classList.add('direct-checkout');
   $('#trip-purpose-initial').value=saved.purpose||'';
