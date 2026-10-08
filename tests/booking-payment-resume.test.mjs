@@ -37,3 +37,13 @@ test('expired session preserves receipt but requires login without displaying it
 test('another account cannot resume the previous account payment',async()=>{
  const {dom,w,calls}=fixture({user:{id:'other'}});try{assert.equal(await w.restoreResume(),false);assert.equal(calls.length,0);assert.equal(w.sessionStorage.getItem('chalezinho_booking_resume'),null)}finally{dom.window.close()}
 });
+test('recovered receipt never labels the previous payment with a different simulation',async()=>{
+ const {dom,w}=fixture();try{
+  const saved=JSON.parse(w.sessionStorage.getItem('chalezinho_booking_resume'));saved.payment.view.receiptOnly=true;w.sessionStorage.setItem('chalezinho_booking_resume',JSON.stringify(saved));
+  w.VilleOffers.contractMarkup=()=>{throw Error('unrelated quote must not be displayed')};
+  await w.restoreResume();await new Promise(r=>setTimeout(r,0));
+  assert.equal(w.$('#checkout-title').textContent,'Consulta de pagamento');assert.doesNotMatch(w.$('#checkout-summary').textContent,/2026/);
+  assert.equal(JSON.parse(w.sessionStorage.getItem('chalezinho_booking_resume')).payment.view.receiptOnly,true);
+  assert.match(w.$('#sandbox-payment-result').textContent,/Reserva confirmada/);
+ }finally{dom.window.close()}
+});

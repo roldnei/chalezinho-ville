@@ -503,7 +503,7 @@ function renderSummary(){
   resume.onclick=async()=>{resume.disabled=true;
    try{const s=await api("pagbank_sandbox_status",{});
     state.activePayment={payment_id:s.payment_id,provider:"pagbank_sandbox",status:s.payment_status};
-    renderSandboxPayment({payment:{id:s.payment_id,amount_cents:s.amount_cents},confirmation_code:"Última cobrança de teste"});
+    renderSandboxPayment({payment:{id:s.payment_id,amount_cents:s.amount_cents},confirmation_code:"Última cobrança de teste",receiptOnly:true});
     showStep(6);setFlowError("");
    }catch(e){setFlowError(e.message==="not_found"?"Nenhuma cobrança de teste recente foi encontrada.":"Não foi possível consultar a cobrança agora.");}
    finally{resume.disabled=false;}};
@@ -561,13 +561,14 @@ async function performStartPayment(choice){
 }
 function renderSandboxPayment(d){
  // Keep only the public payment receipt; never persist card data or credentials.
- state.paymentView={payment:{id:d.payment.id,amount_cents:d.payment.amount_cents,pix_code:d.payment.pix_code||null},confirmation_code:d.confirmation_code};
+ state.paymentView={payment:{id:d.payment.id,amount_cents:d.payment.amount_cents,pix_code:d.payment.pix_code||null},confirmation_code:d.confirmation_code,receiptOnly:d.receiptOnly===true};
  if(state.property&&state.session?.user?.id){try{saveResume()}catch{setFlowError('Não foi possível guardar a retomada nesta aba. Acompanhe esta cobrança em Minha conta.')}}
+ if(d.receiptOnly){$('#checkout-title').textContent='Consulta de pagamento';$('#checkout-summary').textContent='Cobrança anterior. Confira o chalé, as datas e os itens contratados em Minhas reservas.';}
  clearInterval(window.__quoteTimer);
  $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
- box.innerHTML=window.VilleOffers.contractMarkup(state.rate?.contract_snapshot)+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
-  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p id="sandbox-provider-progress">O cartão de teste foi enviado. Consultando o resultado…</p>')+
+ box.innerHTML=(d.receiptOnly?'':window.VilleOffers.contractMarkup(state.rate?.contract_snapshot))+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
+  (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p id="sandbox-provider-progress">Consultando o resultado da cobrança…</p>')+
   '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
  if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=async()=>{
   const button=$("#sandbox-copy-pix");
@@ -655,7 +656,7 @@ async function restoreResume(matchingEntry=false){
  if(saved.payment?.id){
   state.activePayment={payment_id:saved.payment.id,provider:'pagbank_sandbox',status:'awaiting_payment'};
   showStep(6);
-  renderSandboxPayment({payment:{...saved.payment.view?.payment,id:saved.payment.id},confirmation_code:saved.payment.view?.confirmation_code||'Consultando cobrança de teste'});
+  renderSandboxPayment({payment:{...saved.payment.view?.payment,id:saved.payment.id},confirmation_code:saved.payment.view?.confirmation_code||'Consultando cobrança de teste',receiptOnly:saved.payment.view?.receiptOnly===true});
   return true;
  }
  if(state.fastCheckout){
