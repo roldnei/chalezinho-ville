@@ -10,7 +10,7 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "test:finance": "node --test tests/finance-*.test.mjs",
-    "check": "node --check admin.js && node --check booking.js && node --check account.js && node --check villegram.js && node --check villegram-effects.js && node --check villegram-content.js && node --check villegram-signals.js && node --check villegram-admin.js && node --check villegram-upload.js && node --check villegram-community.js && node --check account-navigation.js && node --check villegram-avatar.js && node --check villegram-text.js && node --check villegram-review-notifications.js",
+    "check": "node --check admin.js && node --check booking.js && node --check account.js && node --check villegram.js && node --check villegram-effects.js && node --check villegram-feelings.js && node --check villegram-timeline.js && node --check villegram-timeline-editor.js && node --check villegram-content.js && node --check villegram-signals.js && node --check villegram-admin.js && node --check villegram-upload.js && node --check villegram-community.js && node --check account-navigation.js && node --check villegram-avatar.js && node --check villegram-text.js && node --check villegram-review-notifications.js",
     "test:browser": "playwright test",
     "typecheck": "tsc --noEmit --allowImportingTsExtensions --module esnext --target es2022 --moduleResolution bundler --skipLibCheck tests/deno-shim.d.ts supabase/functions/booking-engine/index.ts supabase/functions/guarantee-preview/index.ts supabase/functions/pagbank-webhook/index.ts supabase/functions/villegram-content/index.ts"
   },

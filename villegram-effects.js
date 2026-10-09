@@ -1,6 +1,7 @@
 (()=>{
  const filters={original:{label:'Original',css:'none'},warm:{label:'Aconchego',css:'sepia(.18) saturate(1.12) brightness(1.04)'},soft:{label:'Suave',css:'saturate(.8) contrast(.92) brightness(1.08)'},gold:{label:'Dourado',css:'sepia(.3) saturate(1.15) contrast(1.05)'},mono:{label:'P&B',css:'grayscale(1) contrast(1.08)'}};
  const modes={original:{label:'Original',duration:6500,description:'Enquadramento livre'},breathe:{label:'Respirar',duration:8000,description:'Tela cheia · dissolve suave · zoom entra e sai'},pulse:{label:'Pulso',duration:3200,description:'Tela cheia · corte rápido · zoom alternado'},cinema:{label:'Cinema',duration:6000,description:'Moldura vertical · transição lateral · movimento amplo'}};
+ modes.feelings={label:'Feelings',duration:6000,description:'ASMR · sons sugeridos e montagem suave · ajustes na timeline'};
  const templates=modes;
  const css=m=>filters[m?.filter||'original']?.css||'none';
  function applyTemplate(m,key){if(!modes[key])return;m.mode=key;}
@@ -20,7 +21,7 @@
   let active='filter',categoryKind,choicesKey,gesture,suppressClickUntil=0;
   function announce(text){host.querySelector('.vg-wheel-feedback').textContent=text;}
   function options(){const m=getMedia();if(!m)return [];return active==='filter'?Object.entries(filters).map(([key,v])=>[key,v.label,(m.filter||'original')===key]):active==='effect'?Object.entries(modes).map(([key,v])=>[key,v.label,(m.mode||'original')===key]):[.5,.75,1].map(v=>[String(v),v===1?'Normal':String(v).replace('.',',')+'×',(m.speed||1)===v]);}
-  function choose(value){if(locked())return;const m=getMedia();if(!m)return;if(active==='filter')m.filter=value;else if(active==='speed')m.speed=Number(value);else getCollection().forEach(item=>applyTemplate(item,value));changed();draw();announce(options().find(([key])=>key===value)?.[1]||'');}
+  function choose(value){if(locked())return;const m=getMedia();if(!m)return;if(active==='filter')m.filter=value;else if(active==='speed')m.speed=Number(value);else if(value==='feelings'){host.dispatchEvent(new CustomEvent('villegram-feelings',{bubbles:true}));return}else getCollection().forEach(item=>applyTemplate(item,value));changed();draw();announce(options().find(([key])=>key===value)?.[1]||'');}
   function advance(direction){const items=options();if(!items.length)return;const index=Math.max(0,items.findIndex(item=>item[2]));choose(items[(index+direction+items.length)%items.length][0]);}
   function draw(){
    const m=getMedia();if(!m)return;
@@ -71,7 +72,7 @@
  if(m.kind!=='video')return await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('export_unavailable')),'image/jpeg',.92));
  if(!window.MediaRecorder||!canvas.captureStream)throw Error('export_unavailable');
  // MP4 is required for the Instagram export; never silently discard the edits.
- const mime=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4'].find(v=>MediaRecorder.isTypeSupported(v));if(!mime)throw Error('mp4_unavailable');
+ const mime=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1.42E01E,opus','video/mp4;codecs=avc1','video/mp4'].find(v=>MediaRecorder.isTypeSupported(v));if(!mime)throw Error('mp4_unavailable');
  source.playbackRate=m.speed||1;source.preservesPitch=true;stream=canvas.captureStream(30);
  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('audio_unavailable');audioContext=new AC();const audioSource=audioContext.createMediaElementSource(source),dest=audioContext.createMediaStreamDestination();audioSource.connect(dest);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));await audioContext.resume();
  const chunks=[];recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4000000});
@@ -79,5 +80,5 @@
  const paint=()=>{if(recorder.state==='inactive')return;draw(ctx,source,m,layers);progress(Math.min(99,Math.round(source.currentTime/source.duration*100)));frame=requestAnimationFrame(paint)};recorder.start(1000);source.play().then(paint).catch(stopError);});
  }finally{clearTimeout(timeout);cancelAnimationFrame(frame);source?.pause?.();source?.remove();stream?.getTracks().forEach(t=>t.stop());if(recorder&&recorder.state!=='inactive')recorder.stop();await audioContext?.close();URL.revokeObjectURL(url);}
  }
- window.VillegramEffects={filters,modes,templates,css,applyTemplate,controls,geometry,watermark,exportMedia};
+ window.VillegramEffects={filters,modes,templates,css,applyTemplate,controls,geometry,watermark,renderFrame:draw,exportMedia};
 })();

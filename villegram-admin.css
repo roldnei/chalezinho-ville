@@ -130,7 +130,7 @@ body.vg-admin-page #vg-composer-screen .vg-effects button.vg-wheel-close{left:50
  #vg-composer-screen .vg-wheel:not([hidden]){animation:vg-wheel-enter .28s cubic-bezier(.2,.8,.2,1)}
  #vg-composer-screen .vg-glyph-frame{animation:vg-frame-float 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
  #vg-composer-screen .vg-wheel-outer [aria-pressed=true] .vg-glyph-color{animation:vg-color-slide 2.8s ease-in-out infinite}
- #vg-composer-screen .vg-mode-demo[data-preview-mode=breathe] img{animation:vg-demo-breathe 2.8s ease-in-out infinite alternate}
+ #vg-composer-screen .vg-mode-demo:is([data-preview-mode=breathe],[data-preview-mode=feelings]) img{animation:vg-demo-breathe 2.8s ease-in-out infinite alternate}
  #vg-composer-screen .vg-mode-demo[data-preview-mode=pulse] img{animation:vg-demo-pulse 1.35s cubic-bezier(.2,.8,.2,1) infinite}
  #vg-composer-screen .vg-mode-demo[data-preview-mode=cinema] img{animation:vg-demo-cinema 2.6s ease-in-out infinite alternate}
 }

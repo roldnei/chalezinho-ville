@@ -1,0 +1,74 @@
+[
+  {
+    "id": "coffee",
+    "label": "Café sendo servido",
+    "tags": "café bebida xícara servir",
+    "loop": false,
+    "duration": 5.642,
+    "url": "assets/feelings/coffee.mp3",
+    "author": "Federico_Casazza",
+    "source": "https://freesound.org/people/Federico_Casazza/sounds/538932/",
+    "license": "CC0-1.0",
+    "sha256": "d44de42ef8dda4b268e4a9c572c036d092bd81262b860d83ba2b709b2e90e123"
+  },
+  {
+    "id": "pour",
+    "label": "Líquido sendo servido",
+    "tags": "água vinho taça bebida servir",
+    "loop": false,
+    "duration": 4.493,
+    "url": "assets/feelings/pour.mp3",
+    "author": "Rudmer_Rotteveel",
+    "source": "https://freesound.org/people/Rudmer_Rotteveel/sounds/700352/",
+    "license": "CC0-1.0",
+    "sha256": "ec7c36ec0752197a366f65f20564ac020d7818681bba00d46428f1bf293206f2"
+  },
+  {
+    "id": "bubbles",
+    "label": "Bolhas na água",
+    "tags": "água bolhas spa hidro banho piscina",
+    "loop": true,
+    "duration": 20.036,
+    "url": "assets/feelings/bubbles.mp3",
+    "author": "Electroviolence",
+    "source": "https://freesound.org/people/Electroviolence/sounds/234556/",
+    "license": "CC0-1.0",
+    "sha256": "b914922433fbd872c86e109c539a84d1cea5ffb0618422c58e03ed8b59fafbb6"
+  },
+  {
+    "id": "fire",
+    "label": "Fogo estalando",
+    "tags": "fogo fogueira lareira madeira",
+    "loop": true,
+    "duration": 20.036,
+    "url": "assets/feelings/fire.mp3",
+    "author": "ceich93",
+    "source": "https://freesound.org/people/ceich93/sounds/263864/",
+    "license": "CC0-1.0",
+    "sha256": "0dc929562283ee8d25e0efd8c7ed5c21eef2b7868c28396f9e4c32ac01affd06"
+  },
+  {
+    "id": "birds",
+    "label": "Pássaros na natureza",
+    "tags": "natureza jardim pássaros manhã floresta",
+    "loop": true,
+    "duration": 20.036,
+    "url": "assets/feelings/birds.mp3",
+    "author": "Magnesus",
+    "source": "https://freesound.org/people/Magnesus/sounds/723913/",
+    "license": "CC0-1.0",
+    "sha256": "9666d3d108ca6f1f7d32808d4b52c78bd49bcc91a5949a677fc13dcccacb766f"
+  },
+  {
+    "id": "rain",
+    "label": "Chuva suave",
+    "tags": "chuva água descanso relaxar",
+    "loop": true,
+    "duration": 20.036,
+    "url": "assets/feelings/rain.mp3",
+    "author": "esh9419",
+    "source": "https://freesound.org/people/esh9419/sounds/417616/",
+    "license": "CC0-1.0",
+    "sha256": "dc2a1bb59790ade76aab57a09624c7a63444ce4e399d0dc55548e2e15708ac61"
+  }
+]
