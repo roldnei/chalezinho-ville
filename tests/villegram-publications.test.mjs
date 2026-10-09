@@ -90,3 +90,23 @@ test('Story sharing falls back to saving photos without file-share support and r
  assert.match(w.document.querySelector('[data-story-status]').textContent,/Não foi possível/);assert.equal(w.document.querySelector('[data-prepare]').disabled,false);assert.ok(w.document.querySelector('[data-copy-property]'));
  w.Villegram.close();d.window.close();
 });
+
+test('share opens compact destination icons and prepares media only after selecting Stories',async()=>{
+ const d=await dom('<main></main>'),w=d.window;let fetched=0;
+ w.URL.createObjectURL=()=> 'blob:story';w.URL.revokeObjectURL=()=>{};
+ w.fetch=async()=>{fetched++;return {ok:true,blob:async()=>new w.Blob(['photo'],{type:'image/jpeg'})}};
+ w.VillegramContent={request:async()=>({likes:0,comments:[]}),rank:a=>a,leave(){}};
+ w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));
+ const c={publication:post,publication_id:id,property_url:'chale-premium.html',property_name:'Ville',offer_name:'Ville'};
+ w.Villegram.configurePublications([c],[],[]);w.Villegram.openHome(c);w.document.querySelector('[data-action=share]').click();
+ const body=w.document.querySelector('.vg-sheet-body'),panel=body.querySelector('.vg-story-share');
+ assert.equal(panel.hidden,true);assert.equal(fetched,0);
+ assert.deepEqual([...body.querySelectorAll('.vg-share-choice')].map(n=>n.textContent),['WhatsApp','Instagram','Stories','Copiar link']);
+ assert.equal(body.querySelectorAll('.vg-share-choice svg').length,4);
+ assert.ok([...body.querySelectorAll('input')].every(n=>n.hidden));
+ body.querySelector('[data-stories]').click();await new Promise(r=>setTimeout(r,10));
+ assert.equal(panel.hidden,false);assert.equal(fetched,1);assert.ok(body.querySelector('[data-save]'));
+ body.querySelector('[data-share-back]').click();assert.equal(panel.hidden,true);assert.equal(body.querySelector('.vg-share-options').hidden,false);
+ body.querySelector('[data-instagram]').click();assert.equal(fetched,1,'prepared media is reused');
+ w.Villegram.close();d.window.close();
+});
