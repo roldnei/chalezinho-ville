@@ -94,59 +94,50 @@ body.vg-admin-page #vg-upload-retry{pointer-events:auto;margin:0;font-size:12px;
 #vg-filter-toast{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);z-index:20;border-radius:24px;padding:10px 18px;background:#171719cc;color:#fff;pointer-events:none;font:500 16px 'DM Sans',sans-serif;animation:vg-filter-roll .22s ease-out}#vg-filter-toast[hidden]{display:none!important}#vg-scene-gesture.vg-panning{cursor:grabbing}#vg-composer-visual img[data-mode=breathe]{animation:vg-breathe 8s ease-in-out infinite}#vg-composer-visual img[data-mode=pulse]{animation:vg-pulse 3.2s ease-out infinite}#vg-composer-visual img[data-mode=cinema]{animation:vg-cinema 6s ease-in-out infinite;clip-path:inset(5% 5% round 16px)}@keyframes vg-filter-roll{from{opacity:0;translate:18px 0}to{opacity:1;translate:0 0}}@keyframes vg-breathe{0%,100%{scale:1}50%{scale:1.065}}@keyframes vg-pulse{from{scale:1.08}to{scale:1}}@keyframes vg-cinema{from{scale:1.05;translate:-1% 0}to{scale:1.05;translate:1% 0}}@media(prefers-reduced-motion:reduce){#vg-composer-visual img[data-mode]{animation:none!important}#vg-filter-toast{animation:none}}
 
 #vg-composer-screen:has(.vg-panning) #vg-composer-visual img{animation-play-state:paused!important}
-/* A 150-degree glass arc keeps editing controls over the photo. */
+/* A photo carousel highlights the current look without a backing panel. */
 #vg-scene-gesture{touch-action:pan-y pinch-zoom;cursor:grab}
 #vg-composer-screen{touch-action:pan-y}
 #vg-composer-screen .vg-effects{position:absolute;inset:0;z-index:15;margin:0;pointer-events:none}
-body.vg-admin-page #vg-composer-screen .vg-effects button{box-sizing:border-box;position:absolute;display:grid;place-items:center;flex:none;gap:0;width:44px;height:44px;min-width:44px;max-width:44px;min-height:44px;max-height:44px;margin:0;padding:0;border:1px solid #ffffff28;border-radius:50%;background:#131a2380;backdrop-filter:blur(5px);color:#faf8f2;box-shadow:0 2px 8px #0002;letter-spacing:0;line-height:1;pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-#vg-composer-screen .vg-effects svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6}
+body.vg-admin-page #vg-composer-screen .vg-effects button{box-sizing:border-box;position:absolute;display:grid;place-items:center;flex:none;gap:0;width:44px;height:44px;min-width:44px;max-width:44px;min-height:44px;max-height:44px;margin:0;padding:0;border:1px solid #ffffff28;border-radius:50%;background:#131a2380;backdrop-filter:blur(5px);color:#faf8f2;box-shadow:0 2px 8px #0002;letter-spacing:0;line-height:1;pointer-events:auto;touch-action:pan-y;-webkit-tap-highlight-color:transparent}
+#vg-composer-screen .vg-effects svg{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.6}
 body.vg-admin-page #vg-composer-screen .vg-wheel-launch{left:12px;top:72px;backdrop-filter:blur(12px);transition:background .2s ease}
 #vg-composer-screen .vg-wheel-launch svg{transition:transform .3s cubic-bezier(.2,.8,.2,1)}
 #vg-composer-screen .vg-wheel-launch[aria-expanded=true] svg{transform:rotate(90deg)}
-#vg-composer-screen .vg-wheel{position:absolute;width:312px;height:172px;left:50%;top:50%;translate:-50% -50%;pointer-events:none}
-#vg-composer-screen .vg-effects svg.vg-wheel-surface{position:absolute;inset:0;width:100%;height:100%;fill:none;stroke:none;overflow:visible;opacity:.75;scale:.88;transform-origin:50% var(--vg-hub-y);transition:scale .32s cubic-bezier(.2,.8,.2,1),opacity .25s ease}
-#vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-surface{scale:1;opacity:1}
-#vg-composer-screen .vg-wheel-rim{fill:none;stroke:#ffffff38;stroke-width:.8}
-body.vg-admin-page #vg-composer-screen .vg-wheel button{translate:-50% -50%;transition:top .32s cubic-bezier(.2,.8,.2,1),left .32s cubic-bezier(.2,.8,.2,1),border-color .2s ease,background .2s ease,opacity .2s ease}
-body.vg-admin-page #vg-composer-screen .vg-wheel-outer button{background:#1a222c80;color:#faf8f2;border-color:#ffffff30}
-body.vg-admin-page #vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-outer button{color:#dbdfe4;background:#16202a78;border-color:#ffffff26}
-body.vg-admin-page #vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-outer button[aria-pressed=true]{color:#f6e0b4;background:#493c2878;border-color:#e4c48b80}
-body.vg-admin-page #vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-outer button{background:transparent;border-color:transparent;box-shadow:none;backdrop-filter:none}
-#vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-outer button:before{content:'';position:absolute;inset:4px;border-radius:50%;border:1px solid #ffffff30;background:#17212b80;z-index:-1;backdrop-filter:blur(5px)}
-#vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-outer button[aria-pressed=true]:before{background:#493c2878;border-color:#e4c48b80}
-#vg-composer-screen .vg-wheel-category-name{position:absolute;top:48px;left:50%;translate:-50% 0;display:block;width:max-content;max-width:80px;white-space:nowrap;font:500 10px/1.25 'DM Sans',sans-serif;color:#fff;letter-spacing:0;text-transform:none;text-shadow:0 1px 4px #000c;pointer-events:none}
-#vg-composer-screen .vg-wheel[data-expanded=true] .vg-wheel-category-name{display:none}
-body.vg-admin-page #vg-composer-screen .vg-wheel-inner button{background:#17212b80;border-color:#ffffff40;overflow:visible}
-body.vg-admin-page #vg-composer-screen .vg-wheel-inner button[aria-pressed=true]{border-color:#f5deaa;box-shadow:0 0 0 2px #e7c68b38,0 3px 10px #0003;color:#f5deaa}
-#vg-composer-screen .vg-wheel-visual{display:grid;place-items:center;width:38px;height:38px;border-radius:50%;overflow:hidden;pointer-events:none;transition:scale .25s cubic-bezier(.2,.8,.2,1)}
-#vg-composer-screen .vg-wheel-inner button[aria-pressed=true] .vg-wheel-visual{scale:1.04}
-#vg-composer-screen .vg-wheel-inner button:active .vg-wheel-visual{scale:.9}
-#vg-composer-screen .vg-wheel-visual>img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none}
-#vg-composer-screen .vg-wheel-speed-value{font:600 13px/1 'DM Sans',sans-serif}
-body.vg-admin-page #vg-composer-screen .vg-effects button.vg-wheel-close{left:50%;width:44px;height:44px;min-width:44px;max-width:44px;min-height:44px;max-height:44px;background:#f0e3c6c9;color:#29271f;border:1px solid #ffffff60;box-shadow:0 3px 12px #0002}
-#vg-composer-screen .vg-wheel-current{position:absolute;left:50%;translate:-50% 0;max-width:100px;white-space:nowrap;font:500 11px/1.25 'DM Sans',sans-serif;color:#fff;text-shadow:0 1px 5px #000;pointer-events:none}
-#vg-composer-screen .vg-mode-demo{position:relative;display:block;width:23px;height:31px;overflow:hidden;border:1px solid #ffffffa6;border-radius:5px;background:#ffffff16;box-shadow:0 2px 5px #0003}
-#vg-composer-screen .vg-mode-demo img{display:block;width:100%;height:100%;object-fit:cover;pointer-events:none}
-#vg-composer-screen .vg-mode-demo[data-preview-mode=cinema]{height:29px;padding-block:3px;background:#0f141b}
-#vg-composer-screen .vg-wheel[hidden],#vg-composer-screen .vg-effects[hidden]{display:none!important}
+#vg-composer-screen .vg-wheel{position:absolute;width:min(290px,calc(100% - 16px));height:274px;left:50%;top:50%;translate:-50% -50%;pointer-events:none}
+#vg-composer-screen .vg-wheel-outer{position:absolute;top:0;left:0;right:0;display:flex;justify-content:center;gap:30px;height:62px}
+body.vg-admin-page #vg-composer-screen .vg-wheel-outer button{position:relative;opacity:.45;background:#17212b80;color:#fff;transition:opacity .25s ease,border-color .25s ease,background .25s ease}
+body.vg-admin-page #vg-composer-screen .vg-wheel-outer button[aria-pressed=true]{opacity:1;border-color:#e4c48b90;background:#493c2878;color:#f6e0b4}
+#vg-composer-screen .vg-wheel-category-name{position:absolute;top:48px;left:50%;translate:-50% 0;display:block;width:max-content;white-space:nowrap;font:500 11px/1.25 'DM Sans',sans-serif;color:#fff;letter-spacing:0;text-transform:none;text-shadow:0 1px 4px #000;pointer-events:none}
+#vg-composer-screen .vg-wheel-inner{position:absolute;top:72px;left:0;right:0;height:128px;perspective:900px;pointer-events:auto;touch-action:pan-y}
+body.vg-admin-page #vg-composer-screen .vg-effects .vg-wheel-inner button{left:50%;top:50%;translate:-50% -50%;width:90px;height:120px;min-width:90px;max-width:90px;min-height:120px;max-height:120px;border-radius:20px;border:1px solid #ffffff60;background:#17212b80;overflow:hidden;transform:translateX(calc(var(--vg-card-x) + var(--vg-drag-x,0px))) scale(var(--vg-card-scale)) rotateY(var(--vg-card-turn));transition:transform .38s cubic-bezier(.2,.8,.2,1),opacity .25s ease,border-color .25s ease;opacity:.36;z-index:2;box-shadow:0 5px 20px #0004}
+body.vg-admin-page #vg-composer-screen .vg-effects .vg-wheel-inner button[data-position=current]{opacity:1;z-index:3;border:2px solid #f5deaa;box-shadow:0 0 0 3px #e7c68b25,0 7px 24px #0006;color:#f5deaa}
+#vg-composer-screen .vg-wheel[data-dragging=true] .vg-wheel-inner button{transition:none!important}
+#vg-composer-screen .vg-wheel-visual{display:grid;place-items:center;width:100%;height:100%;overflow:hidden;pointer-events:none;transition:scale .2s ease}
+#vg-composer-screen .vg-wheel-inner button:active .vg-wheel-visual{scale:.96}
+#vg-composer-screen .vg-wheel-visual>img,#vg-composer-screen .vg-mode-demo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center;pointer-events:none}
+#vg-composer-screen .vg-wheel-speed-value{font:600 25px/1 'DM Sans',sans-serif}
+#vg-composer-screen .vg-wheel-visual>svg{width:44px;height:44px}
+body.vg-admin-page #vg-composer-screen .vg-effects button.vg-wheel-close{left:50%;bottom:0;translate:-50% 0;background:#f0e3c6c9;color:#29271f;border:1px solid #ffffff60;box-shadow:0 3px 12px #0002}
+#vg-composer-screen .vg-wheel-current{position:absolute;top:204px;left:50%;translate:-50% 0;max-width:160px;white-space:nowrap;font:500 14px/1.25 'DM Sans',sans-serif;color:#fff;text-shadow:0 1px 5px #000,0 0 12px #000;pointer-events:none}
+#vg-composer-screen .vg-mode-demo{position:relative;display:block;width:100%;height:100%;overflow:hidden;background:#0f141b}
+#vg-composer-screen .vg-mode-demo[data-preview-mode=cinema]{padding-block:12px;box-sizing:border-box}
+#vg-composer-screen .vg-wheel[hidden],#vg-composer-screen .vg-effects[hidden],#vg-composer-screen .vg-wheel-inner button[hidden]{display:none!important}
 #vg-composer-screen .vg-media-strip{touch-action:pan-y;scrollbar-width:thin;scrollbar-color:#d8c29a transparent;scroll-padding:5px}
 #vg-composer-screen .vg-media-strip button{touch-action:pan-y}
 #vg-composer-screen .vg-media-strip::-webkit-scrollbar{display:block;height:3px}
 #vg-composer-screen .vg-media-strip::-webkit-scrollbar-thumb{background:#d8c29a;border-radius:3px}
 @media(prefers-reduced-motion:no-preference){
- #vg-composer-screen .vg-wheel:not([hidden]){animation:vg-arc-enter .28s cubic-bezier(.2,.8,.2,1)}
- #vg-composer-screen .vg-wheel-inner button{animation:vg-arc-choice .22s ease both;animation-delay:calc(var(--vg-choice-order)*25ms)}
+ #vg-composer-screen .vg-wheel:not([hidden]){animation:vg-wheel-enter .28s cubic-bezier(.2,.8,.2,1)}
  #vg-composer-screen .vg-glyph-frame{animation:vg-frame-float 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
  #vg-composer-screen .vg-wheel-outer [aria-pressed=true] .vg-glyph-color{animation:vg-color-slide 2.8s ease-in-out infinite}
  #vg-composer-screen .vg-mode-demo[data-preview-mode=breathe] img{animation:vg-demo-breathe 2.8s ease-in-out infinite alternate}
  #vg-composer-screen .vg-mode-demo[data-preview-mode=pulse] img{animation:vg-demo-pulse 1.35s cubic-bezier(.2,.8,.2,1) infinite}
  #vg-composer-screen .vg-mode-demo[data-preview-mode=cinema] img{animation:vg-demo-cinema 2.6s ease-in-out infinite alternate}
 }
-@keyframes vg-arc-enter{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes vg-arc-choice{from{opacity:0}to{opacity:1}}
+@keyframes vg-wheel-enter{from{opacity:0;transform:translateY(10px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes vg-frame-float{0%,100%{transform:translateY(0)}50%{transform:translateY(2px)}}
 @keyframes vg-color-slide{0%,100%{transform:translateY(0)}50%{transform:translateY(3px)}}
 @keyframes vg-demo-breathe{from{transform:scale(1)}to{transform:scale(1.2)}}
 @keyframes vg-demo-pulse{from{transform:scale(1.2)}to{transform:scale(1)}}
 @keyframes vg-demo-cinema{from{transform:scale(1.2) translateX(-4%)}to{transform:scale(1.2) translateX(4%)}}
-@media(prefers-reduced-motion:reduce){#vg-composer-screen .vg-wheel button,#vg-composer-screen .vg-wheel-surface,#vg-composer-screen .vg-wheel-launch svg,#vg-composer-screen .vg-wheel-visual{transition:none}}
+@media(prefers-reduced-motion:reduce){#vg-composer-screen .vg-wheel button,#vg-composer-screen .vg-wheel-launch svg,#vg-composer-screen .vg-wheel-visual{transition:none!important}}

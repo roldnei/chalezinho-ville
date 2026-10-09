@@ -15,41 +15,42 @@
    pulse:'<rect x="8" y="4" width="12" height="16" rx="3"/><path d="M4 7h1M2 12h3m-1 5h1m8-9 4 4-4 4"/>',
    cinema:'<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M6 7h12M6 17h12m-4-7 3 2-3 2"/>'
   };
-  host.innerHTML='<button type="button" class="vg-wheel-launch" data-effects-toggle aria-label="Abrir filtros e modos" aria-expanded="false">'+svg('<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>')+'</button><div class="vg-wheel" hidden aria-label="Editar visual"><svg class="vg-wheel-surface" aria-hidden="true"><defs><linearGradient id="vg-arc-glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151b24" stop-opacity=".2"/><stop offset="1" stop-color="#0b1018" stop-opacity=".42"/></linearGradient></defs><path class="vg-wheel-glass" fill="url(#vg-arc-glass)"/><path class="vg-wheel-rim"/></svg><div class="vg-wheel-outer" role="group" aria-label="Categorias de edição"></div><div class="vg-wheel-inner" role="group" aria-label="Opções"></div><button type="button" class="vg-wheel-close" aria-label="Fechar edição">'+svg('<path d="m6 6 12 12M18 6 6 18"/>')+'</button><span class="vg-wheel-current" aria-hidden="true" hidden></span><span class="vg-wheel-feedback vg-visually-hidden" role="status" aria-live="polite"></span></div>';
-  const wheel=host.querySelector('.vg-wheel'),launch=host.querySelector('[data-effects-toggle]'),outer=host.querySelector('.vg-wheel-outer'),inner=host.querySelector('.vg-wheel-inner'),center=host.querySelector('.vg-wheel-close');
-  let active=null,categoryKind,choicesKey,hubY=160;
-  function position(button,degrees,radius){const angle=degrees*Math.PI/180;button.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';button.style.top=(hubY+Math.sin(angle)*radius)+'px';button.dataset.angle=String(degrees);}
+  host.innerHTML='<button type="button" class="vg-wheel-launch" data-effects-toggle aria-label="Abrir filtros e modos" aria-expanded="false">'+svg('<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>')+'</button><div class="vg-wheel" hidden aria-label="Editar visual"><div class="vg-wheel-outer" role="group" aria-label="Categorias de edição"></div><div class="vg-wheel-inner" role="group" aria-roledescription="carrossel" aria-label="Deslize para escolher o filtro"></div><span class="vg-wheel-current" aria-hidden="true"></span><button type="button" class="vg-wheel-close" aria-label="Concluir edição">'+svg('<path d="m5 12 4 4L19 6"/>')+'</button><span class="vg-wheel-feedback vg-visually-hidden" role="status" aria-live="polite"></span></div>';
+  const wheel=host.querySelector('.vg-wheel'),launch=host.querySelector('[data-effects-toggle]'),outer=host.querySelector('.vg-wheel-outer'),inner=host.querySelector('.vg-wheel-inner');
+  let active='filter',categoryKind,choicesKey,gesture,suppressClickUntil=0;
   function announce(text){host.querySelector('.vg-wheel-feedback').textContent=text;}
+  function options(){const m=getMedia();if(!m)return [];return active==='filter'?Object.entries(filters).map(([key,v])=>[key,v.label,(m.filter||'original')===key]):active==='effect'?Object.entries(modes).map(([key,v])=>[key,v.label,(m.mode||'original')===key]):[.5,.75,1].map(v=>[String(v),v===1?'Normal':String(v).replace('.',',')+'×',(m.speed||1)===v]);}
+  function choose(value){if(locked())return;const m=getMedia();if(!m)return;if(active==='filter')m.filter=value;else if(active==='speed')m.speed=Number(value);else getCollection().forEach(item=>applyTemplate(item,value));changed();draw();announce(options().find(([key])=>key===value)?.[1]||'');}
+  function advance(direction){const items=options();if(!items.length)return;const index=Math.max(0,items.findIndex(item=>item[2]));choose(items[(index+direction+items.length)%items.length][0]);}
   function draw(){
    const m=getMedia();if(!m)return;
-   const categories=m.kind==='video'?[['filter','Filtro'],['speed','Velocidade']]:[['filter','Filtro'],['effect','Modo']];
-   if(active&&!categories.some(c=>c[0]===active))active=null;
-   wheel.dataset.expanded=String(!!active);wheel.dataset.category=active||'';
-   const diameter=Math.min(312,Math.max(240,(host.parentElement?.clientWidth||324)-12)),radius=diameter/2,innerRadius=radius-22;hubY=radius+12;wheel.style.width=diameter+'px';wheel.style.height=(hubY+4)+'px';wheel.dataset.arc='150';
-   const surface=host.querySelector('.vg-wheel-surface'),sx=radius+Math.cos(-165*Math.PI/180)*radius,ey=hubY+Math.sin(-165*Math.PI/180)*radius,ex=diameter-sx,arc='M '+sx+' '+ey+' A '+radius+' '+radius+' 0 0 1 '+ex+' '+ey;
-   surface.setAttribute('viewBox','0 0 '+diameter+' '+(hubY+4));surface.querySelector('.vg-wheel-glass').setAttribute('d','M '+radius+' '+hubY+' L '+sx+' '+ey+' A '+radius+' '+radius+' 0 0 1 '+ex+' '+ey+' Z');surface.querySelector('.vg-wheel-rim').setAttribute('d',arc);wheel.style.setProperty('--vg-hub-y',hubY+'px');center.style.top=(hubY-26)+'px';
-   center.setAttribute('aria-label',active?'Concluir edição':'Fechar edição');center.innerHTML=svg(active?'<path d="m5 12 4 4L19 6"/>':'<path d="m6 6 12 12M18 6 6 18"/>');const currentName=host.querySelector('.vg-wheel-current');currentName.hidden=!active;currentName.style.top=(hubY-74)+'px';currentName.textContent=!active?'':active==='filter'?filters[m.filter||'original'].label:active==='effect'?modes[m.mode||'original'].label:(m.speed||1)===1?'Normal':String(m.speed).replace('.',',')+'×';
-   if(categoryKind!==m.kind){categoryKind=m.kind;outer.replaceChildren();categories.forEach(([key,name])=>{const b=document.createElement('button');b.type='button';b.dataset.effectsTab=key;b.setAttribute('aria-label',name);b.innerHTML=svg(glyphs[key])+'<span class="vg-wheel-category-name">'+name+'</span>';b.onclick=()=>{if(locked())return;active=key;draw();announce(name)};outer.append(b)});}
-   categories.forEach(([key],i)=>{const b=outer.querySelector('[data-effects-tab="'+key+'"]');b.setAttribute('aria-pressed',String(active===key));b.disabled=locked();b.style.left='calc(50% + '+(i===0?-46:46)+'px)';b.style.top=(hubY-(active?40:58))+'px';});
-   const items=!active?[]:active==='filter'?Object.entries(filters).map(([key,v])=>[key,v.label,(m.filter||'original')===key]):active==='effect'?Object.entries(modes).map(([key,v])=>[key,v.label,(m.mode||'original')===key]):[.5,.75,1].map(v=>[String(v),v===1?'Normal':String(v).replace('.',',')+'×',(m.speed||1)===v]);
-   const preview=m.kind==='video'?m.poster:m.url;
-   const key=m.kind+'|'+active+'|'+preview;
-   if(choicesKey!==key){choicesKey=key;inner.replaceChildren();items.forEach(([value,name],i)=>{
-    const b=document.createElement('button');b.type='button';b.dataset[active==='filter'?'filter':active==='effect'?'template':'speed']=value;b.setAttribute('aria-label',name);b.title=active==='effect'?modes[value].description:name;
+   const categories=m.kind==='video'?[['filter','Filtro'],['speed','Velocidade']]:[['filter','Filtro'],['effect','Modo']];if(!categories.some(c=>c[0]===active))active='filter';
+   wheel.dataset.category=active;inner.setAttribute('aria-label','Deslize para escolher '+(active==='filter'?'o filtro':active==='effect'?'o modo':'a velocidade'));
+   if(categoryKind!==m.kind){categoryKind=m.kind;outer.replaceChildren();categories.forEach(([key,name])=>{const b=document.createElement('button');b.type='button';b.dataset.effectsTab=key;b.setAttribute('aria-label',name);b.innerHTML=svg(glyphs[key])+'<span class="vg-wheel-category-name">'+name+'</span>';b.onclick=()=>{if(locked())return;resetGesture();active=key;draw();announce(name)};outer.append(b)});}
+   categories.forEach(([key])=>{const b=outer.querySelector('[data-effects-tab="'+key+'"]');b.setAttribute('aria-pressed',String(active===key));b.disabled=locked();});
+   const items=options(),preview=m.kind==='video'?m.poster:m.url,key=m.kind+'|'+active+'|'+preview;
+   if(choicesKey!==key){choicesKey=key;inner.replaceChildren();items.forEach(([value,name])=>{
+    const b=document.createElement('button');b.type='button';b.dataset[active==='filter'?'filter':active==='effect'?'template':'speed']=value;b.setAttribute('aria-label',name);b.title=active==='effect'?name+' · '+modes[value].description:name;
     const visual=document.createElement('span');visual.className='vg-wheel-visual';
     if(active==='filter'&&preview){const img=document.createElement('img');img.alt='';img.src=preview;img.draggable=false;img.style.filter=filters[value].css;visual.append(img);}
     else if(active==='effect'&&preview){const frame=document.createElement('span');frame.className='vg-mode-demo';frame.dataset.previewMode=value;const img=document.createElement('img');img.src=preview;img.alt='';img.draggable=false;frame.append(img);visual.append(frame);}
     else visual.innerHTML=active==='speed'?'<span class="vg-wheel-speed-value">'+name+'</span>':svg(glyphs[value]||glyphs.filter);
-    const caption=document.createElement('span');caption.className='vg-wheel-option-name vg-visually-hidden';caption.textContent=name;b.append(visual,caption);
-    position(b,-152+124*i/Math.max(1,items.length-1),innerRadius);
-    b.onclick=()=>{if(locked())return;const current=getMedia();if(!current)return;if(active==='filter')current.filter=value;else if(active==='speed')current.speed=Number(value);else getCollection().forEach(item=>applyTemplate(item,value));changed();draw();announce(name)};b.style.setProperty('--vg-choice-order',String(i));inner.append(b);
+    b.append(visual);b.onclick=()=>choose(value);inner.append(b);
    });}
-   items.forEach(([value,,selected],i)=>{const b=inner.querySelector('[data-'+(active==='filter'?'filter':active==='effect'?'template':'speed')+'="'+value+'"]');position(b,-152+124*i/Math.max(1,items.length-1),innerRadius);b.setAttribute('aria-pressed',String(selected));b.disabled=locked();});
+   const selected=Math.max(0,items.findIndex(item=>item[2]));host.querySelector('.vg-wheel-current').textContent=items[selected]?.[1]||'';
+   items.forEach(([value,,isSelected],i)=>{
+    const b=inner.querySelector('[data-'+(active==='filter'?'filter':active==='effect'?'template':'speed')+'="'+value+'"]');let delta=(i-selected+items.length)%items.length;if(delta>items.length/2)delta-=items.length;
+    b.dataset.position=delta===0?'current':delta===-1?'left':delta===1?'right':'away';b.style.setProperty('--vg-card-x',(delta*72)+'px');b.style.setProperty('--vg-card-scale',delta===0?'1':'.84');b.style.setProperty('--vg-card-turn',delta===0?'0deg':delta<0?'18deg':'-18deg');b.hidden=Math.abs(delta)>1;b.tabIndex=delta===0?0:-1;b.setAttribute('aria-pressed',String(isSelected));b.disabled=locked();
+   });
   }
-  function open(){if(locked()||!getMedia())return;active=null;wheel.hidden=false;launch.setAttribute('aria-expanded','true');draw();}
-  function close(){wheel.hidden=true;launch.setAttribute('aria-expanded','false');}
-  if(window.ResizeObserver&&host.parentElement)new ResizeObserver(()=>{if(!wheel.hidden)draw()}).observe(host.parentElement);
-  launch.onclick=()=>wheel.hidden?open():close();center.onclick=()=>{close();launch.focus()};host.onkeydown=e=>{if(e.key==='Escape'){close();launch.focus()}};
+  function resetGesture(){gesture=null;wheel.dataset.dragging='false';inner.style.setProperty('--vg-drag-x','0px');}
+  inner.onpointerdown=e=>{if(locked()||e.button!==undefined&&e.button!==0)return;gesture={id:e.pointerId,x:e.clientX,y:e.clientY,moving:false};};
+  inner.onpointermove=e=>{if(!gesture||gesture.id!==e.pointerId)return;const dx=e.clientX-gesture.x,dy=e.clientY-gesture.y;if(!gesture.moving&&Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){resetGesture();return;}if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(dy)){gesture.moving=true;inner.setPointerCapture?.(e.pointerId);}if(!gesture.moving)return;e.preventDefault();wheel.dataset.dragging='true';inner.style.setProperty('--vg-drag-x',Math.max(-48,Math.min(48,dx))+'px');};
+  inner.onpointerup=e=>{if(!gesture||gesture.id!==e.pointerId)return;const dx=e.clientX-gesture.x,moved=gesture.moving;resetGesture();if(moved){suppressClickUntil=Date.now()+300;if(Math.abs(dx)>24)advance(dx<0?1:-1);}};
+  inner.onpointercancel=resetGesture;inner.addEventListener('click',e=>{if(Date.now()<suppressClickUntil){e.preventDefault();e.stopPropagation()}},true);
+  function open(){if(locked()||!getMedia())return;active='filter';wheel.hidden=false;launch.setAttribute('aria-expanded','true');draw();}
+  function close(){resetGesture();wheel.hidden=true;launch.setAttribute('aria-expanded','false');}
+  launch.onclick=()=>wheel.hidden?open():close();host.querySelector('.vg-wheel-close').onclick=()=>{close();launch.focus()};host.onkeydown=e=>{if(e.key==='Escape'){close();launch.focus()}else if(!wheel.hidden&&['ArrowLeft','ArrowRight'].includes(e.key)){e.preventDefault();advance(e.key==='ArrowRight'?1:-1);inner.querySelector('[data-position=current]')?.focus()}};
   return {open,close,render(){host.hidden=!getMedia();if(!getMedia())close();else if(!wheel.hidden)draw()}};
  }
  // Share frame: only authored layers, media framing and a discreet brand handle.
