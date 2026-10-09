@@ -49,3 +49,8 @@ Deslize horizontal curto aplica filtros em ciclo (incluindo Original) sem altera
 Frases-modelo removidas: modos visuais acessíveis por ícone são Original, Respirar (8 s, dissolve e zoom oscilante), Pulso (3,2 s, cortes e zoom alternado) e Cinema (6 s, moldura e movimento lateral). Aplicados ao conjunto de fotos, sem apagar textos ou enquadramento. Prévia no editor e reprodução no feed; movimento reduzido respeitado. Modos não são oferecidos para vídeo, cuja velocidade continua separada. Exportação de foto ainda produz uma imagem estática, não uma montagem animada do conjunto; exportação de montagem completa não foi implementada nesta etapa.
 
 61 testes afetados passaram; typecheck/build DEV aprovados. Interface real e gestos em aparelho permanecem pendentes de acesso à prévia. Persistência compatível via campo opcional mode no JSONB, sem migração.
+
+### Roleta radial e rolagem do editor
+Controles de estilo abaixo da foto removidos. Segurar 500 ms sem mover abre roleta na foto: categorias externas Filtros/Efeitos (ou Velocidade para vídeo), categoria inativa opaca, opções por ícones no arco interno. Aplicação imediata, seleção acessível por aria-label/aria-pressed e fechamento por ícone/Escape. Arraste após segurar fecha a roleta e mantém enquadramento; deslize horizontal rápido continua filtros. Vertical livre usa touch-action pan-y e não é cancelado pelo editor antes do hold; pointercancel limpa o temporizador. Nova publicação e entrada inicial centralizam o canvas de upload.
+
+39 testes afetados passaram. Sintaxe e build DEV aprovados. Validação visual e toque real ainda pendentes por bloqueio de acesso à prévia.
