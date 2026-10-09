@@ -9,7 +9,7 @@
 .home-sales .hero h1{font-size:clamp(52px,6vw,88px)}
 .home-sales .hero p{max-width:540px;line-height:1.65;color:#f0e9df}
 .home-sales .trust-strip{margin:0}.home-sales .trust-reviews a{color:inherit;text-decoration:underline;text-underline-offset:4px}
-.home-sales .home-account-link{border-color:#ffffff40;border-radius:999px;padding:8px 16px;background:#17130f30}
+.home-sales .home-account-link,.home-sales .villegram-home-entry{border-color:#ffffff40;border-radius:999px;padding:8px 16px;background:#17130f30}
 .home-hero-actions{display:flex;gap:32px;margin-top:28px;width:fit-content}
 .home-hero-action{display:flex;align-items:center;gap:12px;min-height:64px;padding:6px 0;border-radius:999px;color:#fff;font:500 15px/1.4 'DM Sans',sans-serif;text-align:left}
 .home-action-icon{display:grid;place-items:center;flex:none;width:56px;height:56px;border:1px solid #ffffff66;border-radius:50%;background:#17130f55;backdrop-filter:blur(8px);transition:background .2s ease,border-color .2s ease,transform .2s ease}
