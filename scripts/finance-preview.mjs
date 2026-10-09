@@ -33,7 +33,7 @@ const server=createServer(async(req,res)=>{
   }
   if(path==='/fixture.js'){res.writeHead(200,{'Content-Type':'application/javascript'});res.end(bootstrap);return;}
   // Explicit allowlist excludes credentials, repository internals and server source.
-  const files=new Set(['/admin.html','/admin.js','/styles.css']);
+  const files=new Set(['/admin.html','/admin.js','/styles.css','/villegram-audio-dsp.js']);
   if(!files.has(path)){res.writeHead(404);res.end();return;}
   let data=await readFile(resolve(root,'.'+path));
   if(path==='/admin.html')data=Buffer.from(data.toString().replace(/<script src="https:\/\/cdn.jsdelivr[^>]+><\/script>/,'').replace(/<script src="app-config[^>]+><\/script>/,'<script src="fixture.js"></script>'));

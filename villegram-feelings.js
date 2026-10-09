@@ -1,6 +1,13 @@
 (()=>{
  'use strict';
- const base='assets/feelings/',cache=new Map();let catalog=[],ready;
+ const base='assets/feelings/',cache=new Map(),prepared=new WeakMap();let catalog=[],ready;
+ const scriptURL=document.currentScript?.src;
+ const dspURL=()=>new URL('villegram-audio-dsp.js?v=cleanup1',scriptURL||location.href).href;
+ async function prepare(context){
+  if(!context.audioWorklet)throw Error('audio_cleanup_unavailable');
+  if(!prepared.has(context))prepared.set(context,context.audioWorklet.addModule(dspURL()).catch(e=>{prepared.delete(context);throw e}));
+  let timer;try{await Promise.race([prepared.get(context),new Promise((_,reject)=>timer=setTimeout(()=>reject(Error('audio_cleanup_timeout')),10000))]);}finally{clearTimeout(timer)}
+ }
  const clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),db=n=>20*Math.log10(Math.max(1e-7,n)),round=n=>Math.round(n*1000)/1000;
  const abort=()=>new DOMException('Cancelado','AbortError');
  async function load(){if(!ready)ready=fetch(base+'catalog.json',{signal:AbortSignal.timeout(15000)}).then(r=>{if(!r.ok)throw Error('catalog_unavailable');return r.json()}).then(items=>catalog=items).catch(e=>{ready=null;throw e});return ready;}
@@ -10,11 +17,12 @@
  // 50 ms windows keep real pauses and transients; channel power avoids stereo cancellation.
  async function measure(buffer,{cancelled=()=>false,progress=()=>{}}={}){
   const sr=buffer.sampleRate,channels=Array.from({length:buffer.numberOfChannels},(_,i)=>buffer.getChannelData(i)),size=Math.max(1,Math.round(sr*.05)),envelope=[],peaks=[];
+  const bands=window.VillegramAudioDSP?new window.VillegramAudioDSP.Bands(sr,channels.length):null,bandFrames=[];
   let power=0,peak=0,clipped=0,hpPower=0,hpPrevious=channels.map(()=>0),hpInput=channels.map(()=>0);
   const alpha=1/(1+2*Math.PI*90/sr);
-  for(let start=0;start<buffer.length;start+=size){let sum=0,p=0;
-   for(let c=0;c<channels.length;c++)for(let j=start;j<Math.min(buffer.length,start+size);j++){const v=channels[c][j],a=Math.abs(v);sum+=v*v;p=Math.max(p,a);if(a>.995)clipped++;const h=alpha*(hpPrevious[c]+v-hpInput[c]);hpPrevious[c]=h;hpInput[c]=v;hpPower+=h*h;}
-   const count=Math.min(size,buffer.length-start)*channels.length;power+=sum;peak=Math.max(peak,p);envelope.push(Math.sqrt(sum/count));peaks.push(p);
+  for(let start=0;start<buffer.length;start+=size){let sum=0,p=0;const bandPower=new Float64Array(12);
+   for(let c=0;c<channels.length;c++)for(let j=start;j<Math.min(buffer.length,start+size);j++){const v=channels[c][j],a=Math.abs(v);sum+=v*v;p=Math.max(p,a);if(a>.995)clipped++;const h=alpha*(hpPrevious[c]+v-hpInput[c]);hpPrevious[c]=h;hpInput[c]=v;hpPower+=h*h;if(bands){const values=bands.split(v,c);for(let b=0;b<12;b++)bandPower[b]+=values[b]*values[b];}}
+   const count=Math.min(size,buffer.length-start)*channels.length;power+=sum;peak=Math.max(peak,p);envelope.push(Math.sqrt(sum/count));peaks.push(p);if(bands)bandFrames.push(Array.from(bandPower,n=>Math.sqrt(n/count)));
    if(envelope.length%40===0){if(cancelled())throw abort();progress(start/buffer.length);await new Promise(r=>setTimeout(r,0));}
   }
   const sorted=envelope.slice().sort((a,b)=>a-b),rms=Math.sqrt(power/(buffer.length*channels.length)),floor=sorted[Math.floor(sorted.length*.2)]||0,body=sorted[Math.floor(sorted.length*.9)]||0;
@@ -25,14 +33,26 @@
     ratios.push(2*(re*re+im*im)/Math.max(1e-12,n*energy));}
    const ratio=Math.min(...ratios);if(ratio>.35&&ratio>humRatio){humHz=hz;humRatio=ratio;}}
   const waveform=Array.from({length:Math.min(240,envelope.length)},(_,i)=>{const a=Math.floor(i*envelope.length/Math.min(240,envelope.length)),b=Math.ceil((i+1)*envelope.length/Math.min(240,envelope.length));return round(Math.min(1,Math.max(...peaks.slice(a,b))));});
-  return {duration:buffer.duration,envelope,peaks,waveform,rmsDb:db(rms),peakDb:db(peak),floorDb:db(floor),bodyDb:db(body),clipped:clipped/(buffer.length*channels.length),lowRatio:power?1-hpPower/power:0,humHz};
+  return {duration:buffer.duration,envelope,peaks,waveform,rmsDb:db(rms),peakDb:db(peak),floorDb:db(floor),bodyDb:db(body),clipped:clipped/(buffer.length*channels.length),lowRatio:power?1-hpPower/power:0,humHz,bandFrames};
  }
  function profile(a){
   const quiet=a.rmsDb<-55,damaged=a.clipped>.005,stationary=a.bodyDb-a.floorDb<4;
   // Never lift near-silence or a steady noise bed. +6 dB is the maximum boost.
   const gainDb=quiet||damaged?Math.min(0,-3-a.peakDb):clamp(-23-a.rmsDb,-18,stationary?0:6);
   const compress=!quiet&&!damaged&&!stationary&&a.peakDb+gainDb>-4;
-  return {version:1,enabled:!quiet&&!damaged&&(Math.abs(Math.min(gainDb,-1-a.peakDb))>.2||a.lowRatio>.65||!!a.humHz||compress),gain_db:round(Math.min(gainDb,-1-a.peakDb)),highpass_hz:!quiet&&!damaged&&a.lowRatio>.65?35:0,hum_hz:!quiet&&!damaged?a.humHz:0,compress,fade_ms:80,status:quiet?'quiet':damaged?'clipped':'ready',waveform:a.waveform};
+  const valid=!quiet&&!damaged,frames=a.bandFrames||[],noise=[],reduction=[];
+  for(let b=0;b<12;b++){
+   const levels=frames.map(f=>f[b]).sort((x,y)=>x-y),floor=levels[Math.floor(levels.length*.2)]||0,body=levels[Math.floor(levels.length*.9)]||0,contrast=db(body)-db(floor);
+   noise.push(round(clamp(db(floor),-120,-6)));
+   // Low stationary components are the strongest candidate. Broad natural
+   // textures get at most 2 dB; silence and clipped sources are never cleaned.
+   reduction.push(valid&&floor>.00002?(b<5&&contrast<10?6:contrast>5?2:0):0);
+  }
+  const hasNoise=reduction.some(n=>n>0),hasEvents=a.bodyDb-a.floorDb>6;
+  const p={version:frames.length?2:1,enabled:valid&&(Math.abs(Math.min(gainDb,-1-a.peakDb))>.2||a.lowRatio>.65||!!a.humHz||compress||hasNoise),gain_db:round(Math.min(gainDb,-1-a.peakDb)),highpass_hz:valid&&a.lowRatio>.65?35:0,hum_hz:valid?a.humHz:0,compress,fade_ms:80,status:quiet?'quiet':damaged?'clipped':'ready',waveform:a.waveform};
+  // Do not boost a noise floor immediately after cleaning it.
+  if(p.version===2){Object.assign(p,{noise_db:noise,reduction_db:reduction,dereverb_db:valid&&hasEvents?1.5:0,cleanup:'gentle'});if(hasNoise){p.gain_db=Math.min(0,p.gain_db);p.compress=false;}}
+  return p;
  }
  async function motion(m,{signal,cancelled=()=>false}={}){
   if(m.kind!=='video')return [];const video=document.createElement('video');video.muted=true;video.playsInline=true;video.crossOrigin='anonymous';video.preload='auto';
@@ -67,13 +87,14 @@
   }if(signal?.aborted||cancelled())throw abort();return plans;
  }
  // Exactly the same graph is used for live playback, offline verification and export.
- function graph(context,source,destination,m){
+ function graph(context,source,destination,m,onError=()=>{}){
   const input=context.createGain(),output=context.createGain(),dry=context.createGain(),wet=context.createGain(),gain=context.createGain(),high=context.createBiquadFilter(),hum=context.createBiquadFilter(),compress=context.createDynamicsCompressor();
   high.type='highpass';high.Q.value=.5;hum.type='notch';hum.Q.value=18;compress.threshold.value=-16;compress.knee.value=12;compress.attack.value=.006;compress.release.value=.18;
-  source.connect(input);input.connect(dry);dry.connect(output);input.connect(high);high.connect(hum);hum.connect(gain);gain.connect(compress);compress.connect(wet);wet.connect(output);output.connect(destination);
-  let initialized=false;
-  function update(original=false){const p=m.audio_treatment,enabled=p?.version===1&&p.enabled&&!original;if(!initialized){dry.gain.value=enabled?0:1;wet.gain.value=enabled?1:0;initialized=true;}else{dry.gain.setTargetAtTime(enabled?0:1,context.currentTime,.012);wet.gain.setTargetAtTime(enabled?1:0,context.currentTime,.012);}gain.gain.value=10**((p?.gain_db||0)/20);high.frequency.value=p?.highpass_hz||1;hum.frequency.value=p?.hum_hz||20000;hum.Q.value=p?.hum_hz?18:1000;compress.ratio.value=p?.compress?2:1;}
-  update();return {update,volume(value){output.gain.setTargetAtTime(value,context.currentTime,.008)},disconnect(){[source,input,output,dry,wet,gain,high,hum,compress].forEach(n=>n.disconnect())}};
+  source.connect(input);input.connect(dry);dry.connect(output);input.connect(high);high.connect(hum);const p=m.audio_treatment;let cleaner=null;if(p?.version===2){if(!prepared.has(context))throw Error('audio_cleanup_not_prepared');cleaner=new AudioWorkletNode(context,'villegram-feelings-v2',{numberOfInputs:1,numberOfOutputs:1,outputChannelCount:[2],processorOptions:{profile:p}});hum.connect(cleaner);cleaner.connect(gain);}else hum.connect(gain);if(p?.version===2&&!p.compress)gain.connect(wet);else{gain.connect(compress);compress.connect(wet);}wet.connect(output);output.connect(destination);
+  let initialized=false,failed=false;
+  if(cleaner)cleaner.onprocessorerror=()=>{failed=true;update(true);onError('A limpeza de áudio falhou. Original preservado.')};
+  function update(original=false){const p=m.audio_treatment,enabled=[1,2].includes(p?.version)&&p.enabled&&!original&&!failed;if(!initialized){dry.gain.value=enabled?0:1;wet.gain.value=enabled?1:0;initialized=true;}else{dry.gain.setTargetAtTime(enabled?0:1,context.currentTime,.012);wet.gain.setTargetAtTime(enabled?1:0,context.currentTime,.012);}gain.gain.value=10**((p?.gain_db||0)/20);high.frequency.value=p?.highpass_hz||1;hum.frequency.value=p?.hum_hz||20000;hum.Q.value=p?.hum_hz?18:1000;compress.ratio.value=p?.compress?2:1;}
+  update();return {update,volume(value){output.gain.setTargetAtTime(value,context.currentTime,.008)},reset(){cleaner?.port.postMessage({reset:true})},disconnect(){cleaner?.port.close();[source,input,output,dry,wet,gain,high,hum,compress,cleaner].filter(Boolean).forEach(n=>n.disconnect())}};
  }
- window.VillegramFeelings={load,assetURL,search,analyze,measure,profile,suggestTrim,compose,graph,get catalog(){return catalog}};
+ window.VillegramFeelings={load,assetURL,search,analyze,measure,profile,suggestTrim,compose,prepare,graph,get catalog(){return catalog}};
 })();

@@ -15,7 +15,7 @@ test('eight-media visual timeline: trim, reorder, undo redo, original treatment,
  await d.locator('[data-tl-transition="1"]').click();await d.locator('[data-tl-transition-value=cut]').click();await d.locator('[data-tl-scene="1"]').click();await d.locator('[data-tl-move="1"]').click();
  await d.locator('[data-tl-undo]').click();await d.locator('[data-tl-redo]').click();
  await d.screenshot({path:'/tmp/feelings2-'+info.project.name+'.png'});await d.locator('[data-tl-close]').click();await page.locator('#vg-step-next').click();await expect(page.locator('#vg-timeline-open')).toBeVisible();await page.locator('#vg-step-next').click();await expect(page.locator('#vg-timeline-open')).toBeVisible();await page.locator('[name=draft]').click();await expect.poll(()=>saved.length).toBe(1);
- const media=saved[0].publication.media;expect(media).toHaveLength(8);expect(media[2].kind).toBe('video');expect(media[2].trim_start).toBeGreaterThan(.7);expect(media[2].audio_treatment.version).toBe(1);expect(media[2].transition).toBe('cut');expect(media[2].sound).toBeUndefined();
+ const media=saved[0].publication.media;expect(media).toHaveLength(8);expect(media[2].kind).toBe('video');expect(media[2].trim_start).toBeGreaterThan(.7);expect(media[2].audio_treatment.version).toBe(2);expect(media[2].transition).toBe('cut');expect(media[2].sound).toBeUndefined();
  await page.locator('#vg-timeline-open').click();await d.locator('[data-tl-original="2"]').click();await expect(d.locator('[data-tl-treatment=true]')).toHaveAttribute('aria-pressed','true');expect(errors).toEqual([]);
 });
 test('audio option waveform, positioning, transitions, feed and playable MP4 export',async({page},info)=>{

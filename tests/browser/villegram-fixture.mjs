@@ -12,7 +12,7 @@ export async function fixture(page,{mixed=false,eight=false}={}){
  if(mixed)post.media.splice(1,0,{kind:'video',url:'/qa-video.mp4',path:id+'/'+id+'.mp4',poster:photos[1],poster_path:id+'/'+id+'.webp',duration:8,bytes:10000,fit:'cover'});
  if(eight)post.media.push({kind:'photo',url:photos[0],fit:'cover'});
  const bootstrap=`window.CHALEZINHO_CONFIG={supabaseUrl:location.origin,supabaseKey:'local-fixture'};window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'local-fixture',user:{id:'${id}'}}}})}})};`;
- await page.route('**/*',async route=>{
+ await page.context().route('**/*',async route=>{
   const u=new URL(route.request().url());if(u.origin!=='http://127.0.0.1:4173')return route.abort();
   if(u.pathname==='/qa-bootstrap.js')return route.fulfill({contentType:'text/javascript',body:bootstrap});
   if(u.pathname.startsWith('/storage/v1/upload/')){const req=route.request(),method=req.method();if(method==='POST'){const key=String(++uploadId);uploads.set(key,0);return route.fulfill({status:201,headers:{Location:'http://127.0.0.1:4173/storage/v1/upload/'+key}});}const key=u.pathname.split('/').pop();if(method==='HEAD')return route.fulfill({status:200,headers:{'Upload-Offset':String(uploads.get(key)||0)}});if(method==='PATCH'){uploads.set(key,(uploads.get(key)||0)+(req.postDataBuffer()?.length||0));return route.fulfill({status:204,headers:{'Upload-Offset':String(uploads.get(key))}});}}
@@ -25,7 +25,7 @@ export async function fixture(page,{mixed=false,eight=false}={}){
   }
   if(u.pathname==='/qa-video.mp4')return mediaResponse(route,await readFile('/tmp/ville-feelings-fixture.mp4'),'video/mp4');
   if(!/^\/(villegram[\w-]*\.(?:js|css|html)|styles\.css|stay-offers\.css|ui-controls\.css|assets\/[\w./-]+\.(?:webp|jpg|png|json|mp3|bin|js))$/.test(u.pathname))return route.abort();
-  try{let body=await readFile(new URL('./'+u.pathname.slice(1),root));if(u.pathname==='/villegram-admin.html'){const scripts=['villegram-media.js','villegram-upload.js','villegram-text.js','villegram-feelings.js','villegram-timeline.js','villegram-effects.js','villegram.js','villegram-content.js','villegram-timeline-editor.js','villegram-admin.js'];body=Buffer.from(body.toString().replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace('</head>','<script src="qa-bootstrap.js"></script>'+scripts.map(name=>'<script src="'+name+'" defer></script>').join('')+'</head>'));}
+  try{let body=await readFile(new URL('./'+u.pathname.slice(1),root));if(u.pathname==='/villegram-admin.html'){const scripts=['villegram-media.js','villegram-upload.js','villegram-text.js','villegram-audio-dsp.js','villegram-feelings.js','villegram-timeline.js','villegram-effects.js','villegram.js','villegram-content.js','villegram-timeline-editor.js','villegram-admin.js'];body=Buffer.from(body.toString().replace(/<script\b[^>]*>[\s\S]*?<\/script>/g,'').replace('</head>','<script src="qa-bootstrap.js"></script>'+scripts.map(name=>'<script src="'+name+'" defer></script>').join('')+'</head>'));}
    const ext=u.pathname.split('.').pop(),contentType=({css:'text/css',js:'text/javascript',html:'text/html',json:'application/json',mp3:'audio/mpeg',bin:'application/octet-stream'})[ext]||'image/webp';return ['mp3'].includes(ext)?mediaResponse(route,body,contentType):route.fulfill({body,contentType});
   }catch{return route.abort();}
  });
