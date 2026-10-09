@@ -1,0 +1,29 @@
+# Ville Moments — desenvolvimento
+
+Base: `feature/romantic-stay-offers` em `85d6cbcd96dc935b9bb34d09553b773ee4fac4d4`.
+Branch de entrega: `feature/ville-moments`. Nenhuma publicação em produção.
+
+## Alterações
+
+- Marca Chalezinho Ville e localização no feed, inclusive em entradas compartilhadas.
+- Apresentação curta integrada e acesso à coleção de chalés.
+- Conteúdo de imóvel usa nome e resumo/tagline do cadastro; ofertas mostram datas com ano, noites, hóspedes, preço, inclusões e condições.
+- Publicação de hóspede preserva autoria e legenda; seu vínculo com imóvel é discreto e não vira uma chamada comercial principal.
+- Os links de ofertas conservam chalé, hóspedes, oferta e datas; levam um total de referência para avisar mudanças na nova consulta. A tarifa continua exigindo escolha expressa.
+- Nome público Ville Moments e formato Trips. Rotas, nomes de arquivos, eventos, tabelas, permissões e APIs legadas foram mantidos por compatibilidade. Nenhuma migração de dados é necessária.
+- Assets alterados receberam uma nova versão de cache.
+
+## Evidência de validação
+
+- `npm run check`: passou.
+- `npm run typecheck`: passou.
+- `npm test`: 403 testes passaram, nenhum falhou.
+- Testes DOM cobrem navegação, entrada compartilhada, links antigos de oferta, datas/experiências, estado de reserva/login, editor, comunidade/moderação, notificações e interações. Novos testes verificam marca/localização, total de referência e ação discreta de hóspede.
+- Build verificou o projeto Supabase de desenvolvimento e a proibição de produção.
+- Prévia Vercel criada como Preview, sem target de produção.
+
+## Limitações reais
+
+A inspeção visual no navegador e jornadas autenticadas contra o backend não foram concluídas. O navegador local foi bloqueado pela restrição de sockets do ambiente. A prévia na nuvem exige autenticação da Vercel; a revisão automática rejeitou a criação de um link temporário sem autenticação. Testes DOM e de contratos não substituem testes visuais mobile/desktop nem uma reserva real no sandbox.
+
+Pendente validar visualmente legibilidade, áreas seguras e sobreposições e concluir na prévia as jornadas autenticadas de reserva/pagamento, criação/edição/aprovação, notificações e interações.

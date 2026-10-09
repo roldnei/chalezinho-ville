@@ -41,7 +41,7 @@ test('mobile teaching gesture expires without advancing, appears once, and disap
  const second=await setup({mobile:true});second.w.document.querySelector('[data-action=caption]').click();assert.equal(second.w.document.querySelector('.vg-swipe-hint'),null);assert.equal(second.w.document.querySelector('.vg-swipe-demo'),null);assert.equal(second.w.document.querySelector('.vg-sheet').hidden,false);second.d.window.close();
 });
 test('desktop navigation is labelled and enlarged; reduced motion receives a static mobile hint',async()=>{
- const {d,w}=await setup();assert.equal(w.document.querySelector('.vg-swipe-hint'),null);const next=w.document.querySelector('[data-action=next]');assert.equal(next.getAttribute('aria-label'),'Próximo trip');assert.equal(next.querySelector('.vg-step-label').textContent,'Próximo trip');assert.equal(w.getComputedStyle(next).minHeight,'56px');assert.equal(w.getComputedStyle(next).minWidth,'156px');d.window.close();
+ const {d,w}=await setup();assert.equal(w.document.querySelector('.vg-swipe-hint'),null);const next=w.document.querySelector('[data-action=next]');assert.equal(next.getAttribute('aria-label'),'Próximo Trip');assert.equal(next.querySelector('.vg-step-label').textContent,'Próximo Trip');assert.equal(w.getComputedStyle(next).minHeight,'56px');assert.equal(w.getComputedStyle(next).minWidth,'156px');d.window.close();
  const reduced=await setup({mobile:true,reduced:true});assert.ok(reduced.w.document.querySelector('.vg-swipe-hint'));assert.equal(reduced.w.document.querySelector('.vg-swipe-demo'),null);reduced.d.window.close();
 });
 

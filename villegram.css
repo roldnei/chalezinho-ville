@@ -143,3 +143,4 @@
 @media(min-width:701px){#villegram .vg-welcome{top:120px;left:32px}#villegram .vg-pause{right:32px}}
 @media(max-width:700px){#villegram .vg-welcome{top:calc(120px + env(safe-area-inset-top));left:16px;right:72px;padding:8px 12px}#villegram header [data-action=site]{display:none}#villegram header .vg-brand strong{font-size:16px}#villegram header button{padding:8px}#villegram .vg-pause{right:16px;top:calc(126px + env(safe-area-inset-top))}}
 @media(max-height:650px){#villegram .vg-welcome p{display:none}#villegram .vg-welcome{padding-top:6px;padding-bottom:0}#villegram.vg-home .vg-purchase,#villegram .vg-purchase{max-height:calc(100dvh - 340px)}}
+#villegram .vg-swipe-hint{top:calc(230px + env(safe-area-inset-top));padding:6px 10px;font-size:12px}
