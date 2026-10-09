@@ -57,3 +57,36 @@ test('automatic catalog photos with cache versions survive generation and previe
  for(const source of ['assets/photo.webp?v=2&size=large','assets/photo.jpg?v=2026-10-07','assets/sub/photo.png?version=abc%20def'])assert.equal(publicationInput({...post,media:[{kind:'photo',url:source}]},url).media[0].url,source);
  for(const source of ['assets/../private/photo.webp?v=2','assets/./photo.webp?v=2','assets/photo.svg?v=2','https://outside.example/photo.webp?v=2','//outside.example/photo.webp?v=2','assets/photo.webp?v=2#x','javascript:alert(1)?v=2'])assert.throws(()=>publicationInput({...post,media:[{kind:'photo',url:source}]},url),/invalid_media/);
 });
+
+test('Story sharing prepares original video, copies chalet and mention, and shares files on a separate click',async()=>{
+ const d=await dom('<main></main>'),w=d.window,shared=[],copied=[];let revoked=0;
+ w.URL.createObjectURL=()=> 'blob:story';w.URL.revokeObjectURL=()=>revoked++;
+ Object.defineProperty(w.navigator,'clipboard',{value:{writeText:async value=>copied.push(value)}});
+ w.navigator.share=async data=>shared.push(data);w.navigator.canShare=({files})=>files[0].type==='video/mp4';
+ w.fetch=async()=>({ok:true,blob:async()=>new w.Blob(['video'],{type:'video/mp4'})});
+ w.VillegramContent={request:async()=>({likes:0,comments:[]}),rank:a=>a,leave(){}};
+ w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));
+ const c={publication:{...post,media:[{kind:'video',url:'https://dev.supabase.co/video.mp4'}]},publication_id:id,property_url:'chale-premium.html',property_name:'Ville',offer_name:'Ville'};
+ w.Villegram.configurePublications([c],[],[]);w.Villegram.openHome(c);w.document.querySelector('[data-action=share]').click();
+ w.document.querySelector('[data-copy-property]').click();w.document.querySelector('[data-copy-handle]').click();
+ await w.document.querySelector('[data-prepare]').onclick();
+ assert.equal(shared.length,0,'download must not consume the sharing click activation');
+ assert.deepEqual(copied,[new URL('chale-premium.html',w.location.href).href,'@chalezinhoville']);
+ assert.equal(w.document.querySelector('[data-save]').download,'chalezinho-ville-story.mp4');
+ await w.document.querySelector('[data-story-file] button').onclick();assert.equal(shared[0].files[0].type,'video/mp4');assert.equal(shared[0].url,undefined);
+ w.Villegram.close();assert.equal(revoked,1);d.window.close();
+});
+
+test('Story sharing falls back to saving photos without file-share support and retains links on media failure',async()=>{
+ const d=await dom('<main></main>'),w=d.window;
+ w.URL.createObjectURL=()=> 'blob:photo';w.URL.revokeObjectURL=()=>{};
+ w.fetch=async()=>({ok:true,blob:async()=>new w.Blob(['photo'],{type:'image/jpeg'})});
+ w.VillegramContent={request:async()=>({likes:0,comments:[]}),rank:a=>a,leave(){}};
+ w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));
+ const c={publication:post,publication_id:id,property_url:'chale-premium.html',property_name:'Ville',offer_name:'Ville'};
+ w.Villegram.configurePublications([c],[],[]);w.Villegram.openHome(c);w.document.querySelector('[data-action=share]').click();await w.document.querySelector('[data-prepare]').onclick();
+ assert.ok(w.document.querySelector('[data-save]'));assert.equal(w.document.querySelector('[data-story-file] button'),null);
+ w.document.querySelector('[data-action=share]').click();w.fetch=async()=>{throw Error('network')};await w.document.querySelector('[data-prepare]').onclick();
+ assert.match(w.document.querySelector('[data-story-status]').textContent,/Não foi possível/);assert.equal(w.document.querySelector('[data-prepare]').disabled,false);assert.ok(w.document.querySelector('[data-copy-property]'));
+ w.Villegram.close();d.window.close();
+});

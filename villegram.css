@@ -138,3 +138,5 @@
 
 #villegram .vg-pause{top:calc(96px + env(safe-area-inset-top))}
 @media(max-width:700px){#villegram header [data-action=site]{display:none}#villegram header .vg-brand strong{font-size:16px}#villegram header button{padding:8px}#villegram .vg-pause{right:16px}}
+
+#villegram .vg-story-share{margin:14px 0;padding:12px;border:1px solid #ffffff30;border-radius:12px}#villegram .vg-story-share summary{font-size:16px;min-height:44px}#villegram .vg-story-share button{display:block;width:100%;min-height:48px;margin:10px 0;padding:12px;font:inherit;white-space:normal}#villegram .vg-story-share input{box-sizing:border-box;min-width:0}#villegram .vg-story-share [data-story-status]{font-size:14px;color:#e4d4b1}
