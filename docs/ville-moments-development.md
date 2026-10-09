@@ -55,5 +55,14 @@ Controles de estilo abaixo da foto removidos. Segurar 500 ms sem mover abre role
 
 39 testes afetados passaram. Sintaxe e build DEV aprovados. Validação visual e toque real ainda pendentes por bloqueio de acesso à prévia.
 
-### Centro fixo e acesso às seis fotos
-Roleta passa a abrir apenas categorias Filtro/Modo no anel próximo ao centro. Escolher categoria move ambas para fora e mostra variedades no anel interno completo; centro retorna às categorias ou fecha na raiz. Filtros usam amostras de cor com nomes e modos usam ícones consistentes, seleção destacada. Faixa de mídia permite deslize horizontal imediato, setas e preservação da foto selecionada visível após reconstruir/reordenar; segurar continua arraste com rolagem nas bordas. 41 testes afetados passaram, incluindo seis fotos, rolagem, mudança de ordem e capa preservada. Aparência em aparelho real ainda não validada.
+### Menu de edição e acesso às seis fotos
+
+A faixa de mídia mantém deslize horizontal imediato, rolagem visível e a foto selecionada acessível após reconstruir/reordenar. As setas adicionais abaixo das miniaturas foram removidas. Segurar continua arraste com rolagem nas bordas; Alt + setas permanece disponível no teclado.
+
+O menu reúne categorias e escolhas em uma superfície circular discreta. Filtro/Modo (Filtro/Velocidade em vídeo) têm nomes visíveis e uma família única de ícones. Categorias se deslocam para fora ao abrir a seleção; opções ocupam o anel interno, com contornos e seleção destacados. Filtros mostram a própria mídia em miniaturas circulares, com o filtro aplicado. O centro permanece fixo: fecha na raiz e conclui a edição na seleção. Efeitos são aplicados imediatamente e não alteram textos ou enquadramento. Regras antigas de largura de modelos foram retiradas; todos os alvos têm dimensões explícitas e pelo menos 44 px. A foto e as seis miniaturas continuam presentes durante a edição.
+
+Referências de pesquisa: [interface móvel do Lightroom](https://blog.adobe.com/en/publish/2023/07/26/adobe-photoshop-lightroom-has-new-mobile-interface-make-editing-even-easier-on-go), [ferramentas e prévias do VSCO](https://support.vsco.co/en/articles/12698570-vsco-tools-quick-start). Foram usados princípios de agrupamento, hierarquia e prévias visuais; a composição circular foi desenvolvida para o editor existente.
+
+Validação desta revisão: 41 testes DOM/contratos afetados, checagem de sintaxe e build DEV. Quatro cenários Playwright passaram no Chromium: jornadas de edição em 390×844, 1366×768 e 1920×1080; teste adicional em 320×740 com eventos reais de toque do Chromium. Conferidos alvos circulares, ausência de sobreposição entre ícones/nomes, limites da foto, filtros aplicados, modos, conclusão, seis fotos, reordenação e seleção/capa preservadas ao salvar. Capturas de tela do editor real foram inspecionadas. Backend e sessão desses cenários são fixtures locais, sem acesso à produção. A checagem em 320 px encontrou aproximação entre categoria e opção, corrigida e retestada.
+
+A integração autenticada na prévia Vercel e o comportamento em Android/iOS físicos continuam pendentes. A validação local no navegador desta revisão substitui a limitação anterior de renderização local apenas para o editor afetado; não comprova reserva/pagamento nem exportação nativa Instagram.
