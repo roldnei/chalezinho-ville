@@ -32,7 +32,7 @@
   // Never lift near-silence or a steady noise bed. +6 dB is the maximum boost.
   const gainDb=quiet||damaged?Math.min(0,-3-a.peakDb):clamp(-23-a.rmsDb,-18,stationary?0:6);
   const compress=!quiet&&!damaged&&!stationary&&a.peakDb+gainDb>-4;
-  return {version:1,enabled:!quiet&&!damaged,gain_db:round(Math.min(gainDb,-1-a.peakDb)),highpass_hz:!quiet&&!damaged&&a.lowRatio>.65?35:0,hum_hz:!quiet&&!damaged?a.humHz:0,compress,fade_ms:80,status:quiet?'quiet':damaged?'clipped':'ready',waveform:a.waveform};
+  return {version:1,enabled:!quiet&&!damaged&&(Math.abs(Math.min(gainDb,-1-a.peakDb))>.2||a.lowRatio>.65||!!a.humHz||compress),gain_db:round(Math.min(gainDb,-1-a.peakDb)),highpass_hz:!quiet&&!damaged&&a.lowRatio>.65?35:0,hum_hz:!quiet&&!damaged?a.humHz:0,compress,fade_ms:80,status:quiet?'quiet':damaged?'clipped':'ready',waveform:a.waveform};
  }
  async function motion(m,{signal,cancelled=()=>false}={}){
   if(m.kind!=='video')return [];const video=document.createElement('video');video.muted=true;video.playsInline=true;video.crossOrigin='anonymous';video.preload='auto';
