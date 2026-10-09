@@ -35,3 +35,10 @@ Validação: 49 testes de publicações, navegação e compartilhamento passaram
 
 ### Painel de compartilhamento por ícones
 A entrada de Compartilhar foi reduzida a WhatsApp, Instagram, Stories e Copiar link, sem URLs visíveis. Instagram/Stories abrem uma etapa compacta com preparação automática, envio/salvar e cópia de Link/Menção. O usuário volta às opções sem perder o arquivo preparado. 50 testes de compartilhamento, navegação e publicações passaram; sintaxe e build DEV aprovados. Validação real no Instagram permanece pendente.
+
+### Editor de estilo e exportação editada
+Implementados filtros Original/Aconchego/Suave/Dourado/P&B, vídeo Normal/0,75×/0,5× e modelos Fim de semana/Café a dois/Comemorar. Os modelos acrescentam texto editável e não apagam textos existentes; limite de cinco camadas preservado. Campos opcionais filter/speed são validados no backend e persistidos na mídia JSONB, sem migração. Publicações antigas continuam com Original/Normal. Edge villegram-content versão 16 implantada apenas no Supabase DEV.
+
+A exportação anterior de arquivo original foi substituída por composição vertical 720×1280: enquadramento, filtro, texto do hóspede e assinatura @chalezinhoville em canto livre. Textos de publicações comerciais, preços e controles da interface não entram no arquivo. Exportação de vídeo grava áudio e velocidade em MP4 quando o navegador oferece o codec; informa erro e mantém links quando não oferece. Não há transcrição. A gravação ocorre em tempo real e pode levar a duração final do vídeo; a aba deve permanecer aberta. Não há serviço externo de edição nem envio da mídia a terceiros para processamento.
+
+412 testes passaram, além de syntax/typecheck/build DEV. Os testes de exportação usam canvas/MediaRecorder simulados para conferir texto, formato, velocidade, áudio e limpeza; não comprovam codec real ou resultado visual no Android/iOS. Validação real do editor mobile/desktop e exportação Instagram permanece pendente por proteção Vercel e limitações do navegador local.

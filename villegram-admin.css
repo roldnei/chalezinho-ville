@@ -90,3 +90,5 @@ body.vg-admin-page #vg-upload-retry{pointer-events:auto;margin:0;font-size:12px;
 #vg-composer-screen.is-uploading #vg-composer-empty{visibility:hidden}
 @keyframes vg-upload-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#vg-upload-spinner svg{animation:none}}
+
+.vg-effects{margin:12px 0}.vg-effects [hidden]{display:none!important}.vg-effects button{font:500 14px/1.3 "DM Sans",sans-serif;min-height:44px;border:1px solid #ffffff26;border-radius:20px;background:#222;color:#eee;padding:10px 14px;cursor:pointer}.vg-effects-panel{background:#19191c;border:1px solid #ffffff20;border-radius:18px;padding:12px;margin-top:8px}.vg-effects [role=tablist],.vg-effects [data-effects-options]{display:flex;gap:8px;overflow:auto;padding:4px 0 10px}.vg-effects button[aria-selected=true],.vg-effects button[aria-pressed=true]{background:#e8d7b6;color:#191919}.vg-effects [data-effects-feedback]{font-size:13px;line-height:1.4}.vg-effects [data-effects-feedback]:empty{display:none}
