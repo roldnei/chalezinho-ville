@@ -7,28 +7,30 @@
  function controls(host,getMedia,changed,locked=()=>false,getCollection=()=>[getMedia()]){
   const svg=p=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+p+'</svg>';
   const glyphs={
-   filter:'<circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/>',
-   effect:'<rect x="5" y="3" width="14" height="18" rx="4"/><path d="m10 8 5 4-5 4Z"/>',
+   filter:'<path d="M5 3v3m0 5v10M12 3v10m0 5v3M19 3v5m0 5v8"/><circle class="vg-glyph-color" cx="5" cy="8.5" r="2.5"/><circle cx="12" cy="15.5" r="2.5"/><circle cx="19" cy="10.5" r="2.5"/>',
+   effect:'<rect x="3" y="6" width="12" height="15" rx="3" opacity=".35"/><g class="vg-glyph-frame"><rect x="8" y="3" width="13" height="16" rx="3"/><path d="m12 8 5 3-5 3Z"/></g>',
    speed:'<path d="M4 17a9 9 0 1 1 16 0M12 12l5-5M6 17h12"/>',
    original:'<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M9 15l3-4 3 4"/>',
    breathe:'<path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5M8 8l-5-5m13 5 5-5M8 16l-5 5m13-5 5 5"/>',
    pulse:'<rect x="8" y="4" width="12" height="16" rx="3"/><path d="M4 7h1M2 12h3m-1 5h1m8-9 4 4-4 4"/>',
    cinema:'<rect x="6" y="3" width="12" height="18" rx="3"/><path d="M6 7h12M6 17h12m-4-7 3 2-3 2"/>'
   };
-  host.innerHTML='<button type="button" class="vg-wheel-launch" data-effects-toggle aria-label="Abrir filtros e modos" aria-expanded="false">'+svg('<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>')+'</button><div class="vg-wheel" hidden aria-label="Editar visual"><div class="vg-wheel-surface" aria-hidden="true"></div><div class="vg-wheel-track" aria-hidden="true"></div><div class="vg-wheel-outer" role="group" aria-label="Categorias de edição"></div><div class="vg-wheel-inner" role="group" aria-label="Opções"></div><button type="button" class="vg-wheel-close" aria-label="Fechar edição">'+svg('<path d="m6 6 12 12M18 6 6 18"/>')+'</button><span class="vg-wheel-center-name" aria-hidden="true">Fechar</span><span class="vg-wheel-feedback vg-visually-hidden" role="status" aria-live="polite"></span></div>';
+  host.innerHTML='<button type="button" class="vg-wheel-launch" data-effects-toggle aria-label="Abrir filtros e modos" aria-expanded="false">'+svg('<path d="m12 3 2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5Z"/>')+'</button><div class="vg-wheel" hidden aria-label="Editar visual"><svg class="vg-wheel-surface" aria-hidden="true"><defs><linearGradient id="vg-arc-glass" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151b24" stop-opacity=".2"/><stop offset="1" stop-color="#0b1018" stop-opacity=".42"/></linearGradient></defs><path class="vg-wheel-glass" fill="url(#vg-arc-glass)"/><path class="vg-wheel-rim"/></svg><div class="vg-wheel-outer" role="group" aria-label="Categorias de edição"></div><div class="vg-wheel-inner" role="group" aria-label="Opções"></div><button type="button" class="vg-wheel-close" aria-label="Fechar edição">'+svg('<path d="m6 6 12 12M18 6 6 18"/>')+'</button><span class="vg-wheel-current" aria-hidden="true" hidden></span><span class="vg-wheel-feedback vg-visually-hidden" role="status" aria-live="polite"></span></div>';
   const wheel=host.querySelector('.vg-wheel'),launch=host.querySelector('[data-effects-toggle]'),outer=host.querySelector('.vg-wheel-outer'),inner=host.querySelector('.vg-wheel-inner'),center=host.querySelector('.vg-wheel-close');
-  let active=null,categoryKind,choicesKey;
-  function position(button,degrees,radius){const angle=degrees*Math.PI/180;button.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';button.style.top='calc(50% + '+Math.sin(angle)*radius+'px)';}
+  let active=null,categoryKind,choicesKey,hubY=160;
+  function position(button,degrees,radius){const angle=degrees*Math.PI/180;button.style.left='calc(50% + '+Math.cos(angle)*radius+'px)';button.style.top=(hubY+Math.sin(angle)*radius)+'px';button.dataset.angle=String(degrees);}
   function announce(text){host.querySelector('.vg-wheel-feedback').textContent=text;}
   function draw(){
    const m=getMedia();if(!m)return;
    const categories=m.kind==='video'?[['filter','Filtro'],['speed','Velocidade']]:[['filter','Filtro'],['effect','Modo']];
    if(active&&!categories.some(c=>c[0]===active))active=null;
    wheel.dataset.expanded=String(!!active);wheel.dataset.category=active||'';
-   const diameter=Math.min(292,Math.max(240,(host.parentElement?.clientWidth||308)-8)),outerRadius=diameter/2-24,innerRadius=diameter*.281;wheel.style.width=diameter+'px';wheel.style.height=diameter+'px';
-   center.setAttribute('aria-label',active?'Concluir edição':'Fechar edição');center.innerHTML=svg(active?'<path d="m5 12 4 4L19 6"/>':'<path d="m6 6 12 12M18 6 6 18"/>');host.querySelector('.vg-wheel-center-name').textContent=active?'Pronto':'Fechar';
+   const diameter=Math.min(312,Math.max(240,(host.parentElement?.clientWidth||324)-12)),radius=diameter/2,innerRadius=radius-22;hubY=radius+12;wheel.style.width=diameter+'px';wheel.style.height=(hubY+4)+'px';wheel.dataset.arc='150';
+   const surface=host.querySelector('.vg-wheel-surface'),sx=radius+Math.cos(-165*Math.PI/180)*radius,ey=hubY+Math.sin(-165*Math.PI/180)*radius,ex=diameter-sx,arc='M '+sx+' '+ey+' A '+radius+' '+radius+' 0 0 1 '+ex+' '+ey;
+   surface.setAttribute('viewBox','0 0 '+diameter+' '+(hubY+4));surface.querySelector('.vg-wheel-glass').setAttribute('d','M '+radius+' '+hubY+' L '+sx+' '+ey+' A '+radius+' '+radius+' 0 0 1 '+ex+' '+ey+' Z');surface.querySelector('.vg-wheel-rim').setAttribute('d',arc);wheel.style.setProperty('--vg-hub-y',hubY+'px');center.style.top=(hubY-26)+'px';
+   center.setAttribute('aria-label',active?'Concluir edição':'Fechar edição');center.innerHTML=svg(active?'<path d="m5 12 4 4L19 6"/>':'<path d="m6 6 12 12M18 6 6 18"/>');const currentName=host.querySelector('.vg-wheel-current');currentName.hidden=!active;currentName.style.top=(hubY-74)+'px';currentName.textContent=!active?'':active==='filter'?filters[m.filter||'original'].label:active==='effect'?modes[m.mode||'original'].label:(m.speed||1)===1?'Normal':String(m.speed).replace('.',',')+'×';
    if(categoryKind!==m.kind){categoryKind=m.kind;outer.replaceChildren();categories.forEach(([key,name])=>{const b=document.createElement('button');b.type='button';b.dataset.effectsTab=key;b.setAttribute('aria-label',name);b.innerHTML=svg(glyphs[key])+'<span class="vg-wheel-category-name">'+name+'</span>';b.onclick=()=>{if(locked())return;active=key;draw();announce(name)};outer.append(b)});}
-   categories.forEach(([key],i)=>{const b=outer.querySelector('[data-effects-tab="'+key+'"]');b.setAttribute('aria-pressed',String(active===key));b.disabled=locked();position(b,active?(i===0?-125:-55):(i===0?-135:-45),active?outerRadius:70);});
+   categories.forEach(([key],i)=>{const b=outer.querySelector('[data-effects-tab="'+key+'"]');b.setAttribute('aria-pressed',String(active===key));b.disabled=locked();b.style.left='calc(50% + '+(i===0?-46:46)+'px)';b.style.top=(hubY-(active?40:58))+'px';});
    const items=!active?[]:active==='filter'?Object.entries(filters).map(([key,v])=>[key,v.label,(m.filter||'original')===key]):active==='effect'?Object.entries(modes).map(([key,v])=>[key,v.label,(m.mode||'original')===key]):[.5,.75,1].map(v=>[String(v),v===1?'Normal':String(v).replace('.',',')+'×',(m.speed||1)===v]);
    const preview=m.kind==='video'?m.poster:m.url;
    const key=m.kind+'|'+active+'|'+preview;
@@ -36,12 +38,13 @@
     const b=document.createElement('button');b.type='button';b.dataset[active==='filter'?'filter':active==='effect'?'template':'speed']=value;b.setAttribute('aria-label',name);b.title=active==='effect'?modes[value].description:name;
     const visual=document.createElement('span');visual.className='vg-wheel-visual';
     if(active==='filter'&&preview){const img=document.createElement('img');img.alt='';img.src=preview;img.draggable=false;img.style.filter=filters[value].css;visual.append(img);}
+    else if(active==='effect'&&preview){const frame=document.createElement('span');frame.className='vg-mode-demo';frame.dataset.previewMode=value;const img=document.createElement('img');img.src=preview;img.alt='';img.draggable=false;frame.append(img);visual.append(frame);}
     else visual.innerHTML=active==='speed'?'<span class="vg-wheel-speed-value">'+name+'</span>':svg(glyphs[value]||glyphs.filter);
-    const caption=document.createElement('span');caption.className='vg-wheel-option-name';caption.textContent=name;b.append(visual,caption);
-    position(b,-90+360*i/items.length,innerRadius);
-    b.onclick=()=>{if(locked())return;const current=getMedia();if(!current)return;if(active==='filter')current.filter=value;else if(active==='speed')current.speed=Number(value);else getCollection().forEach(item=>applyTemplate(item,value));changed();draw();announce(name)};inner.append(b);
+    const caption=document.createElement('span');caption.className='vg-wheel-option-name vg-visually-hidden';caption.textContent=name;b.append(visual,caption);
+    position(b,-152+124*i/Math.max(1,items.length-1),innerRadius);
+    b.onclick=()=>{if(locked())return;const current=getMedia();if(!current)return;if(active==='filter')current.filter=value;else if(active==='speed')current.speed=Number(value);else getCollection().forEach(item=>applyTemplate(item,value));changed();draw();announce(name)};b.style.setProperty('--vg-choice-order',String(i));inner.append(b);
    });}
-   items.forEach(([value,,selected],i)=>{const b=inner.querySelector('[data-'+(active==='filter'?'filter':active==='effect'?'template':'speed')+'="'+value+'"]');position(b,-90+360*i/items.length,innerRadius);b.setAttribute('aria-pressed',String(selected));b.disabled=locked();});
+   items.forEach(([value,,selected],i)=>{const b=inner.querySelector('[data-'+(active==='filter'?'filter':active==='effect'?'template':'speed')+'="'+value+'"]');position(b,-152+124*i/Math.max(1,items.length-1),innerRadius);b.setAttribute('aria-pressed',String(selected));b.disabled=locked();});
   }
   function open(){if(locked()||!getMedia())return;active=null;wheel.hidden=false;launch.setAttribute('aria-expanded','true');draw();}
   function close(){wheel.hidden=true;launch.setAttribute('aria-expanded','false');}
