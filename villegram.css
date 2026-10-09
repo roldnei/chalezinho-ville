@@ -123,3 +123,23 @@
 #villegram .vg-comment{padding:12px 0;border-bottom:1px solid #ffffff26}
 #villegram .vg-comment strong{display:block;font-size:14px}
 #villegram .vg-comment time{display:block;font-size:11px;color:#d7cfc5;margin:4px 0}
+
+/* Brand and entry context stay readable above the immersive photograph. */
+#villegram header{background:linear-gradient(#000e,#0009 75%,transparent);align-items:flex-start;padding-bottom:16px}
+#villegram .vg-brand{margin-right:auto;min-width:0;display:flex;flex-direction:column;gap:3px}
+#villegram header .vg-brand strong{font:600 18px/1.2 'DM Sans',sans-serif;letter-spacing:0;margin:0}
+#villegram .vg-brand span{font:400 12px/1.3 'DM Sans',sans-serif}
+#villegram .vg-brand small{font:500 12px/1.3 'DM Sans',sans-serif;color:#eddbac}
+#villegram .vg-welcome{position:absolute;z-index:3;top:calc(100px + env(safe-area-inset-top));left:24px;right:24px;max-width:440px;padding:10px 14px;border-radius:12px;background:#000a;color:#fff;text-shadow:0 1px 4px #000;pointer-events:none}
+#villegram .vg-welcome strong{font:500 14px/1.3 'DM Sans',sans-serif}
+#villegram .vg-welcome p{font-size:12px;line-height:1.35;margin:5px 0}
+#villegram .vg-welcome a{display:inline-flex;align-items:center;font-size:14px;min-height:44px;pointer-events:auto;color:#eddbac}
+#villegram .vg-feed-switch{top:calc(80px + env(safe-area-inset-top))}
+#villegram .vg-pause{top:calc(110px + env(safe-area-inset-top))}
+#villegram .vg-property-summary{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#villegram .vg-guest-property{font-size:14px;text-decoration:underline}
+#villegram.vg-home .vg-purchase,#villegram .vg-purchase{max-height:calc(100dvh - 385px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+#villegram .vg-purchase p,#villegram .vg-purchase li{font-size:14px}
+@media(min-width:701px){#villegram .vg-welcome{top:120px;left:32px}#villegram .vg-pause{right:32px}}
+@media(max-width:700px){#villegram .vg-welcome{top:calc(120px + env(safe-area-inset-top));left:16px;right:72px;padding:8px 12px}#villegram header [data-action=site]{display:none}#villegram header .vg-brand strong{font-size:16px}#villegram header button{padding:8px}#villegram .vg-pause{right:16px;top:calc(126px + env(safe-area-inset-top))}}
+@media(max-height:650px){#villegram .vg-welcome p{display:none}#villegram .vg-welcome{padding-top:6px;padding-bottom:0}#villegram.vg-home .vg-purchase,#villegram .vg-purchase{max-height:calc(100dvh - 340px)}}

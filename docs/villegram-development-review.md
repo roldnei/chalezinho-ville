@@ -1,10 +1,10 @@
-# Villegram — desenvolvimento
+# Ville Moments — desenvolvimento
 
 Implementação no projeto existente, branch `feature/romantic-stay-offers`. Banco isolado `pxfqmnhqodqyaaqeyjgr`; nenhum deploy ou alteração de banco em produção. O preview verificado é https://chalezinho-ville-1id7oma5q-roldneicosta-4140.vercel.app/ (commit 187c2c8; alterações posteriores documentadas neste mesmo histórico).
 
 ## Implementado
 
-- Home: cada escapada tem ações distintas de assistir e reservar. Villegram abre o card escolhido; setas, teclado e gesto vertical mudam a oferta por ação do visitante. Fechar devolve foco sem deslocar a home.
+- Home: cada escapada tem ações distintas de assistir e reservar. Ville Moments abre o card escolhido; setas, teclado e gesto vertical mudam a oferta por ação do visitante. Fechar devolve foco sem deslocar a home.
 - Páginas dos três chalés e imóveis genéricos: mesma apresentação filtrada pelo cadastro do imóvel. Datas alternativas mantêm a oferta; hospedagem simples permanece acessível.
 - Componente em diálogo nativo, CSS próprio, compra ao lado das fotos no desktop e apresentação vertical no celular. Fotos inteiras, zoom/pan/afastamento suaves, pausa, preferência de movimento reduzido, leitura e visibilidade. Carregamento da cena atual/próxima e capa da próxima oferta.
 - Catálogo único: fotos por imóvel, ordem, giro/enquadramento com prévia, mensagem, movimento e áudio no cadastro de estadias completas. Prévia de edição sem preço inventado ou reserva de uma oferta ainda não publicada.
@@ -14,7 +14,7 @@ Implementação no projeto existente, branch `feature/romantic-stay-offers`. Ban
 - Compartilhamento nativo quando disponível, cópia e WhatsApp por ação do visitante. Link preserva identidade, imóvel e datas; metadados de título, descrição e imagem. Datas fora do feed são reconsultadas, sem persistir cotação; indisponibilidade/expiração oferece outras datas. Não houve envio de mensagens.
 - Sugestões no servidor, reutilizando calendário, PriceLabs, antecedência, estoque e capacidade do motor existente. Diversidade de imóvel/duração, prioridade a intervalos exatos entre reservas confirmadas e dias úteis. Categoria de comemoração separada. Cache curto; reserva sempre recalcula.
 - Feriados nacionais de 2026 reconhecidos; datas locais/outros anos configuráveis no PMS. Fonte: Portaria MGI 11.460/2025, calendário 2026, publicada no DOU em 30/12/2025, reprodução oficial https://www2.unifap.br/prosear/files/2026/01/Portaria_Gov_MGI_11460_de29_de_dezembro_de_2025_Feriados-Nacionais-de-2026.pdf . Pontos facultativos não são automaticamente classificados como feriados.
-- Desconto de comemoração somente com autorização explícita no PMS. A oferta DEV foi inicializada com comemorações habilitadas e desconto nessas datas desabilitado, preservando 5% nos dias úteis. Na reserva, o preço anterior da oferta agora usa o bruto da própria tarifa, alinhado ao reel, em vez de uma tarifa de referência diferente. Sem dados comerciais suficientes de procura, a apresentação informa que usa regras de calendário; preço barato ou data livre não é prova de baixa demanda.
+- Desconto de comemoração somente com autorização explícita no PMS. A oferta DEV foi inicializada com comemorações habilitadas e desconto nessas datas desabilitado, preservando 5% nos dias úteis. Na reserva, o preço anterior da oferta agora usa o bruto da própria tarifa, alinhado ao trip, em vez de uma tarifa de referência diferente. Sem dados comerciais suficientes de procura, a apresentação informa que usa regras de calendário; preço barato ou data livre não é prova de baixa demanda.
 
 ## Efetivamente verificado
 
@@ -22,7 +22,7 @@ Implementação no projeto existente, branch `feature/romantic-stay-offers`. Ban
 |---|---|
 | Testes automatizados | 259 testes aprovados; tipos TypeScript, sintaxe e build com bloqueio de produção. Incluem simulações JSDOM/serviços; não representam homologação de pagamento. |
 | Feed real do DEV | 18 cards, três imóveis, duas/três noites; 10 oportunidades de comemoração com desconto zero. |
-| Valor real | Essenza, 7–9/10/2026, duas noites: bruto 126120, desconto 6306, total 119814 centavos; igual no feed, na reconsulta do link compartilhado e na tarifa não reembolsável da reserva aberta pelo Villegram no navegador. |
+| Valor real | Essenza, 7–9/10/2026, duas noites: bruto 126120, desconto 6306, total 119814 centavos; igual no feed, na reconsulta do link compartilhado e na tarifa não reembolsável da reserva aberta pelo Ville Moments no navegador. |
 | Navegador desktop | Home e página Essenza abrem oferta, composição, preço, pausa/continuação, próximas ofertas, comentários públicos, compartilhamento e áudio por toque. |
 | Celular | Página real em viewport de 390 × 844 por iframe de teste; largura interna/rolagem 390; rodapé corrigido para 60 px; preço e CTA visíveis. Não é homologação em aparelhos físicos. |
 | EXIF/giro | Fixture JPEG 120 × 80 com EXIF 6 decodificada em 80 × 120; giro manual à direita produziu WebP 120 × 80, confirmado no navegador. Fixture de teste identificada. |

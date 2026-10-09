@@ -67,7 +67,8 @@ async function init(){
    const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);
    if(incoming.has("stay_offer")&&state.offerId!==incoming.get("stay_offer")){directCheckoutError();return}
    if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);
-    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout()}
+    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout();const reference=Number(incoming.get('expected_total'));if(reference>0&&reference!==rate.total_amount_cents)setFlowError('O preço desta oferta mudou de '+brlC(reference)+' para '+brlC(rate.total_amount_cents)+'. Revise o total e escolha sua tarifa antes de continuar.')}
+    else if(!incoming.get('rate'))await openFastCheckout();
     else directCheckoutError();
    }else directCheckoutError();
   }

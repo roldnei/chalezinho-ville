@@ -22,7 +22,7 @@ async function setup({mobile=false,reduced=false,media=null}={}){
  w.Villegram.openHome(current);return {d,w,timers,advance(ms){now+=ms;intervals.get(100)?.()}};
 }
 test('feed and conventional home use the same named icons and reset inherited navigation formatting',async()=>{
- const {d,w}=await setup();const expected=['Villegram','Chalés','Escolher datas','Minha conta'];
+ const {d,w}=await setup();const expected=['Ville Moments','Chalés','Escolher datas','Minha conta'];
  for(const selector of ['.vg-bottom-nav','.villegram-mobile-nav']){
   const items=[...w.document.querySelector(selector).children];assert.deepEqual(items.map(e=>e.textContent),expected);
   for(const e of items){assert.equal(e.querySelectorAll('svg').length,1);assert.equal(e.querySelector('svg').getAttribute('aria-hidden'),'true');const style=w.getComputedStyle(e);assert.equal(style.textTransform,'none');assert.equal(style.letterSpacing,'0');assert.equal(style.fontFamily,'"DM Sans", sans-serif')}
@@ -41,7 +41,7 @@ test('mobile teaching gesture expires without advancing, appears once, and disap
  const second=await setup({mobile:true});second.w.document.querySelector('[data-action=caption]').click();assert.equal(second.w.document.querySelector('.vg-swipe-hint'),null);assert.equal(second.w.document.querySelector('.vg-swipe-demo'),null);assert.equal(second.w.document.querySelector('.vg-sheet').hidden,false);second.d.window.close();
 });
 test('desktop navigation is labelled and enlarged; reduced motion receives a static mobile hint',async()=>{
- const {d,w}=await setup();assert.equal(w.document.querySelector('.vg-swipe-hint'),null);const next=w.document.querySelector('[data-action=next]');assert.equal(next.getAttribute('aria-label'),'Próximo reel');assert.equal(next.querySelector('.vg-step-label').textContent,'Próximo reel');assert.equal(w.getComputedStyle(next).minHeight,'56px');assert.equal(w.getComputedStyle(next).minWidth,'156px');d.window.close();
+ const {d,w}=await setup();assert.equal(w.document.querySelector('.vg-swipe-hint'),null);const next=w.document.querySelector('[data-action=next]');assert.equal(next.getAttribute('aria-label'),'Próximo trip');assert.equal(next.querySelector('.vg-step-label').textContent,'Próximo trip');assert.equal(w.getComputedStyle(next).minHeight,'56px');assert.equal(w.getComputedStyle(next).minWidth,'156px');d.window.close();
  const reduced=await setup({mobile:true,reduced:true});assert.ok(reduced.w.document.querySelector('.vg-swipe-hint'));assert.equal(reduced.w.document.querySelector('.vg-swipe-demo'),null);reduced.d.window.close();
 });
 
@@ -135,4 +135,19 @@ test('leaving a later reel updates this history entry and restores the same publ
 test('social totals use server count beyond page size and comments show escaped author and Brasilia timestamp',async()=>{
  const {d,w}=await setup();w.VillegramContent.request=async()=>({likes:12,comments_count:71,liked:false,comments:[{display_name:'Ana <teste>',body:'Olá <script>',created_at:'2026-10-08T21:40:00Z'}]});w.document.querySelector('[data-action=comments]').click();await new Promise(r=>setTimeout(r,0));
  assert.equal(w.document.querySelector('[data-action=like] .vg-social-count').textContent,'12');assert.equal(w.document.querySelector('[data-action=comments] .vg-social-count').textContent,'71');assert.equal(w.document.querySelector('.vg-comment strong').textContent,'Ana <teste>');assert.match(w.document.querySelector('.vg-comment time').textContent,/08\/10\/2026.*18:40.*Brasília/);assert.equal(w.document.querySelector('.vg-comment script'),null);assert.equal(w.document.querySelector('.vg-comment time').dateTime,'2026-10-08T21:40:00.000Z');d.window.close();
+});
+
+test('Moments identifies the property site on shared entries and preserves quoted offer context',async()=>{
+ const {d,w}=await setup();const root=w.document.querySelector('#villegram');
+ assert.match(root.querySelector('.vg-brand').textContent,/Chalezinho Ville.*Chalés românticos em Guarapari.*Ville Moments/);
+ assert.equal(root.querySelector('.vg-welcome a').getAttribute('href'),'index.html?view=site#colecao');
+ const q=new URL(root.querySelector('.vg-primary').href).searchParams;
+ assert.equal(q.get('expected_total'),'123456');assert.equal(q.get('guests'),'2');
+ assert.doesNotMatch(root.textContent,/ville\s*gram|\breels?\b/i);w.Villegram.close();d.window.close();
+});
+test('guest Trips retain their caption and only a discreet linked property action',async()=>{
+ const {d,w}=await setup();const guest={...card,publication_id:'guest',publication:{...publication,id:'guest',type:'property',source:'guest_submission',cta:'property',author_name:'Ana',caption:'Nossa viagem'},property_url:'chale-premium.html'};
+ w.Villegram.configurePublications([guest],[],[]);w.Villegram.openHome(guest);
+ assert.equal(w.document.querySelector('.vg-primary'),null);assert.equal(w.document.querySelector('.vg-guest-property').getAttribute('href'),'chale-premium.html');assert.match(w.document.querySelector('.vg-story').textContent,/Ana.*Nossa viagem/);
+ assert.equal(w.document.querySelectorAll('.vg-social button').length,3);w.Villegram.close();d.window.close();
 });

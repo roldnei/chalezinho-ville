@@ -1,4 +1,4 @@
-# Villegram — desenvolvimento e verificação de 06/10/2026
+# Ville Moments — desenvolvimento e verificação de 06/10/2026
 
 ## Escopo e preservação
 
@@ -8,13 +8,13 @@ Somente DEV (`pxfqmnhqodqyaaqeyjgr`) recebeu migrações e a função `villegram
 
 ## Implementado
 
-- Home móvel abre o Villegram; computador preserva a vitrine. Navegação fixa: Villegram, Chalés, Escolher datas e Minha conta, além de Site completo.
+- Home móvel abre o Ville Moments; computador preserva a vitrine. Navegação fixa: Ville Moments, Chalés, Escolher datas e Minha conta, além de Site completo.
 - Publicações próprias, separadas das ofertas: autor, origem, título/legenda, fotos ou vídeo, capa, enquadramento, vínculos, ação, ordem, destaque, status e datas. Curtidas/comentários usam a publicação, preservando as interações antigas das ofertas.
 - Editor em `villegram-admin.html`, acessível pelo painel existente: mídia privada, fotos do catálogo ou upload, prévia, rascunho, edição com proteção contra conflito, publicação e arquivamento. Equipe autorizada publica; hóspedes não recebem permissão pública. A origem `guest_submission` e o estado `pending_review` são estrutura para uma etapa futura.
 - Fotos normalizadas/comprimidas em WebP com orientação EXIF; vídeo MP4/WebM até 120 segundos e 50 MiB, capa separada e enquadramento inteiro por padrão. Upload TUS em blocos de 6 MiB com retomada e progresso. Falhas da capa preservam o vídeo já enviado. Não existe transcodificação/compressão automática de vídeo.
 - Motor automático compõe fotos reais de chalés, experiências, ofertas e conteúdo de orientação. Modelos, textos, movimento, frequência e publicação automática são configuráveis. Por padrão gera rascunhos. Chaves estáveis impedem duplicação, substituição de edições e republicação de conteúdo arquivado. O cron verifica a geração de hora em hora; a frequência configurada define quando novos itens de catálogo podem ser gerados. Não produz um novo post idêntico a cada execução.
 - Nove apresentações do catálogo DEV foram geradas, revisadas e publicadas para conferir o feed. Datas/preços das ofertas são ligados à vitrine atual; não ficam incorporados à mídia. Disponibilidade/preço são reconfirmados pelo fluxo existente de reserva. Nenhum desconto, avaliação, escassez ou previsão de procura foi criado por este motor.
-- Troca de reel depende do visitante. Leitura/detalhes pausam mídia e navegação, som começa desligado, há alternativas por botões/teclado, imagens horizontais podem ser vistas inteiras e posição/foto são restauradas ao retornar. O feed é finito e diversifica os próximos itens, preservando o item atual.
+- Troca de trip depende do visitante. Leitura/detalhes pausam mídia e navegação, som começa desligado, há alternativas por botões/teclado, imagens horizontais podem ser vistas inteiras e posição/foto são restauradas ao retornar. O feed é finito e diversifica os próximos itens, preservando o item atual.
 - Elegibilidade, preferência explícita de datas/motivo, cliques/curtidas, variedade e oportunidades de calendário orientam regras iniciais de ordenação. Tempo de tela não determina interesse. O aprendizado permanece neste navegador; não é um modelo preditivo nem personalização entre dispositivos.
 
 ## Sinais e atribuição
@@ -31,10 +31,10 @@ Prévia efetivamente usada no navegador: https://chalezinho-ville-dy6oa8kkv-rold
 
 | Jornada | Evidência obtida |
 | --- | --- |
-| Home desktop e entrada no feed | Navegador; vitrine existente preservada, Villegram aberto pelo menu |
+| Home desktop e entrada no feed | Navegador; vitrine existente preservada, Ville Moments aberto pelo menu |
 | Home móvel e navegação fixa | Navegador em iframe responsivo de 390 × 844; abertura automática e acesso aos controles, sem simular aparelho físico |
 | Som, pausa e compartilhamento | Navegador; alternância de som/pausa, painel de compartilhamento e cópia com mensagem de sucesso |
-| Legenda e avanço | Navegador; legenda aberta, tentativa de avançar permaneceu no mesmo reel; avanço após fechar mostrou outro tipo de publicação |
+| Legenda e avanço | Navegador; legenda aberta, tentativa de avançar permaneceu no mesmo trip; avanço após fechar mostrou outro tipo de publicação |
 | Comentários | Painel abriu no navegador; publicação de comentário não foi exercitada |
 | Datas, hóspedes e motivo | Navegador; preenchidos 16–19/11/2026, 2 hóspedes e Romântico; busca entrou direto no resultado, sem repetir formulário durante carregamento |
 | Login e painel da equipe | Login seguro abriu o editor e mostrou publicações, controles, automação e relatório. Interações posteriores foram bloqueadas pela proteção de credenciais do navegador |
@@ -60,13 +60,13 @@ Esta entrega representa implementação DEV com validação visual parcial; não
 
 ## Ajuste de navegação e orientação por gesto — 06/10/2026
 
-Após as capturas enviadas pelo proprietário, a navegação móvel do feed e do site convencional foi uniformizada. Os quatro destinos usam os mesmos rótulos e ícones SVG decorativos: reel, chalé, calendário e conta. O CSS dos links deixa de herdar maiúsculas e espaçamento do menu geral. Curtir, comentar e compartilhar também receberam ícones, mantendo os nomes acessíveis.
+Após as capturas enviadas pelo proprietário, a navegação móvel do feed e do site convencional foi uniformizada. Os quatro destinos usam os mesmos rótulos e ícones SVG decorativos: trip, chalé, calendário e conta. O CSS dos links deixa de herdar maiúsculas e espaçamento do menu geral. Curtir, comentar e compartilhar também receberam ícones, mantendo os nomes acessíveis.
 
 “Quero estes dias” usa um formato explícito e consistente de botão, com ícone de calendário, contraste, largura disponível inteira e alvo mínimo de 54 px. O vínculo preserva chalé, oferta e datas. A área reservada à barra inferior foi atualizada para comportar ícones e rótulos.
 
-No computador, os controles têm rótulos “Reel anterior” e “Próximo reel”, ícones maiores e alvo mínimo de 156 × 56 px. No celular, permanecem alternativas tocáveis de 48 × 48 px. Os nomes acessíveis correspondem aos rótulos visíveis.
+No computador, os controles têm rótulos “Trip anterior” e “Próximo trip”, ícones maiores e alvo mínimo de 156 × 56 px. No celular, permanecem alternativas tocáveis de 48 × 48 px. Os nomes acessíveis correspondem aos rótulos visíveis.
 
-A dica móvel “Arraste para cima” aparece uma vez por sessão, por aproximadamente quatro segundos. Um ícone de mão e um movimento discreto de 18 px ensinam o gesto no reel atual; a dica NÃO navega para outro item. Interação, legenda/painel, fechamento e aba oculta removem a dica. Preferência por movimento reduzido recebe orientação estática.
+A dica móvel “Arraste para cima” aparece uma vez por sessão, por aproximadamente quatro segundos. Um ícone de mão e um movimento discreto de 18 px ensinam o gesto no trip atual; a dica NÃO navega para outro item. Interação, legenda/painel, fechamento e aba oculta removem a dica. Preferência por movimento reduzido recebe orientação estática.
 
 Validação: 300 testes passaram (quatro novos), checagens JavaScript/TypeScript e build local DEV aprovados. Os testes novos verificam a cascata de estilos com o CSS real do site, os vínculos de reserva, nomes acessíveis, expiração da dica sem avanço, interrupção ao ler e movimento reduzido. Após alinhar os nomes acessíveis dos controles, os quatro testes específicos foram executados novamente.
 
@@ -77,16 +77,16 @@ A tentativa de abrir o navegador nesta continuação foi recusada pela mesma pro
 
 O CTA usa margens simétricas; a margem da coluna social afeta somente os textos. Curtir, comentar e compartilhar têm apenas ícones visíveis, mantendo nomes acessíveis e a quantidade de curtidas no nome do controle. A reserva usa cabeçalho no fluxo normal e etapas em três colunas, evitando a sobreposição com a marca.
 
-O contorno oval da pausa mostra o tempo restante do ciclo completo das fotos (6,5 s por foto) ou a duração real do vídeo. Pausas, leitura e aba oculta congelam o relógio; retomar preserva o tempo restante. O ciclo nunca muda o reel automaticamente. Quatro novos testes verificam o layout, os controles sociais, o relógio das fotos e o relógio do vídeo.
+O contorno oval da pausa mostra o tempo restante do ciclo completo das fotos (6,5 s por foto) ou a duração real do vídeo. Pausas, leitura e aba oculta congelam o relógio; retomar preserva o tempo restante. O ciclo nunca muda o trip automaticamente. Quatro novos testes verificam o layout, os controles sociais, o relógio das fotos e o relógio do vídeo.
 
 A abertura da prévia no navegador continua bloqueada: “Browser observation is unavailable because native credential state cannot be safely resumed. Start a new browser runtime to continue.” Portanto estes ajustes ainda não têm validação visual nem novas capturas de tela.
 
 
 ## Contador durante a consulta de ofertas — 6 de outubro de 2026
 
-O feed inicial contém seis publicações; três ofertas elegíveis podem chegar depois da consulta de preços. Antes, o total era atualizado internamente sem atualizar o contador do reel já aberto. O primeiro permanecia “1 de 6” e só ao avançar aparecia “2 de 9”.
+O feed inicial contém seis publicações; três ofertas elegíveis podem chegar depois da consulta de preços. Antes, o total era atualizado internamente sem atualizar o contador do trip já aberto. O primeiro permanecia “1 de 6” e só ao avançar aparecia “2 de 9”.
 
-Agora o total fica oculto enquanto a consulta está pendente (“Reel 1”). Ao receber as ofertas, contador e setas são atualizados no próprio reel, preservando mídia, relógio, pausa, rolagem e painéis abertos. O conteúdo atual e o histórico não mudam de ordem. Dois testes reproduzem a chegada tardia das ofertas com leitura aberta e a atualização dos limites das setas.
+Agora o total fica oculto enquanto a consulta está pendente (“Trip 1”). Ao receber as ofertas, contador e setas são atualizados no próprio trip, preservando mídia, relógio, pausa, rolagem e painéis abertos. O conteúdo atual e o histórico não mudam de ordem. Dois testes reproduzem a chegada tardia das ofertas com leitura aberta e a atualização dos limites das setas.
 
 O navegador continua recusando observação devido ao estado protegido de credenciais. Estes ajustes não têm novas capturas ou validação visual; os testes usam DOM e serviço simulado.
 
@@ -95,14 +95,14 @@ O navegador continua recusando observação devido ao estado protegido de creden
 
 O vídeo manual “Vinho no SPA aquecido?” foi enviado integralmente (39.856.960 bytes, 9,706521 s) e recebeu uma capa privada. A auditoria registrou três salvamentos publicados e dois salvamentos posteriores como rascunho. O último retirou a publicação do feed. Os vínculos permaneciam ativos.
 
-O editor mostra o estado atual e um link direto ao reel. Quando o registro já está publicado, oferece “Salvar alterações” e preserva esse estado inclusive ao enviar o formulário com Enter; salvar rascunho fica disponível para registros não publicados. Arquivar continua sendo uma ação explícita. A mensagem de sucesso usa o estado devolvido pelo servidor. Dois novos testes usam o clique dos botões reais e envio nativo do formulário no DOM, incluindo upload de vídeo, edição e arquivamento.
+O editor mostra o estado atual e um link direto ao trip. Quando o registro já está publicado, oferece “Salvar alterações” e preserva esse estado inclusive ao enviar o formulário com Enter; salvar rascunho fica disponível para registros não publicados. Arquivar continua sendo uma ação explícita. A mensagem de sucesso usa o estado devolvido pelo servidor. Dois novos testes usam o clique dos botões reais e envio nativo do formulário no DOM, incluindo upload de vídeo, edição e arquivamento.
 
 A publicação existente foi recolocada em published somente no DEV por pedido de recuperação do usuário, mantendo mídia, texto, vínculos, datas e identidade. A alteração foi auditada e protegida pela versão updated_at, validade dos vínculos, permissão do autor e existência dos dois arquivos no Storage. Não houve mudança de esquema ou de contratos. A reprodução visual do vídeo continua pendente enquanto o navegador estiver bloqueado.
 
 
 A inspeção posterior mostrou que a capa enviada estava completamente preta (2.248 bytes). O original foi baixado por URL assinada do feed DEV e decodificado localmente: HEVC 10 bits, HLG/BT.2020, áudio AAC e rotação vertical. Foi extraído um quadro do primeiro segundo, ajustado de HDR para SDR e inspecionado visualmente. A nova capa WebP tem 720×1280, 56.672 bytes e SHA-256 6170b7ac883fcff4e0bdb42a5d0d687311ab6ef42eea582b245903ddee7d1f1f.
 
-A capa foi gravada em um novo caminho no bucket privado, mantendo o original, e vinculada ao mesmo reel com proteção updated_at e auditoria. O reparo único foi executado pela implantação administrativa DEV da função; esse código provisório foi retirado em seguida. A função villegram-content está na versão 5, com o código normal anterior e as verificações de administrador preservadas. Não foi criado endpoint de reparo ou liberado o bucket.
+A capa foi gravada em um novo caminho no bucket privado, mantendo o original, e vinculada ao mesmo trip com proteção updated_at e auditoria. O reparo único foi executado pela implantação administrativa DEV da função; esse código provisório foi retirado em seguida. A função Ville Moments-content está na versão 5, com o código normal anterior e as verificações de administrador preservadas. Não foi criado endpoint de reparo ou liberado o bucket.
 
 A geração de capas do editor passa a aguardar o seek de um quadro após o início do vídeo, verificar dimensões e rejeitar canvas completamente preto com mensagem explícita. 309 testes passaram e o build DEV passou. A compatibilidade de reprodução do HEVC em todos os navegadores e a jornada visual de publicação continuam sem validação no navegador bloqueado; não foi implementada conversão automática de vídeos para H.264.
 
@@ -130,7 +130,7 @@ Para “Quero estes dias”, a equipe pode escolher chalé, entrada, saída, hó
 
 Somente datas, hóspedes e código da tarifa são persistidos em `stay_selection`; preços nunca são gravados na publicação nem no vídeo. A consulta pública `villegram_quote` é somente leitura, restrita ao projeto DEV, e não cria cotações, reservas ou pagamentos. Publicação e prévia consultam novamente a disponibilidade; o feed omite uma publicação com datas indisponíveis em vez de substituir suas datas. O botão preserva a escolha até a revisão existente, em que o hóspede confirma a tarifa. O modo anterior de ofertas sugeridas pelo calendário permanece disponível.
 
-A migração `20261007033341_villegram_stay_selection.sql` foi aplicada somente no DEV. As funções DEV booking-engine v55 e villegram-content v6 receberam a integração, preservando as dependências financeiras e as verificações de autorização existentes. Nenhuma implantação ou alteração de schema foi realizada no PROD.
+A migração `20261007033341_villegram_stay_selection.sql` foi aplicada somente no DEV. As funções DEV booking-engine v55 e Ville Moments-content v6 receberam a integração, preservando as dependências financeiras e as verificações de autorização existentes. Nenhuma implantação ou alteração de schema foi realizada no PROD.
 
 Validação anterior à publicação: 326 testes passaram, além das checagens JavaScript/TypeScript, build DEV e verificação de diff. A cobertura nova verifica transformação imediata, arraste/capa, geometria publicada, seleção explícita das duas tarifas, inclusão/remoção de pacote, descarte de respostas antigas e links de reserva com datas fixas. São testes automatizados de DOM e serviços; não equivalem a testes de tela.
 
@@ -158,7 +158,7 @@ Na ordenação, uma cópia ampliada da miniatura acompanha o dedo/mouse com somb
 
 Consulta somente leitura no DEV encontrou nove publicações automáticas, todas já publicadas, criadas em 06/10/2026; a configuração atual é `auto_publish=false` para novas gerações. O motor mantém uma publicação por tema e não duplica conteúdos existentes. Foram acrescentados filtro “Motor automático”, botão “Ver prévias do motor” e “Ver prévia” em cada cartão. Após gerar, a lista automática abre e informa novos rascunhos ou ausência de novos itens. Visualizar uma publicação dessa lista não substitui a edição ainda não salva.
 
-A função villegram-content DEV v7 recebeu somente a validação/persistência dos novos deslocamentos. Não há migração nem alteração de permissões. Após a implantação, o feed anônimo respondeu HTTP 200 com 11 publicações e `admin_list` sem autenticação respondeu HTTP 403. Nenhuma publicação foi criada/editada para esse teste. Os 334 testes passaram, além de JavaScript, TypeScript, build DEV e diff. Cinco casos adicionais cobrem deslocamento em 1×, persistência/limites, geometria no feed, geração com prévia sem perder edição e geração sem duplicatas. O teste da miniatura verifica a cópia que acompanha o ponteiro e sua remoção ao cancelar. Validação visual e capturas no navegador virtual continuam pendentes devido ao bloqueio de credenciais já registrado.
+A função Ville Moments-content DEV v7 recebeu somente a validação/persistência dos novos deslocamentos. Não há migração nem alteração de permissões. Após a implantação, o feed anônimo respondeu HTTP 200 com 11 publicações e `admin_list` sem autenticação respondeu HTTP 403. Nenhuma publicação foi criada/editada para esse teste. Os 334 testes passaram, além de JavaScript, TypeScript, build DEV e diff. Cinco casos adicionais cobrem deslocamento em 1×, persistência/limites, geometria no feed, geração com prévia sem perder edição e geração sem duplicatas. O teste da miniatura verifica a cópia que acompanha o ponteiro e sua remoção ao cancelar. Validação visual e capturas no navegador virtual continuam pendentes devido ao bloqueio de credenciais já registrado.
 
 ## Correção da prévia automática com imagem versionada — 7 de outubro de 2026
 
@@ -166,4 +166,4 @@ A captura do proprietário revelou `invalid_media` ao abrir a prévia de Ville S
 
 O validador agora aceita parâmetros de versão nas imagens locais permitidas, preserva o endereço completo e continua recusando extensões não permitidas, URLs externas e segmentos de travessia de diretório. Os nove registros automáticos reais do DEV passaram pela mesma função corrigida, sem modificar as publicações ou suas mídias.
 
-Dois testes adicionais reproduzem geração/validação com a capa versionada e o clique em “Ver prévia” na lista automática. O simulador do editor passou a executar `publicationInput` real antes de devolver uma prévia, evitando que o stub aceite uma mídia que o servidor recusaria. Resultado: 336 testes aprovados, TypeScript e diff aprovados. A função villegram-content DEV v8 foi publicada e seu arquivo compartilhado conferido com o código local. A correção vale nas prévias DEV existentes, sem atualização do frontend. Não houve nova migração, mudança de permissões ou alteração em PROD. A execução visual autenticada continua pendente no navegador virtual bloqueado.
+Dois testes adicionais reproduzem geração/validação com a capa versionada e o clique em “Ver prévia” na lista automática. O simulador do editor passou a executar `publicationInput` real antes de devolver uma prévia, evitando que o stub aceite uma mídia que o servidor recusaria. Resultado: 336 testes aprovados, TypeScript e diff aprovados. A função Ville Moments-content DEV v8 foi publicada e seu arquivo compartilhado conferido com o código local. A correção vale nas prévias DEV existentes, sem atualização do frontend. Não houve nova migração, mudança de permissões ou alteração em PROD. A execução visual autenticada continua pendente no navegador virtual bloqueado.

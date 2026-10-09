@@ -26,7 +26,7 @@
    if(property&&window.Villegram){
     const feed=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase',{headers:{'X-Chalezinho-Env':'development'}}).then(r=>r.json()).catch(()=>({cards:[]}));
     const cards=(feed.cards||[]).filter(c=>c.property_id===property.id);await window.Villegram.configure(cards,offers);
-    section.querySelectorAll('article').forEach((article,i)=>{const c=cards.find(c=>c.offer_id===available[i]?.id);if(!c)return;const b=document.createElement('button');b.type='button';b.className='villegram-watch';b.textContent='▶ Assistir no Villegram · '+(c.total_cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});b.onclick=()=>window.Villegram.open(c);article.querySelector('div').append(b)});
+    section.querySelectorAll('article').forEach((article,i)=>{const c=cards.find(c=>c.offer_id===available[i]?.id);if(!c)return;const b=document.createElement('button');b.type='button';b.className='villegram-watch';b.textContent='▶ Assistir no Ville Moments · '+(c.total_cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});b.onclick=()=>window.Villegram.open(c);article.querySelector('div').append(b)});
    }
    if(version!==bootVersion)return;document.querySelector('#estadias-completas')?.remove();
    const main=document.querySelector('main[data-property-code],#property-detail')||document.querySelector('main');

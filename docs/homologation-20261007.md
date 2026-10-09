@@ -28,7 +28,7 @@ Executar entradas reais, conferir estados no navegador, cruzar operações finan
 
 | Jornada | Estado | Evidência parcial |
 | --- | --- | --- |
-| 1. Villegram visitante | Em execução | 360×800: 13 reels, mudo, legenda pausa vídeo, avanço/pausa, like exige login, retorno ao primeiro reel, consulta de datas |
+| 1. Ville Moments visitante | Em execução | 360×800: 13 trips, mudo, legenda pausa vídeo, avanço/pausa, like exige login, retorno ao primeiro trip, consulta de datas |
 | 2. Site convencional | Em execução | Home aberta; demais caminhos pendentes |
 | 3. Composição A–F | Em execução | Hospedagem simples: datas/motivo preservados; duas tarifas sem seleção; escolha reembolsável |
 | 4. Login/finalização | Em execução | Erro de senha e tentativa correta; composição preservada; aceite único; marketing opcional desmarcado |
@@ -42,7 +42,7 @@ Executar entradas reais, conferir estados no navegador, cruzar operações finan
 - `node --test tests/*.test.mjs`: 380 aprovados, 0 falhas. Log externo `outputs/homologation-20261007-tests.txt`.
 - O navegador integrado abriu a prévia normalmente; não reproduziu o bloqueio de credenciais relatado na Work anterior.
 - Capturas reais em `outputs/qa-360-villegram-legenda.png`, `outputs/qa-360-reserva-tarifa.png`, `outputs/qa-360-pix-gerado.png` (workspace externo ao repositório).
-- Em 360×800, o formulário do Villegram levou diretamente aos resultados, com estado de carregamento sem repetir o formulário.
+- Em 360×800, o formulário do Ville Moments levou diretamente aos resultados, com estado de carregamento sem repetir o formulário.
 - Hospedagem CH1, 08–10/12/2026, 2 hóspedes, motivo romântico: reembolsável R$ 1.853,60; não reembolsável R$ 1.723,30. Ambas inicialmente desmarcadas.
 - Conta sintética de hóspede `ffcf6506-52ab-4b43-8aae-286eb682c673`, criada via Auth signup; confirmação preparada administrativamente apenas para a fixture. Isso **não** comprova entrega/ativação por e-mail. Credencial fora do repositório.
 - A identificação por passaporte foi recusada com mensagem explícita de CPF necessário ao PagBank. A fixture foi ajustada para CPF sintético exclusivamente em DEV; nenhuma identidade real alterada.
@@ -59,7 +59,7 @@ Executar entradas reais, conferir estados no navegador, cruzar operações finan
 - Portal DEV PagBank pediu novo login. Conferência direta no portal ainda pendente; não confundir confirmação de tela/banco com essa conferência.
 - Cartão testado retornou somente 1–6 parcelas após consulta do BIN; 12x ainda não concluído. A interface removeu a seleção inválida e exigiu nova escolha.
 - Perfil sintético público `qa_20261007` salvo; upload real de duas fotos sintéticas (horizontal/vertical), indicador de envio desapareceu, alternância preencher/inteira e texto sobre imagem funcionaram. Rascunho salvo e reaberto após reload, enviado para aprovação. Conta administrativa separada recebeu uma pendência e abriu a fila correta. Aprovação/retorno ao hóspede em conferência.
-- Villegram em 412 px: identificados aviso de mídia cobrindo CTA e evento tardio de vídeo causando TypeError. Correções de código com regressão automatizada; publicação/reteste visual da segunda correção pendentes.
+- Ville Moments em 412 px: identificados aviso de mídia cobrindo CTA e evento tardio de vídeo causando TypeError. Correções de código com regressão automatizada; publicação/reteste visual da segunda correção pendentes.
 - Duas referências inexistentes do café (`assets/02-cozinha.webp`, `assets/ch2-01-cafe.webp`) removidas somente do catálogo DEV e da publicação automática `d9246b7a-b8e6-4b0d-abb9-c1bb6035f069`, preservando as três imagens válidas e capa. Backup externo `outputs/qa-dev-media-backup.json`. Bootstrap corrigido para não recriar referências. Nenhuma migration/função/PROD alterada.
 - Suíte completa após correções de vídeo: 382 testes aprovados, zero falhas; log `outputs/homologation-20261007-tests-final.txt`. As jornadas completas continuam em execução, sem homologação global.
 
@@ -86,7 +86,7 @@ Os estados acima são históricos. A homologação global continua em execução
 
 | Jornada | Resultado atual | Pendências concretas |
 | --- | --- | --- |
-| 1. Villegram visitante | Bloqueada para conclusão da homologação | Parte observada; faltam feed vazio, falhas de serviço, compartilhar e todos os retornos/origens |
+| 1. Ville Moments visitante | Bloqueada para conclusão da homologação | Parte observada; faltam feed vazio, falhas de serviço, compartilhar e todos os retornos/origens |
 | 2. Site convencional | Bloqueada para conclusão da homologação | Home/consulta/experiência testadas; completar limites, indisponibilidade e navegação de volta |
 | 3. Composição A–F | Bloqueada para conclusão da homologação | A, pacote, adicional, reload e oferta observados; falta matriz completa de trocas e duas origens |
 | 4. Login/finalização | Bloqueada para conclusão da homologação | Login e preservação testados; e-mail real, recuperação e sessão expirada não comprovados nesta rodada |
@@ -144,7 +144,7 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - Prévia `9b0a6ce6` (3lvv6du1e): troca Signature → Essenza não mostrou mais tarifas antigas durante carregamento; captura `qa-troca-chale-tarifas-corrigidas.png`.
 - Hóspede e anfitrião fictícios: ativação de perfil público, seguir, notificação de novo seguidor e aceite de convite funcionaram. Reuso do convite foi recusado. Aceitar acompanhante não expôs as reservas privadas do titular. Feed de pessoas seguidas sem conteúdo elegível mostrou estado vazio. Captura `qa-notificacao-seguidor.png`.
 - Renovação agendada da garantia `b1b764c8-7060-4a21-b541-265d7111e472`: nova autorização registrada em 02/10 às 14:15:15 UTC, anterior liberada às 14:15:24 UTC. Consulta ao provedor em 08/10 confirmou nova cobrança AUTHORIZED, R$ 500, sem captura. Prazo de captura já expirado e cobertura indisponível. Evidência `qa-renovacao-consulta-provedor.json`. Nenhuma nova autorização ou alteração de relógio/agendamento.
-- Jornada F + D: home móvel → Villegram → oferta “Teste” → Quero estes dias → tarifa explicitamente não reembolsável → adicionar café → login → cartão sandbox 1x. Reserva `00BA201ADB` / `4e4eeb11-c984-4947-8591-7a52df5e4691`, pagamento `78e3ae1e-ff4e-46c4-b996-3e98fc2adf40`, R$ 793,68, confirmado na tela e banco. Uma atribuição à publicação `edeaf9ff-b924-413e-b3cd-c0295eb94fc0`. Capturas 360×800 `qa-360-oferta-villegram-inclusoes.png` e `qa-360-oferta-villegram-paga.png`.
+- Jornada F + D: home móvel → Ville Moments → oferta “Teste” → Quero estes dias → tarifa explicitamente não reembolsável → adicionar café → login → cartão sandbox 1x. Reserva `00BA201ADB` / `4e4eeb11-c984-4947-8591-7a52df5e4691`, pagamento `78e3ae1e-ff4e-46c4-b996-3e98fc2adf40`, R$ 793,68, confirmado na tela e banco. Uma atribuição à publicação `edeaf9ff-b924-413e-b3cd-c0295eb94fc0`. Capturas 360×800 `qa-360-oferta-villegram-inclusoes.png` e `qa-360-oferta-villegram-paga.png`.
 - **Falha reproduzida:** reload após aprovação reabria formulário de pagamento. Nenhum segundo pagamento foi enviado. Corrigida persistência da referência e recibo público da cobrança; restauração consulta o status autenticado sem recotar ou voltar à finalização. Sessão expirada exige login; outra conta descarta a referência anterior. Dados do cartão não são persistidos. Quatro testes novos cobrem restauração paga, falha de consulta, sessão expirada e troca de conta; reteste visual da correção depende da prévia seguinte.
 - Estornos de cartão continuam sem confirmação: reembolsável `5434e8f6-1901-4793-95ae-6554c456b92a` com `pagbank_charge_operation_http_400_code_40008`; não reembolsável com tentativa anterior 40008 e repetição idempotente 40005. Não foram disparadas novas tentativas incertas.
 - Compartilhar abriu painel e pausou vídeo. Cópia para clipboard não comprovada; não marcar como aprovada. Portal PagBank exigiu novo login; aguardando disponibilidade do usuário, sem bloquear demais jornadas.
@@ -181,7 +181,7 @@ Capturas adicionais reais em outputs do workspace: `qa-412-recusa-corrigida.png`
 - Reteste da mensagem na conta do hóspede: captura integral mostra Sem saldo a liberar. Captura qa-caucao-integral-hospede-corrigida.png. Consulta de pedidos apresentou falha transitória explícita e recuperou após reload, sem falsa lista vazia durante falha.
 - Troca de cartão sintético da garantia f1f6a0b7-843b-4f2a-844b-5f6ad5198296 / reserva A6D3B69F79 concluída pela interface com consentimentos. Tela informou sucesso, banco manteve pending, sem autorização/captura antecipada. Captura qa-cartao-caucao-atualizado.png. Não comprova aprovação futura desse novo cartão.
 - Nova revisão visual em 360×800 (painel compartilhar), 412×915 (legenda) e 1440×900 (home), sem sobreposição nos estados capturados. Arquivos qa-final-360-compartilhar.png, qa-final-412-legenda.png, qa-final-1440-home.png. São viewports emulados, não Android físico.
-- Compartilhamento: URL exibida correta, painel pausa no mesmo reel. Copiar link informou sucesso, mas clipboard/colagem pelo navegador integrado devolveram URL anterior. Resultado da cópia NÃO aprovado; possível limitação de clipboard do navegador, causa não isolada. Nenhum comentário enviado durante o teste de colagem.
+- Compartilhamento: URL exibida correta, painel pausa no mesmo trip. Copiar link informou sucesso, mas clipboard/colagem pelo navegador integrado devolveram URL anterior. Resultado da cópia NÃO aprovado; possível limitação de clipboard do navegador, causa não isolada. Nenhum comentário enviado durante o teste de colagem.
 - Documentos da reserva 0D88FF9D57: política não reembolsável 1.2, termos 1.2, regras 1.1, privacidade 1.0; conteúdo/aceite de 07/10 23:54 visíveis. Botão de download acionado, mas evento download não chegou ao navegador controlado em 10s: arquivo não comprovado.
 - account.js passou sintaxe; TypeScript das quatro funções passou novamente. Nenhuma mudança adicional de código/banco.
 - Cadastro real por e-mail autorizado para roldneicosta+homologacao@gmail.com, formulário preenchido com identidade fictícia, senha e envio aguardando usuário. Não substituir confirmação de e-mail por confirmação administrativa.
