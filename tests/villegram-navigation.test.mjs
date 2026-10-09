@@ -140,7 +140,7 @@ test('social totals use server count beyond page size and comments show escaped 
 test('Moments identifies the property site on shared entries and preserves quoted offer context',async()=>{
  const {d,w}=await setup();const root=w.document.querySelector('#villegram');
  assert.match(root.querySelector('.vg-brand').textContent,/Chalezinho Ville.*Chalés românticos em Guarapari.*Ville Moments/);
- assert.equal(root.querySelector('.vg-welcome a').getAttribute('href'),'index.html?view=site#colecao');
+ assert.equal(root.querySelector('.vg-welcome'),null);assert.equal(root.querySelector('.vg-feed-switch'),null);
  const q=new URL(root.querySelector('.vg-primary').href).searchParams;
  assert.equal(q.get('expected_total'),'123456');assert.equal(q.get('guests'),'2');
  assert.doesNotMatch(root.textContent,/ville\s*gram|\breels?\b/i);w.Villegram.close();d.window.close();

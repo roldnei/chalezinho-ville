@@ -6,7 +6,7 @@ Branch de entrega: `feature/ville-moments`. Nenhuma publicação em produção.
 ## Alterações
 
 - Marca Chalezinho Ville e localização no feed, inclusive em entradas compartilhadas.
-- Apresentação curta integrada e acesso à coleção de chalés.
+- Entrada simplificada a pedido do usuário: sem apresentação promocional e sem as abas Descobrir/Seguindo sobre as fotos. A coleção continua na navegação inferior e Seguindo continua acessível pelo perfil.
 - Conteúdo de imóvel usa nome e resumo/tagline do cadastro; ofertas mostram datas com ano, noites, hóspedes, preço, inclusões e condições.
 - Publicação de hóspede preserva autoria e legenda; seu vínculo com imóvel é discreto e não vira uma chamada comercial principal.
 - Os links de ofertas conservam chalé, hóspedes, oferta e datas; levam um total de referência para avisar mudanças na nova consulta. A tarifa continua exigindo escolha expressa.
