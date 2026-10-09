@@ -147,3 +147,22 @@ test('avatar server validates size/type, derives own path, and removes upload if
  const result=await communityOperation({db:database(),u:{id:owner},op:'community_save_profile',body,isAdmin:false});assert.equal(result.status,200);assert.ok(uploaded[0].path.startsWith(owner+'/'));assert.equal(written[0].avatar_path,uploaded[0].path);assert.equal(removed.length,0);
  const failed=await communityOperation({db:database(true),u:{id:owner},op:'community_save_profile',body,isAdmin:false});assert.equal(failed.body.error,'handle_taken');assert.equal(removed[0],uploaded[1].path);
 });
+
+test('profile Trips group by month and day in Brazil, retain dates and edit destinations',async()=>{
+ const posts=[
+  {id:'old',title:'Setembro',status:'published',published_at:'2026-10-01T01:00:00Z',created_at:'2026-09-01T12:00:00Z'},
+  {id:'new',title:'Outubro',status:'published',published_at:'2026-10-09T12:00:00Z'},
+  {id:'draft',title:'Rascunho',status:'draft',created_at:'2026-10-09T14:00:00Z'},
+  {id:'missing',title:'Sem data',status:'archived'}
+ ];
+ const state={profile:null,allowed:false,publications:posts,notifications:[],mentions:[],invites:[]};
+ const {dom,w}=await communityPage('conta.html','',()=>state),d=w.document;
+ assert.deepEqual([...d.querySelectorAll('.community-tile-title')].map(n=>n.textContent),['Rascunho','Outubro','Setembro','Sem data']);
+ assert.deepEqual([...d.querySelectorAll('.community-month')].map(n=>n.textContent),['outubro de 2026','setembro de 2026','Sem data registrada']);
+ assert.equal(d.querySelectorAll('.community-day').length,3);
+ assert.deepEqual([...d.querySelectorAll('time.community-post-date')].map(n=>n.textContent),['Criado em 09/10/2026','Publicado em 09/10/2026','Publicado em 30/09/2026']);
+ assert.match(d.querySelector('.community-tile>a').href,/mode=guest&edit=draft/);
+ assert.equal(d.querySelectorAll('.community-edit').length,4);
+ assert.equal(posts[0].id,'old','input order remains intact');
+ dom.window.close();
+});

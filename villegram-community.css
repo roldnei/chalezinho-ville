@@ -45,3 +45,23 @@
 @media(hover:hover){#community-root .community-actions>a:hover,#community-root .community-actions>button:hover,#community-root .community-watch-open:hover{filter:brightness(1.15)}#community-root .community-tabs>button:hover{color:#fff}}
 @media(max-width:700px){#community-root .community-watch-open{width:44px;height:44px;padding:10px}#community-root .community-watch-open>span{display:none}#community-root .community-tabs>button{font-size:11px}#community-root .community-actions>a,#community-root .community-actions>button{padding:11px 8px;font-size:13px}#community-root .community-actions>.primary-action{font-size:15px}}
 @media(min-width:701px){#community-root .community-actions{grid-template-columns:minmax(220px,1.3fr) 1fr 1fr}#community-root .community-actions>.primary-action{grid-column:auto}#community-root .community-tabs>button{flex-direction:row;gap:9px;min-height:60px;font-size:14px}}
+
+/* Profile timeline and people search use their own layout, including narrow phones. */
+#community-root .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+#community-root [data-community-panel="people"]{padding-top:22px}
+#community-root [data-community-panel="people"]>h2{font:600 22px/1.3 'DM Sans',sans-serif;margin:0 0 14px}
+#community-root [data-community-panel="people"]>a{display:inline-flex;align-items:center;min-height:44px;margin-bottom:12px;font-size:14px}
+#community-root .community-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;margin:0 0 20px}
+#community-root .community-search input{min-width:0;width:100%;min-height:48px;font-size:16px}
+#community-root .community-search button{white-space:normal;margin:0;font-size:14px}
+#community-root .community-invite{padding:20px;margin-top:24px}
+#community-root .community-invite h3{margin:0 0 12px;font:600 18px/1.3 'DM Sans',sans-serif}
+#community-root .community-invite p{font-size:14px;line-height:1.6}
+#community-root .community-invite button{margin:8px 0 0;width:100%;font-size:14px;overflow-wrap:anywhere}
+.community-month,.community-day{grid-column:1/-1;margin:0;color:#f5f3ef;font-family:'DM Sans',sans-serif;letter-spacing:0;text-transform:none}
+.community-month{font-size:18px;font-weight:600;padding:22px 0 10px;border-bottom:1px solid #ffffff1f;line-height:1.4}
+.community-month:first-letter{text-transform:uppercase}
+.community-day{font-size:13px;font-weight:500;color:#bcb7ae;padding:8px 0 4px}
+.community-post-date{display:block;margin:9px 0 0;font:400 12px/1.4 'DM Sans',sans-serif;color:#bcb7ae}
+.community-edit{font-size:14px;line-height:1.4}
+@media(max-width:380px){#community-root .community-search{grid-template-columns:minmax(0,1fr)}#community-root .community-search button{width:100%}}
