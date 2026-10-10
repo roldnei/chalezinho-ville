@@ -5,10 +5,11 @@ import {JSDOM} from 'jsdom';
 const id='4069a585-7cc6-48ad-9263-567358a45c0c';
 const publication={id,type:'offer',title:'Escapada a dois',caption:'Fotos reais',cta:'offer',media:[{kind:'photo',url:'assets/signature.webp'}],cover_index:0};
 const card={publication,publication_id:id,offer_id:id,property_id:1,property_code:'CH1',property_name:'Ville Signature',check_in:'2026-11-16',check_out:'2026-11-19',guests:2,nights:3,rate_code:'refundable',total_cents:123456,experiences:[]};
-async function setup({mobile=false,reduced=false,media=null}={}){
+async function setup({mobile=false,reduced=false,media=null,home=true,preview=false}={}){
  const d=new JSDOM('<header><nav></nav></header><main><div class="hero"></div></main>',{url:'https://dev.local/index.html',runScripts:'outside-only',pretendToBeVisual:true}),w=d.window,timers=new Map();
  for(const file of ['styles.css','villegram.css']){const style=w.document.createElement('style');style.textContent=await readFile(new URL('../'+file,import.meta.url),'utf8');w.document.head.append(style)}
  let now=0;const intervals=new Map();Object.defineProperty(w.performance,'now',{value:()=>now});w.setInterval=(fn,ms)=>{intervals.set(ms,fn);return ms};w.clearInterval=ms=>intervals.delete(ms);
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
  w.HTMLMediaElement.prototype.play=async()=>{};w.HTMLMediaElement.prototype.pause=()=>{};
  w.matchMedia=q=>({matches:q.includes('reduced-motion')?reduced:mobile,addEventListener(){}});
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://dev.supabase.co',bookingEngine:'https://dev/engine'};
@@ -18,8 +19,8 @@ async function setup({mobile=false,reduced=false,media=null}={}){
  w.eval(await readFile(new URL('../villegram-text.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));
  w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));
  await new Promise(r=>setTimeout(r,10));
- const current=media?{...card,publication:{...publication,media}}:card;w.Villegram.configurePublications([current,{...card,publication_id:'other',publication:{...publication,id:'other'}}],[],[]);
- w.Villegram.openHome(current);return {d,w,timers,advance(ms){now+=ms;intervals.get(100)?.()}};
+ const current={...(media?{...card,publication:{...publication,media}}:card),...(preview?{preview:true}:{})};w.Villegram.configurePublications([current,{...card,publication_id:'other',publication:{...publication,id:'other'}}],[],[]);
+ w.Villegram[home?"openHome":"open"](current);return {d,w,timers,advance(ms){now+=ms;intervals.get(100)?.()}};
 }
 test('feed and conventional home use the same named icons and reset inherited navigation formatting',async()=>{
  const {d,w}=await setup();const expected=['Ville Moments','Chalés','Escolher datas','Minha conta'];
@@ -150,4 +151,21 @@ test('guest Trips retain their caption and only a discreet linked property actio
  w.Villegram.configurePublications([guest],[],[]);w.Villegram.openHome(guest);
  assert.equal(w.document.querySelector('.vg-primary'),null);assert.equal(w.document.querySelector('.vg-guest-property').getAttribute('href'),'chale-premium.html');assert.match(w.document.querySelector('.vg-story').textContent,/Ana.*Nossa viagem/);
  assert.equal(w.document.querySelectorAll('.vg-social button').length,3);w.Villegram.close();d.window.close();
+});
+
+test('storefront entry keeps the four shortcuts through Trip changes and opens the complete feed',async()=>{
+ for(const mobile of [true,false]){
+  const {d,w}=await setup({mobile,home:false});
+  const nav=()=>w.document.querySelector('#villegram .vg-bottom-nav');
+  assert.deepEqual([...nav().children].map(e=>e.textContent),['Ville Moments','Chalés','Escolher datas','Minha conta']);
+  assert.equal(w.document.querySelector('#villegram').tagName,'DIALOG');assert.ok(w.document.querySelector('#villegram').classList.contains('vg-with-nav'));
+  assert.equal(new URL(w.document.querySelector('.vg-primary').href).searchParams.get('check_in'),'2026-11-16');
+  w.document.querySelector('[data-action=next]').click();assert.equal(nav().children.length,4);
+  let dates=0,feed=0;w.VillegramContent.datesSheet=async()=>{dates++};w.VillegramContent.enter=()=>{feed++};
+  nav().querySelector('[data-action=dates]').click();assert.equal(dates,1);assert.equal(w.document.querySelector('.vg-sheet').hidden,false);
+  w.document.querySelector('[data-sheet-close]').click();
+  nav().querySelector('[data-action=feed]').click();assert.equal(feed,1);assert.equal(w.document.querySelector('#villegram'),null);assert.equal(w.document.documentElement.style.overflow,'');
+  d.window.close();
+ }
+ const preview=await setup({home:false,preview:true});assert.equal(preview.w.document.querySelector('#villegram .vg-bottom-nav'),null);preview.d.window.close();
 });
