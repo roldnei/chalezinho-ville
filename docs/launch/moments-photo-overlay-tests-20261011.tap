@@ -1,0 +1,41 @@
+✔ every showcase escape joins the initial feed without a click: offers-first (1955.450868ms)
+✔ every showcase escape joins the initial feed without a click: publications-first (3326.241549ms)
+✔ same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh (1210.099941ms)
+✔ following feed remains limited to followed publications (355.817574ms)
+✔ private composer previews retain the saved immersive headline (60.81144ms)
+✔ feed and conventional home use the same named icons and reset inherited navigation formatting (8046.812796ms)
+✔ offer CTA keeps its full booking link and has an explicit accessible button format (5027.986754ms)
+✔ mobile teaching gesture expires without advancing, appears once, and disappears when reading (2843.85281ms)
+✔ desktop navigation is labelled and enlarged; reduced motion receives a static mobile hint (1282.849528ms)
+✔ primary action uses equal reel gutters and social actions display counts with accessible names (759.274461ms)
+✔ oval countdown tracks a whole photo cycle and freezes during pause, hidden tabs and reading (730.291412ms)
+✔ video countdown follows actual playback metadata and keeps its ring when toggling pause (275.938948ms)
+✔ late video events after moving to a photo do not crash or attribute completion to the new reel (269.573571ms)
+✔ booking header and steps occupy normal document rows with a bounded three-column layout (323.978001ms)
+✔ feed preserves the exact top alignment selected in the composer for photos and videos (1635.927682ms)
+✔ the feed preserves zoom and both scene coordinates outside its motion animation (1752.482436ms)
+✔ photo playback respects the saved order even when a different photo is selected as the cover (373.101453ms)
+✔ the feed retains free photo translation as well as zoom (378.174825ms)
+✔ following entry sends the current session and keeps login optional for discovery (106.937221ms)
+✔ embedded booking and login navigation leave the player frame (408.738684ms)
+✔ scene text appears outside the photo transform and changes with the scene (387.886171ms)
+✔ comment survives login return on the same publication and is sent only after explicit resubmission (655.074953ms)
+✔ like asks for login before sending and returns to the selected publication (520.305629ms)
+✔ rejected authenticated like forces an actual login instead of redirecting a stale session back (470.10953ms)
+✔ leaving a later reel updates this history entry and restores the same publication after rebuilding the feed (610.708129ms)
+✔ social totals use server count beyond page size and comments show escaped author and Brasilia timestamp (510.888483ms)
+✔ Moments identifies the property site on shared entries and preserves quoted offer context (640.843551ms)
+✔ guest Trips retain their caption and only a discreet linked property action (432.431919ms)
+✔ storefront entry keeps the four shortcuts through Trip changes and opens the complete feed (1228.211489ms)
+✔ media configuration requires property identity and commercial audio provenance (15.130616ms)
+✔ holiday rules are explicit and celebrations do not masquerade as low demand (8.690981ms)
+✔ interaction writes require validated authentication and never change finance (17.22351ms)
+✔ reel keeps contract links, escapes comments and cleans lifecycle on close (6407.372475ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 32697.594926
