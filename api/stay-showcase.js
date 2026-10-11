@@ -9,12 +9,8 @@ export default async function handler(req,res){
   const r=await fetch(target.endpoint+'?action=stay_showcase',{headers:{Origin:'https://'+host,'X-Chalezinho-Env':target.environment},signal:AbortSignal.timeout(45000)});
   const timing=r.headers.get('server-timing');if(timing)res.setHeader('Server-Timing',timing);
   const data=await r.json();if(!r.ok||!data.ok)return res.status(503).json({ok:false,error:'showcase_unavailable'});
-  // The browser changes catalog_version after catalog edits, invalidating this key.
-  // Never carry yesterday's suggestions across midnight in Guarapari.
-  const now=new Date(),localDate=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
-  const midnight=Date.parse(localDate+'T00:00:00-03:00')+86400000;
-  const ttl=Math.max(0,Math.min(60,Math.floor((midnight-now.getTime())/1000)));
-  res.setHeader('Cache-Control',ttl?'public, max-age=0, s-maxage='+ttl:'no-store');
+  // Eligibility changes must be checked on every request. The backend keeps its
+  // catalog-keyed quote cache; a CDN cache here could resurrect paused offers.
   return res.status(200).json(data);
  }catch{return res.status(503).json({ok:false,error:'showcase_unavailable'})}
 }
