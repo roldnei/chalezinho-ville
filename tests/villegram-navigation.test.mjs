@@ -38,6 +38,17 @@ test('dated escapes and editorial Trips keep social icons in the same vertical r
   }
  }finally{w.Villegram.close();w.close()}
 });
+test('escapes reserve space for visible icons without leaving an empty rail in the production profile',async()=>{
+ const {w}=await setup();
+ try{
+  for(const social of [true,false]){
+   w.CHALEZINHO_CONFIG.features={social};
+   const current={...card,publication:null,publication_id:null,image:'assets/signature.webp'};
+   w.Villegram.configurePublications([current],[],[]);w.Villegram.openHome(current);
+   assert.equal(w.getComputedStyle(w.document.querySelector('.vg-story')).paddingRight==='64px',social);
+  }
+ }finally{w.Villegram.close();w.close()}
+});
 test('DEV escape interactions use the social service, preserving the public price endpoint',async()=>{
  const {d,w}=await setup(),calls=[];
  try{
