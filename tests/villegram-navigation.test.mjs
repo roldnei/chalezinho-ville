@@ -22,6 +22,37 @@ async function setup({mobile=false,reduced=false,media=null,home=true,preview=fa
  const current={...(media?{...card,publication:{...publication,media}}:card),...(preview?{preview:true}:{})};w.Villegram.configurePublications([current,{...card,publication_id:'other',publication:{...publication,id:'other'}}],[],[]);
  w.Villegram[home?"openHome":"open"](current);return {d,w,timers,advance(ms){now+=ms;intervals.get(100)?.()}};
 }
+test('dated escapes and editorial Trips keep social icons in the same vertical rail',async()=>{
+ const {d,w}=await setup();
+ try{
+  for(const current of [card,{...card,publication:null,publication_id:null,image:'assets/signature.webp'}]){
+   w.Villegram.configurePublications([current],[],[]);w.Villegram.openHome(current);
+   const controls=w.document.querySelector('.vg-controls'),social=controls.querySelector('.vg-social');
+   assert.equal(w.getComputedStyle(social).flexDirection,'column');
+   assert.equal(w.getComputedStyle(controls).left,'auto');
+   assert.equal(w.getComputedStyle(controls).bottom,'auto');
+   assert.equal(w.getComputedStyle(controls).right,'12px');
+   assert.equal(controls.querySelectorAll('button').length,3);
+   assert.equal(w.getComputedStyle(controls.querySelector('.vg-status')).position,'fixed');
+   assert.equal(w.document.querySelector('.vg-primary').closest('.vg-controls'),null);
+  }
+ }finally{w.Villegram.close();w.close()}
+});
+test('DEV escape interactions use the social service, preserving the public price endpoint',async()=>{
+ const {d,w}=await setup(),calls=[];
+ try{
+  w.CHALEZINHO_CONFIG={environment:'development',releaseProfile:'whatsapp',supabaseUrl:'https://pxfqmnhqodqyaaqeyjgr.supabase.co',bookingEngine:'https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/public-consultation',features:{social:true}};
+  w.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,likes:2,comments_count:0,comments:[],liked:false})}};
+  const current={...card,publication:null,publication_id:null,image:'assets/signature.webp'};w.Villegram.configurePublications([current],[],[]);w.Villegram.openHome(current);
+  await new Promise(resolve=>setTimeout(resolve,20));
+  const social=calls.filter(c=>c.body.action==='villegram');assert.ok(social.length);
+  for(const call of social){assert.equal(call.url,'https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine');assert.equal(call.body.offer_id,id);assert.equal(call.body.operation,undefined)}
+  assert.equal(calls.some(c=>['start_payment','hold','quote'].includes(c.body.action)),false);
+  assert.match(w.CHALEZINHO_CONFIG.bookingEngine,/public-consultation$/);
+  assert.equal(w.document.querySelector('.vg-status').textContent,'');
+  assert.equal(w.document.querySelector('[data-action=like] .vg-social-count').textContent,'2');
+ }finally{w.Villegram.close();w.close()}
+});
 test('feed and conventional home use the same named icons and reset inherited navigation formatting',async()=>{
  const {d,w}=await setup();const expected=['Ville Moments','Chalés','Escolher datas','Minha conta'];
  for(const selector of ['.vg-bottom-nav','.villegram-mobile-nav']){

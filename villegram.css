@@ -228,3 +228,10 @@
 @media(max-height:740px){#villegram.vg-escape .vg-story{margin-bottom:40px}}
 
 @media(max-height:680px){#villegram.vg-escape .vg-purchase{padding:12px 22px 8px}#villegram.vg-escape .vg-story{margin-bottom:20px}#villegram.vg-escape .vg-story h2{font-size:24px}#villegram.vg-escape .vg-escape-guests{margin-bottom:8px}#villegram.vg-escape .vg-price{font-size:28px}#villegram.vg-escape .vg-escape-total{margin-bottom:8px}#villegram.vg-escape details{margin-bottom:6px}#villegram.vg-escape .vg-escape-alternatives{margin:0 0 8px}#villegram.vg-escape .vg-primary{min-height:52px;padding:14px 20px}}
+
+/* Every Trip, including date-only escapes, uses the same side rail. */
+#villegram .vg-controls,#villegram:has(.vg-caption-short) .vg-controls{left:auto;right:12px;top:34%;bottom:auto;transform:none;width:48px;padding:0}
+#villegram .vg-controls .vg-social,#villegram:has(.vg-caption-short) .vg-social{display:flex;flex-direction:column;align-items:stretch;gap:12px;margin:0}
+#villegram .vg-controls .vg-social button,#villegram:has(.vg-caption-short) .vg-controls .vg-social button{flex-direction:column;gap:3px;width:48px;min-width:48px;min-height:48px;padding:8px 3px;border-radius:50%;font:500 11px/1.15 'DM Sans',sans-serif}
+#villegram.vg-escape .vg-story,#villegram.vg-escape .vg-escape-selection>:not(.vg-primary):not(.vg-escape-alternatives){padding-right:64px}
+#villegram .vg-status,#villegram:has(.vg-caption-short) .vg-status{position:fixed;top:calc(164px + env(safe-area-inset-top));left:20px;right:76px;bottom:auto;margin:0;padding:8px 10px;border-radius:8px;background:#17130fea;font-size:12px;line-height:1.4;pointer-events:none}
