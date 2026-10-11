@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,ENGINE=C.bookingEngine,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);
+const C=window.CHALEZINHO_CONFIG,PUBLIC=C.releaseProfile==="whatsapp",ENGINE=C.bookingEngine,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
@@ -34,10 +34,10 @@ function accessSessionId(){
   return visit&&Date.now()-visit.last<=30*60*1000?visit.id:null;
  }catch{return null}
 }
-function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
+function track(event_name,payload={}){if(PUBLIC)return;api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 
 async function flushVillegramAttribution(){
- if(!state.session?.access_token)return;
+ if(PUBLIC||!state.session?.access_token)return;
  try{const pending=JSON.parse(sessionStorage.getItem('villegram-pending-reservation')||'null');if(!pending)return;if(Date.now()-pending.at>86400000){sessionStorage.removeItem('villegram-pending-reservation');return}const r=await fetch(C.supabaseUrl+'/functions/v1/villegram-content',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+state.session.access_token},body:JSON.stringify({operation:'attribute',reservation_id:pending.reservation_id,attribution:pending.attribution}),signal:AbortSignal.timeout(10000),keepalive:true});if(r.ok||r.status===404)sessionStorage.removeItem('villegram-pending-reservation')}catch{}
 }
 setInterval(flushVillegramAttribution,30000);
@@ -51,8 +51,10 @@ async function init(){
  $("#checkout-close").addEventListener("click",closeCheckout);$("#upsell-close")?.addEventListener("click",()=>$("#upsell-modal").hidden=true);
  $("#step-back").addEventListener("click",()=>state.stage==="finalize"?openFastCheckout():closeCheckout());
  $("#step-next").addEventListener("click",next);
+ if(PUBLIC){$('#step-next').textContent='Continuar pelo WhatsApp';$('#checkout-panel').insertAdjacentHTML('beforeend','<div id="whatsapp-actions" class="whatsapp-actions" hidden><a id="whatsapp-open" class="primary-action" target="_blank" rel="noopener">Abrir WhatsApp</a><button id="whatsapp-copy" class="text-action" type="button">Copiar resumo</button></div><p id="whatsapp-status" role="status" class="consultation-note"></p>');$('#whatsapp-copy').onclick=copyWhatsAppSummary;$('#whatsapp-open').onclick=()=>{$('#whatsapp-status').textContent='O WhatsApp foi solicitado. Envie a mensagem no aplicativo para iniciar o atendimento.'}}
  await initChaletFilter();
  initStayModes();
+ if(PUBLIC)for(const id of ['#book-in','#book-out','#book-guests','#book-chalet','#stay-mode'])$(id).addEventListener('change',()=>{state.quote=null;state.rate=null;state.search=null;state.rateConfirmed=false;clearWhatsApp();$('#booking-list').innerHTML='';$('#availability-count').textContent='Seleção alterada. Consulte novamente.';$('#step-next').disabled=true;persistSelection()});
  initTripPurpose();
  $("#change-dates").onclick=()=>{document.body.classList.remove("booking-results-screen");document.documentElement.classList.remove("booking-dates-arrival")};
  window.addEventListener("beforeunload",()=>{if(state.property&&!$("#checkout-modal").hidden&&Number($("#checkout-panel").dataset.step)<6)saveResume()});
@@ -134,12 +136,12 @@ async function closeCheckout(){
  setCheckoutVisible(false);
  if($("#booking-results").classList.contains("booking-results-hidden")&&state.search)await search();
 }
-function renderDevBanner(){if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent="AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
+function renderDevBanner(){if(C.environment!=="development")return;if(document.querySelector(".dev-banner"))return;const b=document.createElement("div");b.className="dev-banner";b.textContent=PUBLIC?"HOMOLOGAÇÃO · CONSULTA PELO WHATSAPP · catálogo de teste identificado": "AMBIENTE DE DESENVOLVIMENTO · "+(pagbankSandbox?"PagBank sandbox, sem cobrança real":"nenhum pagamento real será realizado");document.body.prepend(b)}
 function error(t){$("#booking-error").textContent=t;if(t&&!state.search&&document.documentElement.classList.contains("booking-dates-arrival"))$("#booking-list").textContent=t;if(document.documentElement.classList.contains("direct-checkout"))$("#direct-checkout-status p").textContent=t}
 function setFlowError(t){$("#checkout-error").textContent=t}
 
 async function search({scroll=true}={}){
- const sequence=++searchSequence;
+ const sequence=++searchSequence;state.search=null;state.quote=null;state.rate=null;state.rateConfirmed=false;if(PUBLIC)clearWhatsApp();
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
  if(!bi||!bo||bo<=bi)return error("Escolha datas válidas.");
  error("Consultando disponibilidade e valores...");
@@ -194,7 +196,7 @@ async function openSameDayRequest(propertyId){
  try{await api('same_day_request',{operation:'create',property_id:propertyId,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:Number($('#book-guests').value),guest_name:f.elements.guest_name.value,guest_phone:f.elements.guest_phone.value,estimated_arrival_time:f.elements.estimated_arrival_time.value,note:f.elements.note.value});dialog.innerHTML='<h2>Pedido recebido</h2><p>A equipe foi avisada com prioridade. Acompanhe a aprovação em Minhas reservas.</p><a class="primary-action" href="conta.html">Acompanhar pedido</a><button id="close-same-day" type="button">Fechar</button>';$('#close-same-day').onclick=()=>dialog.close()}
  catch(e){$('#same-day-message').textContent=e.message==='dates_unavailable'?'Estas datas não estão mais disponíveis para pedido. Consulte novamente.':'Não foi possível enviar o pedido. Confira os dados e tente novamente.';b.disabled=false}};
 }
-async function restoreSameDay(){
+async function restoreSameDay(){if(PUBLIC)return false;
  const q=new URLSearchParams(location.search),id=q.get('approved_request');
  if(id){try{const {request:r}=await api('same_day_request',{operation:'get',id});if(r.status!=='approved')throw Error('expired');state.approvedRequest=r.id;$('#book-in').value=r.check_in;$('#book-out').value=r.check_out;$('#book-guests').value=r.guests;await search();await openFlow(Number(r.property_id))}catch{error('Este pedido não está aprovado ou expirou. Consulte Minhas reservas.')}return}
  if(q.has('request_property')){$('#book-in').value=q.get('check_in')||'';$('#book-out').value=q.get('check_out')||'';$('#book-guests').value=q.get('guests')||'2';await search();if(state.search.some(p=>p.requestable&&p.id===Number(q.get('request_property'))))openSameDayRequest(Number(q.get('request_property')))}
@@ -221,14 +223,15 @@ function showStep(n){
  $('#step-back').hidden=n===6;$('#step-next').hidden=n===6||(n===5&&!state.session);
  $('#reservation-stage-label').textContent=n===2?'2 · SUA ESTADIA':'3 · FINALIZAR RESERVA';
  $('#step-back').textContent=n===5?'← Alterar reserva':'← Ver outros chalés';
- $('#step-next').textContent=n===2?'Continuar para identificação':'Ir para pagamento de teste';setFlowError('');
+ $('#step-next').textContent=PUBLIC?'Continuar pelo WhatsApp':n===2?'Continuar para identificação':'Ir para pagamento de teste';setFlowError('');
 }
 async function generateQuote(withExperiences){
+ if(PUBLIC){state.quote=null;state.rate=null;}if(PUBLIC){clearWhatsApp();$('#summary-content').textContent='Atualizando a consulta…';$('#checkout-rate-options').textContent=''}
  const controls=['#stay-mode','#checkout-stay-mode','#step-next'].map($).filter(Boolean);controls.forEach(x=>x.disabled=true);
  try{
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
  const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen,stay_offer_id:state.offerId||undefined,experience_preferences:state.preferences,same_day_request_id:state.approvedRequest||undefined});
- q.selected_variant_ids=chosen.map(String).sort();q.preferences_key=JSON.stringify(state.preferences);state.quote=q;startCountdown(q.expires_at);renderOfferContext();return q;
+ q.checked_at=new Date().toISOString();q.selected_variant_ids=chosen.map(String).sort();q.preferences_key=JSON.stringify(state.preferences);state.quote=q;startCountdown(q.expires_at);renderOfferContext();return q;
  }finally{controls.forEach(x=>x.disabled=x.id==='checkout-stay-mode'&&$('#checkout-panel').dataset.step==='6')}
 }
 function initTripPurpose(){
@@ -387,7 +390,7 @@ async function checkPaymentIdentity(){
  const identity=await api("identity_status");
  if(!identity.payment_eligible)throw new Error("pagbank_cpf_required");
 }
-async function next(){
+async function next(){if(PUBLIC){await continueWhatsApp();return;}
  if(state.stage==='review'){
   if(!state.rateConfirmed)return setFlowError('Escolha a tarifa para continuar.');
   if(!validExperienceChoices())return setFlowError('Escolha as preferências dos itens do pacote antes de continuar.');
@@ -411,7 +414,7 @@ async function renderLoginStep(){
   }catch{$('#checkout-login-error').textContent='Não foi possível conectar ao login. Tente novamente.'}finally{button.disabled=false}
  };
 }
-async function openFinalization(){
+async function openFinalization(){if(PUBLIC){await continueWhatsApp();return;}
  state.stage='finalize';showStep(5);$('#authenticated-finalization').hidden=true;
  $('#final-selection').textContent=state.property.name+' · '+state.rate.name+' · '+brlC(state.rate.total_amount_cents);
  $('#final-summary-slot').appendChild($('#summary-content'));
@@ -426,7 +429,7 @@ function renderGuestStep(){
  const meta=state.session?.user?.user_metadata||{};$("#guest-name").value=$("#guest-name").value||meta.full_name||"";$("#guest-email").value=state.session?.user?.email||"";$("#guest-phone").value=$("#guest-phone").value||meta.phone||"";
 }
 function validateGuest(){if(!$("#guest-name").value.trim()||!$("#guest-email").value.trim()||!$("#guest-phone").value.trim()){setFlowError("Preencha seus dados.");return false}return true}
-function renderSelectionSummary(){
+function renderSelectionSummary(){if(PUBLIC){$('#summary-content').innerHTML='';if(state.rateConfirmed&&state.quote&&state.rate){const pre=document.createElement('div');pre.className='consultation-summary';pre.textContent=window.VilleConsultationSummary.summary({quote:state.quote,rate:state.rate});$('#summary-content').append(pre)}else $('#summary-content').textContent='Escolha sua tarifa para conferir o resumo completo.';return;}
  const total=Number(state.rate.total_amount_cents||0),stay=Number(state.rate.stay_amount_cents||0);
  const perNight=Math.round(stay/stayNights());
  const experiences=state.quote?.experiences||[];
@@ -636,15 +639,16 @@ function renderMockPayment(d){
   }
  }));
 }
-function startCountdown(exp){
+function startCountdown(exp){if(PUBLIC){clearInterval(window.__quoteTimer);$('#quote-countdown').textContent='Consulta sem bloqueio de datas. Disponibilidade reconfirmada no atendimento.';return;}
  const el=$("#quote-countdown");clearInterval(window.__quoteTimer);
  const tick=()=>{const s=Math.max(0,Math.floor((Date.parse(exp)-Date.now())/1000));el.textContent="Preço garantido por "+Math.floor(s/60)+":"+String(s%60).padStart(2,"0")+" · datas ainda não bloqueadas";if(!s){el.textContent="Cotação expirada · gere uma nova para atualizar o preço";clearInterval(window.__quoteTimer)}};
  tick();window.__quoteTimer=setInterval(tick,1000);
 }
-function saveResume(){
+function saveResume(){if(PUBLIC){saveConsultation();return;}
  sessionStorage.setItem("chalezinho_booking_resume",JSON.stringify({entryUrl:location.pathname+location.search,reopen:true,fastCheckout:state.fastCheckout,stage:state.stage,entrySource:state.entrySource,rateConfirmed:state.rateConfirmed,guestName:$("#guest-name").value,guestPhone:$("#guest-phone").value,offerId:state.offerId,preferences:state.preferences,property:state.property,selectedByProduct:state.selectedByProduct,quote:state.quote,rateCode:state.rateCode,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:$("#book-guests").value,purpose:$("#trip-purpose-initial")?.value||"",payment:state.activePayment?.provider==='pagbank_sandbox'?{id:state.activePayment.payment_id,userId:state.session?.user?.id,view:state.paymentView}:null}));
 }
 async function restoreResume(matchingEntry=false){
+ if(PUBLIC)return restoreConsultation(matchingEntry);
  let saved=null;try{saved=JSON.parse(sessionStorage.getItem("chalezinho_booking_resume")||"null")}catch{}
  if(!saved?.property||!saved.check_in||!saved.check_out)return false;
  // A new link must not inherit the composition of a different stay in this tab.
@@ -690,7 +694,7 @@ function renderCheckoutRates(){
   if(state.fastUpdating)return;
   const rate=state.quote.rate_options.find(r=>r.code===input.value&&r.selectable);if(!rate)return;
   state.rate=rate;state.rateCode=rate.code;state.rateConfirmed=true;state.upsellHandled=false;
-  renderReview();$('#step-next').disabled=false;setFlowError('Tarifa escolhida. Confira o total e continue para identificação.');
+  renderReview();$('#step-next').disabled=false;clearWhatsApp();setFlowError(PUBLIC?'Tarifa escolhida. Confira o resumo e continue pelo WhatsApp.':'Tarifa escolhida. Confira o total e continue para identificação.');
  });
 }
 function directCheckoutError(){
@@ -710,7 +714,7 @@ async function updateFastQuote(){
  if(state.fastUpdating)return;
  state.fastUpdating=true;$('#step-next').disabled=true;
  const controls=$$('#direct-extras button, #offer-choices select, #checkout-rate-options input, #checkout-stay-mode, #trip-purpose-review');controls.forEach(b=>b.disabled=true);
- try{await refreshQuoteAfterExperiences();if(!state.rate)throw new Error('tariff_unavailable');if(state.stage==='review')renderReview();else renderSummary();setFlowError('Reserva atualizada. Confira o total e aceite os termos antes de pagar.')}
+ try{await refreshQuoteAfterExperiences();if(!state.rate)throw new Error('tariff_unavailable');if(state.stage==='review')renderReview();else renderSummary();setFlowError(PUBLIC?'Consulta atualizada. Confira o total antes de continuar.':'Reserva atualizada. Confira o total e aceite os termos antes de pagar.')}
  catch(e){state.rate=null;setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar esta escolha. Remova o adicional ou consulte outras opções.');}
  finally{state.fastUpdating=false;controls.forEach(b=>b.disabled=false);$('#step-next').disabled=!state.rate||!state.rateConfirmed;}
 }
@@ -769,5 +773,25 @@ function renderOfferChoices(){
  node.querySelectorAll('select').forEach(select=>select.onchange=()=>{state.preferences[select.dataset.product]??={};state.preferences[select.dataset.product][select.dataset.component]=select.value;persistSelection();if(state.fastCheckout)updateFastQuote()});
 }
 function validExperienceChoices(){const ids=[...(selectedOffer()?.product_ids||[]),...Object.keys(state.selectedByProduct)];return ids.every(id=>window.VilleOffers.components((state.config.experience_products||[]).find(p=>p.id===id)||{}).every(c=>!c.choices?.length||c.choices.includes(state.preferences[id]?.[c.name])))}
+let whatsappMessage='',whatsappBusy=false;
+function clearWhatsApp(){whatsappMessage='';const box=$('#whatsapp-actions');if(box)box.hidden=true;$('#whatsapp-open')?.removeAttribute('href');if($('#whatsapp-status'))$('#whatsapp-status').textContent='';}
+function saveConsultation(){try{sessionStorage.setItem('ville-consultation-selection',JSON.stringify({entryUrl:location.pathname+location.search,propertyCode:state.property?.code,offerId:state.offerId,preferences:state.preferences,selectedByProduct:state.selectedByProduct,rateCode:state.rateConfirmed?state.rateCode:null,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value}))}catch{}}
+async function restoreConsultation(matchingEntry){let saved;try{saved=JSON.parse(sessionStorage.getItem('ville-consultation-selection')||'null')}catch{}if(!saved?.propertyCode||matchingEntry&&saved.entryUrl!==location.pathname+location.search)return false;$('#book-in').value=saved.check_in;$('#book-out').value=saved.check_out;$('#book-guests').value=saved.guests;state.offerId=saved.offerId;state.preferences=saved.preferences||{};syncStayModes();await search();const property=state.search?.find(p=>p.code===saved.propertyCode&&p.available);if(!property)return false;await openFlow(property.id);state.selectedByProduct=saved.selectedByProduct||{};await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===saved.rateCode&&r.selectable)||state.quote.rate_options.find(r=>r.selectable);state.rateCode=state.rate?.code;state.rateConfirmed=!!saved.rateCode&&state.rateCode===saved.rateCode;await openFastCheckout();return true;}
+async function continueWhatsApp(){
+ if(whatsappBusy||state.fastUpdating||!state.rateConfirmed||!state.rate)return;
+ if(!validExperienceChoices()){setFlowError('Escolha as preferências dos itens antes de continuar.');return;}
+ whatsappBusy=true;$('#step-next').disabled=true;const previous=window.VilleConsultationSummary.message({quote:state.quote,rate:state.rate}),oldCode=state.rateCode;clearWhatsApp();
+ try{
+  await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===oldCode&&r.selectable);if(!state.rate)throw Error('tariff_unavailable');state.rateCode=oldCode;state.rateConfirmed=true;renderReview();
+  const current=window.VilleConsultationSummary.message({quote:state.quote,rate:state.rate});
+  // Ignore only the consultation timestamp when checking for commercial changes.
+  if(previous.replace(/Consulta:.*\n/,'')!==current.replace(/Consulta:.*\n/,'')){state.rateConfirmed=false;renderReview();setFlowError('O valor ou as condições mudaram. Revise o resumo e escolha sua tarifa novamente.');return;}
+  whatsappMessage=current;const url='https://wa.me/'+C.whatsappNumber+'?text='+encodeURIComponent(current);$('#whatsapp-open').href=url;$('#whatsapp-actions').hidden=false;$('#whatsapp-status').textContent='Resumo atualizado. Abra o WhatsApp e envie a mensagem para iniciar o atendimento. Se o aplicativo não abrir, copie o resumo.';saveConsultation();
+  // The explicit link is a second gesture: mobile browsers cannot block it as an async popup.
+  $('#whatsapp-open').focus();
+ }catch(e){state.quote=null;state.rate=null;$('#summary-content').textContent='Consulta indisponível. Consulte novamente antes de continuar.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível reconfirmar os valores e a disponibilidade. Faça uma nova consulta.');}
+ finally{whatsappBusy=false;$('#step-next').disabled=!state.rate||!state.rateConfirmed;}
+}
+async function copyWhatsAppSummary(){if(!whatsappMessage)return;try{await navigator.clipboard.writeText(whatsappMessage);$('#whatsapp-status').textContent='Resumo copiado. Cole no WhatsApp para solicitar a finalização.'}catch{const field=document.createElement('textarea');field.value=whatsappMessage;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();$('#whatsapp-status').textContent='Selecione e copie o resumo abaixo.'}}
 init();
 })();

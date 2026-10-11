@@ -1,3 +1,4 @@
+import {releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {communityOperation,communityPublic} from '../_shared/villegram-community.ts';
 import {resolvePublicationStay} from '../_shared/villegram-stay.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2';
@@ -21,13 +22,14 @@ async function paginated(table:string,columns:string,days:number){const rows:any
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  // This function cannot operate on PROD, even if a caller spoofs its environment header.
- if(new URL(projectUrl).hostname!=='pxfqmnhqodqyaaqeyjgr.supabase.co')return json({ok:false,error:'development_only'},403);
+ const target=releaseTarget(projectUrl);
  try{
  const query=new URL(req.url).searchParams,body=req.method==='POST'?await req.json():{},op=body.operation||query.get('operation')||'feed';
- if(op==='feed'||op==='generate_due'){
-  if(op==='generate_due'){await generate();return json({ok:true})}try{await generate()}catch{console.warn('villegram_generation_unavailable')}
+ if(target==='production'&&!['public_feed','feed','signals','admin_list','save_settings','generate','save','preview','report'].includes(op))return json({ok:false,error:'feature_not_released'},403);
+ if(op==='feed'||op==='public_feed'||op==='generate_due'){
+  if(op==='generate_due'){await generate();return json({ok:true})}if(op!=='public_feed')try{await generate()}catch{console.warn('villegram_generation_unavailable')}
   const [c,s,posts]=await Promise.all([catalog(),settings(),admin.from('villegram_publications').select('*').eq('status','published').order('featured',{ascending:false}).order('display_order').order('created_at').limit(200)]);if(posts.error)throw Error('feed_unavailable');
-  let eligible=(posts.data||[]).filter(p=>eligiblePublication(p,c.properties,c.products,c.offers));eligible=await communityPublic(admin,eligible);if(body.feed==='following'){const viewer=await user(req);if(!viewer)return json({ok:false,error:'authentication_required'},401);const follows=await admin.from('villegram_follows').select('followed_id').eq('follower_id',viewer.id);if(follows.error)throw Error('feed_unavailable');const ids=new Set(follows.data.map(f=>f.followed_id));eligible=eligible.filter(p=>ids.has(p.author_id));}return json({ok:true,publications:await resolveMedia(await resolveStays(eligible)),...c,max_offers:s.max_offers,checked_at:new Date().toISOString()});
+  let eligible=(posts.data||[]).filter(p=>op!=='public_feed'||p.source!=='guest_submission').filter(p=>target!=='production'||commercialItem(p)).filter(p=>eligiblePublication(p,c.properties,c.products,c.offers));eligible=await communityPublic(admin,eligible);if(body.feed==='following'){const viewer=await user(req);if(!viewer)return json({ok:false,error:'authentication_required'},401);const follows=await admin.from('villegram_follows').select('followed_id').eq('follower_id',viewer.id);if(follows.error)throw Error('feed_unavailable');const ids=new Set(follows.data.map(f=>f.followed_id));eligible=eligible.filter(p=>ids.has(p.author_id));}return json({ok:true,publications:await resolveMedia(await resolveStays(eligible)),...c,max_offers:s.max_offers,checked_at:new Date().toISOString()});
  }
  if(op==='signals'){
   if(!Array.isArray(body.events)||body.events.length<1||body.events.length>25)return json({ok:false,error:'invalid_signals'},400);

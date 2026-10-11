@@ -1,4 +1,5 @@
 (()=>{
+ if(window.CHALEZINHO_CONFIG.features?.guestPublications===false)return;
  const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),$=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
  const states={draft:'Rascunho',pending_review:'Em aprovação',published:'Publicado',archived:'Arquivado'};
  let me,session,activeTab='watch',pendingAvatar=null,pendingAvatarURL=null;

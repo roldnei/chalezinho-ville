@@ -1,3 +1,4 @@
+import {commercialItem,releaseTarget} from './release-policy.ts';
 import {validateStayOffer,offerIssues} from './stay-offers.ts';
 export function stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl}:any){
  async function catalog(includePaused=false){
@@ -5,7 +6,8 @@ export function stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl}
   const {data:offers,error}=await(includePaused?query:query.eq('status','active'));
   const {data:products,error:pe}=await admin.from('experience_products').select('id,name,status,description,price_cents,details,package_type,minimum_lead_hours,daily_capacity,inventory,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(media_url,alt_text,display_order)');
   if(error||pe)throw Error('offer_catalog_unavailable');
-  return {offers:offers||[],products:products||[]};
+  const eligible=releaseTarget(projectUrl)==='production'&&!includePaused?(products||[]).filter(commercialItem):products||[];
+  return {offers:releaseTarget(projectUrl)==='production'&&!includePaused?(offers||[]).filter(commercialItem).filter((o:any)=>o.product_ids.every((id:string)=>eligible.some((p:any)=>p.id===id))):offers||[],products:eligible};
  }
  async function action(req:Request,body:any,development:boolean){
   if(!development)return json({ok:false,error:'development_only'},403);

@@ -4,7 +4,10 @@ window.CHALEZINHO_CONFIG={
   bookingEngine:"https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine",
   refundEngine:"https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine",
   guaranteeEngine:"https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/guarantee-preview",
-  environment:"development"
+  environment:"development",
+  releaseProfile:"checkout-development",
+  whatsappNumber:"5593991592266",
+  features:{feelings:true,guestPublications:true,social:true}
 };
 
 // Shared session policy for every page on this origin. No passwords are stored.
@@ -27,3 +30,6 @@ window.CHALEZINHO_CONFIG={
  };
  window.CHALEZINHO_CONFIG.authOptions={auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true,storage}};
 })();
+
+// UI capability policy comes from the reviewed build profile, never the URL.
+(()=>{const script=document.createElement("script");script.src="launch-ui.js";document.head.append(script)})();

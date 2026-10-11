@@ -1,3 +1,4 @@
+import {consultationActions,launchAdminActions,releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {villegramStayQuote} from '../_shared/villegram-stay.ts';
 import {isCelebration} from "../_shared/stay-showcase.ts";
 import {villegramService} from "../_shared/villegram.ts";
@@ -233,7 +234,8 @@ async function searchSources(start:string,end:string){
   ]);
 }
 async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false,sources:any=null){
-  if(!validDate(start)||!validDate(end)||end<=start)throw Error("invalid_dates");
+  if(!Number.isInteger(guests)||guests<1||guests>12)throw Error("capacity");
+  if(!validDate(start)||!validDate(end)||end<=start||nights(start,end)>90)throw Error("invalid_dates");
   const stay=nights(start,end);if(stay<1)throw Error("invalid_dates");
   const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices]=sources||await searchSources(start,end);
   const {data:properties,error:pe}=propertiesQ;
@@ -302,7 +304,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
   if(body.stay_offer_id){
     const catalog=offerCatalog||await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
     if(offer?.showcase&&isCelebration(body.check_in,body.check_out,offer.showcase)&&!offer.showcase.celebration_discount)offer={...offer,discount_enabled:false};
-    if(!offer)throw Error("offer_unavailable");
+    if(!offer||releaseTarget(projectUrl)==='production'&&!commercialItem(offer))throw Error("offer_unavailable");
     const issues=offerIssues(offer,catalog.products,Number(property_id),{check_in,check_out});
     if(issues.length)throw Error(issues[0]);
     for(const id of offer.product_ids){
@@ -342,7 +344,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
       const leadOk=(Date.parse(check_in+"T15:00:00-03:00")-Date.now()) >= Number(prod.minimum_lead_hours||0)*3600000;
       const stockOk=prod.inventory==null || Number(prod.inventory)>0;
       const allowed=v.active && eligible.has(String(prod.id)) && stockOk && prod.status==="active";
-      if(!allowed) throw new Error("experience_unavailable");
+      if(!allowed||releaseTarget(projectUrl)==='production'&&!commercialItem(prod)) throw new Error("experience_unavailable");
       const viability=await admin.rpc("experience_sale_issue",{p_product:prod.id,p_property:property.id,p_start:check_in,p_end:check_out,p_exclude:excludeReservationId});
       if(viability.error)throw Error("experience_lookup_failed");if(viability.data)throw Error(viability.data);
       const included=offer?.product_ids.includes(prod.id)||false;
@@ -2043,20 +2045,29 @@ async function retryDb(label:string,run:()=>PromiseLike<any>,attempts=3){
 
 Deno.serve(async(req)=>{
   if(req.method==="OPTIONS") return new Response("ok",{headers:corsHeaders});
-  try{assertFinanceDevelopment(projectUrl,Deno.env.get("FINANCE_ENVIRONMENT"))}
-  catch{return json({ok:false,error:"isolated_finance_environment_required"},503)}
   try{
     const url=new URL(req.url);
     let body:any={};
     if(req.method==="POST") body=await req.json().catch(()=>({}));
-    const action=url.searchParams.get("action")||body.action||"config";
+    const rawAction=url.searchParams.get("action")||body.action||"config";
+    const consultation=String(rawAction).startsWith('consult_');
+    const action=consultation?String(rawAction).slice(8):rawAction;
+    const target=releaseTarget(projectUrl);
+    if(consultation&&!consultationActions.has(action))return json({ok:false,error:'consultation_operation_not_allowed'},403);
+    // Production can expose only the explicitly prepared consultation and core
+    // PMS operations. Spoofed development headers never unlock the financial code.
+    if(target==='production'&&!consultation&&!['calendar_export',...launchAdminActions].includes(action))return json({ok:false,error:'public_checkout_disabled'},403);
+    if(target==='production'&&!consultation&&launchAdminActions.has(action)){
+      const actor=await currentUser(req);if(!actor||!await userIsAdmin(actor))return json({ok:false,error:'admin_required'},403);
+    }
+    if(target==='development'){try{assertFinanceDevelopment(projectUrl,Deno.env.get('FINANCE_ENVIRONMENT'))}catch{return json({ok:false,error:'isolated_finance_environment_required'},503)}}
     if(action==="calendar_export"){
       if(req.method!=="GET")return json({ok:false,error:"method_not_allowed"},405);
       return await calendars.exportFeed(url.searchParams.get("token")||"");
     }
     if(action==="admin_calendar")return await adminCalendarAction(req,body);
     const origin=req.headers.get("origin")||"";
-    const development=req.headers.get("x-chalezinho-env")==="development" &&
+    const development=target==='development' && (consultation || req.headers.get("x-chalezinho-env")==="development" &&
       (origin==="https://chalezinho-ville-git-feature-romantic-fdde70-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
@@ -2068,7 +2079,7 @@ Deno.serve(async(req)=>{
        origin==="https://chalezinho-ville-b1ai8z78g-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-9nrmtmt7w-roldneicosta-4140.vercel.app" ||
        /^https:\/\/chalezinho-ville-[a-z0-9]{9}-roldneicosta-4140\.vercel\.app$/.test(origin) ||
-       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin));
+       /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)));
 
     if(action==="identity_status"||action==="complete_identity"){
       const user=await currentUser(req);
@@ -2114,18 +2125,18 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         payment_settings:settingsQ.data||{},
         policy_documents:docsQ.data||[],
         required_booking_documents:bookingDocuments(docsQ.data||[],development),
-        experience_products:productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
+        experience_products:target==='production'?(productsQ.data||[]).filter(commercialItem):productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
     if(action==="villegram_quote"){
       // Public read-only merchandising also serves this project's server-side feed.
-      if(req.headers.get('x-chalezinho-env')!=='development'||new URL(projectUrl).hostname!=='pxfqmnhqodqyaaqeyjgr.supabase.co')return json({ok:false,error:'development_only'},403);
-      try{return json(await villegramStayQuote(body,{search:(start:string,end:string,guests:number)=>searchData(start,end,guests,null,true),quote:(input:any,list:any[])=>createQuote(input,true,null,null,list,false)}))}
+      if(!consultation&&(req.headers.get('x-chalezinho-env')!=='development'||target!=='development'))return json({ok:false,error:'development_only'},403);
+      try{return json(await villegramStayQuote(body,{search:(start:string,end:string,guests:number)=>searchData(start,end,guests,null,development),quote:(input:any,list:any[])=>createQuote(input,development,null,null,list,false)}))}
       catch(e){return json({ok:false,error:(e as Error).message||'quote_unavailable'},409)}
     }
     if(action==="villegram_offer"){
-      if(!development)return json({ok:false,error:'development_only'},403);
+      if(!development&&!consultation)return json({ok:false,error:'development_only'},403);
       const data=await stayOffers.catalog(),offer=data.offers.find((o:any)=>o.id===body.offer_id);
       if(!offer)return json({ok:false,error:'offer_unavailable'},404);
       try{
@@ -2138,7 +2149,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
       }catch{return json({ok:false,error:'offer_unavailable'},409)}
     }
     if(action==="stay_showcase"){
-      if(!development)return json({ok:false,error:"development_only"},403);
+      if(!development&&!consultation)return json({ok:false,error:"development_only"},403);
       const started=performance.now();
       const catalog=await stayOffers.catalog(),today=brazilClock().date,key=await showcaseCacheKey(today,catalog),catalogMs=performance.now()-started;
       let context:Promise<any>|null=null;
@@ -2149,7 +2160,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     }
     if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
     if(action==="villegram")return await villegram(req,body,development);
-    if(action==="stay_offer_action")return await stayOffers.action(req,body,development);
+    if(action==="stay_offer_action")return await stayOffers.action(req,body,development||target==='production');
     if(action==="legal_documents")return await legalDocuments(req,body,development);
     if(action==="property_media"){
       const {data,error}=await admin.from("properties").select("id,code,slug,name,tagline,summary,property_type,max_guests,cover_image,gallery,features").eq("active",true).order("id");
@@ -2169,7 +2180,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         const selected=catalog?.offers.find((o:any)=>o.id===offerId);
         const issues=offerId?selected?offerIssues(selected,catalog.products,x.id,{check_in:start,check_out:end}):["offer_unavailable"]:[];
         if(issues.length)return {...rest,offer_issues:issues,from_stay_price:null};
-        let quote;try{quote=await createQuote({property_id:x.id,check_in:start,check_out:end,guests,stay_offer_id:offerId||undefined},development,null,null,listings)}catch(e){return {...rest,from_stay_price:null,offer_issues:[(e as Error).message]}};
+        let quote;try{quote=await createQuote({property_id:x.id,check_in:start,check_out:end,guests,stay_offer_id:offerId||undefined},development,null,null,listings,!consultation)}catch(e){return {...rest,from_stay_price:null,offer_issues:[(e as Error).message]}};
         const available=quote.rate_options.filter((p:any)=>p.selectable);
         return {...rest,from_stay_price:Math.min(...available.map((p:any)=>p.total_amount_cents))/100,quote,offer_issues:[]};
       }));
@@ -2182,8 +2193,8 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     }
     if(action==="quote"){
       let approved=null;
-      if(body.same_day_request_id){const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);approved=await approvedSameDayRequest(admin,body.same_day_request_id,user.id,body)}
-      return json(await createQuote(body,development,null,approved));
+      if(!consultation&&body.same_day_request_id){const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);approved=await approvedSameDayRequest(admin,body.same_day_request_id,user.id,body)}
+      return json(await createQuote(body,development,null,approved,null,!consultation));
     }
     if(action==="reservation_incident"){
       const user=await currentUser(req);

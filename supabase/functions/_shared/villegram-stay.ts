@@ -21,7 +21,7 @@ export async function villegramStayQuote(raw:Row,{search,quote}:Row){
 }
 export async function resolvePublicationStay(p:Row,projectUrl:string,request=fetch){
  if(!p.stay_selection)return p;
- const r=await request(projectUrl+'/functions/v1/booking-engine',{method:'POST',headers:{'Content-Type':'application/json','X-Chalezinho-Env':'development'},body:JSON.stringify({action:'villegram_quote',property_id:p.property_id,offer_id:p.offer_id,...p.stay_selection}),signal:AbortSignal.timeout(25000)}),d=await r.json();
+ const r=await request(projectUrl+'/functions/v1/booking-engine',{method:'POST',headers:{'Content-Type':'application/json','X-Chalezinho-Env':'development'},body:JSON.stringify({action:'consult_villegram_quote',property_id:p.property_id,offer_id:p.offer_id,...p.stay_selection}),signal:AbortSignal.timeout(25000)}),d=await r.json();
  if(!r.ok||!d.ok||!d.card)throw Error('stay_unavailable');
  return {...p,stay_card:d.card};
 }
