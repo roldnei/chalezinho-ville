@@ -1,3 +1,4 @@
+import {commercialPricing,experienceCommercial} from '../_shared/experience-commercial.ts';
 import {consultationActions,launchAdminActions,releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {villegramStayQuote} from '../_shared/villegram-stay.ts';
 import {isCelebration} from "../_shared/stay-showcase.ts";
@@ -350,8 +351,10 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
       const included=offer?.product_ids.includes(prod.id)||false;
       if(!included&&prod.details?.standalone_enabled===false)throw Error("experience_not_sold_separately");
       for(const c of experienceComponents(prod.details)){const key=c.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();if(seenComponents.has(key))throw Error("experience_component_conflict");seenComponents.add(key)}
-      experienceTotal+=Number(v.price_cents||0);
-      expSnapshots.push({variant:v,product:prod,included,composition:compositionSnapshot(prod,body.experience_preferences?.[prod.id]||{})});
+      const preferences=body.experience_preferences?.[prod.id]||{},condition=experienceCommercial(prod,preferences);
+      const variant={...v,price_cents:condition?.price_cents??v.price_cents};
+      experienceTotal+=Number(variant.price_cents||0);
+      expSnapshots.push({variant,product:prod,included,composition:{...compositionSnapshot({...prod,price_cents:variant.price_cents},preferences),...(condition?{commercial_condition:condition}: {})}});
     }
   }
 
@@ -667,6 +670,7 @@ async function startPayment(req:Request,body:any,development:boolean){
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
   if((option.quotes as any)?.pricing_snapshot?.modification_only)return json({ok:false,error:"modification_quote_not_payable"},409);
+  if(option.contract_snapshot?.experiences?.some((p:any)=>p.commercial_condition?.consultation_only))return json({ok:false,error:"commercial_payment_not_released"},403);
   if(option.contract_snapshot?.experiences?.some((p:any)=>p.components?.some((c:any)=>c.choices?.length&&!c.choice)))return json({ok:false,error:"experience_choice_required"},400);
   const {data:property}=await admin.from("properties").select("guarantee_amount_cents")
     .eq("id",(option.quotes as any)?.property_id).single();
@@ -1539,7 +1543,7 @@ async function experienceAdminAction(req:Request,body:any){
     const packageType=["romantic","beach","breakfast","celebration","wellness","other"].includes(String(body?.package_type))?String(body.package_type):"other";
     const priceCents=Math.max(0,Math.round(Number(body?.price_cents||0)));
     const upsellEnabled=body?.upsell_enabled===true;
-    let components;try{components=experienceComponents({components:body.components||[]})}catch{return json({ok:false,error:"invalid_components"},400)}
+    let components,pricing;try{components=experienceComponents({components:body.components||[]});pricing=body.commercial_pricing===undefined?undefined:commercialPricing(body.commercial_pricing)}catch{return json({ok:false,error:"invalid_components"},400)}
     const propertyIds=Array.isArray(body.property_ids)?[...new Set(body.property_ids.map(Number))]:null;
     if(propertyIds&&(!propertyIds.length||propertyIds.some((x:any)=>!Number.isSafeInteger(x)||x<1)))return json({ok:false,error:"experience_property_required"},400);
     const rawMedia=Array.isArray(body?.media_items)?body.media_items:[];
@@ -1553,6 +1557,7 @@ async function experienceAdminAction(req:Request,body:any){
       .map((m:any)=>[m.media_url,m])).values()];
     if(!name) return json({ok:false,error:"experience_name_required"},400);
     if(priceCents<=0) return json({ok:false,error:"experience_price_required"},400);
+    if(pricing&&pricing.cash_cents!==priceCents)return json({ok:false,error:"invalid_commercial_pricing"},400);
     if(mediaItems.length<1) return json({ok:false,error:"experience_photo_required",photo_count:mediaItems.length},400);
 
     let existing:any=null;
@@ -1567,7 +1572,7 @@ async function experienceAdminAction(req:Request,body:any){
       code,name,description,package_type:packageType,price_cents:priceCents,upsell_enabled:upsellEnabled,
       status:body.status==="active"?"active":body.status==="inactive"?"inactive":existing?.status||"draft",
       sales_headline:existing?.sales_headline||null,
-      details:{...(existing?.details||{}),...(body.components?{components}:{}),standalone_enabled:body.standalone_enabled??existing?.details?.standalone_enabled??true,offer_enabled:body.offer_enabled??existing?.details?.offer_enabled??true},
+      details:{...(existing?.details||{}),...(body.components?{components}:{}),...(pricing===undefined?{}:{commercial_pricing:pricing}),standalone_enabled:body.standalone_enabled??existing?.details?.standalone_enabled??true,offer_enabled:body.offer_enabled??existing?.details?.offer_enabled??true},
       minimum_lead_hours:Number(body.minimum_lead_hours??existing?.minimum_lead_hours??0),daily_capacity:body.daily_capacity===null?null:Number(body.daily_capacity??existing?.daily_capacity??0)||null,inventory:body.inventory===null?null:body.inventory!==undefined?Number(body.inventory):existing?.inventory??null,
       travel_purposes:Array.isArray(existing?.travel_purposes)?existing.travel_purposes:[],
       display_order:Number(existing?.display_order||0)

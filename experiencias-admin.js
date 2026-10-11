@@ -51,6 +51,8 @@ function selectExperience(id){
   $("#exp-name").value=current?.name||"";
   $("#exp-price").value=current?Number(current.price_cents||0)/100:"";
   $("#exp-description").value=current?.description||"";
+  $("#exp-card-price").value=current?.details?.commercial_pricing?current.details.commercial_pricing.card_cents/100:"";
+  $("#exp-card-installments").value=current?.details?.commercial_pricing?.max_installments||4;
   $("#exp-upsell-yes").checked=current?.upsell_enabled===true;
   $("#exp-upsell-no").checked=current?.upsell_enabled!==true;
   $("#exp-status").value=current?.status==='active'?'active':'inactive';
@@ -119,7 +121,7 @@ async function save(e){
     const r=await api("experience_admin_action",{
       operation:"save_simple_product",id:current?.id||null,
       package_type:$("#exp-type").value,name,
-      price_cents:price,description:$("#exp-description").value.trim(),
+      price_cents:price,commercial_pricing:$("#exp-card-price").value?{cash_cents:price,card_cents:Math.round(Number($("#exp-card-price").value)*100),max_installments:Number($("#exp-card-installments").value)}:null,description:$("#exp-description").value.trim(),
       upsell_enabled:$("#exp-upsell-yes").checked,
       status:$('#exp-status').value,standalone_enabled:$('#exp-standalone').checked,offer_enabled:$('#exp-offer').checked,
       property_ids:[...$('#package-properties').querySelectorAll('input:checked')].map(x=>Number(x.value)),

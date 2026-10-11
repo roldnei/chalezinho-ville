@@ -204,7 +204,7 @@ async function restoreSameDay(){if(PUBLIC)return false;
 
 async function openFlow(id){
  state.activePayment=null;state.paymentView=null;clearInterval(window.__pagbankPoll);
- state.fastCheckout=true;state.rateConfirmed=false;state.stage="review";state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};const desiredExperience=new URLSearchParams(location.search).get('experience');const desired=(state.config?.experience_products||[]).find(p=>p.id===desiredExperience);const variant=desired?.experience_variants?.find(v=>v.active);if(!state.offerId&&desired&&variant)state.selectedByProduct[desired.id]=variant.id;state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
+ state.fastCheckout=true;state.rateConfirmed=false;state.stage="review";state.property=state.search.find(x=>Number(x.id)===id);state.selectedByProduct={};const desiredExperience=new URLSearchParams(location.search).get('experience');const desired=(state.config?.experience_products||[]).find(p=>p.id===desiredExperience);const variant=desired?.experience_variants?.find(v=>v.active);if(!state.offerId&&desired&&variant&&!desired.details?.commercial_pricing)state.selectedByProduct[desired.id]=variant.id;state.quote=null;state.rate=null;state.rateCode=null;state.upsellHandled=false;
  track("property_viewed",{property_id:state.property.id,metadata:{nights:stayNights()}});
  setCheckoutVisible(true);$("#checkout-title").textContent=state.property.name;$("#checkout-summary").textContent=$("#book-in").value.split("-").reverse().join("/")+" a "+$("#book-out").value.split("-").reverse().join("/");
  if(state.fastCheckout){$('#checkout-rate-options')?.remove();$("#summary-content").innerHTML='<p class="loading-state">Confirmando sua escolha…</p>'}
@@ -248,6 +248,7 @@ function eligibleExperienceProducts(purpose=""){
  const checkInAt=checkIn?Date.parse(checkIn+"T15:00:00-03:00"):Infinity;
  return (state.config.experience_products||[])
   .filter(p=>p.status==="active")
+  .filter(p=>PUBLIC||!p.details?.commercial_pricing)
   .filter(p=>p.details?.standalone_enabled!==false&&!selectedOffer()?.product_ids.includes(p.id))
   .filter(p=>!selectedOffer()?.product_ids.some(id=>(state.config.experience_products||[]).find(x=>x.id===id)?.package_type===p.package_type))
   .filter(p=>Number(p.price_cents||0)>0)
@@ -273,15 +274,24 @@ function renderExperienceList(purpose){
   const variant=primaryVariant(p);if(!variant)return;
   const media=(p.experience_media||[]).slice().sort((a,b)=>a.display_order-b.display_order);
   const selected=state.selectedByProduct[p.id]===variant.id;
+  const pricing=p.details?.commercial_pricing,condition=state.preferences[p.id]?._commercial_condition;
+  const conditionMarkup=pricing?'<label class="offer-choice-fields">Condição · '+esc(p.name)+'<select data-commercial="'+p.id+'"><option value="">Escolha uma condição</option><option value="cash" '+(condition==='cash'?'selected':'')+'>À vista · '+brlC(pricing.cash_cents)+'</option><option value="card" '+(condition==='card'?'selected':'')+'>Cartão · '+brlC(pricing.card_cents)+' · até '+pricing.max_installments+'x sem juros</option></select></label>':'';
+  const shownPrice=pricing?(condition==='cash'?pricing.cash_cents:condition==='card'?pricing.card_cents:null):variant.price_cents;
   const slides=media.map((m,i)=>'<img class="experience-slide '+(i===0?"active":"")+'" src="'+m.media_url+'" alt="'+(m.alt_text||p.name)+'" loading="lazy">').join("");
   const controls=media.length>1?'<button class="exp-arrow prev" type="button" aria-label="Foto anterior">‹</button><button class="exp-arrow next" type="button" aria-label="Próxima foto">›</button><div class="exp-dots">'+media.map((_,i)=>'<span class="'+(i===0?"active":"")+'"></span>').join("")+'</div>':"";
   const item=document.createElement("article");item.className="experience-card"+(selected?" selected":"");
-  item.innerHTML='<div class="experience-carousel">'+slides+controls+'</div><div class="experience-copy"><small>'+String(p.package_type||"experiência").toUpperCase()+'</small><h4>'+p.name+'</h4><strong class="experience-headline">'+(p.sales_headline||"Um detalhe a mais para a estadia.")+'</strong><p>'+p.description+'</p><div class="experience-actions"><button type="button" class="experience-buy '+(selected?"selected":"")+'" data-package="'+p.id+'" data-variant="'+variant.id+'">'+(selected?"✓ Adicionado":"Adicionar por "+brlC(p.price_cents))+'</button>'+(selected?'<button class="text-action remove-experience" type="button" data-remove="'+p.id+'">Remover experiência</button>':"")+'</div></div>';
+  item.innerHTML='<div class="experience-carousel">'+slides+controls+'</div><div class="experience-copy"><small>'+String(p.package_type||"experiência").toUpperCase()+'</small><h4>'+p.name+'</h4><strong class="experience-headline">'+(p.sales_headline||"Um detalhe a mais para a estadia.")+'</strong><p>'+esc(p.description)+'</p>'+conditionMarkup+'<div class="experience-actions"><button type="button" '+(pricing&&!condition?'disabled ':'')+'class="experience-buy '+(selected?"selected":"")+'" data-package="'+p.id+'" data-variant="'+variant.id+'">'+(selected?"✓ Adicionado":shownPrice===null?"Escolha a condição":"Adicionar por "+brlC(shownPrice))+'</button>'+(selected?'<button class="text-action remove-experience" type="button" data-remove="'+p.id+'">Remover experiência</button>':"")+'</div></div>';
   box.appendChild(item);
  });
  bindExperienceControls();
 }
 function bindExperienceControls(){
+ $$('[data-commercial]').forEach(select=>select.onchange=()=>{
+  if(state.fastUpdating)return;
+  const id=select.dataset.commercial,wasSelected=!!state.selectedByProduct[id];state.preferences[id]??={};state.preferences[id]._commercial_condition=select.value;
+  if(!select.value)delete state.selectedByProduct[id];
+  persistSelection();renderExperienceList($('#trip-purpose-initial').value);renderOfferChoices();if(state.fastCheckout&&wasSelected)updateFastQuote();
+ });
  $$(".experience-carousel").forEach(car=>{
   const slides=[...car.querySelectorAll(".experience-slide")],dots=[...car.querySelectorAll(".exp-dots span")];let index=0;
   const go=n=>{if(!slides.length)return;index=(n+slides.length)%slides.length;slides.forEach((s,i)=>s.classList.toggle("active",i===index));dots.forEach((d,i)=>d.classList.toggle("active",i===index))};
@@ -713,7 +723,7 @@ async function openFastCheckout(){
 async function updateFastQuote(){
  if(state.fastUpdating)return;
  state.fastUpdating=true;$('#step-next').disabled=true;
- const controls=$$('#direct-extras button, #offer-choices select, #checkout-rate-options input, #checkout-stay-mode, #trip-purpose-review');controls.forEach(b=>b.disabled=true);
+ const controls=$$('#direct-extras button, #offer-choices select, #checkout-rate-options input, #checkout-stay-mode, #trip-purpose-review, [data-commercial]');controls.forEach(b=>b.disabled=true);
  try{await refreshQuoteAfterExperiences();if(!state.rate)throw new Error('tariff_unavailable');if(state.stage==='review')renderReview();else renderSummary();setFlowError(PUBLIC?'Consulta atualizada. Confira o total antes de continuar.':'Reserva atualizada. Confira o total e aceite os termos antes de pagar.')}
  catch(e){state.rate=null;state.quote=null;$('#summary-content').textContent='Consulta indisponível. Revise sua seleção e consulte novamente.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar esta escolha. Remova o adicional ou consulte outras opções.');}
  finally{state.fastUpdating=false;controls.forEach(b=>b.disabled=false);$('#step-next').disabled=!state.rate||!state.rateConfirmed;}

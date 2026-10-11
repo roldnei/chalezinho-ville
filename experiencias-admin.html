@@ -5,7 +5,8 @@
 <div class="simple-form-title"><div><small>EXPERIÊNCIA</small><h2>Dados do pacote</h2></div><span id="experience-status" class="simple-status"></span></div>
 <label>Tipo do pacote<select id="exp-type"><option value="romantic">Romântico</option><option value="beach">Praia</option><option value="breakfast">Café da manhã</option><option value="celebration">Comemoração</option><option value="wellness">Bem-estar</option><option value="other">Outros</option></select></label>
 <label>Nome<input id="exp-name" placeholder="Ex.: Ultra Premium Lua de Mel" required></label>
-<label>Preço (R$)<input id="exp-price" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="599,00" required></label>
+<label>Preço à vista ou único (R$)<input id="exp-price" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="599,00" required></label>
+<fieldset><legend>Condições comerciais (opcional)</legend><label>Preço no cartão (R$)<input id="exp-card-price" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="Mesmo preço"></label><label>Máximo de parcelas sem juros<input id="exp-card-installments" type="number" min="1" max="12" step="1" value="4"></label><p>Quando preenchido, o preço acima corresponde à condição à vista. Estas condições serão consultadas e finalizadas pelo atendimento.</p></fieldset>
 <label>Descrição<textarea id="exp-description" rows="7" placeholder="O que o hóspede recebe neste pacote?"></textarea></label>
 <section><h2>O que está incluído</h2><p>Liste o que a equipe deve separar. Nas escolhas, use vírgulas: vinho, espumante.</p><div id="package-components"></div><button id="add-component" type="button">+ Adicionar item</button></section>
 <fieldset><legend>Imóveis participantes</legend><div id="package-properties" class="offer-checks"></div></fieldset>
