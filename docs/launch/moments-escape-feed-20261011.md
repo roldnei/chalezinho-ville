@@ -36,3 +36,9 @@ Não houve teste em aparelho físico; os quadros usam documentos reais carregado
 Não foram alterados motores de preço/disponibilidade, APIs de consulta, guardas de pagamentos/holds, rotinas financeiras, calendário, PMS, contratos, mídias, publicações, checkout completo ou Feelings. Evidência de ausência de efeitos financeiros do fluxo permanece no relatório `ultra-escapadas-20261011.md`; não representa um novo ensaio integral de checkout nesta correção de feed/layout.
 
 A publicação em produção permanece pendente da autorização e dos pré-requisitos dos relatórios de lançamento anteriores. Esta mudança, quando autorizada, usa os mesmos assets na única base de código e a configuração explícita de ambiente/recurso. Retorno desta correção de frontend: reverter seu commit ou reconstruir o código `9997ef3` no ambiente correto. Não restaurar nem excluir dados de hóspedes, contratos ou pagamentos. Nunca promover uma prévia DEV para PROD.
+
+## Prévia final confirmada
+
+https://chalezinho-ville-35yaq7uot-roldneicosta-4140.vercel.app/index.html?view=moments
+
+Deployment `dpl_7nQRsc97CujcXZWsM9iHZjuYKpSu`, READY, target null, commit `d65b80f1cd361e0a234449b547636c9ae114d736`. Reaberto o feed diretamente na versão final: 28 entradas e 24 cards reais da vitrine, sem clique numa sugestão. Nova captura do quadro 390px na versão final em `evidence/moments-mobile-final-20261011.jpg`. Prévia privada do editor mantém título salvo; quinta regressão passou no total de 454 testes. Último PROD READY reconferido continua `dpl_GfCE3VYLNmxwSorGBUPYQjU6ys41`, commit `9bc9e0e7d3b9d18bb643e724f999ff37f64bc2fc`, igual à evidência anterior.
