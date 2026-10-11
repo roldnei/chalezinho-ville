@@ -1,0 +1,270 @@
+{
+  "environment": "development",
+  "type": "real browser in 320x844 iframe; no physical device",
+  "url": "https://chalezinho-ville-nrah38l4p-roldneicosta-4140.vercel.app/launch-qa.html?width=320&villegram=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH3&check_in=2026-10-19&check_out=2026-10-21",
+  "feed": [
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-19&check_out=2026-10-21&rate=non_refundable&expected_total=172263&from=showcase",
+      "position": "1 de 28",
+      "price": "R$ 1.722,63",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "chale-premium.html",
+      "position": "2 de 28",
+      "title": "Ville Signature"
+    },
+    {
+      "href": null,
+      "position": "3 de 28",
+      "title": "Do seu jeito"
+    },
+    {
+      "href": "chale-com-hidro.html",
+      "position": "4 de 28",
+      "title": "Ville Essenza"
+    },
+    {
+      "href": "chale-romantico.html",
+      "position": "5 de 28",
+      "title": "Ville Amore"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-19&check_out=2026-10-21&rate=non_refundable&expected_total=183435&from=showcase",
+      "position": "6 de 28",
+      "price": "R$ 1.834,35",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-19&check_out=2026-10-21&rate=non_refundable&expected_total=186285&from=showcase",
+      "position": "7 de 28",
+      "price": "R$ 1.862,85",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-19&check_out=2026-10-22&rate=non_refundable&expected_total=253868&from=showcase",
+      "position": "8 de 28",
+      "price": "R$ 2.538,68",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-19&check_out=2026-10-22&rate=non_refundable&expected_total=256718&from=showcase",
+      "position": "9 de 28",
+      "price": "R$ 2.567,18",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-24&check_out=2026-10-26&rate=non_refundable&expected_total=218500&from=showcase",
+      "position": "10 de 28",
+      "price": "R$ 2.185,00",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-24&check_out=2026-10-26&rate=non_refundable&expected_total=221500&from=showcase",
+      "position": "11 de 28",
+      "price": "R$ 2.215,00",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-24&check_out=2026-10-27&rate=non_refundable&expected_total=278120&from=showcase",
+      "position": "12 de 28",
+      "price": "R$ 2.781,20",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH1&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-24&check_out=2026-10-27&rate=non_refundable&expected_total=281120&from=showcase",
+      "position": "13 de 28",
+      "price": "R$ 2.811,20",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-19&check_out=2026-10-21&rate=non_refundable&expected_total=179474&from=showcase",
+      "position": "14 de 28",
+      "price": "R$ 1.794,74",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-19&check_out=2026-10-21&rate=non_refundable&expected_total=182324&from=showcase",
+      "position": "15 de 28",
+      "price": "R$ 1.823,24",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-26&check_out=2026-10-29&rate=non_refundable&expected_total=231828&from=showcase",
+      "position": "16 de 28",
+      "price": "R$ 2.318,28",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-26&check_out=2026-10-29&rate=non_refundable&expected_total=234678&from=showcase",
+      "position": "17 de 28",
+      "price": "R$ 2.346,78",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-17&check_out=2026-10-19&rate=non_refundable&expected_total=226870&from=showcase",
+      "position": "18 de 28",
+      "price": "R$ 2.268,70",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-17&check_out=2026-10-19&rate=non_refundable&expected_total=229870&from=showcase",
+      "position": "19 de 28",
+      "price": "R$ 2.298,70",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-17&check_out=2026-10-20&rate=non_refundable&expected_total=280000&from=showcase",
+      "position": "20 de 28",
+      "price": "R$ 2.800,00",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH2&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-17&check_out=2026-10-20&rate=non_refundable&expected_total=283000&from=showcase",
+      "position": "21 de 28",
+      "price": "R$ 2.830,00",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-19&check_out=2026-10-21&rate=non_refundable&expected_total=175113&from=showcase",
+      "position": "22 de 28",
+      "price": "R$ 1.751,13",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-19&check_out=2026-10-22&rate=non_refundable&expected_total=229320&from=showcase",
+      "position": "23 de 28",
+      "price": "R$ 2.293,20",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-19&check_out=2026-10-22&rate=non_refundable&expected_total=232170&from=showcase",
+      "position": "24 de 28",
+      "price": "R$ 2.321,70",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-17&check_out=2026-10-19&rate=non_refundable&expected_total=222250&from=showcase",
+      "position": "25 de 28",
+      "price": "R$ 2.222,50",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-17&check_out=2026-10-19&rate=non_refundable&expected_total=225250&from=showcase",
+      "position": "26 de 28",
+      "price": "R$ 2.252,50",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&check_in=2026-10-17&check_out=2026-10-20&rate=non_refundable&expected_total=271970&from=showcase",
+      "position": "27 de 28",
+      "price": "R$ 2.719,70",
+      "title": "Escapada Ultra Premium"
+    },
+    {
+      "href": "reservar.html?chalet=CH3&guests=2&stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&check_in=2026-10-17&check_out=2026-10-20&rate=non_refundable&expected_total=274970&from=showcase",
+      "position": "28 de 28",
+      "price": "R$ 2.749,70",
+      "title": "Escapada Ultra Premium"
+    }
+  ],
+  "vitrine": [
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH3&check_in=2026-10-19&check_out=2026-10-21&guests=2&rate=non_refundable&expected_total=172263&from=showcase",
+      "price": "R$ 1.722,63"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH3&check_in=2026-10-19&check_out=2026-10-21&guests=2&rate=non_refundable&expected_total=175113&from=showcase",
+      "price": "R$ 1.751,13"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH2&check_in=2026-10-19&check_out=2026-10-21&guests=2&rate=non_refundable&expected_total=179474&from=showcase",
+      "price": "R$ 1.794,74"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH2&check_in=2026-10-19&check_out=2026-10-21&guests=2&rate=non_refundable&expected_total=182324&from=showcase",
+      "price": "R$ 1.823,24"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH1&check_in=2026-10-19&check_out=2026-10-21&guests=2&rate=non_refundable&expected_total=183435&from=showcase",
+      "price": "R$ 1.834,35"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH1&check_in=2026-10-19&check_out=2026-10-21&guests=2&rate=non_refundable&expected_total=186285&from=showcase",
+      "price": "R$ 1.862,85"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH3&check_in=2026-10-19&check_out=2026-10-22&guests=2&rate=non_refundable&expected_total=229320&from=showcase",
+      "price": "R$ 2.293,20"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH2&check_in=2026-10-26&check_out=2026-10-29&guests=2&rate=non_refundable&expected_total=231828&from=showcase",
+      "price": "R$ 2.318,28"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH3&check_in=2026-10-19&check_out=2026-10-22&guests=2&rate=non_refundable&expected_total=232170&from=showcase",
+      "price": "R$ 2.321,70"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH2&check_in=2026-10-26&check_out=2026-10-29&guests=2&rate=non_refundable&expected_total=234678&from=showcase",
+      "price": "R$ 2.346,78"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH1&check_in=2026-10-19&check_out=2026-10-22&guests=2&rate=non_refundable&expected_total=253868&from=showcase",
+      "price": "R$ 2.538,68"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH1&check_in=2026-10-19&check_out=2026-10-22&guests=2&rate=non_refundable&expected_total=256718&from=showcase",
+      "price": "R$ 2.567,18"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH1&check_in=2026-10-24&check_out=2026-10-26&guests=2&rate=non_refundable&expected_total=218500&from=showcase",
+      "price": "R$ 2.185,00"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH1&check_in=2026-10-24&check_out=2026-10-26&guests=2&rate=non_refundable&expected_total=221500&from=showcase",
+      "price": "R$ 2.215,00"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH3&check_in=2026-10-17&check_out=2026-10-19&guests=2&rate=non_refundable&expected_total=222250&from=showcase",
+      "price": "R$ 2.222,50"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH3&check_in=2026-10-17&check_out=2026-10-19&guests=2&rate=non_refundable&expected_total=225250&from=showcase",
+      "price": "R$ 2.252,50"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH2&check_in=2026-10-17&check_out=2026-10-19&guests=2&rate=non_refundable&expected_total=226870&from=showcase",
+      "price": "R$ 2.268,70"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH2&check_in=2026-10-17&check_out=2026-10-19&guests=2&rate=non_refundable&expected_total=229870&from=showcase",
+      "price": "R$ 2.298,70"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH3&check_in=2026-10-17&check_out=2026-10-20&guests=2&rate=non_refundable&expected_total=271970&from=showcase",
+      "price": "R$ 2.719,70"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH3&check_in=2026-10-17&check_out=2026-10-20&guests=2&rate=non_refundable&expected_total=274970&from=showcase",
+      "price": "R$ 2.749,70"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH1&check_in=2026-10-24&check_out=2026-10-27&guests=2&rate=non_refundable&expected_total=278120&from=showcase",
+      "price": "R$ 2.781,20"
+    },
+    {
+      "href": "reservar.html?stay_offer=1826ddf2-87f4-4c04-8f3f-e3f1e830fdca&chalet=CH2&check_in=2026-10-17&check_out=2026-10-20&guests=2&rate=non_refundable&expected_total=280000&from=showcase",
+      "price": "R$ 2.800,00"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH1&check_in=2026-10-24&check_out=2026-10-27&guests=2&rate=non_refundable&expected_total=281120&from=showcase",
+      "price": "R$ 2.811,20"
+    },
+    {
+      "href": "reservar.html?stay_offer=87c99ed5-16e2-4e26-bf10-c2b0d34a519a&chalet=CH2&check_in=2026-10-17&check_out=2026-10-20&guests=2&rate=non_refundable&expected_total=283000&from=showcase",
+      "price": "R$ 2.830,00"
+    }
+  ],
+  "mismatches": []
+}

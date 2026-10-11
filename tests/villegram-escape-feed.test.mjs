@@ -33,3 +33,5 @@ test('same arrival preserves the clicked departure, condition and total, without
  w.Villegram.close();w.VillegramContent.enter();assert.equal(w.document.querySelector('.vg-primary').href,href,'return must restore the exact escape');
 });
 test('following feed remains limited to followed publications',async t=>{const {w,settle}=await setup(t,{following:true});await settle();w.Villegram.configure(escapes,[],[]);assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 4$/)});
+
+test('private composer previews retain the saved immersive headline',async t=>{const {w,settle}=await setup(t);await settle();const preview={...escape(),preview:true};w.Villegram.configure([preview],[{id:preview.offer_id,villegram:{title:'Título imersivo salvo no editor'}}],[]);w.Villegram.open(preview);assert.equal(w.document.querySelector('h2').textContent,'Título imersivo salvo no editor');assert.equal(w.document.querySelector('.vg-price').textContent,'Consulte as datas para saber o total')});
