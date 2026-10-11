@@ -16,3 +16,15 @@ test('production consultation config does not query payment settings or expose p
  const r=await handler(new Request('https://example.test/?action=config'));assert.equal(r.status,200);const body=await r.json();assert.equal(body.ok,true);assert.deepEqual(body.payment_settings,{});assert.ok(!tables.includes('payment_settings'));assert.deepEqual(body.experience_products,[]);
 });
 
+test('production PMS requires active admin and permits property settings without enabling payments',async()=>{
+ async function run(role,action,operation){
+  let handler,writes=0;const db={auth:{getUser:async()=>({data:{user:{id:'fixture-user'}},error:null})},from(table){const q={select(){return q},eq(){return q},update(){writes++;return q},single(){return q},maybeSingle(){return q},then(resolve){return Promise.resolve({data:table==='profiles'?{role,pms_access_status:'active'}:{id:1,cleaning_fee:290},error:null}).then(resolve)}};return q}};
+  const empty=new Proxy({}, {get:()=>()=>({})}),code=ts.transpileModule(readFileSync('supabase/functions/booking-engine/index.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
+  vm.runInNewContext(code,{exports:{},require(name){if(name.includes('release-policy'))return release;if(name.startsWith('npm:'))return {createClient:()=>db};return empty},Deno:{env:{get:k=>k==='SUPABASE_URL'?'https://'+release.PROD_PROJECT+'.supabase.co':'fixture'},serve:h=>handler=h},Response,URL,console});
+  const r=await handler(new Request('https://example.test/?action='+action,{method:'POST',headers:{Authorization:'Bearer fixture','Content-Type':'application/json','X-Chalezinho-Env':'development'},body:JSON.stringify({operation,property_id:1,cleaning_fee:290,guarantee_amount_cents:50000})}));return {status:r.status,body:await r.json(),writes};
+ }
+ for(const action of ['ops','ops_settings_action','admin_notification_action']){const r=await run('guest',action,'property_settings');assert.equal(r.status,403);assert.equal(r.body.error,'admin_required');assert.equal(r.writes,0)}
+ const blocked=await run('admin','ops_settings_action','payment_settings');assert.equal(blocked.status,403);assert.equal(blocked.writes,0);
+ const property=await run('admin','ops_settings_action','property_settings');assert.equal(property.status,200);assert.equal(property.writes,1);
+});
+

@@ -1,6 +1,6 @@
 import {lodgingLaunchCatalog,lodgingLaunchPlans,assertLodgingLaunchSelection,lodgingLaunchPrice} from '../_shared/lodging-launch.ts';
 import {commercialPricing,experienceCommercial,offerExperiencePreferences} from '../_shared/experience-commercial.ts';
-import {consultationActions,launchAdminActions,releaseTarget,commercialItem} from '../_shared/release-policy.ts';
+import {consultationActions,launchAdminActions,launchAdminOperationAllowed,releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {villegramStayQuote} from '../_shared/villegram-stay.ts';
 import {isCelebration} from "../_shared/stay-showcase.ts";
 import {villegramService} from "../_shared/villegram.ts";
@@ -2075,6 +2075,7 @@ Deno.serve(async(req)=>{
     if(target==='production'&&!consultation&&!['calendar_export',...launchAdminActions].includes(action))return json({ok:false,error:'public_checkout_disabled'},403);
     if(target==='production'&&!consultation&&launchAdminActions.has(action)){
       const actor=await currentUser(req);if(!actor||!await userIsAdmin(actor))return json({ok:false,error:'admin_required'},403);
+      if(!launchAdminOperationAllowed(action,body))return json({ok:false,error:'public_checkout_disabled'},403);
     }
     if(target==='development'){try{assertFinanceDevelopment(projectUrl,Deno.env.get('FINANCE_ENVIRONMENT'))}catch{return json({ok:false,error:'isolated_finance_environment_required'},503)}}
     if(action==="calendar_export"){
