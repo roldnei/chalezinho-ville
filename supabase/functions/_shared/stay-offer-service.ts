@@ -4,13 +4,13 @@ export function stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl}
  async function catalog(includePaused=false){
   const query=admin.from('stay_offers').select('*').order('created_at');
   const {data:offers,error}=await(includePaused?query:query.eq('status','active'));
-  const {data:products,error:pe}=await admin.from('experience_products').select('id,name,status,description,price_cents,details,package_type,minimum_lead_hours,daily_capacity,inventory,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(media_url,alt_text,display_order)');
+  const {data:products,error:pe}=await admin.from('experience_products').select('id,code,name,status,description,price_cents,details,package_type,minimum_lead_hours,daily_capacity,inventory,experience_variants(id,code,name,price_cents,active,display_order),experience_property_eligibility(property_id),experience_media(media_url,alt_text,display_order)');
   if(error||pe)throw Error('offer_catalog_unavailable');
   const eligible=releaseTarget(projectUrl)==='production'&&!includePaused?(products||[]).filter(commercialItem):products||[];
   return {offers:releaseTarget(projectUrl)==='production'&&!includePaused?(offers||[]).filter(commercialItem).filter((o:any)=>o.product_ids.every((id:string)=>eligible.some((p:any)=>p.id===id))):offers||[],products:eligible};
  }
  async function action(req:Request,body:any,development:boolean){
-  if(!development)return json({ok:false,error:'development_only'},403);
+  if(!development&&releaseTarget(projectUrl)!=='production')return json({ok:false,error:'development_only'},403);
   const user=await currentUser(req);if(!user||!await userIsAdmin(user))return json({ok:false,error:'admin_required'},403);
   const data=await catalog(true);
   if(body.operation==='list')return json({ok:true,...data});

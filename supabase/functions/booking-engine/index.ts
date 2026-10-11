@@ -9,7 +9,7 @@ import {cachedWeekdayShowcase} from "../_shared/stay-showcase.ts";
 import {persistentShowcase,showcaseCacheKey} from "../_shared/showcase-cache.ts";
 import {stayOfferService} from "../_shared/stay-offer-service.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
-import {brazilClock,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
+import {brazilClock,availabilityDefaults,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey} from "../_shared/calendars.ts";
@@ -235,7 +235,7 @@ async function searchSources(start:string,end:string){
 }
 async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false,sources:any=null){
   if(!Number.isInteger(guests)||guests<1||guests>12)throw Error("capacity");
-  if(!validDate(start)||!validDate(end)||end<=start||nights(start,end)>90)throw Error("invalid_dates");
+  if(!validDate(start)||!validDate(end)||end<=start||nights(start,end)>availabilityDefaults.max_nights)throw Error("invalid_dates");
   const stay=nights(start,end);if(stay<1)throw Error("invalid_dates");
   const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices]=sources||await searchSources(start,end);
   const {data:properties,error:pe}=propertiesQ;
@@ -2050,9 +2050,12 @@ Deno.serve(async(req)=>{
     let body:any={};
     if(req.method==="POST") body=await req.json().catch(()=>({}));
     const rawAction=url.searchParams.get("action")||body.action||"config";
-    const consultation=String(rawAction).startsWith('consult_');
-    const action=consultation?String(rawAction).slice(8):rawAction;
     const target=releaseTarget(projectUrl);
+    const prefixed=String(rawAction).startsWith('consult_');
+    // Authenticated PMS screens also fetch the public catalog from this engine.
+    // All public reads on PROD are forced to the non-persisting consultation path.
+    const consultation=prefixed||target==='production'&&consultationActions.has(String(rawAction));
+    const action=prefixed?String(rawAction).slice(8):rawAction;
     if(consultation&&!consultationActions.has(action))return json({ok:false,error:'consultation_operation_not_allowed'},403);
     // Production can expose only the explicitly prepared consultation and core
     // PMS operations. Spoofed development headers never unlock the financial code.

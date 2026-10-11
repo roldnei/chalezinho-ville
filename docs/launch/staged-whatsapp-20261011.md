@@ -37,7 +37,7 @@ Em PROD, o projeto identificado pelo `SUPABASE_URL` é a autoridade: operações
 
 A migration aditiva `20261011040000_public_consultation_guard.sql` impede INSERT de novas reservas diretas em `hold`/`pending_payment` no modo WhatsApp. Não altera reservas existentes, não intercepta UPDATE de histórico, não apaga bloqueios e não interfere em reservas importadas/manuais confirmadas. A tabela de configuração é inacessível a anon/authenticated. Aplicada somente em DEV, com `checkout-development` ao final para preservar o checkout de homologação. Teste transacional temporário de `whatsapp` rejeitou hold com `public_checkout_disabled`; rollback restaurou o modo DEV.
 
-O engine e as rotinas de leitura podem atualizar saúde/cache de calendários e cache da vitrine; isso não é bloqueio de agenda. Nenhuma rotina financeira é acionada pela consulta. Public feed não gera novas publicações nem expõe submissões de hóspedes; geração/administração original permanece no DEV completo.
+O engine e as rotinas de leitura podem atualizar saúde/cache de calendários e cache da vitrine; isso não é bloqueio de agenda. Nenhuma rotina financeira é acionada pela consulta. Os seis jobs DEV (expiração de pendências, finance-lifecycle, dispatcher, prazos pós-reserva, geração DEV e warmup DEV) foram conferidos ativos e não foram alterados. Public feed não gera novas publicações nem expõe submissões de hóspedes; geração/administração original permanece no DEV completo.
 
 ### Banco antes/depois das jornadas reais
 
@@ -58,19 +58,19 @@ Hashes dos IDs/status/datas/hold das reservas: `2b0c2acb8957c2ea5f629f2ac3691bfe
 
 | Função | Evidência obtida | Pendência |
 |---|---|---|
-| Chalés, fotos, textos, comodidades | Leitura real de catálogo e consumo pela interface; ações de escrita exigem administrador | Salvar/editar pela interface com administrador autenticado |
-| Limpeza, regras e calendários | Consulta real; fontes Airbnb/Booking habilitadas e saúde disponível; regras/ocupação consumidas | Edição autenticada e reconsulta de calendário após edição |
-| Experiências, inclusões, desconto e capacidade | Configuração real DEV e composição real cotada; suíte automatizada de capacidade/antecedência/ofertas | CRUD real autorizado e catálogo comercial definitivo |
-| Escapadas | Cadastro existente e status ativo/pausado lidos; seleção e cotação consumidas | Criar, ativar e pausar pela interface autenticada |
-| Conteúdo/vitrine | Publicações existentes lidas; endpoint público não gera/aprova conteúdo | Edição/aprovação real pelo administrador |
-| Permissões | Endpoint público recusa administração; páginas administrativas exigem sessão; RLS/RPC conferidos | Matriz real administrador/equipe/proprietário em sessões autorizadas |
+| Chalés, fotos, textos, comodidades | Admin autenticado: editor de descrição do Amore, salvar → leitura SQL → reabrir → restaurar; catálogo/fotos existentes lidos | Reordenação/upload de fotos e gravação de comodidades ainda sem reteste real |
+| Limpeza, regras e calendários | Multicalendário e calendário individual carregados no PMS; regras 1 noite geral/2 com sexta ou sábado e consulta real coerentes; limpeza R$290 na cotação | Edição de regras/fontes e gravação de limpeza não executadas |
+| Experiências, inclusões, desconto e capacidade | Admin salvou café de 100 para 101 centavos; variante e cotação real atualizaram; restaurados 100 centavos. Inclusões/fotos/eligibilidade lidas; capacidade/antecedência em testes automatizados | Novos cadastros e catálogo comercial definitivo; operação de capacidade em sessões reais |
+| Escapadas | Admin pausou Escapada a dois; catálogo público deixou de incluí-la. Reativou e SQL confirmou active/5%; cadastro e prévia validaram inclusões | Criar nova oferta e homologar condições comerciais finais |
+| Conteúdo/vitrine | Feed real e editor/admin_list/relatório carregados com administrador; publicações preservadas | Salvar/editar conteúdo e aprovação/moderação ainda sem operação real nesta execução |
+| Permissões | Visitante redirecionado para login; administrador autenticado conseguiu salvar. RLS ativada e INSERT anon/authenticated negado nos cadastros/reservas; RPCs de reserva sem EXEC público | Sessões reais de equipe/proprietário e matriz completa de escopo |
 | Publicações de hóspedes/moderação | Código preservado; não liberado no lançamento parcial | Homologação social independente |
 
-Nenhum administrador foi criado ou recebeu privilégios adicionais. Sem sessão administrativa nesta prévia, não se declara CRUD do PMS homologado. Não foram criadas reservas fictícias para representar interesse ou WhatsApp.
+Nenhum administrador foi criado ou recebeu privilégios adicionais. Sessão administrativa DEV foi disponibilizada pelo formulário seguro e verificada na Central. Descrição de chalé, gravação de preço de experiência e pausa/reativação de oferta foram homologadas com dados de teste reais do DEV; isso não homologa todo o PMS. Não foram criadas reservas fictícias para representar interesse ou WhatsApp.
 
 ## Evidências e limites
 
-Checks: sintaxe, TypeScript, build do perfil WhatsApp e suíte Node. Testes específicos incluem allowlist, tentativa de PROD com cabeçalho DEV, trava SQL em PGlite, seleção explícita, correspondência literal resumo/mensagem, mudança de preço, falha removendo orçamento e retomada somente de escolhas. JSDOM e VM são **fixtures**, não interface real.
+Checks: sintaxe, TypeScript, build do perfil WhatsApp e suíte Node: 442 aprovados, zero falhas. Após ajuste do limite de datas ao máximo existente de 1125 noites, 16 testes afetados repetidos passaram; sem limite comercial novo de 90 noites. Testes específicos incluem allowlist, tentativa de PROD com cabeçalho DEV, trava SQL em PGlite, seleção explícita, correspondência literal resumo/mensagem, mudança de preço, falha removendo orçamento e retomada somente de escolhas. JSDOM e VM são **fixtures**, não interface real.
 
 Interface real: Chrome remoto sobre deployment Vercel DEV e funções Supabase DEV. Dados de PriceLabs/calendários são reais; limpeza/produtos/pacotes são o catálogo **de homologação DEV**. Layout móvel por iframe de 390×844; não houve teste em aparelho físico Android/iPhone, nem prova de abertura no aplicativo nativo WhatsApp. Nenhuma mensagem foi enviada a hóspedes.
 
@@ -80,7 +80,7 @@ Relatórios históricos consultados: `docs/homologation-20261007.md`, `docs/homo
 
 1. Catalogar e homologar os preços comerciais definitivos. DEV tem limpeza R$290 em todos os chalés e experiências `[DEV]` de R$1. PROD tem limpeza R$150/R$292/R$292 e também produtos de homologação ativos. A candidata filtra itens DEV/QA no perfil PROD; não inventa preços nem migra produtos de teste.
 2. PROD não possui `stay_offers`, registro de fontes iCal, cache da vitrine ou tabelas Ville Moments. Revisar dependências de schema/colunas/políticas e preparar migração mínima; não executar em lote todas as migrations financeiras/cron de DEV. Consultas falham com segurança enquanto faltarem dependências.
-3. Homologar PMS autenticado: alterações reais controladas de chalés, calendário, oferta, experiência, conteúdo e permissões. Homologar novamente checkout PagBank no perfil DEV completo.
+3. Completar a matriz PMS: fotos/comodidades, edição de calendário/limpeza/regras, criação de cadastros, conteúdo e sessões de equipe/proprietário. Texto de chalé, preço de experiência e pausa/reativação de oferta já passaram com restauração dos valores originais. Homologar novamente checkout PagBank no perfil DEV completo.
 4. Completar teste de aplicativo WhatsApp em aparelhos físicos, clipboard e acessibilidade móvel. Falhas de calendário/preço foram cobertas por fixtures e tratamento de servidor; indisponibilidade real de serviços externos não foi forçada.
 5. Revisar migração das mídias/publicações comerciais aprovadas, políticas e configuração de capacidade/antecedência. Não copiar hóspedes/histórico financeiro de DEV nem eliminar conteúdo antigo.
 
@@ -95,3 +95,26 @@ Relatórios históricos consultados: `docs/homologation-20261007.md`, `docs/homo
 7. Retorno: restaurar deployment Vercel anterior revisado e versões anteriores de funções compatíveis. Manter trava WhatsApp até decisão explícita; rollback não pode liberar checkout não aprovado. Deixar migrations aditivas e histórico intactos. Verificar reservas, calendário, notificações e atendimento após o retorno. Não apagar dados para desfazer a versão.
 
 Uma única base continua oferecendo `checkout-development` em DEV e `whatsapp` na candidata. Publicação continua pendente e precisa de autorização posterior sobre o resultado testado.
+
+## Registro adicional das jornadas reais
+
+- Desktop: home → Signature → datas ocupadas; novas datas → escolher estadia → tarifa explícita → resumo → link WhatsApp. Café adicional e pacote romântico recalcularam no servidor. Trocar pacote retirou valores durante carregamento.
+- Vitrine → Assistir no Ville Moments: foto/publicação real, legenda e navegação inferior com Ville Moments/Chalés/Escolher datas/Minha conta. Oferta Essenza 03–05/11 transportou chalé, datas, hóspedes e escapada; não escolheu silenciosamente a tarifa recebida na URL. Total/mensagem literalmente iguais.
+- Layout móvel 390×844: vídeo real Signature, legenda e navegação; Ville Moments → datas 01–03/12 → 1 hóspede/Descanso → Amore → reembolsável → resumo e copiar. Preço real consultado R$1490 com limpeza DEV R$290; mensagem refletiu 1 hóspede. Clipboard confirmado pela API do próprio navegador; fallback manual adicional validado em fixture.
+- API real: 3 hóspedes rejeitados por capacidade nos 3 chalés; 04–05/12 rejeitado por minimum_stay=2; 09–11/11 ocupado nos 3. Requisições de preço/financeiro maliciosas não produziram writes. Falhas externas de preço/calendário e mudança de orçamento têm evidência automatizada, não uma interrupção forçada de PriceLabs/iCal.
+- Novo clique de abertura do WhatsApp não pôde ser concluído pelo navegador remoto devido à proteção de observação de credenciais após login; nenhuma mensagem foi enviada. Link oficial, conteúdo e alternativa de cópia conferidos. Abertura do app nativo permanece teste em aparelho físico.
+- Calendário PMS mostrou reservas/importações existentes, sem inclusão de bloqueios. Cadastros testados restaurados: Amore com descrição original, café/variante 100 centavos, escapada active/500 bps. Auditoria administrativa registra esses saves; nenhum histórico foi apagado.
+
+As exceções de PROD foram revistas para que leituras públicas requisitadas pelo PMS usem sempre o caminho sem persistência; `stay_offer_action` permite somente a administração autenticada no projeto conhecido. Financeiro novo continua bloqueado por referência de projeto, não por parâmetro do navegador. Nada disso foi implantado em PROD.
+
+### Evidência visual e estado de produção
+
+![Ville Moments em iframe de 390×844, Chrome remoto](evidence/ville-moments-mobile.jpg)
+
+Último deployment de produção READY conferido (somente leitura): `dpl_GfCE3VYLNmxwSorGBUPYQjU6ys41`, commit `9bc9e0e7d3b9d18bb643e724f999ff37f64bc2fc`. Há uma tentativa histórica posterior em ERROR; não usar esse ERROR como alvo de rollback. Antes de publicar, registrar novamente o deployment que efetivamente serve os aliases de produção. Schema PROD continua na migration `20260929010445` nesta conferência, sem a nova trava.
+
+Catálogo público PROD também filtra títulos de publicações e vínculos com produtos/ofertas DEV, QA, Teste ou homologação. Administradores continuam vendo o catálogo completo para manutenção. Não apaga registros nem tratamentos.
+
+PROD recusa publicação de hóspedes, curtidas, comentários, follows, moderação social e geração automática por visitante mesmo com cabeçalho DEV/sessão de hóspede simulados. Um pedido de `feed` em PROD é convertido em `public_feed`, sem geração e sem submissões de hóspedes. Esses casos são testes de VM; não houve implantação ou escrita em PROD.
+
+Versões homologadas somente em DEV: `booking-engine` 62, `public-consultation` 2 e `villegram-content` 24. Log da suíte: [tests-20261011.tap](tests-20261011.tap).
