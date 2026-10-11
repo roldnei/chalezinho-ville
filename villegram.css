@@ -226,3 +226,5 @@
 #villegram.vg-escape .vg-escape-alternatives{order:1;margin:4px 0 16px}
 #villegram.vg-escape .vg-escape-selection .vg-primary{order:2}
 @media(max-height:740px){#villegram.vg-escape .vg-story{margin-bottom:40px}}
+
+@media(max-height:680px){#villegram.vg-escape .vg-purchase{padding:12px 22px 8px}#villegram.vg-escape .vg-story{margin-bottom:20px}#villegram.vg-escape .vg-story h2{font-size:24px}#villegram.vg-escape .vg-escape-guests{margin-bottom:8px}#villegram.vg-escape .vg-price{font-size:28px}#villegram.vg-escape .vg-escape-total{margin-bottom:8px}#villegram.vg-escape details{margin-bottom:6px}#villegram.vg-escape .vg-escape-alternatives{margin:0 0 8px}#villegram.vg-escape .vg-primary{min-height:52px;padding:14px 20px}}
