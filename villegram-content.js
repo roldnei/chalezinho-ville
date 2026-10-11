@@ -8,7 +8,9 @@
  const introPhotos={CH1:{url:'assets/ch1-04-piscina-chale-dia-opt-w1152.webp',alt:'Piscina privativa do Ville Signature com o chalé ao fundo',position:65},CH2:{url:'assets/manifesto-hidro-romance-1-opt-w1152.webp',alt:'Hidromassagem do Ville Essenza em primeiro plano',position:80},CH3:{url:'assets/03-banheira-petalas-compartilhada-opt-w1200.webp',alt:'Hidromassagem com pétalas do Ville Amore',position:80}};
  function introduction(){
   if(new URLSearchParams(location.search).get('feed')==='following')return null;
-  const available=offerProperties.length?offerProperties:data?.properties||[];
+  // The editorial catalog owns publication eligibility. Showcase properties are
+  // a pricing projection and may omit active; they must not remove the intro.
+  const available=data?.properties||[];
   const chalets=['CH1','CH2','CH3'].map(code=>available.find(p=>p.code===code&&p.active===true)).filter(Boolean).map(p=>({id:p.id,code:p.code,name:p.name,url:propertyURL(p),publication:(data?.publications||[]).find(x=>x.property_id===p.id&&x.type==='property'&&x.cta==='property'&&x.source!=='guest_submission'),summary:p.code==='CH1'?'Piscina aquecida privativa + spa':'Hidromassagem privativa',photo:introPhotos[p.code]}));
   return chalets.length?{intro:true,intro_properties:chalets,property_name:'Chalezinho Ville',offer_name:'Conheça nossos chalés',image:chalets[0].photo.url}:null;
  }

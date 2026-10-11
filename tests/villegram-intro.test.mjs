@@ -6,6 +6,16 @@ import {JSDOM} from 'jsdom';
 const source=name=>readFile(new URL('../'+name,import.meta.url),'utf8');
 const properties=[{id:1,code:'CH1',name:'Ville Signature',active:true},{id:2,code:'CH2',name:'Ville Essenza',active:true},{id:3,code:'CH3',name:'Ville Amore',active:true}];
 const publication={id:'4069a585-7cc6-48ad-9263-567358a45c0c',type:'property',property_id:1,title:'Signature',caption:'Original preservado',cta:'property',media:[{kind:'photo',url:'assets/ch1-capa-casal-spa.webp'}],cover_index:0};
+test('late showcase projection cannot remove the opening chalet Trip',async()=>{
+ const p=await page({query:'?view=moments'});
+ try{
+  p.w.VillegramContent.setOffers([],[],properties.map(({active,...property})=>property));
+  p.w.Villegram.close();p.w.VillegramContent.enter();
+  assert.ok(p.w.document.querySelector('#villegram.vg-intro'));
+  assert.equal(p.w.document.querySelectorAll('[data-intro-scene]').length,3);
+  assert.match(p.w.document.querySelector('.vg-progress').textContent,/1 de/);
+ }finally{p.close()}
+});
 async function page({query='?view=moments&intro=1',reduced=false,catalog=properties,saved=null,publications=[publication]}={}){
  const dom=new JSDOM('<header><nav></nav></header><main><div class="hero"></div></main>',{url:'https://preview.local/index.html'+query,runScripts:'outside-only',pretendToBeVisual:true}),w=dom.window,calls=[],intervals=new Map(),timeouts=new Map();let now=0;
  Object.defineProperty(w.performance,'now',{value:()=>now});w.setInterval=(fn,ms)=>{intervals.set(ms,fn);return ms};w.clearInterval=id=>intervals.delete(id);w.setTimeout=(fn,ms)=>{timeouts.set(ms,fn);return ms};w.clearTimeout=id=>timeouts.delete(id);
