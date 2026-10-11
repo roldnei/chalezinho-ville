@@ -1,0 +1,150 @@
+{
+  "cards_checked": [
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 127430
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-26",
+      "check_out": "2026-10-28",
+      "total_cents": 133700
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 135020
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-26",
+      "check_out": "2026-10-28",
+      "total_cents": 136230
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 139190
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-26",
+      "check_out": "2026-10-28",
+      "total_cents": 145350
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-24",
+      "check_out": "2026-10-26",
+      "total_cents": 164600
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 168350
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 172970
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-23",
+      "check_out": "2026-10-25",
+      "total_cents": 174720
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-16",
+      "check_out": "2026-10-18",
+      "total_cents": 177700
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-16",
+      "check_out": "2026-10-18",
+      "total_cents": 183090
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 184730
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-16",
+      "check_out": "2026-10-18",
+      "total_cents": 195070
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-11-01",
+      "check_out": "2026-11-04",
+      "total_cents": 196290
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-12",
+      "check_out": "2026-10-15",
+      "total_cents": 211140
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-31",
+      "check_out": "2026-11-03",
+      "total_cents": 226870
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-31",
+      "check_out": "2026-11-03",
+      "total_cents": 227860
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-11-01",
+      "check_out": "2026-11-04",
+      "total_cents": 229720
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-31",
+      "check_out": "2026-11-03",
+      "total_cents": 269100
+    }
+  ],
+  "quote_ids_persisted": 0,
+  "periods": 9,
+  "counts_before": {
+    "reservations": 30,
+    "payments": 34,
+    "quotes": 346,
+    "calendar_blocks": 2,
+    "outbox": 136,
+    "holds": 0
+  },
+  "counts_after": {
+    "reservations": 30,
+    "payments": 34,
+    "quotes": 346,
+    "calendar_blocks": 2,
+    "outbox": 136,
+    "holds": 0
+  },
+  "browser_message_matches_summary": true,
+  "browser_selection": {
+    "property_code": "CH3",
+    "check_in": "2026-10-17",
+    "check_out": "2026-10-19",
+    "total_cents": 168350,
+    "width": 320
+  }
+}
