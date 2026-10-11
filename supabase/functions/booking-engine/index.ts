@@ -2122,7 +2122,8 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
       const purposesQ=await retryDb("travel_purposes",()=>admin.from("travel_purposes").select("*").eq("active",true).order("display_order"));
       if(purposesQ.error) return json({ok:false,error:"config_unavailable"},500);
 
-      const settingsQ=await retryDb("payment_settings",()=>admin.from("payment_settings").select("active_provider,pix_enabled,card_enabled,charge_percent,pix_expiration_minutes,max_card_installments,modification_payment_deadline_hours,post_booking_payment_minutes").eq("id",1).single());
+      // Consultation has no payment UI and must not depend on a finance schema upgrade.
+      const settingsQ=consultation?{data:{},error:null}:await retryDb("payment_settings",()=>admin.from("payment_settings").select("active_provider,pix_enabled,card_enabled,charge_percent,pix_expiration_minutes,max_card_installments,modification_payment_deadline_hours,post_booking_payment_minutes").eq("id",1).single());
       if(settingsQ.error) return json({ok:false,error:"config_unavailable"},500);
 
       const docsQ=await retryDb("policy_documents",()=>admin.from("policy_documents").select("id,document_type,code,version,title,body,status").in("status",development?["active","draft"]:["active"]).order("document_type"));
