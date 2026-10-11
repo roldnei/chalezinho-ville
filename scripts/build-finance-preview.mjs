@@ -12,11 +12,11 @@ for(const entry of await readdir(root,{withFileTypes:true})){
 await cp(new URL('assets/',root),new URL('assets/',out),{recursive:true});
 console.log('Preview browser assets built in dist.');
 
-import {releaseProfile} from './release-profile.mjs';
+import {releaseProfile,releaseFeatures} from './release-profile.mjs';
 const release=releaseProfile(process.env);
 let config=await readFile(new URL('app-config.js',root),'utf8');
 if(release.profile==='whatsapp'){
- config=config.replace('releaseProfile:"checkout-development"','releaseProfile:"whatsapp"').replace('features:{feelings:true,guestPublications:true,social:true}','features:{feelings:false,guestPublications:false,social:false}');
+ config=config.replace('releaseProfile:"checkout-development"','releaseProfile:"whatsapp"').replace('features:{feelings:true,guestPublications:true,social:true}','features:'+JSON.stringify(releaseFeatures(release)));
  config=config.replace(/bookingEngine:"[^"]+"/,`bookingEngine:"https://${release.ref}.supabase.co/functions/v1/public-consultation"`);
 }
 if(release.environment==='production'){

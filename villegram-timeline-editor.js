@@ -5,6 +5,7 @@
  const icons={play:'<path d="m9 5 11 7-11 7Z"/>',pause:'<path d="M9 5v14M15 5v14"/>',undo:'<path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12"/>',redo:'<path d="m16 4 5 5-5 5m5-5H10a6 6 0 0 0 0 12"/>',audio:'<path d="M4 10v4m4-8v12m4-15v18m4-15v12m4-8v4"/>',close:'<path d="m6 6 12 12M18 6 6 18"/>',timeline:'<path d="M3 5h18M3 12h18M3 19h18M7 3v4m10 3v4M9 17v4"/>'};
  const clock=n=>Math.floor(Math.max(0,n)/60)+':'+(Math.max(0,n)%60).toFixed(1).padStart(4,'0'),clamp=(n,a,b)=>Math.max(a,Math.min(b,n)),clone=v=>JSON.parse(JSON.stringify(v));
  function editor({screen,getMedia,getSelected,getCover=()=>0,onRestore,onSelect,onChange,onMove,isBusy,onBusy}){
+  if(window.CHALEZINHO_CONFIG?.features?.feelings===false)return null;
   const button=(key,label,content=svg(icons[key]||icons.audio))=>'<button type="button" data-tl-'+key+' aria-label="'+label+'" title="'+label+'">'+content+'</button>';
   const quick=document.createElement('div');quick.className='vg-feelings-quick';quick.innerHTML=button('quick','Criar Feelings',svg(icons.audio)+'<span>Criar Feelings</span>')+'<small>Água, café, fogo, chuva… grave os detalhes com seus sons.</small>';screen.after(quick);quick.querySelector('button').onclick=()=>automate();
   const launch=document.createElement('button');launch.type='button';launch.id='vg-timeline-open';launch.setAttribute('aria-label','Abrir timeline de edição');launch.title='Timeline';launch.innerHTML=svg(icons.timeline);screen.append(launch);
