@@ -32,4 +32,4 @@ window.CHALEZINHO_CONFIG={
 })();
 
 // UI capability policy comes from the reviewed build profile, never the URL.
-(()=>{const script=document.createElement("script");script.src="launch-ui.js";document.head.append(script)})();
+(()=>{const script=document.createElement("script");script.src="launch-ui.js?v=consultation2";document.head.append(script)})();

@@ -1,8 +1,11 @@
 (()=>{
  const C=window.CHALEZINHO_CONFIG;if(C.releaseProfile!=='whatsapp')return;
- const suppressed=(C.features?.social===false?'.vg-social{display:none!important}':'')+(C.features?.guestPublications===false?'[data-account-mode="social"],#community-root{display:none!important}':'');
+ const suppressed='#direct-extras{display:none!important}'+(C.features?.social===false?'.vg-social{display:none!important}':'')+(C.features?.guestPublications===false?'[data-account-mode="social"],#community-root{display:none!important}':'');
  const style=document.createElement('style');style.textContent=suppressed+'.direct-checkout .offer-context{display:block!important}.direct-checkout .review-purpose[hidden]{display:none!important}.booking-page .consultation-summary{white-space:pre-wrap;font:inherit;line-height:1.65;overflow-wrap:anywhere;background:#202125;color:#f5f3ed;border:1px solid #ffffff24;padding:20px;border-radius:14px}.whatsapp-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:16px}.whatsapp-actions a,.whatsapp-actions button{min-height:44px}.consultation-note{font-size:.85rem;line-height:1.5;color:#c7bfb5}';document.head.append(style);
  function apply(){
+  const extras=document.querySelector('#direct-extras');if(extras)extras.hidden=true;
+  const changeDates=document.querySelector('#change-dates');if(changeDates)changeDates.textContent='← Alterar datas e hóspedes';
+  const priceHint=document.querySelector('.availability-summary>span');if(priceHint)priceHint.textContent='Preço total da escapada para as datas e hóspedes escolhidos.';
   document.querySelector('#direct-checkout-status h1')?.replaceChildren(document.createTextNode('Sua consulta'));
   const preparing=document.querySelector('#direct-checkout-status p');if(preparing)preparing.textContent='Consultando disponibilidade e preços, sem bloquear datas…';
   document.querySelectorAll('.detail-book>p').forEach(p=>{if(p.textContent.includes('finalize a reserva diretamente pelo site'))p.textContent=p.textContent.replace('finalize a reserva diretamente pelo site','continue pelo WhatsApp para finalizar com nosso atendimento')});
