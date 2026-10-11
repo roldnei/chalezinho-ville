@@ -1,0 +1,20 @@
+✔ visitor explicitly chooses a rate; message equals displayed summary; no login/payment calls (1097.564746ms)
+✔ changed quote requires review and removes WhatsApp link; failed quote discards previous price (802.041264ms)
+✔ reload stores only choices and refreshes the quote before restoring summary (377.21724ms)
+✔ clipboard failure provides the exact prepared message for manual copying (409.399675ms)
+✔ commercial experience requires an explicit condition and clears a prior quote when deselected (543.010656ms)
+✔ lodging-only escape keeps offer context without promising an included experience (361.462349ms)
+✔ consultation rejects financial, hold and admin operations before forwarding (191.080201ms)
+✔ production build requires reviewed profile, exact project and public key (0.753639ms)
+✔ test products cannot be included in a production catalog (0.765088ms)
+✔ database launch guard blocks direct holds while preserving existing/admin/imported reservations (12920.526297ms)
+✔ production shared engine refuses direct payment despite spoofed DEV headers before database access (1100.870157ms)
+✔ PMS loads and saves a lodging-only offer with the calendar minimum and pause preserved (586.527587ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 15446.629606

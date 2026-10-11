@@ -1,0 +1,177 @@
+{
+  "cards_checked": [
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-19",
+      "nights": 2,
+      "total_cents": 127430,
+      "base_pricelabs": 893,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-19",
+      "nights": 2,
+      "total_cents": 135020,
+      "base_pricelabs": 962,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-19",
+      "nights": 2,
+      "total_cents": 139190,
+      "base_pricelabs": 1129,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-24",
+      "nights": 2,
+      "total_cents": 164600,
+      "base_pricelabs": 1360,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-17",
+      "nights": 2,
+      "total_cents": 168350,
+      "base_pricelabs": 1265,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-17",
+      "nights": 2,
+      "total_cents": 172970,
+      "base_pricelabs": 1307,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-11-01",
+      "nights": 3,
+      "total_cents": 196290,
+      "base_pricelabs": 1519,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-12",
+      "nights": 3,
+      "total_cents": 211140,
+      "base_pricelabs": 1654,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-11-01",
+      "nights": 3,
+      "total_cents": 229720,
+      "base_pricelabs": 1952,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-26",
+      "nights": 2,
+      "total_cents": 133700,
+      "base_pricelabs": 950,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-26",
+      "nights": 2,
+      "total_cents": 136230,
+      "base_pricelabs": 973,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-26",
+      "nights": 2,
+      "total_cents": 145350,
+      "base_pricelabs": 1185,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-23",
+      "nights": 2,
+      "total_cents": 174720,
+      "base_pricelabs": 1452,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-16",
+      "nights": 2,
+      "total_cents": 177700,
+      "base_pricelabs": 1350,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-16",
+      "nights": 2,
+      "total_cents": 183090,
+      "base_pricelabs": 1399,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH2",
+      "check_in": "2026-10-31",
+      "nights": 3,
+      "total_cents": 226870,
+      "base_pricelabs": 1797,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH3",
+      "check_in": "2026-10-31",
+      "nights": 3,
+      "total_cents": 227860,
+      "base_pricelabs": 1806,
+      "quote_id": null
+    },
+    {
+      "property_code": "CH1",
+      "check_in": "2026-10-31",
+      "nights": 3,
+      "total_cents": 269100,
+      "base_pricelabs": 2310,
+      "quote_id": null
+    }
+  ],
+  "duplicate_arrivals": 0,
+  "minimum_stay_rejection": {
+    "ok": false,
+    "error": "minimum_stay",
+    "min_stay": 3
+  },
+  "payment_actions_rejected": [
+    "hold",
+    "pay",
+    "checkout",
+    "stay_offer_action"
+  ],
+  "counts_before": {
+    "reservations": 30,
+    "payments": 34,
+    "quotes": 346,
+    "calendar_blocks": 2,
+    "outbox": 136,
+    "holds": 0
+  },
+  "counts_after": {
+    "reservations": 30,
+    "payments": 34,
+    "quotes": 346,
+    "calendar_blocks": 2,
+    "outbox": 136,
+    "holds": 0
+  },
+  "anonymous_pms_write_rejected": "admin_required"
+}
