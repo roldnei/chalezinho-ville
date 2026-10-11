@@ -30,3 +30,7 @@ As publicações existentes continuam no feed. Entradas por link de uma publica�
 Alteração somente na branch DEV feature/staged-whatsapp-launch do repositório roldnei/chalezinho-ville, sobre `0f137ea757f88b56de4a06f4bf88a195d1b413c4`. Vercel chalezinho-ville; DEV Supabase pxfqmnhqodqyaaqeyjgr; PROD irxsaladqhbzhkoaclxy. Não houve publicação/promover deployment, alteração de configuração ou de dados de produção. Não houve migração nem alteração de banco DEV nesta etapa.
 
 Retorno: reverter o commit desta apresentação na branch DEV e gerar outra prévia. A prévia anterior continua disponível como referência; não é necessário restaurar ou apagar dados. A versão completa com checkout e Feelings continua preservada para homologação no perfil checkout-development.
+
+## Ajuste após imagem do aparelho do usuário, 19:22
+
+A imagem enviada confirma o primeiro Trip com os três seletores na interface real do aparelho do usuário. A pedido dele, texto, seletores e botão foram deslocados juntos para baixo: afastamento inferior de 156 para 124 px (32 px de deslocamento); em telas de altura até 680 px, de 144 para 124 px (20 px). Permanecem a navegação inferior, os ícones laterais e os links sincronizados. Foi atualizada a versão de cache do CSS. Essa imagem evidencia a posição anterior; a posição nova ainda não foi validada visualmente neste navegador, que continua bloqueado pela proteção de credenciais.

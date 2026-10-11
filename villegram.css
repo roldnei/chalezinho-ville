@@ -237,7 +237,7 @@
 #villegram .vg-status,#villegram:has(.vg-caption-short) .vg-status{position:fixed;top:calc(164px + env(safe-area-inset-top));left:20px;right:76px;bottom:auto;margin:0;padding:8px 10px;border-radius:8px;background:#17130fea;font-size:12px;line-height:1.4;pointer-events:none}
 
 /* One opening Trip introduces the three chalets with synchronized destinations. */
-#villegram.vg-intro .vg-purchase{bottom:calc(156px + env(safe-area-inset-bottom));padding:16px 20px;max-height:calc(100dvh - 290px);overflow:auto;touch-action:pan-y}
+#villegram.vg-intro .vg-purchase{bottom:calc(124px + env(safe-area-inset-bottom));padding:16px 20px;max-height:calc(100dvh - 290px);overflow:auto;touch-action:pan-y}
 #villegram.vg-intro .vg-story{position:static;inset:auto;margin:0 0 20px;padding-right:0}
 #villegram.vg-intro.vg-with-social .vg-story{padding-right:64px}
 #villegram.vg-intro .vg-story small{display:block;letter-spacing:.12em;font-size:11px;margin-bottom:10px}
@@ -247,4 +247,4 @@
 #villegram .vg-intro-choices button{flex:1;min-width:0;min-height:44px;padding:8px 3px;margin:0;border:1px solid #ffffff60;background:#17130f66;border-radius:12px;font-size:13px;letter-spacing:0;text-transform:none}
 #villegram .vg-intro-choices button[aria-pressed=true]{border-color:#dfc48b;background:#b59a6140;color:#fff5df}
 #villegram.vg-intro .vg-purchase .vg-primary{margin:0;min-height:54px}
-@media(max-height:680px){#villegram.vg-intro .vg-purchase{padding:12px 20px;bottom:calc(144px + env(safe-area-inset-bottom))}#villegram.vg-intro .vg-story{margin-bottom:12px}#villegram.vg-intro .vg-story h2{font-size:28px}#villegram .vg-intro-choices{margin-bottom:12px}}
+@media(max-height:680px){#villegram.vg-intro .vg-purchase{padding:12px 20px;bottom:calc(124px + env(safe-area-inset-bottom))}#villegram.vg-intro .vg-story{margin-bottom:12px}#villegram.vg-intro .vg-story h2{font-size:28px}#villegram .vg-intro-choices{margin-bottom:12px}}
