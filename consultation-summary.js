@@ -10,7 +10,7 @@
   for(const [key,label,fallback] of [['accommodation','Hospedagem',rate.accommodation_amount_cents],['cleaning','Limpeza',rate.cleaning_fee_cents]])lines.push(`${label}: ${money(priceLines.find(l=>l.key===key)?.gross_cents??fallback)}`);
   for(const e of quote.experiences||[])lines.push(`${e.product}: ${money(priceLines.find(l=>l.key===e.product_id)?.gross_cents??e.price_cents)}`);
   lines.push(`Desconto: ${money(c.discount_cents||0)}`,`Total consultado: ${money(rate.total_amount_cents)}`);
-  if(rate.cancellation_policy?.body)lines.push(`Condições: ${rate.cancellation_policy.body}`);
+  if(rate.cancellation_policy)lines.push(`Condições: ${rate.cancellation_policy.title||rate.name}${rate.cancellation_policy.version?' · versão '+rate.cancellation_policy.version:''}. Consulte os detalhes da tarifa no site.`);
   lines.push(`Consulta: ${new Date(quote.checked_at||quote.consulted_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}`);
   lines.push('Disponibilidade e valores serão reconfirmados no atendimento. Esta consulta não confirma nem bloqueia a hospedagem.');
   return lines.join('\n');

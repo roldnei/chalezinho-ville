@@ -6,6 +6,11 @@ export function releaseProfile(env){
  if(production&&(profile!=='whatsapp'||env.VILLE_PRODUCTION_RELEASE!=='approved'))throw Error('Production requires an explicitly approved WhatsApp release');
  const ref=production?PROD:DEV;
  if(production&&new URL(env.VILLE_PUBLIC_SUPABASE_URL||'http://invalid').hostname!==PROD+'.supabase.co')throw Error('Production Supabase target mismatch');
- if(production&&!env.VILLE_PUBLIC_SUPABASE_KEY)throw Error('Production publishable key required');
+ if(production){
+  const key=env.VILLE_PUBLIC_SUPABASE_KEY||'';
+  let publicKey=key.startsWith('sb_publishable_');
+  if(!publicKey&&key.split('.').length===3){try{publicKey=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString()).role==='anon'}catch{}}
+  if(!publicKey)throw Error('Production publishable or anon key required; server secrets cannot enter browser assets');
+ }
  return {profile,ref,environment:production?'production':'development'};
 }

@@ -62,7 +62,7 @@ function policyForPlan(rows:any[],code:string){
 
 function overlaps(a:string,b:string,s:string,e:string){ return a < e && b > s; }
 function nights(a:string,b:string){ return Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000); }
-function validDate(v:string){ return /^\d{4}-\d{2}-\d{2}$/.test(v||""); }
+function validDate(v:string){return typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v+"T12:00:00Z"))&&new Date(v+"T12:00:00Z").toISOString().slice(0,10)===v;}
 function cents(v:number){ return Math.round(Number(v||0)*100); }
 function spreadBuyerFee(amounts:number[],fee:number){
   const base=amounts.reduce((s,v)=>s+v,0);
@@ -280,7 +280,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
       min_stay:minStay,
       base_price:hasPrice?Number(pr.total_price):null,
       available,same_day_approval_required:sameDayApproval,requestable:sameDayApproval&&requestable,
-      unavailable_reason: channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : sameDayApproval&&!approvedSameDay ? "same_day_approval_required" : null
+      unavailable_reason: !cal?.ok || bookingIcal.configured&&!bookingCal?.ok ? "calendar_unavailable" : channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : sameDayApproval&&!approvedSameDay ? "same_day_approval_required" : null
     };
   });
 }
@@ -423,7 +423,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     d.quote_option_id=plan?byPlan[String(plan.id)]||null:null;
   }
   const {cleaning_fee:_hiddenCleaning,...guestProperty}=property;
-  return {ok:true,quote_id:q.id,expires_at:expiresAt,property:guestProperty,rate_options:display,experiences:expSnapshots.map(x=>({
+  return {ok:true,quote_id:q.id,consulted_at:new Date().toISOString(),expires_at:expiresAt,property:guestProperty,rate_options:display,experiences:expSnapshots.map(x=>({
     product_id:x.product.id,product:x.product.name,package_type:x.product.package_type,included:x.included,composition:x.composition,
     variant:x.variant.code==="package"?null:x.variant.name,price_cents:Number(x.variant.price_cents)
   }))};

@@ -54,7 +54,7 @@ async function init(){
  if(PUBLIC){$('#step-next').textContent='Continuar pelo WhatsApp';$('#checkout-panel').insertAdjacentHTML('beforeend','<div id="whatsapp-actions" class="whatsapp-actions" hidden><a id="whatsapp-open" class="primary-action" target="_blank" rel="noopener">Abrir WhatsApp</a><button id="whatsapp-copy" class="text-action" type="button">Copiar resumo</button></div><p id="whatsapp-status" role="status" class="consultation-note"></p>');$('#whatsapp-copy').onclick=copyWhatsAppSummary;$('#whatsapp-open').onclick=()=>{$('#whatsapp-status').textContent='O WhatsApp foi solicitado. Envie a mensagem no aplicativo para iniciar o atendimento.'}}
  await initChaletFilter();
  initStayModes();
- if(PUBLIC)for(const id of ['#book-in','#book-out','#book-guests','#book-chalet','#stay-mode'])$(id).addEventListener('change',()=>{state.quote=null;state.rate=null;state.search=null;state.rateConfirmed=false;clearWhatsApp();$('#booking-list').innerHTML='';$('#availability-count').textContent='Seleção alterada. Consulte novamente.';$('#step-next').disabled=true;persistSelection()});
+ if(PUBLIC)for(const id of ['#book-in','#book-out','#book-guests','#book-chalet','#stay-mode'])$(id).addEventListener('change',()=>{++searchSequence;try{sessionStorage.removeItem('ville-consultation-selection')}catch{}state.quote=null;state.rate=null;state.search=null;state.rateConfirmed=false;clearWhatsApp();$('#booking-list').innerHTML='';$('#availability-count').textContent='Seleção alterada. Consulte novamente.';$('#step-next').disabled=true;persistSelection()});
  initTripPurpose();
  $("#change-dates").onclick=()=>{document.body.classList.remove("booking-results-screen");document.documentElement.classList.remove("booking-dates-arrival")};
  window.addEventListener("beforeunload",()=>{if(state.property&&!$("#checkout-modal").hidden&&Number($("#checkout-panel").dataset.step)<6)saveResume()});
@@ -169,7 +169,7 @@ function renderResults(list,{scroll=true}={}){
  list.forEach(p=>{
   const a=document.createElement("article");a.className="booking-property"+(p.available?"":" is-unavailable");
   const feats=(Array.isArray(p.features)?p.features:p.features?.amenities||[]).filter(x=>typeof x==='string').map(x=>"<span>"+(window.VilleAmenities?.icon(x)||"")+esc(x)+"</span>").join("");
-  const availabilityMessages={maximum_stay:"Estadia acima do máximo permitido",advance_notice:"Antecedência mínima não atendida",same_day_cutoff:"Horário limite para hoje encerrado",availability_window:"Fora do período disponível",checkin_day:"Check-in não permitido neste dia",checkout_day:"Checkout não permitido neste dia",past_date:"Data de entrada já passou"};
+  const availabilityMessages={calendar_unavailable:"Não foi possível verificar o calendário. Tente novamente.",maximum_stay:"Estadia acima do máximo permitido",advance_notice:"Antecedência mínima não atendida",same_day_cutoff:"Horário limite para hoje encerrado",availability_window:"Fora do período disponível",checkin_day:"Check-in não permitido neste dia",checkout_day:"Checkout não permitido neste dia",past_date:"Data de entrada já passou"};
   const status=p.requestable?"Sujeito à aprovação":availabilityMessages[p.unavailable_reason]||(p.available?"Disponível":p.unavailable_reason==="minimum_stay"?"Estadia mínima não atendida":p.unavailable_reason==="occupied"?"Datas ocupadas":"Tarifa indisponível");
   const minNotice=p.unavailable_reason==="minimum_stay"?'<div class="minimum-stay-alert"><small>MÍNIMO DE ESTADIA</small><strong>'+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'</strong><span>Para estas datas, este imóvel exige no mínimo '+p.min_stay+' '+(Number(p.min_stay)===1?"noite":"noites")+'.</span></div>':"";
   const total=p.from_stay_price!=null?Number(p.from_stay_price):null;
@@ -231,7 +231,7 @@ async function generateQuote(withExperiences){
  try{
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
  const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen,stay_offer_id:state.offerId||undefined,experience_preferences:state.preferences,same_day_request_id:state.approvedRequest||undefined});
- q.checked_at=new Date().toISOString();q.selected_variant_ids=chosen.map(String).sort();q.preferences_key=JSON.stringify(state.preferences);state.quote=q;startCountdown(q.expires_at);renderOfferContext();return q;
+ q.checked_at=q.consulted_at||new Date().toISOString();q.selected_variant_ids=chosen.map(String).sort();q.preferences_key=JSON.stringify(state.preferences);state.quote=q;startCountdown(q.expires_at);renderOfferContext();return q;
  }finally{controls.forEach(x=>x.disabled=x.id==='checkout-stay-mode'&&$('#checkout-panel').dataset.step==='6')}
 }
 function initTripPurpose(){
@@ -694,7 +694,7 @@ function renderCheckoutRates(){
   if(state.fastUpdating)return;
   const rate=state.quote.rate_options.find(r=>r.code===input.value&&r.selectable);if(!rate)return;
   state.rate=rate;state.rateCode=rate.code;state.rateConfirmed=true;state.upsellHandled=false;
-  renderReview();$('#step-next').disabled=false;clearWhatsApp();setFlowError(PUBLIC?'Tarifa escolhida. Confira o resumo e continue pelo WhatsApp.':'Tarifa escolhida. Confira o total e continue para identificação.');
+  renderReview();$('#step-next').disabled=false;clearWhatsApp();if(PUBLIC)saveConsultation();setFlowError(PUBLIC?'Tarifa escolhida. Confira o resumo e continue pelo WhatsApp.':'Tarifa escolhida. Confira o total e continue para identificação.');
  });
 }
 function directCheckoutError(){
@@ -774,7 +774,7 @@ function renderOfferChoices(){
 }
 function validExperienceChoices(){const ids=[...(selectedOffer()?.product_ids||[]),...Object.keys(state.selectedByProduct)];return ids.every(id=>window.VilleOffers.components((state.config.experience_products||[]).find(p=>p.id===id)||{}).every(c=>!c.choices?.length||c.choices.includes(state.preferences[id]?.[c.name])))}
 let whatsappMessage='',whatsappBusy=false;
-function clearWhatsApp(){whatsappMessage='';const box=$('#whatsapp-actions');if(box)box.hidden=true;$('#whatsapp-open')?.removeAttribute('href');if($('#whatsapp-status'))$('#whatsapp-status').textContent='';}
+function clearWhatsApp(){whatsappMessage='';document.querySelector('#whatsapp-manual-copy')?.remove();const box=$('#whatsapp-actions');if(box)box.hidden=true;$('#whatsapp-open')?.removeAttribute('href');if($('#whatsapp-status'))$('#whatsapp-status').textContent='';}
 function saveConsultation(){try{sessionStorage.setItem('ville-consultation-selection',JSON.stringify({entryUrl:location.pathname+location.search,propertyCode:state.property?.code,offerId:state.offerId,preferences:state.preferences,selectedByProduct:state.selectedByProduct,rateCode:state.rateConfirmed?state.rateCode:null,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value}))}catch{}}
 async function restoreConsultation(matchingEntry){let saved;try{saved=JSON.parse(sessionStorage.getItem('ville-consultation-selection')||'null')}catch{}if(!saved?.propertyCode||matchingEntry&&saved.entryUrl!==location.pathname+location.search)return false;$('#book-in').value=saved.check_in;$('#book-out').value=saved.check_out;$('#book-guests').value=saved.guests;state.offerId=saved.offerId;state.preferences=saved.preferences||{};syncStayModes();await search();const property=state.search?.find(p=>p.code===saved.propertyCode&&p.available);if(!property)return false;await openFlow(property.id);state.selectedByProduct=saved.selectedByProduct||{};await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===saved.rateCode&&r.selectable)||state.quote.rate_options.find(r=>r.selectable);state.rateCode=state.rate?.code;state.rateConfirmed=!!saved.rateCode&&state.rateCode===saved.rateCode;await openFastCheckout();return true;}
 async function continueWhatsApp(){
@@ -792,6 +792,6 @@ async function continueWhatsApp(){
  }catch(e){state.quote=null;state.rate=null;$('#summary-content').textContent='Consulta indisponível. Consulte novamente antes de continuar.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível reconfirmar os valores e a disponibilidade. Faça uma nova consulta.');}
  finally{whatsappBusy=false;$('#step-next').disabled=!state.rate||!state.rateConfirmed;}
 }
-async function copyWhatsAppSummary(){if(!whatsappMessage)return;try{await navigator.clipboard.writeText(whatsappMessage);$('#whatsapp-status').textContent='Resumo copiado. Cole no WhatsApp para solicitar a finalização.'}catch{const field=document.createElement('textarea');field.value=whatsappMessage;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();$('#whatsapp-status').textContent='Selecione e copie o resumo abaixo.'}}
+async function copyWhatsAppSummary(){if(!whatsappMessage)return;try{await navigator.clipboard.writeText(whatsappMessage);if(await navigator.clipboard.readText()!==whatsappMessage)throw Error('clipboard_unverified');$('#whatsapp-status').textContent='Resumo copiado. Cole no WhatsApp para solicitar a finalização.'}catch{document.querySelector('#whatsapp-manual-copy')?.remove();const field=document.createElement('textarea');field.id='whatsapp-manual-copy';field.className='consultation-summary';field.style.width='100%';field.style.minHeight='220px';field.value=whatsappMessage;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();$('#whatsapp-status').textContent='Selecione e copie o resumo abaixo.'}}
 init();
 })();
