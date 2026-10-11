@@ -7,7 +7,7 @@ let cached: {key: string; until: number; result: Promise<Row>} | null = null;
  * Catalog edits change the key immediately; checkout always performs a fresh search. */
 export async function cachedWeekdayShowcase(deps: Row) {
   const data = await deps.catalog();
-  const key = deps.today + ':' + JSON.stringify(data);
+  const key = (deps.cache_scope||'default') + ':' + deps.today + ':' + JSON.stringify(data);
   if (cached?.key === key && cached.until > Date.now()) return cached.result;
   const result = weekdayShowcase({...deps, catalog: async () => data});
   const entry = {key, until: Date.now() + 60000, result}; cached = entry;

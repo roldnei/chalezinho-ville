@@ -89,7 +89,7 @@ test('home renders dated price cards and duration filters; links carry explicit 
 });
 test('storefront preview never persists quote rows or enables payments',async()=>{
  const engine=await readFile(new URL('../supabase/functions/booking-engine/index.ts',import.meta.url),'utf8');
- assert.match(engine,/createQuote\(body,development,null,null,list,false,catalog,await context\)/);
+ assert.match(engine,/createQuote\(body,development,null,null,list,false,catalog,await context,consultation\)/);
  assert.match(engine,/if\(persist&&expSnapshots.length\)/);assert.match(engine,/if\(persist&&inserted.length\)/);
 });
 

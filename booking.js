@@ -11,6 +11,7 @@ function downloadPolicyDocument(doc){
  document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 const state={config:null,search:null,property:null,selectedByProduct:{},quote:null,rate:null,rateCode:null,session:null,upsellHandled:false,activePayment:null,installmentQuote:null,offerId:null,preferences:{},fastCheckout:false,fastUpdating:false,rateConfirmed:false,stage:"review",entrySource:"manual"};
+const lodgingOnly=()=>PUBLIC&&state.quote?.consultation_pricing?.profile==='lodging-airbnb-base-v1';
 const pagbankSandbox=window.CHALEZINHO_CONFIG.environment==="development";
 let anonymousId="",searchSequence=0;
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
@@ -69,7 +70,7 @@ async function init(){
    const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);
    if(incoming.has("stay_offer")&&state.offerId!==incoming.get("stay_offer")){directCheckoutError();return}
    if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);
-    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout();const reference=Number(incoming.get('expected_total'));if(reference>0&&reference!==rate.total_amount_cents)setFlowError('O preço desta oferta mudou de '+brlC(reference)+' para '+brlC(rate.total_amount_cents)+'. Revise o total e escolha sua tarifa antes de continuar.')}
+    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout();const reference=Number(incoming.get('expected_total'));if(reference>0&&reference!==rate.total_amount_cents)setFlowError('O preço desta oferta mudou de '+brlC(reference)+' para '+brlC(rate.total_amount_cents)+'. '+(PUBLIC?'Confira o novo total antes de continuar.':'Revise o total e escolha sua tarifa antes de continuar.'))}
     else if(!incoming.get('rate'))await openFastCheckout();
     else directCheckoutError();
    }else directCheckoutError();
@@ -176,7 +177,7 @@ function renderResults(list,{scroll=true}={}){
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
   const fromRate=p.quote?.rate_options?.filter(x=>x.selectable).sort((a,b)=>a.total_amount_cents-b.total_amount_cents)[0];
   const offerBlocked=state.offerId&&(p.offer_issues||[]).length;
-  const price=p.available&&!offerBlocked?'<small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">'+(state.offerId?offerKind(selectedOffer()):'Somente hospedagem')+' · '+perNight+' por noite'+(fromRate?' · Tarifa '+esc(fromRate.name):'')+'</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
+  const price=p.available&&!offerBlocked?'<small>A PARTIR DE</small><strong>'+preview+'</strong><span class="price-note">'+(state.offerId?offerKind(selectedOffer()):(PUBLIC?'Escapada':'Somente hospedagem'))+' · '+perNight+' por noite'+(!PUBLIC&&fromRate?' · Tarifa '+esc(fromRate.name):'')+'</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
   a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(({chalet:'Chalé',apartment:'Apartamento',house:'Casa',studio:'Studio'})[p.property_type]||'Imóvel')+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available||p.requestable?"":"disabled")+' data-id="'+p.id+'">'+(p.requestable?"Pedir aprovação":p.available?"Escolher esta estadia":"Indisponível")+'</button></div>';
   VilleImages.set(a.querySelector(".booking-gallery img"),p.cover_image,{sizes:"(max-width: 800px) 100vw, 240px"});
   if(offerBlocked){a.querySelector('.booking-price').insertAdjacentHTML('afterbegin','<p class="offer-unavailable-reason">'+p.offer_issues.map(x=>esc(window.VilleOffers.issues[x]||'Experiência indisponível')).join('. ')+'</p>');const b=a.querySelector('.booking-select');b.textContent='Ver somente hospedagem';b.dataset.stayOnly='1'}
@@ -225,12 +226,14 @@ function showStep(n){
  $('#step-back').textContent=n===5?'← Alterar reserva':'← Ver outros chalés';
  $('#step-next').textContent=PUBLIC?'Continuar pelo WhatsApp':n===2?'Continuar para identificação':'Ir para pagamento de teste';setFlowError('');
 }
+function lodgingOnlyQuote(q){return PUBLIC&&q?.consultation_pricing?.profile==='lodging-airbnb-base-v1'}
 async function generateQuote(withExperiences){
  if(PUBLIC){state.quote=null;state.rate=null;}if(PUBLIC){clearWhatsApp();$('#summary-content').textContent='Atualizando a consulta…';if($('#checkout-rate-options'))$('#checkout-rate-options').textContent=''}
  const controls=['#stay-mode','#checkout-stay-mode','#step-next'].map($).filter(Boolean);controls.forEach(x=>x.disabled=true);
  try{
- const chosen=withExperiences?Object.values(state.selectedByProduct):[];
+ const chosen=PUBLIC?[]:withExperiences?Object.values(state.selectedByProduct):[];
  const q=await api("quote",{property_id:state.property.id,check_in:$("#book-in").value,check_out:$("#book-out").value,guests:Number($("#book-guests").value),experience_variant_ids:chosen,stay_offer_id:state.offerId||undefined,experience_preferences:state.preferences,same_day_request_id:state.approvedRequest||undefined});
+ if(lodgingOnlyQuote(q)){state.selectedByProduct={};state.preferences={};state.rate=q.rate_options.find(r=>r.selectable)||null;state.rateCode=state.rate?.code||null;state.rateConfirmed=!!state.rate;}
  q.checked_at=q.consulted_at||new Date().toISOString();q.selected_variant_ids=chosen.map(String).sort();q.preferences_key=JSON.stringify(state.preferences);state.quote=q;startCountdown(q.expires_at);renderOfferContext();return q;
  }finally{controls.forEach(x=>x.disabled=x.id==='checkout-stay-mode'&&$('#checkout-panel').dataset.step==='6')}
 }
@@ -439,7 +442,7 @@ function renderGuestStep(){
  const meta=state.session?.user?.user_metadata||{};$("#guest-name").value=$("#guest-name").value||meta.full_name||"";$("#guest-email").value=state.session?.user?.email||"";$("#guest-phone").value=$("#guest-phone").value||meta.phone||"";
 }
 function validateGuest(){if(!$("#guest-name").value.trim()||!$("#guest-email").value.trim()||!$("#guest-phone").value.trim()){setFlowError("Preencha seus dados.");return false}return true}
-function renderSelectionSummary(){if(PUBLIC){$('#summary-content').innerHTML='';if(state.rateConfirmed&&state.quote&&state.rate){const pre=document.createElement('div');pre.className='consultation-summary';pre.textContent=window.VilleConsultationSummary.summary({quote:state.quote,rate:state.rate});$('#summary-content').append(pre)}else $('#summary-content').textContent='Escolha sua tarifa para conferir o resumo completo.';return;}
+function renderSelectionSummary(){if(PUBLIC){$('#summary-content').innerHTML='';if((state.rateConfirmed||lodgingOnly())&&state.quote&&state.rate){const pre=document.createElement('div');pre.className='consultation-summary';pre.textContent=window.VilleConsultationSummary.summary({quote:state.quote,rate:state.rate});$('#summary-content').append(pre)}else $('#summary-content').textContent='Escolha sua tarifa para conferir o resumo completo.';return;}
  const total=Number(state.rate.total_amount_cents||0),stay=Number(state.rate.stay_amount_cents||0);
  const perNight=Math.round(stay/stayNights());
  const experiences=state.quote?.experiences||[];
@@ -699,6 +702,7 @@ function renderCheckoutRates(){
  let box=$('#checkout-rate-options');
  if(!box){box=document.createElement('fieldset');box.id='checkout-rate-options';$('#summary-content').before(box)}
  const rates=state.quote.rate_options.filter(r=>r.selectable);
+ if(lodgingOnly()){box.hidden=true;box.innerHTML='';return}box.hidden=false;
  box.innerHTML='<legend>Escolha a política de cancelamento</legend><p>Compare os dois preços completos. Nenhuma tarifa é escolhida automaticamente.</p>'+rates.map(r=>'<label class="checkout-rate-choice"><input type="radio" name="checkout-rate" value="'+esc(r.code)+'" '+(state.rateConfirmed&&r.code===state.rateCode?'checked':'')+'><span><strong>'+esc(r.name)+'</strong><small>Total para '+stayNights()+' noites</small></span><strong>'+brlC(r.total_amount_cents)+'</strong></label><details class="rate-policy"><summary>Condições · '+esc(r.name)+'</summary><p>'+esc(r.cancellation_policy?.body||'Condições indisponíveis.')+'</p></details>').join('');
  box.querySelectorAll('input').forEach(input=>input.onchange=()=>{
   if(state.fastUpdating)return;
@@ -713,7 +717,7 @@ function directCheckoutError(){
  $('#direct-checkout-status').hidden=false;
  $('#direct-checkout-status p').textContent='Esta oferta não está mais disponível nas condições escolhidas. Consulte outras opções para continuar.';
 }
-function renderReview(){renderSelectionSummary();renderCheckoutRates();renderExperienceStep();$('#step-next').disabled=!state.rateConfirmed;}
+function renderReview(){renderSelectionSummary();renderCheckoutRates();renderExperienceStep();if(lodgingOnly()){$("#direct-extras").hidden=true;$("#trip-purpose-review").closest("label").hidden=true;}$('#step-next').disabled=!state.rateConfirmed;}
 async function openFastCheckout(){
  state.stage='review';refreshStayOptions();
  document.documentElement.classList.toggle('direct-checkout',state.entrySource==='showcase');
@@ -761,7 +765,7 @@ function initStayModes(){
  if(!(state.config.stay_offers||[]).some(o=>o.id===state.offerId))state.offerId=null;
  state.preferences=saved.preferences||{};
  if(!q.has('stay_offer')&&!q.has('mode')){if(saved.check_in)$('#book-in').value=saved.check_in;if(saved.check_out)$('#book-out').value=saved.check_out;if(saved.guests)$('#book-guests').value=saved.guests}
- const options='<option value="">Somente hospedagem</option>'+(state.config.stay_offers||[]).map(o=>'<option value="'+esc(o.id)+'">'+offerKind(o)+' · '+esc(o.name)+'</option>').join('');
+ const options=PUBLIC?'<option value="'+esc(state.offerId||'')+'">Escapada</option>':'<option value="">Somente hospedagem</option>'+(state.config.stay_offers||[]).map(o=>'<option value="'+esc(o.id)+'">'+offerKind(o)+' · '+esc(o.name)+'</option>').join('');
  for(const id of ['#stay-mode','#checkout-stay-mode']){$(id).innerHTML=options;$(id).onchange=async e=>{
  if(state.fastUpdating)return;state.offerId=e.target.value||null;state.selectedByProduct={};state.preferences={};syncStayModes();persistSelection();
  if(!$('#checkout-modal').hidden){
@@ -772,11 +776,11 @@ function initStayModes(){
  }}
  refreshStayOptions();syncStayModes();
 }
-function refreshStayOptions(){const code=$("#book-chalet").value,propertyId=Number((state.properties||[]).find(p=>p.code===code)?.id);const purpose=$('#trip-purpose-initial').value;const relevant=o=>o.product_ids.some(id=>(state.config.experience_products||[]).find(p=>p.id===id)?.travel_purposes?.includes(purpose));const compatible=(state.config.stay_offers||[]).filter(o=>!code||o.property_ids.map(Number).includes(propertyId)).filter(o=>!$('#book-in').value||!$('#book-out').value||(stayNights()>=Number(o.min_nights||1)&&(!o.max_nights||stayNights()<=Number(o.max_nights))&&(!o.start_date||$('#book-in').value>=o.start_date)&&(!o.end_date||$('#book-out').value<=o.end_date))).sort((a,b)=>Number(relevant(b))-Number(relevant(a)));if(state.offerId&&!compatible.some(o=>o.id===state.offerId))state.offerId=null;const options='<option value="">Somente hospedagem</option>'+compatible.map(o=>'<option value="'+esc(o.id)+'">'+offerKind(o)+' · '+esc(o.name)+'</option>').join('');for(const id of ["#stay-mode","#checkout-stay-mode"])$(id).innerHTML=options;syncStayModes();}
-function syncStayModes(){const offer=selectedOffer();if(offer?.showcase?.commercial_condition)for(const id of offer.product_ids){state.preferences[id]??={};state.preferences[id]._commercial_condition=offer.showcase.commercial_condition}for(const id of ['#stay-mode','#checkout-stay-mode'])if($(id))$(id).value=state.offerId||'';$('#stay-selection-copy').textContent=offer?offer.description+(offer.product_ids?.length?' O preço inclui hospedagem, limpeza e os pacotes desta oferta.':' O preço inclui somente hospedagem e limpeza.'):'Hospedagem e limpeza. Você pode acrescentar pacotes avulsos pelo preço cheio.';renderOfferContext()}
+function refreshStayOptions(){const code=$("#book-chalet").value,propertyId=Number((state.properties||[]).find(p=>p.code===code)?.id);const purpose=$('#trip-purpose-initial').value;const relevant=o=>o.product_ids.some(id=>(state.config.experience_products||[]).find(p=>p.id===id)?.travel_purposes?.includes(purpose));const compatible=(state.config.stay_offers||[]).filter(o=>!code||o.property_ids.map(Number).includes(propertyId)).filter(o=>!$('#book-in').value||!$('#book-out').value||(stayNights()>=Number(o.min_nights||1)&&(!o.max_nights||stayNights()<=Number(o.max_nights))&&(!o.start_date||$('#book-in').value>=o.start_date)&&(!o.end_date||$('#book-out').value<=o.end_date))).sort((a,b)=>Number(relevant(b))-Number(relevant(a)));if(state.offerId&&!compatible.some(o=>o.id===state.offerId))state.offerId=null;const options=PUBLIC?'<option value="'+esc(state.offerId||'')+'">Escapada</option>':'<option value="">Somente hospedagem</option>'+compatible.map(o=>'<option value="'+esc(o.id)+'">'+offerKind(o)+' · '+esc(o.name)+'</option>').join('');for(const id of ["#stay-mode","#checkout-stay-mode"])$(id).innerHTML=options;syncStayModes();}
+function syncStayModes(){if(PUBLIC){for(const id of ['#stay-mode','#checkout-stay-mode'])if($(id))$(id).value=state.offerId||'';$('#stay-selection-copy').textContent='';renderOfferContext();return}const offer=selectedOffer();if(offer?.showcase?.commercial_condition)for(const id of offer.product_ids){state.preferences[id]??={};state.preferences[id]._commercial_condition=offer.showcase.commercial_condition}for(const id of ['#stay-mode','#checkout-stay-mode'])if($(id))$(id).value=state.offerId||'';$('#stay-selection-copy').textContent=offer?offer.description+(offer.product_ids?.length?' O preço inclui hospedagem, limpeza e os pacotes desta oferta.':' O preço inclui somente hospedagem e limpeza.'):'Hospedagem e limpeza. Você pode acrescentar pacotes avulsos pelo preço cheio.';renderOfferContext()}
 function persistSelection(){try{const url=new URL(location.href);url.searchParams.set('purpose',$('#trip-purpose-initial').value);if(state.offerId){url.searchParams.set('stay_offer',state.offerId);url.searchParams.delete('mode')}else{url.searchParams.set('mode','stay');url.searchParams.delete('stay_offer')}history.replaceState(null,'',url);sessionStorage.setItem('ville-stay-selection',JSON.stringify({offerId:state.offerId,preferences:state.preferences,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value,purpose:$('#trip-purpose-initial').value}))}catch{}}
 function offerKind(offer){return offer?.product_ids?.length?'Com experiência incluída':'Hospedagem e limpeza'}
-function renderOfferContext(){const node=$('#checkout-offer-context');if(node)node.textContent=selectedOffer()?offerKind(selectedOffer())+' · '+selectedOffer().name:'Somente hospedagem · adicionais avulsos pelo preço cheio'}
+function renderOfferContext(){const node=$('#checkout-offer-context');if(node)node.textContent=PUBLIC?'':selectedOffer()?offerKind(selectedOffer())+' · '+selectedOffer().name:'Somente hospedagem · adicionais avulsos pelo preço cheio'}
 function renderOfferChoices(){
  let node=$('#offer-choices');if(!node){node=document.createElement('div');node.id='offer-choices';$('#experience-options').before(node)}
  const products=[...new Set([...(selectedOffer()?.product_ids||[]),...Object.keys(state.selectedByProduct)])].map(id=>(state.config.experience_products||[]).find(p=>p.id===id)).filter(Boolean);
@@ -784,24 +788,26 @@ function renderOfferChoices(){
  node.querySelectorAll('select').forEach(select=>select.onchange=()=>{state.preferences[select.dataset.product]??={};state.preferences[select.dataset.product][select.dataset.component]=select.value;persistSelection();if(state.fastCheckout)updateFastQuote()});
 }
 function validExperienceChoices(){const ids=[...(selectedOffer()?.product_ids||[]),...Object.keys(state.selectedByProduct)];return ids.every(id=>window.VilleOffers.components((state.config.experience_products||[]).find(p=>p.id===id)||{}).every(c=>!c.choices?.length||c.choices.includes(state.preferences[id]?.[c.name])))}
-let whatsappMessage='',whatsappBusy=false;
+let whatsappMessage='',whatsappBusy=false,priceChangePending=false;
 function clearWhatsApp(){whatsappMessage='';document.querySelector('#whatsapp-manual-copy')?.remove();const box=$('#whatsapp-actions');if(box)box.hidden=true;$('#whatsapp-open')?.removeAttribute('href');if($('#whatsapp-status'))$('#whatsapp-status').textContent='';}
 function saveConsultation(){try{sessionStorage.setItem('ville-consultation-selection',JSON.stringify({entryUrl:location.pathname+location.search,propertyCode:state.property?.code,offerId:state.offerId,preferences:state.preferences,selectedByProduct:state.selectedByProduct,rateCode:state.rateConfirmed?state.rateCode:null,check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value}))}catch{}}
-async function restoreConsultation(matchingEntry){let saved;try{saved=JSON.parse(sessionStorage.getItem('ville-consultation-selection')||'null')}catch{}if(!saved?.propertyCode||matchingEntry&&saved.entryUrl!==location.pathname+location.search)return false;$('#book-in').value=saved.check_in;$('#book-out').value=saved.check_out;$('#book-guests').value=saved.guests;state.offerId=saved.offerId;state.preferences=saved.preferences||{};syncStayModes();await search();const property=state.search?.find(p=>p.code===saved.propertyCode&&p.available);if(!property)return false;await openFlow(property.id);state.selectedByProduct=saved.selectedByProduct||{};await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===saved.rateCode&&r.selectable)||state.quote.rate_options.find(r=>r.selectable);state.rateCode=state.rate?.code;state.rateConfirmed=!!saved.rateCode&&state.rateCode===saved.rateCode;await openFastCheckout();return true;}
+async function restoreConsultation(matchingEntry){let saved;try{saved=JSON.parse(sessionStorage.getItem('ville-consultation-selection')||'null')}catch{}if(!saved?.propertyCode||matchingEntry&&saved.entryUrl!==location.pathname+location.search)return false;$('#book-in').value=saved.check_in;$('#book-out').value=saved.check_out;$('#book-guests').value=saved.guests;state.offerId=saved.offerId;state.preferences=saved.preferences||{};syncStayModes();await search();const property=state.search?.find(p=>p.code===saved.propertyCode&&p.available);if(!property)return false;await openFlow(property.id);state.selectedByProduct=saved.selectedByProduct||{};await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===saved.rateCode&&r.selectable)||state.quote.rate_options.find(r=>r.selectable);state.rateCode=state.rate?.code;state.rateConfirmed=lodgingOnly()||!!saved.rateCode&&state.rateCode===saved.rateCode;await openFastCheckout();return true;}
 async function continueWhatsApp(){
- if(whatsappBusy||state.fastUpdating||!state.rateConfirmed||!state.rate)return;
+ if(whatsappBusy||state.fastUpdating||!state.rate)return;
+ if(!state.rateConfirmed&&!priceChangePending)return;
+ if(priceChangePending){priceChangePending=false;state.rateConfirmed=true}
  if(!validExperienceChoices()){setFlowError('Escolha as preferências dos itens antes de continuar.');return;}
- whatsappBusy=true;$('#step-next').disabled=true;const previous=window.VilleConsultationSummary.message({quote:state.quote,rate:state.rate}),oldCode=state.rateCode;clearWhatsApp();
+ whatsappBusy=true;$('#step-next').disabled=true;$('#step-next').textContent='Continuar pelo WhatsApp';const previous=window.VilleConsultationSummary.message({quote:state.quote,rate:state.rate}),oldCode=state.rateCode;clearWhatsApp();
  try{
   await generateQuote(true);state.rate=state.quote.rate_options.find(r=>r.code===oldCode&&r.selectable);if(!state.rate)throw Error('tariff_unavailable');state.rateCode=oldCode;state.rateConfirmed=true;renderReview();
   const current=window.VilleConsultationSummary.message({quote:state.quote,rate:state.rate});
   // Ignore only the consultation timestamp when checking for commercial changes.
-  if(previous.replace(/Consulta:.*\n/,'')!==current.replace(/Consulta:.*\n/,'')){state.rateConfirmed=false;renderReview();setFlowError('O valor ou as condições mudaram. Revise o resumo e escolha sua tarifa novamente.');return;}
+  if(previous.replace(/Consulta:.*\n/,'')!==current.replace(/Consulta:.*\n/,'')){state.rateConfirmed=false;priceChangePending=lodgingOnly();renderReview();$('#step-next').textContent=priceChangePending?'Conferi o novo total · continuar':'Continuar pelo WhatsApp';$('#step-next').disabled=!priceChangePending;setFlowError(priceChangePending?'O total mudou. Confira o novo valor e confirme antes de continuar.':'O valor ou as condições mudaram. Revise o resumo e escolha sua tarifa novamente.');return;}
   whatsappMessage=current;const url='https://wa.me/'+C.whatsappNumber+'?text='+encodeURIComponent(current);$('#whatsapp-open').href=url;$('#whatsapp-actions').hidden=false;$('#whatsapp-status').textContent='Resumo atualizado. Abra o WhatsApp e envie a mensagem para iniciar o atendimento. Se o aplicativo não abrir, copie o resumo.';saveConsultation();
   // The explicit link is a second gesture: mobile browsers cannot block it as an async popup.
   $('#whatsapp-open').focus();
  }catch(e){state.quote=null;state.rate=null;$('#summary-content').textContent='Consulta indisponível. Consulte novamente antes de continuar.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível reconfirmar os valores e a disponibilidade. Faça uma nova consulta.');}
- finally{whatsappBusy=false;$('#step-next').disabled=!state.rate||!state.rateConfirmed;}
+ finally{whatsappBusy=false;$('#step-next').disabled=!state.rate||(!state.rateConfirmed&&!priceChangePending);}
 }
 async function copyWhatsAppSummary(){if(!whatsappMessage)return;try{await navigator.clipboard.writeText(whatsappMessage);if(await navigator.clipboard.readText()!==whatsappMessage)throw Error('clipboard_unverified');$('#whatsapp-status').textContent='Resumo copiado. Cole no WhatsApp para solicitar a finalização.'}catch{document.querySelector('#whatsapp-manual-copy')?.remove();const field=document.createElement('textarea');field.id='whatsapp-manual-copy';field.className='consultation-summary';field.style.width='100%';field.style.minHeight='220px';field.value=whatsappMessage;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();$('#whatsapp-status').textContent='Selecione e copie o resumo abaixo.'}}
 init();

@@ -1,8 +1,8 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {JSDOM} from 'jsdom';
-async function fixture(){
+async function fixture(lodging=false){
  const w=new JSDOM(readFileSync('reservar.html','utf8'),{url:'https://qa.example/reservar.html?mode=stay',runScripts:'outside-only'}).window,calls=[];let failure=false,changed=false;
  const property={id:1,code:'CH1',name:'Ville Signature',available:true,features:{},cover_image:'assets/signature.webp',gallery:[],max_guests:2,from_stay_price:1250};
- function quote(input={}){const total=changed?135000:125000;return {ok:true,quote_id:null,consulted_at:new Date().toISOString(),expires_at:new Date(Date.now()+900000).toISOString(),property,experiences:[],rate_options:['refundable','non_refundable'].map(code=>({code,name:code==='refundable'?'Reembolsável':'Não reembolsável',selectable:true,total_amount_cents:total,accommodation_amount_cents:110000,cleaning_fee_cents:15000,stay_amount_cents:total,cancellation_policy:{body:'Política da tarifa de teste'},contract_snapshot:{property_name:property.name,check_in:input.check_in||'2026-12-01',check_out:input.check_out||'2026-12-03',guests:input.guests||2,lines:[{key:'accommodation',gross_cents:110000},{key:'cleaning',gross_cents:15000}],discount_cents:0}}))};}
+ function quote(input={}){const total=changed?135000:125000;return {ok:true,...(lodging?{consultation_pricing:{profile:'lodging-airbnb-base-v1',markup_bps:0,cleaning_cents:29000}}:{}),quote_id:null,consulted_at:new Date().toISOString(),expires_at:new Date(Date.now()+900000).toISOString(),property,experiences:[],rate_options:(lodging?['non_refundable']:['refundable','non_refundable']).map(code=>({code,name:lodging?'Escapada':code==='refundable'?'Reembolsável':'Não reembolsável',selectable:true,total_amount_cents:total,accommodation_amount_cents:110000,cleaning_fee_cents:15000,stay_amount_cents:total,cancellation_policy:{body:'Política da tarifa de teste'},contract_snapshot:{property_name:property.name,check_in:input.check_in||'2026-12-01',check_out:input.check_out||'2026-12-03',guests:input.guests||2,lines:[{key:'accommodation',gross_cents:110000},{key:'cleaning',gross_cents:15000}],discount_cents:0}}))};}
  property.quote=quote();
  w.CHALEZINHO_CONFIG={releaseProfile:'whatsapp',bookingEngine:'https://qa.example/public-consultation',supabaseUrl:'https://qa.example',supabaseKey:'fixture',whatsappNumber:'5593991592266',environment:'development'};w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}})}})};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.fetch=async(url,options={})=>{const body=options.body?JSON.parse(options.body):{},action=new URL(url).searchParams.get('action')||body.action;calls.push(action);if(failure&&['quote','search'].includes(action))return {ok:false,status:503,json:async()=>({ok:false,error:'unavailable'})};const data=action==='config'?{ok:true,purposes:[],experience_products:[],stay_offers:[]}:action==='property_media'?{ok:true,properties:[property]}:action==='search'?{ok:true,listings:[{...property,quote:quote()}]}:quote(body);return {ok:true,status:200,json:async()=>data};};
@@ -32,10 +32,34 @@ test('lodging-only escape keeps offer context without promising an included expe
  const f=await fixture();try{const {w}=f,state=w.VilleTest.state;
  state.config.stay_offers=[{id:'stay-only',name:'Escapada sem experiência',description:'Hospedagem e limpeza',property_ids:[1],product_ids:[],min_nights:2,discount_enabled:false}];state.offerId='stay-only';
  w.VilleTest.refreshStayOptions();
- assert.match(w.document.querySelector('#checkout-stay-mode').textContent,/Hospedagem e limpeza · Escapada sem experiência/);
+ assert.equal(w.document.querySelector('#checkout-stay-mode').textContent,'Escapada');
  assert.doesNotMatch(w.document.querySelector('#checkout-offer-context').textContent,/Com experiência/);
  assert.doesNotMatch(w.document.querySelector('#stay-selection-copy').textContent,/pacotes desta oferta/);
  f.choose();await w.VilleTest.continueWhatsApp();
  assert.ok(f.calls.every(a=>['config','property_media','search','quote'].includes(a)));
  }finally{f.w.close()}
+});
+
+
+test('first launch shows one Escapada and only the total; no tariff or experience selection',async()=>{
+ const f=await fixture(true);try{const {w}=f;
+ assert.equal(w.document.querySelector('#checkout-rate-options').hidden,true);
+ assert.equal(w.document.querySelector('#direct-extras').hidden,true);
+ assert.equal(w.document.querySelector('#checkout-stay-mode').textContent,'Escapada');
+ assert.equal(w.document.querySelector('#step-next').disabled,false);
+ await w.VilleTest.continueWhatsApp();
+ const summary=w.document.querySelector('.consultation-summary').textContent,message=new URL(w.document.querySelector('#whatsapp-open').href).searchParams.get('text');
+ assert.equal(message,'Olá! Gostaria de finalizar esta hospedagem pelo atendimento.\n\n'+summary);
+ assert.match(summary,/Seleção: Escapada\nTotal consultado:/);
+ assert.doesNotMatch(summary,/Limpeza:|Hospedagem:|Desconto:|Tarifa:|Experiência:|Condições:/);
+ assert.ok(f.calls.every(a=>['config','property_media','search','quote'].includes(a)));
+ }finally{f.w.close()}
+});
+test('first-launch price change requires a second explicit review and failure clears the total',async()=>{
+ for(const scenario of ['change','fail']){const f=await fixture(true);try{
+ await f.w.VilleTest.continueWhatsApp();f[scenario]();await f.w.VilleTest.continueWhatsApp();
+ assert.equal(f.w.document.querySelector('#whatsapp-open').hasAttribute('href'),false);
+ if(scenario==='change'){assert.match(f.w.document.querySelector('#step-next').textContent,/Conferi o novo total/);await f.w.VilleTest.continueWhatsApp();assert.equal(f.w.document.querySelector('#whatsapp-actions').hidden,false)}
+ else{assert.equal(f.w.VilleTest.state.rate,null);assert.equal(f.w.document.querySelector('.consultation-summary'),null)}
+ }finally{f.w.close()}}
 });

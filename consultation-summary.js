@@ -4,6 +4,7 @@
  function summary({quote,rate}){
   if(!quote||!rate||!Number.isSafeInteger(rate.total_amount_cents))throw Error('current_quote_required');
   const c=rate.contract_snapshot,nights=(Date.parse(c.check_out)-Date.parse(c.check_in))/86400000;
+  if(quote.consultation_pricing?.profile==='lodging-airbnb-base-v1')return [`Chalé: ${c.property_name}`,`Entrada: ${date(c.check_in)} · Saída: ${date(c.check_out)} · ${nights} noites`,`Hóspedes: ${c.guests}`,'Seleção: Escapada',`Total consultado: ${money(rate.total_amount_cents)}`,`Consulta: ${new Date(quote.checked_at||quote.consulted_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})}`,'Disponibilidade e valores serão reconfirmados no atendimento. Esta consulta não confirma nem bloqueia a hospedagem.'].join('\n');
   const lines=[`Chalé: ${c.property_name}`,`Entrada: ${date(c.check_in)} · Saída: ${date(c.check_out)} · ${nights} noites`,`Hóspedes: ${c.guests}`,`Seleção: ${c.offer_name||((quote.experiences||[]).length?'Hospedagem com experiências':'Somente hospedagem')}`,`Tarifa: ${rate.name}`];
   for(const e of quote.experiences||[]){lines.push(`Experiência: ${e.product}${e.included?' (incluída)':''}`);if(e.composition?.commercial_condition)lines.push(`Condição da experiência: ${e.composition.commercial_condition.label}`);for(const item of e.composition?.components||[])lines.push(`  ${item.quantity||1} × ${item.name}${item.choice?' · '+item.choice:''}`);}
   const priceLines=c.lines||[];

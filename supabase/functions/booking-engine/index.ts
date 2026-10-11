@@ -1,3 +1,4 @@
+import {lodgingLaunchCatalog,lodgingLaunchPlans,assertLodgingLaunchSelection,lodgingLaunchPrice} from '../_shared/lodging-launch.ts';
 import {commercialPricing,experienceCommercial,offerExperiencePreferences} from '../_shared/experience-commercial.ts';
 import {consultationActions,launchAdminActions,releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {villegramStayQuote} from '../_shared/villegram-stay.ts';
@@ -280,6 +281,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
       cleaning_fee:Number(p.cleaning_fee||0),
       min_stay:minStay,
       base_price:hasPrice?Number(pr.total_price):null,
+      pricing_days:hasPrice?pr.days:null,
       available,same_day_approval_required:sameDayApproval,requestable:sameDayApproval&&requestable,
       unavailable_reason: !cal?.ok || bookingIcal.configured&&!bookingCal?.ok ? "calendar_unavailable" : channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : sameDayApproval&&!approvedSameDay ? "same_day_approval_required" : null
     };
@@ -298,14 +300,16 @@ async function showcaseQuoteContext(catalog:any,development:boolean){
  if(variants.error||eligible.error)throw Error("experience_lookup_failed");if(plans.error)throw Error("rate_plan_failed");
  return {variants:variants.data||[],eligible:eligible.data||[],plans:plans.data||[],policies};
 }
-async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null,persist=true,offerCatalog:any=null,readContext:any=null){
+async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null,persist=true,offerCatalog:any=null,readContext:any=null,launch=false){
   const {property_id,check_in,check_out,guests}=body||{};
+  if(launch)assertLodgingLaunchSelection(body);
   let experience_variant_ids=Array.isArray(body.experience_variant_ids)?[...new Set(body.experience_variant_ids)]:[];
   let offer:any=null;
   if(body.stay_offer_id){
     const catalog=offerCatalog||await stayOffers.catalog();offer=catalog.offers.find((x:any)=>x.id===body.stay_offer_id);
     if(offer?.showcase&&isCelebration(body.check_in,body.check_out,offer.showcase)&&!offer.showcase.celebration_discount)offer={...offer,discount_enabled:false};
     if(!offer||releaseTarget(projectUrl)==='production'&&!commercialItem(offer))throw Error("offer_unavailable");
+    if(launch){assertLodgingLaunchSelection(body,offer);offer={...offer,name:"Escapada",discount_enabled:false,discount_bps:0};}
     const issues=offerIssues(offer,catalog.products,Number(property_id),{check_in,check_out});
     if(issues.length)throw Error(issues[0]);
     for(const id of offer.product_ids){
@@ -392,11 +396,11 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
 
   const inserted:any[]=[];
   const display:any[]=[];
-  for(const p of plans||[]){
-    const cancellationPolicy=development&&p.selectable?policyForPlan(policyAssignments,p.code):p.policy_documents;
-    if(development&&p.selectable&&!cancellationPolicy) throw new Error("cancellation_policy_unavailable");
+  for(const p of launch?lodgingLaunchPlans(plans||[]):plans||[]){
+    const cancellationPolicy=launch?null:development&&p.selectable?policyForPlan(policyAssignments,p.code):p.policy_documents;
+    if(!launch&&development&&p.selectable&&!cancellationPolicy) throw new Error("cancellation_policy_unavailable");
     const accommodation=Math.round(baseCents*Number(p.multiplier_bps)/10000);
-    const price=priceStayOffer([{key:"accommodation",gross_cents:accommodation,included:!!offer},{key:"cleaning",gross_cents:cleaningCents,included:!!offer},...expSnapshots.map(x=>({key:x.product.id,gross_cents:Number(x.variant.price_cents),included:x.included}))],offer);
+    const price=launch?lodgingLaunchPrice(property,accommodation,cleaningCents):priceStayOffer([{key:"accommodation",gross_cents:accommodation,included:!!offer},{key:"cleaning",gross_cents:cleaningCents,included:!!offer},...expSnapshots.map(x=>({key:x.product.id,gross_cents:Number(x.variant.price_cents),included:x.included}))],offer);
     const contract={property_id:property.id,property_name:property.name,check_in,check_out,guests:Number(guests),rate_code:p.code,rate_name:p.name,cancellation_policy:cancellationPolicy,offer_version:offer?.updated_at||null,offer_rules:offer?{min_nights:offer.min_nights,max_nights:offer.max_nights,start_date:offer.start_date,end_date:offer.end_date,property_ids:offer.property_ids}:null,payment_terms:property.features?.payment_terms||null,price_source:"pricelabs",offer_id:offer?.id||null,offer_name:offer?.name||null,description:offer?.description||null,discount_bps:offer?.discount_bps||0,discount_enabled:offer?.discount_enabled||false,...price,experiences:expSnapshots.map(x=>({...x.composition,included:x.included,net_price_cents:price.lines.find(l=>l.key===x.product.id)?.net_cents}))};
     const netAccommodation=price.lines[0].net_cents,netCleaning=price.lines[1].net_cents,netExperiences=price.lines.slice(2).reduce((s,x)=>s+x.net_cents,0);
     const total=price.total_cents;
@@ -426,7 +430,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     d.quote_option_id=plan?byPlan[String(plan.id)]||null:null;
   }
   const {cleaning_fee:_hiddenCleaning,...guestProperty}=property;
-  return {ok:true,quote_id:q.id,consulted_at:new Date().toISOString(),expires_at:expiresAt,property:guestProperty,rate_options:display,experiences:expSnapshots.map(x=>({
+  return {ok:true,...(launch?{consultation_pricing:{profile:"lodging-airbnb-base-v1",markup_bps:0,cleaning_cents:cleaningCents,channel_promotion:property.features?.channel_pricing?.last_minute||null}}:{}),quote_id:q.id,consulted_at:new Date().toISOString(),expires_at:expiresAt,property:guestProperty,rate_options:display,experiences:expSnapshots.map(x=>({
     product_id:x.product.id,product:x.product.name,package_type:x.product.package_type,included:x.included,composition:x.composition,
     variant:x.variant.code==="package"?null:x.variant.name,price_cents:Number(x.variant.price_cents)
   }))};
@@ -2129,28 +2133,28 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
 
       return json({
         ok:true,
-        purposes:purposesQ.data||[],
+        purposes:consultation?[]:purposesQ.data||[],
         payment_settings:settingsQ.data||{},
         policy_documents:docsQ.data||[],
         required_booking_documents:bookingDocuments(docsQ.data||[],development),
-        experience_products:target==='production'?(productsQ.data||[]).filter(commercialItem):productsQ.data||[],stay_offers:(await stayOffers.catalog()).offers,
+        experience_products:consultation?[]:target==='production'?(productsQ.data||[]).filter(commercialItem):productsQ.data||[],stay_offers:(consultation?lodgingLaunchCatalog(await stayOffers.catalog()):await stayOffers.catalog()).offers,
         availability_coverage:{direct:true,airbnb:true,booking:true}
       });
     }
     if(action==="villegram_quote"){
       // Public read-only merchandising also serves this project's server-side feed.
       if(!consultation&&(req.headers.get('x-chalezinho-env')!=='development'||target!=='development'))return json({ok:false,error:'development_only'},403);
-      try{return json(await villegramStayQuote(body,{search:(start:string,end:string,guests:number)=>searchData(start,end,guests,null,development),quote:(input:any,list:any[])=>createQuote(input,development,null,null,list,false)}))}
+      try{return json(await villegramStayQuote(body,{search:(start:string,end:string,guests:number)=>searchData(start,end,guests,null,development),quote:(input:any,list:any[])=>createQuote(input,development,null,null,list,false,null,null,consultation)}))}
       catch(e){return json({ok:false,error:(e as Error).message||'quote_unavailable'},409)}
     }
     if(action==="villegram_offer"){
       if(!development&&!consultation)return json({ok:false,error:'development_only'},403);
-      const data=await stayOffers.catalog(),offer=data.offers.find((o:any)=>o.id===body.offer_id);
+      const raw=await stayOffers.catalog(),data=consultation?lodgingLaunchCatalog(raw):raw,offer=data.offers.find((o:any)=>o.id===body.offer_id);
       if(!offer)return json({ok:false,error:'offer_unavailable'},404);
       try{
        const list=await searchData(body.check_in,body.check_out,2,null,development),property=list.find((p:any)=>p.code===body.property_code);
        if(!property?.available)return json({ok:false,error:'dates_unavailable'},409);
-       const q=await createQuote({property_id:property.id,check_in:body.check_in,check_out:body.check_out,guests:2,stay_offer_id:offer.id},development,null,null,list,false,data);
+       const q=await createQuote({property_id:property.id,check_in:body.check_in,check_out:body.check_out,guests:2,stay_offer_id:offer.id},development,null,null,list,false,data,null,consultation);
        const rate=q.rate_options.filter((r:any)=>r.selectable).sort((a:any,b:any)=>a.total_amount_cents-b.total_amount_cents)[0];
        if(!rate)return json({ok:false,error:'quote_unavailable'},409);
        return json({ok:true,card:{offer_id:offer.id,offer_name:offer.name,property_id:property.id,property_code:property.code,property_name:property.name,image:offer.villegram?.photos?.find((p:any)=>p.property_id===property.id)?.url||property.cover_image,check_in:body.check_in,check_out:body.check_out,nights:nights(body.check_in,body.check_out),guests:2,rate_code:rate.code,rate_name:rate.name,total_cents:rate.total_amount_cents,gross_cents:rate.contract_snapshot.gross_cents,discount_cents:rate.contract_snapshot.discount_cents,experiences:q.experiences.map((p:any)=>p.composition),commercial_condition:q.experiences.find((p:any)=>p.composition?.commercial_condition)?.composition.commercial_condition||null,category:isCelebration(body.check_in,body.check_out,offer.showcase)?'celebration':'weekday'}});
@@ -2159,14 +2163,14 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     if(action==="stay_showcase"){
       if(!development&&!consultation)return json({ok:false,error:"development_only"},403);
       const started=performance.now();
-      const catalog=await stayOffers.catalog(),today=brazilClock().date,key=await showcaseCacheKey(today,catalog),catalogMs=performance.now()-started;
+      const raw=await stayOffers.catalog(),catalog=consultation?lodgingLaunchCatalog(raw):raw,today=brazilClock().date,key=(consultation?"lodging-launch-v2:":"checkout:")+await showcaseCacheKey(today,catalog),catalogMs=performance.now()-started;
       let context:Promise<any>|null=null;
-      const build=()=>cachedWeekdayShowcase({catalog:async()=>catalog,today,sources:searchSources,search:(start:string,end:string,sources:any)=>searchData(start,end,2,null,development,false,sources),quote:async(body:any,list:any[],catalog:any)=>{context ||= showcaseQuoteContext(catalog,development);return createQuote(body,development,null,null,list,false,catalog,await context)}});
+      const build=()=>cachedWeekdayShowcase({cache_scope:consultation?"lodging-launch-v2":"checkout",catalog:async()=>catalog,today,sources:searchSources,search:(start:string,end:string,sources:any)=>searchData(start,end,2,null,development,false,sources),quote:async(body:any,list:any[],catalog:any)=>{context ||= showcaseQuoteContext(catalog,development);return createQuote(body,development,null,null,list,false,catalog,await context,consultation)}});
       const runtime=(globalThis as any).EdgeRuntime;
       const cards=await persistentShowcase({admin,key,build,background:runtime?.waitUntil?(work:Promise<any>)=>runtime.waitUntil(work):null});
       const response=json({ok:true,...cards});response.headers.set("Server-Timing",`catalog;dur=${catalogMs.toFixed(1)},showcase;dur=${(performance.now()-started).toFixed(1)}`);return response;
     }
-    if(action==="stay_offers"){const data=await stayOffers.catalog();return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
+    if(action==="stay_offers"){const raw=await stayOffers.catalog(),data=consultation?lodgingLaunchCatalog(raw):raw;return json({ok:true,offers:data.offers.map((o:any)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products,id)])),packages:data.products.filter((p:any)=>o.product_ids.includes(p.id))}))})}
     if(action==="villegram")return await villegram(req,body,development);
     if(action==="stay_offer_action")return await stayOffers.action(req,body,development||target==='production');
     if(action==="legal_documents")return await legalDocuments(req,body,development);
@@ -2181,14 +2185,14 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
       const guests=Number(url.searchParams.get("guests")||body.guests||2);
       const listings=await searchData(start,end,guests,null,development);
       const offerId=body.stay_offer_id||url.searchParams.get("stay_offer_id");
-      const catalog=offerId?await stayOffers.catalog():null;
+      const raw=offerId?await stayOffers.catalog():null,catalog=consultation&&raw?lodgingLaunchCatalog(raw):raw;
       const listingOffers=await Promise.all(listings.map(async(x:any)=>{
         const {cleaning_fee,...rest}=x;
         if(!x.available)return {...rest,from_stay_price:null};
         const selected=catalog?.offers.find((o:any)=>o.id===offerId);
         const issues=offerId?selected?offerIssues(selected,catalog.products,x.id,{check_in:start,check_out:end}):["offer_unavailable"]:[];
         if(issues.length)return {...rest,offer_issues:issues,from_stay_price:null};
-        let quote;try{quote=await createQuote({property_id:x.id,check_in:start,check_out:end,guests,stay_offer_id:offerId||undefined},development,null,null,listings,!consultation)}catch(e){return {...rest,from_stay_price:null,offer_issues:[(e as Error).message]}};
+        let quote;try{quote=await createQuote({property_id:x.id,check_in:start,check_out:end,guests,stay_offer_id:offerId||undefined},development,null,null,listings,!consultation,null,null,consultation)}catch(e){return {...rest,from_stay_price:null,offer_issues:[(e as Error).message]}};
         const available=quote.rate_options.filter((p:any)=>p.selectable);
         return {...rest,from_stay_price:Math.min(...available.map((p:any)=>p.total_amount_cents))/100,quote,offer_issues:[]};
       }));
@@ -2202,7 +2206,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     if(action==="quote"){
       let approved=null;
       if(!consultation&&body.same_day_request_id){const user=await currentUser(req);if(!user)return json({ok:false,error:"authentication_required"},401);approved=await approvedSameDayRequest(admin,body.same_day_request_id,user.id,body)}
-      return json(await createQuote(body,development,null,approved,null,!consultation));
+      return json(await createQuote(body,development,null,approved,null,!consultation,null,null,consultation));
     }
     if(action==="reservation_incident"){
       const user=await currentUser(req);
@@ -2294,6 +2298,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     const msg=String((e as Error)?.message||"unexpected_error");
     const minMatch=/^minimum_stay:(\d+)$/.exec(msg);
     if(minMatch) return json({ok:false,error:"minimum_stay",min_stay:Number(minMatch[1])},400);
+    if(msg==="experiences_not_available_in_launch")return json({ok:false,error:msg},403);
     if(msg==="booking_not_configured") return json({ok:false,error:"booking_not_configured"},503);
     const clientErrors=["offer_expired","commercial_condition_required","commercial_condition_mismatch","same_day_approval_required","past_date","advance_notice","same_day_cutoff","availability_window","checkin_day","checkout_day","maximum_stay","invalid_dates","property_not_found","occupied","capacity","minimum_stay","rate_unavailable","experience_unavailable","experience_category_conflict","modification_already_open","upsell_not_available","offer_unavailable","offer_duration","offer_period","offer_property_incompatible","package_paused","package_lead_time","package_property_incompatible","package_unavailable","experience_component_conflict","invalid_experience_choice","experience_choice_required","experience_capacity","package_out_of_stock","package_components_required","experience_not_sold_separately"];
     return json({ok:false,error:msg},clientErrors.includes(msg)?400:500);
