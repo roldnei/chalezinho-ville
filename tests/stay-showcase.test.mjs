@@ -53,7 +53,7 @@ test('minimum showcase completes each chosen period with available peers instead
  assert.ok(result.period_status.some(s=>s.property_id===2&&s.check_in==='2026-10-12'&&s.reason==='unavailable'));
 });
 
-test('period columns keep chalet order, unique dates, accurate links and facility photos; missing rows cannot be booked',async()=>{
+test('period columns keep chalet order, unique dates, accurate links and facility photos; unavailable chalets are omitted and remaining rows fill the column',async()=>{
  const dom=new JSDOM('<main><section class="hero"></section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;
  try{
   const properties=[1,2,3].map(id=>({id,code:'CH'+id,name:['Ville Signature','Ville Essenza','Ville Amore'][id-1]}));
@@ -64,8 +64,8 @@ test('period columns keep chalet order, unique dates, accurate links and facilit
   w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([]);
   const doc=w.document,columns=[...doc.querySelectorAll('.showcase-period')];assert.equal(columns.length,2);
   assert.deepEqual([...columns[0].querySelectorAll('[data-property]')].map(e=>e.dataset.property),['CH1','CH2','CH3']);
-  for(const row of columns[0].querySelectorAll('.showcase-card')){const query=new URL(row.querySelector('a').href).searchParams;assert.equal(query.get('chalet'),row.dataset.property);assert.equal(query.get('check_in'),'2026-10-17');assert.equal(query.get('check_out'),'2026-10-19');row.querySelector('[data-villegram]').click();assert.equal(opened.property_code,row.dataset.property);assert.equal(opened.check_in,'2026-10-17');assert.match(row.querySelector('img').src,/piscina|banheira/)}
-  assert.match(columns[1].textContent,/Mínimo de 4 noites/);assert.equal(columns[1].querySelectorAll('.showcase-unavailable button:disabled').length,4);assert.equal(columns[1].querySelectorAll('.showcase-unavailable .primary-action').length,0);
+  for(const row of columns[0].querySelectorAll('.showcase-card')){const query=new URL(row.querySelector('a').href).searchParams;assert.equal(query.get('chalet'),row.dataset.property);assert.equal(query.get('check_in'),'2026-10-17');assert.equal(query.get('check_out'),'2026-10-19');row.querySelector('[data-villegram]').click();assert.equal(opened.property_code,row.dataset.property);assert.equal(opened.check_in,'2026-10-17');assert.equal(opened.showcase_image,new URL(row.querySelector('img').src).pathname.slice(1))}
+  assert.equal(doc.querySelectorAll('.showcase-unavailable').length,0);assert.deepEqual([...columns[1].querySelectorAll('[data-property]')].map(e=>e.dataset.property),['CH3']);assert.equal(columns[1].querySelector('.showcase-period-rows').dataset.rowCount,'1');assert.equal(columns[0].querySelector('.showcase-period-rows').dataset.rowCount,'3');assert.notEqual(columns[0].querySelector('[data-property=CH3] img').src,columns[1].querySelector('img').src);
   doc.querySelector('[data-nights="2"]').click();assert.equal(columns[1].hidden,true);assert.equal(columns[0].hidden,false);
  }finally{w.close()}
 });
