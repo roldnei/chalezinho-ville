@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: visitor explicitly chooses a rate; message equals displayed summary; no login/payment calls
+ok 1 - visitor explicitly chooses a rate; message equals displayed summary; no login/payment calls
+  ---
+  duration_ms: 411.489736
+  type: 'test'
+  ...
+# Subtest: changed quote requires review and removes WhatsApp link; failed quote discards previous price
+ok 2 - changed quote requires review and removes WhatsApp link; failed quote discards previous price
+  ---
+  duration_ms: 355.048041
+  type: 'test'
+  ...
+# Subtest: reload stores only choices and refreshes the quote before restoring summary
+ok 3 - reload stores only choices and refreshes the quote before restoring summary
+  ---
+  duration_ms: 120.467354
+  type: 'test'
+  ...
+# Subtest: clipboard failure provides the exact prepared message for manual copying
+ok 4 - clipboard failure provides the exact prepared message for manual copying
+  ---
+  duration_ms: 167.156983
+  type: 'test'
+  ...
+# Subtest: commercial experience requires an explicit condition and clears a prior quote when deselected
+ok 5 - commercial experience requires an explicit condition and clears a prior quote when deselected
+  ---
+  duration_ms: 191.601054
+  type: 'test'
+  ...
+# Subtest: lodging-only escape keeps offer context without promising an included experience
+ok 6 - lodging-only escape keeps offer context without promising an included experience
+  ---
+  duration_ms: 72.711402
+  type: 'test'
+  ...
+# Subtest: first launch shows one Escapada and only the total; no tariff or experience selection
+ok 7 - first launch shows one Escapada and only the total; no tariff or experience selection
+  ---
+  duration_ms: 65.784355
+  type: 'test'
+  ...
+# Subtest: first-launch price change requires a second explicit review and failure clears the total
+ok 8 - first-launch price change requires a second explicit review and failure clears the total
+  ---
+  duration_ms: 110.410708
+  type: 'test'
+  ...
+# Subtest: every showcase escape joins the initial feed without a click: offers-first
+ok 9 - every showcase escape joins the initial feed without a click: offers-first
+  ---
+  duration_ms: 1728.21878
+  type: 'test'
+  ...
+# Subtest: every showcase escape joins the initial feed without a click: publications-first
+ok 10 - every showcase escape joins the initial feed without a click: publications-first
+  ---
+  duration_ms: 988.77495
+  type: 'test'
+  ...
+# Subtest: same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh
+ok 11 - same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh
+  ---
+  duration_ms: 254.404272
+  type: 'test'
+  ...
+# Subtest: following feed remains limited to followed publications
+ok 12 - following feed remains limited to followed publications
+  ---
+  duration_ms: 85.548837
+  type: 'test'
+  ...
+# Subtest: private composer previews retain the saved immersive headline
+ok 13 - private composer previews retain the saved immersive headline
+  ---
+  duration_ms: 86.422656
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4797.74977

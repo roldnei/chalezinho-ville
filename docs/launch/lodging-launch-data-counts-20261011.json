@@ -1,0 +1,20 @@
+{
+  "before": {
+    "reservations": 30,
+    "holds_pending": 0,
+    "payments": 34,
+    "quotes": 346,
+    "calendar_blocks": 2,
+    "notification_outbox": 136
+  },
+  "after": {
+    "reservations": 30,
+    "holds_pending": 0,
+    "payments": 34,
+    "quotes": 346,
+    "calendar_blocks": 2,
+    "notification_outbox": 136
+  },
+  "source": "read-only DEV SQL",
+  "production_mutations": false
+}

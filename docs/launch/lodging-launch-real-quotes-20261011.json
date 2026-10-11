@@ -1,0 +1,86 @@
+[
+  {
+    "property": 1,
+    "dates": "2026-10-17/2026-10-19",
+    "total": 175585,
+    "discount": 7715,
+    "quote_id": null,
+    "experiences": [],
+    "plans": [
+      [
+        "non_refundable",
+        "Escapada"
+      ]
+    ]
+  },
+  {
+    "property": 2,
+    "dates": "2026-10-17/2026-10-19",
+    "total": 153165,
+    "discount": 6535,
+    "quote_id": null,
+    "experiences": [],
+    "plans": [
+      [
+        "non_refundable",
+        "Escapada"
+      ]
+    ]
+  },
+  {
+    "property": 3,
+    "dates": "2026-10-17/2026-10-19",
+    "total": 149175,
+    "discount": 6325,
+    "quote_id": null,
+    "experiences": [],
+    "plans": [
+      [
+        "non_refundable",
+        "Escapada"
+      ]
+    ]
+  },
+  {
+    "property": 1,
+    "dates": "2026-10-18/2026-10-20",
+    "total": 150500,
+    "discount": 3400,
+    "quote_id": null,
+    "experiences": [],
+    "plans": [
+      [
+        "non_refundable",
+        "Escapada"
+      ]
+    ]
+  },
+  {
+    "property": 1,
+    "dates": "2026-10-19/2026-10-21",
+    "total": 141900,
+    "discount": 0,
+    "quote_id": null,
+    "experiences": [],
+    "plans": [
+      [
+        "non_refundable",
+        "Escapada"
+      ]
+    ]
+  },
+  {
+    "property": 1,
+    "dates": "2026-10-24/2026-10-26",
+    "total": 165000,
+    "discount": 0,
+    "quote_id": null,
+    "experiences": [],
+    "plans": [
+      [
+        "non_refundable",
+        "Escapada"
+      ]
+    ]
+  }
+]

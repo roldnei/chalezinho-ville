@@ -1,0 +1,41 @@
+[
+  {
+    "attempt": "start_payment",
+    "status": 403,
+    "error": "consultation_operation_not_allowed"
+  },
+  {
+    "attempt": "create_reservation",
+    "status": 403,
+    "error": "consultation_operation_not_allowed"
+  },
+  {
+    "attempt": "hold",
+    "status": 403,
+    "error": "consultation_operation_not_allowed"
+  },
+  {
+    "attempt": "consult_start_payment",
+    "status": 403,
+    "error": "consultation_operation_not_allowed"
+  },
+  {
+    "attempt": "experience_injection",
+    "status": 403,
+    "error": "experiences_not_available_in_launch"
+  },
+  {
+    "attempt": "preserved_checkout_read_only",
+    "status": 200,
+    "plans": [
+      [
+        "refundable",
+        214160
+      ],
+      [
+        "non_refundable",
+        198730
+      ]
+    ]
+  }
+]

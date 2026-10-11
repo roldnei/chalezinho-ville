@@ -1,0 +1,2824 @@
+TAP version 13
+# Subtest: page identification uses authoritative mapping and rejects arbitrary pages
+ok 1 - page identification uses authoritative mapping and rejects arbitrary pages
+  ---
+  duration_ms: 3.209666
+  type: 'test'
+  ...
+# Subtest: ranking separates total views from per-chalet sessions and includes zero-access chalets
+ok 2 - ranking separates total views from per-chalet sessions and includes zero-access chalets
+  ---
+  duration_ms: 18.976442
+  type: 'test'
+  ...
+# Subtest: reports read beyond default 1000 rows and propagate database errors
+ok 3 - reports read beyond default 1000 rows and propagate database errors
+  ---
+  duration_ms: 5.125242
+  type: 'test'
+  ...
+# Subtest: browser tracking sends no URL parameters or user identity and reuses session across reloads
+ok 4 - browser tracking sends no URL parameters or user identity and reuses session across reloads
+  ---
+  duration_ms: 196.012037
+  type: 'test'
+  ...
+# Subtest: admin view renders ranking, changes period, and displays errors without false zeroes
+ok 5 - admin view renders ranking, changes period, and displays errors without false zeroes
+  ---
+  duration_ms: 372.183371
+  type: 'test'
+  ...
+# Subtest: conversion counts only linked paid direct confirmed bookings once, after a visit to the same chalet
+ok 6 - conversion counts only linked paid direct confirmed bookings once, after a visit to the same chalet
+  ---
+  duration_ms: 2.031947
+  type: 'test'
+  ...
+# Subtest: saved listing settings reach the public page and replace stale amenities
+ok 7 - saved listing settings reach the public page and replace stale amenities
+  ---
+  duration_ms: 321.159903
+  type: 'test'
+  ...
+# Subtest: public page respects ordered highlights and groups all items, escaping text
+ok 8 - public page respects ordered highlights and groups all items, escaping text
+  ---
+  duration_ms: 75.129388
+  type: 'test'
+  ...
+# Subtest: default highlights prioritize only existing items and limit to eight
+ok 9 - default highlights prioritize only existing items and limit to eight
+  ---
+  duration_ms: 23.173986
+  type: 'test'
+  ...
+# Subtest: backend validates highlight membership, duplicate and count and preserves other settings
+ok 10 - backend validates highlight membership, duplicate and count and preserves other settings
+  ---
+  duration_ms: 1.285525
+  type: 'test'
+  ...
+# Subtest: catalog search ignores accents and hyphens, keeps selection while filtering, renders icons
+ok 11 - catalog search ignores accents and hyphens, keeps selection while filtering, renders icons
+  ---
+  duration_ms: 471.27857
+  type: 'test'
+  ...
+# Subtest: different outdoor and bathroom amenities have meaningful distinct symbols
+ok 12 - different outdoor and bathroom amenities have meaningful distinct symbols
+  ---
+  duration_ms: 19.254807
+  type: 'test'
+  ...
+# Subtest: login differentiates network failure from rejected credentials without reflecting raw errors
+ok 13 - login differentiates network failure from rejected credentials without reflecting raw errors
+  ---
+  duration_ms: 3.457043
+  type: 'test'
+  ...
+# Subtest: missing login dependency disables submission and prevents silent native reload
+ok 14 - missing login dependency disables submission and prevents silent native reload
+  ---
+  duration_ms: 1019.691536
+  type: 'test'
+  ...
+# Subtest: network failure preserves fields and return target and allows a deliberate retry
+ok 15 - network failure preserves fields and return target and allows a deliberate retry
+  ---
+  duration_ms: 150.11457
+  type: 'test'
+  ...
+# Subtest: double submission produces one login attempt and no session means no navigation
+ok 16 - double submission produces one login attempt and no session means no navigation
+  ---
+  duration_ms: 181.014756
+  type: 'test'
+  ...
+# Subtest: blocked storage is reported without submitting credentials or reloading
+ok 17 - blocked storage is reported without submitting credentials or reloading
+  ---
+  duration_ms: 198.149123
+  type: 'test'
+  ...
+# Subtest: availability form saves independent property rules and custom periods
+ok 18 - availability form saves independent property rules and custom periods
+  ---
+  duration_ms: 847.193062
+  type: 'test'
+  ...
+# Subtest: Brazil cutoff is enforced exactly at 11h and past dates cannot be sold
+ok 19 - Brazil cutoff is enforced exactly at 11h and past dates cannot be sold
+  ---
+  duration_ms: 55.904304
+  type: 'test'
+  ...
+# Subtest: minimum, maximum, weekend and PriceLabs rules have defined precedence
+ok 20 - minimum, maximum, weekend and PriceLabs rules have defined precedence
+  ---
+  duration_ms: 2.252222
+  type: 'test'
+  ...
+# Subtest: lead days, arrival/departure days and availability horizon apply per property
+ok 21 - lead days, arrival/departure days and availability horizon apply per property
+  ---
+  duration_ms: 2.848323
+  type: 'test'
+  ...
+# Subtest: custom arrival periods override base stay lengths, optionally retaining PriceLabs
+ok 22 - custom arrival periods override base stay lengths, optionally retaining PriceLabs
+  ---
+  duration_ms: 1.427395
+  type: 'test'
+  ...
+# Subtest: preparation blocks before and after stay with exclusive checkout
+ok 23 - preparation blocks before and after stay with exclusive checkout
+  ---
+  duration_ms: 2.355166
+  type: 'test'
+  ...
+# Subtest: invalid settings and overlapping custom periods are rejected
+ok 24 - invalid settings and overlapping custom periods are rejected
+  ---
+  duration_ms: 2.227676
+  type: 'test'
+  ...
+# Subtest: valid empty calendar and exclusive checkout parse correctly
+ok 25 - valid empty calendar and exclusive checkout parse correctly
+  ---
+  duration_ms: 10.013399
+  type: 'test'
+  ...
+# Subtest: invalid pages, missing dates, impossible dates and recurrence fail closed
+ok 26 - invalid pages, missing dates, impossible dates and recurrence fail closed
+  ---
+  duration_ms: 2.871118
+  type: 'test'
+  ...
+# Subtest: cancelled events and own exported events are not reimported
+ok 27 - cancelled events and own exported events are not reimported
+  ---
+  duration_ms: 0.529832
+  type: 'test'
+  ...
+# Subtest: private network, unexpected hosts, redirects targets and credentials cannot become import URLs
+ok 28 - private network, unexpected hosts, redirects targets and credentials cannot become import URLs
+  ---
+  duration_ms: 3.992954
+  type: 'test'
+  ...
+# Subtest: export is valid iCalendar with stable UID, exclusive checkout and no personal fields
+ok 29 - export is valid iCalendar with stable UID, exclusive checkout and no personal fields
+  ---
+  duration_ms: 4.800143
+  type: 'test'
+  ...
+# Subtest: wrong export token never queries reservation data
+ok 30 - wrong export token never queries reservation data
+  ---
+  duration_ms: 10.250024
+  type: 'test'
+  ...
+# Subtest: generic feeds reject private networks and allow public addresses
+ok 31 - generic feeds reject private networks and allow public addresses
+  ---
+  duration_ms: 16.167175
+  type: 'test'
+  ...
+# Subtest: transparent events do not block availability
+ok 32 - transparent events do not block availability
+  ---
+  duration_ms: 0.803945
+  type: 'test'
+  ...
+# Subtest: HTTP calendar transfer handles chunked bodies, redirects and truncation
+ok 33 - HTTP calendar transfer handles chunked bodies, redirects and truncation
+  ---
+  duration_ms: 5.679185
+  type: 'test'
+  ...
+# Subtest: multiple sources combine dates and one failure keeps availability protected
+ok 34 - multiple sources combine dates and one failure keeps availability protected
+  ---
+  duration_ms: 10.682007
+  type: 'test'
+  ...
+# Subtest: calendar keys distinguish sources and preserve legacy Airbnb links
+ok 35 - calendar keys distinguish sources and preserve legacy Airbnb links
+  ---
+  duration_ms: 0.758044
+  type: 'test'
+  ...
+# Subtest: configuration reads all sources beyond the API cap
+ok 36 - configuration reads all sources beyond the API cap
+  ---
+  duration_ms: 41.619829
+  type: 'test'
+  ...
+# Subtest: reservation requires every explicit guarantee consent; truthy strings do not count
+ok 37 - reservation requires every explicit guarantee consent; truthy strings do not count
+  ---
+  duration_ms: 3.867024
+  type: 'test'
+  ...
+# Subtest: terms, cancellation and each document version are mandatory before payment
+ok 38 - terms, cancellation and each document version are mandatory before payment
+  ---
+  duration_ms: 1.401153
+  type: 'test'
+  ...
+# Subtest: development drafts never substitute active terms or become production terms
+ok 39 - development drafts never substitute active terms or become production terms
+  ---
+  duration_ms: 1.233869
+  type: 'test'
+  ...
+# Subtest: checkout stops before payment without its single explicit acceptance
+ok 40 - checkout stops before payment without its single explicit acceptance
+  ---
+  duration_ms: 163.655982
+  type: 'test'
+  ...
+# Subtest: single acceptance records each document and both guarantee authorizations without implicit consent
+ok 41 - single acceptance records each document and both guarantee authorizations without implicit consent
+  ---
+  duration_ms: 45.069298
+  type: 'test'
+  ...
+# Subtest: card quote preserves six installments
+ok 42 - card quote preserves six installments
+  ---
+  duration_ms: 446.126842
+  type: 'test'
+  ...
+# Subtest: card quote requires a new selection when six installments are unavailable
+ok 43 - card quote requires a new selection when six installments are unavailable
+  ---
+  duration_ms: 210.067331
+  type: 'test'
+  ...
+# Subtest: closing a paid receipt permits a new search but an uncertain payment retains recovery
+ok 44 - closing a paid receipt permits a new search but an uncertain payment retains recovery
+  ---
+  duration_ms: 337.086154
+  type: 'test'
+  ...
+# Subtest: paid reload restores existing payment and queries status even with expired quote
+ok 45 - paid reload restores existing payment and queries status even with expired quote
+  ---
+  duration_ms: 123.650544
+  type: 'test'
+  ...
+# Subtest: unavailable status keeps existing payment pending without another checkout
+ok 46 - unavailable status keeps existing payment pending without another checkout
+  ---
+  duration_ms: 107.532242
+  type: 'test'
+  ...
+# Subtest: expired session preserves receipt but requires login without displaying its details
+ok 47 - expired session preserves receipt but requires login without displaying its details
+  ---
+  duration_ms: 49.865668
+  type: 'test'
+  ...
+# Subtest: another account cannot resume the previous account payment
+ok 48 - another account cannot resume the previous account payment
+  ---
+  duration_ms: 39.848836
+  type: 'test'
+  ...
+# Subtest: recovered receipt never labels the previous payment with a different simulation
+ok 49 - recovered receipt never labels the previous payment with a different simulation
+  ---
+  duration_ms: 56.565657
+  type: 'test'
+  ...
+# Subtest: confirmed refused clears uncertain warning and permits a new availability search
+ok 50 - confirmed refused clears uncertain warning and permits a new availability search
+  ---
+  duration_ms: 247.477116
+  type: 'test'
+  ...
+# Subtest: confirmed cancelled clears uncertain warning and permits a new availability search
+ok 51 - confirmed cancelled clears uncertain warning and permits a new availability search
+  ---
+  duration_ms: 45.883049
+  type: 'test'
+  ...
+# Subtest: confirmed expired clears uncertain warning and permits a new availability search
+ok 52 - confirmed expired clears uncertain warning and permits a new availability search
+  ---
+  duration_ms: 24.63592
+  type: 'test'
+  ...
+# Subtest: unknown provider result retains uncertainty and does not offer another payment
+ok 53 - unknown provider result retains uncertainty and does not offer another payment
+  ---
+  duration_ms: 57.063437
+  type: 'test'
+  ...
+# Subtest: registry creates, edits and deletes links and reloads calendar periods
+ok 54 - registry creates, edits and deletes links and reloads calendar periods
+  ---
+  duration_ms: 1864.400813
+  type: 'test'
+  ...
+# Subtest: lodging dates do not move to the previous Brazilian day in email
+ok 55 - lodging dates do not move to the previous Brazilian day in email
+  ---
+  duration_ms: 43.723599
+  type: 'test'
+  ...
+# Subtest: email currency renders cents consistently including zero
+ok 56 - email currency renders cents consistently including zero
+  ---
+  duration_ms: 10.247926
+  type: 'test'
+  ...
+# Subtest: rolling three-week window includes weekdays, weekends, two and three nights
+ok 57 - rolling three-week window includes weekdays, weekends, two and three nights
+  ---
+  duration_ms: 8.557999
+  type: 'test'
+  ...
+# Subtest: expired dated offers and past or out-of-window links cannot be quoted
+ok 58 - expired dated offers and past or out-of-window links cannot be quoted
+  ---
+  duration_ms: 102.96301
+  type: 'test'
+  ...
+# Subtest: checkout exposes the pending charge immediately without a page reload
+ok 59 - checkout exposes the pending charge immediately without a page reload
+  ---
+  duration_ms: 492.001793
+  type: 'test'
+  ...
+# Subtest: additional below card minimum explains the limit and keeps Pix available
+ok 60 - additional below card minimum explains the limit and keeps Pix available
+  ---
+  duration_ms: 263.645534
+  type: 'test'
+  ...
+# Subtest: additional at card minimum can query installments normally
+ok 61 - additional at card minimum can query installments normally
+  ---
+  duration_ms: 214.576201
+  type: 'test'
+  ...
+# Subtest: commercial prices come only from the server catalog; a condition is required
+ok 62 - commercial prices come only from the server catalog; a condition is required
+  ---
+  duration_ms: 2.585806
+  type: 'test'
+  ...
+# Subtest: invalid commercial setup cannot be saved or priced
+ok 63 - invalid commercial setup cannot be saved or priced
+  ---
+  duration_ms: 0.972746
+  type: 'test'
+  ...
+# Subtest: named escape fixes cash/card server condition and refuses browser substitution
+ok 64 - named escape fixes cash/card server condition and refuses browser substitution
+  ---
+  duration_ms: 0.851227
+  type: 'test'
+  ...
+# Subtest: included discounted and full-price extras bind exactly to their persisted order items
+ok 65 - included discounted and full-price extras bind exactly to their persisted order items
+  ---
+  duration_ms: 3.20948
+  type: 'test'
+  ...
+# Subtest: unbound, mismatched or fractional original allocations fail before provider charge
+ok 66 - unbound, mismatched or fractional original allocations fail before provider charge
+  ---
+  duration_ms: 1.110268
+  type: 'test'
+  ...
+# Subtest: oversized image is rejected without success message or network upload
+ok 67 - oversized image is rejected without success message or network upload
+  ---
+  duration_ms: 216.026103
+  type: 'test'
+  ...
+# Subtest: upload prevents saving or changing experience and restores controls after network failure
+ok 68 - upload prevents saving or changing experience and restores controls after network failure
+  ---
+  duration_ms: 29.47525
+  type: 'test'
+  ...
+# Subtest: voluntary refund for cancelled stay needs no cancellation acceptance and is idempotent
+ok 69 - voluntary refund for cancelled stay needs no cancellation acceptance and is idempotent
+  ---
+  duration_ms: 11334.701449
+  type: 'test'
+  ...
+# Subtest: second invalid allocation rolls back case and first allocation
+ok 70 - second invalid allocation rolls back case and first allocation
+  ---
+  duration_ms: 47.68387
+  type: 'test'
+  ...
+# Subtest: duplicate payment allocations and mismatched totals cannot reserve money
+ok 71 - duplicate payment allocations and mismatched totals cannot reserve money
+  ---
+  duration_ms: 30.582542
+  type: 'test'
+  ...
+# Subtest: guest role cannot invoke refund preparation
+ok 72 - guest role cannot invoke refund preparation
+  ---
+  duration_ms: 10.25296
+  type: 'test'
+  ...
+# Subtest: advancing unchanged experiences preserves the quoted price and original expiry
+ok 73 - advancing unchanged experiences preserves the quoted price and original expiry
+  ---
+  duration_ms: 625.80974
+  type: 'test'
+  ...
+# Subtest: commercial policy migration versions new drafts without changing accepted rules
+ok 74 - commercial policy migration versions new drafts without changing accepted rules
+  ---
+  duration_ms: 10739.019099
+  type: 'test'
+  ...
+# Subtest: experience credit prepares atomically, approves once and refunds without cancelling reservation
+ok 75 - experience credit prepares atomically, approves once and refunds without cancelling reservation
+  ---
+  duration_ms: 219.456167
+  type: 'test'
+  ...
+# Subtest: experience credit requires admin, actual unprovided-service decision and matching reservation
+ok 76 - experience credit requires admin, actual unprovided-service decision and matching reservation
+  ---
+  duration_ms: 66.345975
+  type: 'test'
+  ...
+# Subtest: credit preparation rolls back whole case when a payment cannot fund its allocation
+ok 77 - credit preparation rolls back whole case when a payment cannot fund its allocation
+  ---
+  duration_ms: 41.18796
+  type: 'test'
+  ...
+# Subtest: credits are immutable, idempotent and prevent duplicate items and upgrades
+ok 78 - credits are immutable, idempotent and prevent duplicate items and upgrades
+  ---
+  duration_ms: 98.726387
+  type: 'test'
+  ...
+# Subtest: upgrade and interest allocations require review instead of a guessed refund
+ok 79 - upgrade and interest allocations require review instead of a guessed refund
+  ---
+  duration_ms: 76.437444
+  type: 'test'
+  ...
+# Subtest: credit audit retains item provenance and duplicate key cannot accept a null item
+ok 80 - credit audit retains item provenance and duplicate key cannot accept a null item
+  ---
+  duration_ms: 39.553734
+  type: 'test'
+  ...
+# Subtest: settled avulso permits a credit at the contracted net price; pending charges still block it
+ok 81 - settled avulso permits a credit at the contracted net price; pending charges still block it
+  ---
+  duration_ms: 68.175416
+  type: 'test'
+  ...
+# Subtest: installment offer is immutable and requires exactly one payable source
+ok 82 - installment offer is immutable and requires exactly one payable source
+  ---
+  duration_ms: 9354.870952
+  type: 'test'
+  ...
+# Subtest: financial settings migration preserves configured property terms and enables explicit sandbox provider
+ok 83 - financial settings migration preserves configured property terms and enables explicit sandbox provider
+  ---
+  duration_ms: 14.430109
+  type: 'test'
+  ...
+# Subtest: an existing financial record cannot be moved to another reservation
+ok 84 - an existing financial record cannot be moved to another reservation
+  ---
+  duration_ms: 83.982386
+  type: 'test'
+  ...
+# Subtest: migration installs append-only events and records reservation baseline
+ok 85 - migration installs append-only events and records reservation baseline
+  ---
+  duration_ms: 34.943205
+  type: 'test'
+  ...
+# Subtest: financial event payload excludes customer identity, card data and provider secrets
+ok 86 - financial event payload excludes customer identity, card data and provider secrets
+  ---
+  duration_ms: 9.598844
+  type: 'test'
+  ...
+# Subtest: legacy ledger cannot be rewritten or detached from reservation
+ok 87 - legacy ledger cannot be rewritten or detached from reservation
+  ---
+  duration_ms: 26.368353
+  type: 'test'
+  ...
+# Subtest: total guarantee refund confirms once and survives duplicate callback
+ok 88 - total guarantee refund confirms once and survives duplicate callback
+  ---
+  duration_ms: 138.467994
+  type: 'test'
+  ...
+# Subtest: multiple partial guarantee refunds enforce cumulative provider receipt
+ok 89 - multiple partial guarantee refunds enforce cumulative provider receipt
+  ---
+  duration_ms: 192.936671
+  type: 'test'
+  ...
+# Subtest: concurrent refund preparation never overcommits a capture
+ok 90 - concurrent refund preparation never overcommits a capture
+  ---
+  duration_ms: 14.185212
+  type: 'test'
+  ...
+# Subtest: repeat request is same refund; changed amount is conflict
+ok 91 - repeat request is same refund; changed amount is conflict
+  ---
+  duration_ms: 153.059608
+  type: 'test'
+  ...
+# Subtest: unknown provider outcome keeps funds reserved
+ok 92 - unknown provider outcome keeps funds reserved
+  ---
+  duration_ms: 59.526822
+  type: 'test'
+  ...
+# Subtest: guest cannot request admin refunds or incidents
+ok 93 - guest cannot request admin refunds or incidents
+  ---
+  duration_ms: 11.930228
+  type: 'test'
+  ...
+# Subtest: occurrence without authorization or collection is allowed
+ok 94 - occurrence without authorization or collection is allowed
+  ---
+  duration_ms: 49.433133
+  type: 'test'
+  ...
+# Subtest: occurrence without guarantee belongs directly to reservation
+ok 95 - occurrence without guarantee belongs directly to reservation
+  ---
+  duration_ms: 10.403531
+  type: 'test'
+  ...
+# Subtest: partial capture requires financial decision and resolves only selected occurrence
+ok 96 - partial capture requires financial decision and resolves only selected occurrence
+  ---
+  duration_ms: 61.421831
+  type: 'test'
+  ...
+# Subtest: capture cannot bypass decision or exceed requested amount
+ok 97 - capture cannot bypass decision or exceed requested amount
+  ---
+  duration_ms: 23.2435
+  type: 'test'
+  ...
+# Subtest: event projection preserves paid amount through pending refund
+ok 98 - event projection preserves paid amount through pending refund
+  ---
+  duration_ms: 14.736778
+  type: 'test'
+  ...
+# Subtest: RLS prevents guest reading the financial event stream directly
+ok 99 - RLS prevents guest reading the financial event stream directly
+  ---
+  duration_ms: 5.191715
+  type: 'test'
+  ...
+# Subtest: legacy amenity arrays become an object without losing amenities or installment configuration
+ok 100 - legacy amenity arrays become an object without losing amenities or installment configuration
+  ---
+  duration_ms: 1.638536
+  type: 'test'
+  ...
+# Subtest: experience endpoint forbids production, guests and missing service evidence before DB writes
+ok 101 - experience endpoint forbids production, guests and missing service evidence before DB writes
+  ---
+  duration_ms: 3.534493
+  type: 'test'
+  ...
+# Subtest: experience endpoint passes authenticated actor and operation key, never client amount
+ok 102 - experience endpoint passes authenticated actor and operation key, never client amount
+  ---
+  duration_ms: 0.806062
+  type: 'test'
+  ...
+# Subtest: experience endpoint reports allocation review without claiming a refund
+ok 103 - experience endpoint reports allocation review without claiming a refund
+  ---
+  duration_ms: 0.835804
+  type: 'test'
+  ...
+# Subtest: recorded checkout completes the guest stay before its scheduled departure
+ok 104 - recorded checkout completes the guest stay before its scheduled departure
+  ---
+  duration_ms: 418.309073
+  type: 'test'
+  ...
+# Subtest: guest sees declined guarantee independently from confirmed reservation
+ok 105 - guest sees declined guarantee independently from confirmed reservation
+  ---
+  duration_ms: 215.973496
+  type: 'test'
+  ...
+# Subtest: guest is not shown an authorization deadline when the provider date is absent
+ok 106 - guest is not shown an authorization deadline when the provider date is absent
+  ---
+  duration_ms: 157.84398
+  type: 'test'
+  ...
+# Subtest: consulting a guarantee preserves the selected reservation instead of reopening the first
+ok 107 - consulting a guarantee preserves the selected reservation instead of reopening the first
+  ---
+  duration_ms: 160.755329
+  type: 'test'
+  ...
+# Subtest: a cancellation settled during page load refreshes reservation actions and badges once
+ok 108 - a cancellation settled during page load refreshes reservation actions and badges once
+  ---
+  duration_ms: 663.936437
+  type: 'test'
+  ...
+# Subtest: replacement sends encrypted card, reservation-scoped ID and explicit renewal choice only
+ok 109 - replacement sends encrypted card, reservation-scoped ID and explicit renewal choice only
+  ---
+  duration_ms: 193.982321
+  type: 'test'
+  ...
+# Subtest: booking two months ahead stores token without authorizing
+ok 110 - booking two months ahead stores token without authorizing
+  ---
+  duration_ms: 10931.689492
+  type: 'test'
+  ...
+# Subtest: long stay authorizes before check-in and preserves its actual deadline
+ok 111 - long stay authorizes before check-in and preserves its actual deadline
+  ---
+  duration_ms: 56.913243
+  type: 'test'
+  ...
+# Subtest: claims serialize one bank authorization and unknown outcomes block new requests
+ok 112 - claims serialize one bank authorization and unknown outcomes block new requests
+  ---
+  duration_ms: 28.737989
+  type: 'test'
+  ...
+# Subtest: decline preserves confirmed booking and same card is never retried automatically
+ok 113 - decline preserves confirmed booking and same card is never retried automatically
+  ---
+  duration_ms: 73.590067
+  type: 'test'
+  ...
+# Subtest: card replacement cannot cross owners, interrupt unknown authorization, or reuse the save claim
+ok 114 - card replacement cannot cross owners, interrupt unknown authorization, or reuse the save claim
+  ---
+  duration_ms: 66.133636
+  type: 'test'
+  ...
+# Subtest: renewal confirms new hold before allowing old hold release, with only one dispatch
+ok 115 - renewal confirms new hold before allowing old hold release, with only one dispatch
+  ---
+  duration_ms: 324.002021
+  type: 'test'
+  ...
+# Subtest: renewal refusal retains old coverage and does not release it
+ok 116 - renewal refusal retains old coverage and does not release it
+  ---
+  duration_ms: 99.505241
+  type: 'test'
+  ...
+# Subtest: provider observation preserves current authorization while an incident or capture is in progress
+ok 117 - provider observation preserves current authorization while an incident or capture is in progress
+  ---
+  duration_ms: 53.697684
+  type: 'test'
+  ...
+# Subtest: old consent does not authorize an overlapping renewal
+ok 118 - old consent does not authorize an overlapping renewal
+  ---
+  duration_ms: 40.799358
+  type: 'test'
+  ...
+# Subtest: cancellation racing with provider confirmation cannot install a new active guarantee
+ok 119 - cancellation racing with provider confirmation cannot install a new active guarantee
+  ---
+  duration_ms: 31.324346
+  type: 'test'
+  ...
+# Subtest: date extension wakes renewal; moving stay far ahead releases obsolete hold
+ok 120 - date extension wakes renewal; moving stay far ahead releases obsolete hold
+  ---
+  duration_ms: 27.530913
+  type: 'test'
+  ...
+# Subtest: check-in without coverage requires explicit audited host exception
+ok 121 - check-in without coverage requires explicit audited host exception
+  ---
+  duration_ms: 27.427051
+  type: 'test'
+  ...
+# Subtest: expired coverage cannot be presented as protected
+ok 122 - expired coverage cannot be presented as protected
+  ---
+  duration_ms: 0.405218
+  type: 'test'
+  ...
+# Subtest: authorization identities and service operations cannot be rewritten by guest
+ok 123 - authorization identities and service operations cannot be rewritten by guest
+  ---
+  duration_ms: 41.884375
+  type: 'test'
+  ...
+# Subtest: definite rejection unlocks card replacement but cannot erase an uncertain or identified charge
+ok 124 - definite rejection unlocks card replacement but cannot erase an uncertain or identified charge
+  ---
+  duration_ms: 49.293122
+  type: 'test'
+  ...
+# Subtest: check-in uses the configured checkout time and requires coverage through its inspection margin
+ok 125 - check-in uses the configured checkout time and requires coverage through its inspection margin
+  ---
+  duration_ms: 24.416275
+  type: 'test'
+  ...
+# Subtest: automatic release requires cancellation; manual release requires an administrator
+ok 126 - automatic release requires cancellation; manual release requires an administrator
+  ---
+  duration_ms: 8958.07896
+  type: 'test'
+  ...
+# Subtest: an open reservation incident blocks release even without a guarantee link
+ok 127 - an open reservation incident blocks release even without a guarantee link
+  ---
+  duration_ms: 38.654025
+  type: 'test'
+  ...
+# Subtest: release cannot interrupt an approved capture or be called directly by a guest
+ok 128 - release cannot interrupt an approved capture or be called directly by a guest
+  ---
+  duration_ms: 27.326118
+  type: 'test'
+  ...
+# Subtest: development build cannot target the shared database or enable production
+ok 129 - development build cannot target the shared database or enable production
+  ---
+  duration_ms: 5.771297
+  type: 'test'
+  ...
+# Subtest: money rejects negative, fractional, unsafe or coerced values
+ok 130 - money rejects negative, fractional, unsafe or coerced values
+  ---
+  duration_ms: 0.724194
+  type: 'test'
+  ...
+# Subtest: canonical state WAITING
+ok 131 - canonical state WAITING
+  ---
+  duration_ms: 0.885688
+  type: 'test'
+  ...
+# Subtest: canonical state PAID
+ok 132 - canonical state PAID
+  ---
+  duration_ms: 0.614014
+  type: 'test'
+  ...
+# Subtest: canonical state DECLINED
+ok 133 - canonical state DECLINED
+  ---
+  duration_ms: 0.265718
+  type: 'test'
+  ...
+# Subtest: canonical state IN_ANALYSIS
+ok 134 - canonical state IN_ANALYSIS
+  ---
+  duration_ms: 0.307149
+  type: 'test'
+  ...
+# Subtest: canonical state AUTHORIZED
+ok 135 - canonical state AUTHORIZED
+  ---
+  duration_ms: 0.347651
+  type: 'test'
+  ...
+# Subtest: canonical state expired
+ok 136 - canonical state expired
+  ---
+  duration_ms: 0.472821
+  type: 'test'
+  ...
+# Subtest: partial and full refunds derive from confirmed money
+ok 137 - partial and full refunds derive from confirmed money
+  ---
+  duration_ms: 0.419021
+  type: 'test'
+  ...
+# Subtest: declined guarantee is not an authorization merely because a charge ID exists
+ok 138 - declined guarantee is not an authorization merely because a charge ID exists
+  ---
+  duration_ms: 0.746462
+  type: 'test'
+  ...
+# Subtest: capture availability requires an identified authorization and the server expiry margin
+ok 139 - capture availability requires an identified authorization and the server expiry margin
+  ---
+  duration_ms: 1.568266
+  type: 'test'
+  ...
+# Subtest: damage refund never exceeds capture and changes the canonical state
+ok 140 - damage refund never exceeds capture and changes the canonical state
+  ---
+  duration_ms: 0.678941
+  type: 'test'
+  ...
+# Subtest: 500 authorized and 189 paid is partial capture; unreconciled remainder is never labeled released
+ok 141 - 500 authorized and 189 paid is partial capture; unreconciled remainder is never labeled released
+  ---
+  duration_ms: 0.547289
+  type: 'test'
+  ...
+# Subtest: capture verifies paid summary when original authorization value is retained
+ok 142 - capture verifies paid summary when original authorization value is retained
+  ---
+  duration_ms: 0.626768
+  type: 'test'
+  ...
+# Subtest: refund requested or cancelled status alone is never refund confirmation
+ok 143 - refund requested or cancelled status alone is never refund confirmation
+  ---
+  duration_ms: 0.22105
+  type: 'test'
+  ...
+# Subtest: installment total before card is same immutable total selected for charging
+ok 144 - installment total before card is same immutable total selected for charging
+  ---
+  duration_ms: 0.513135
+  type: 'test'
+  ...
+# Subtest: offer prevents cross-account, cross-reservation, repricing and expiry
+ok 145 - offer prevents cross-account, cross-reservation, repricing and expiry
+  ---
+  duration_ms: 0.336625
+  type: 'test'
+  ...
+# Subtest: confirmed installment offer cannot be reused after changing the card BIN
+ok 146 - confirmed installment offer cannot be reused after changing the card BIN
+  ---
+  duration_ms: 1.020369
+  type: 'test'
+  ...
+# Subtest: gateway selection cannot activate production from a browser parameter
+ok 147 - gateway selection cannot activate production from a browser parameter
+  ---
+  duration_ms: 0.581153
+  type: 'test'
+  ...
+# Subtest: gateway partial refund preserves exact request amount and operation id
+ok 148 - gateway partial refund preserves exact request amount and operation id
+  ---
+  duration_ms: 6.437682
+  type: 'test'
+  ...
+# Subtest: projection replays repeated payment snapshots without doubling paid revenue
+ok 149 - projection replays repeated payment snapshots without doubling paid revenue
+  ---
+  duration_ms: 1.152327
+  type: 'test'
+  ...
+# Subtest: ledger reconstructs additional debt, settled change, approved credit and damage without counting authorization as cash
+ok 150 - ledger reconstructs additional debt, settled change, approved credit and damage without counting authorization as cash
+  ---
+  duration_ms: 2.544868
+  type: 'test'
+  ...
+# Subtest: expired unpaid reservation does not remain collectible in the financial balance
+ok 151 - expired unpaid reservation does not remain collectible in the financial balance
+  ---
+  duration_ms: 0.246824
+  type: 'test'
+  ...
+# Subtest: webhook and manual reconciliation share exact cumulative refund confirmation
+ok 152 - webhook and manual reconciliation share exact cumulative refund confirmation
+  ---
+  duration_ms: 5.545639
+  type: 'test'
+  ...
+# Subtest: provider status paid or cancelled without refunded amount cannot invent refund
+ok 153 - provider status paid or cancelled without refunded amount cannot invent refund
+  ---
+  duration_ms: 1.421421
+  type: 'test'
+  ...
+# Subtest: wrong amount and another charge cannot confirm the reservation refund
+ok 154 - wrong amount and another charge cannot confirm the reservation refund
+  ---
+  duration_ms: 5.192189
+  type: 'test'
+  ...
+# Subtest: a timeout or unknown outcome can never be retried
+ok 155 - a timeout or unknown outcome can never be retried
+  ---
+  duration_ms: 10406.540438
+  type: 'test'
+  ...
+# Subtest: temporary rejection requires cooldown, live balance and one atomic claim
+ok 156 - temporary rejection requires cooldown, live balance and one atomic claim
+  ---
+  duration_ms: 58.733161
+  type: 'test'
+  ...
+# Subtest: authenticated clients cannot unlock uncertain refunds directly
+ok 157 - authenticated clients cannot unlock uncertain refunds directly
+  ---
+  duration_ms: 30.131225
+  type: 'test'
+  ...
+# Subtest: unsigned hints can only reconcile registered charges and are rate limited
+ok 158 - unsigned hints can only reconcile registered charges and are rate limited
+  ---
+  duration_ms: 39.760254
+  type: 'test'
+  ...
+# Subtest: reservation retry preserves allocation and cannot reuse an earlier rejection after a later request
+ok 159 - reservation retry preserves allocation and cannot reuse an earlier rejection after a later request
+  ---
+  duration_ms: 128.965379
+  type: 'test'
+  ...
+# Subtest: financial report reads past the API cap and excludes internal fields for its owner
+ok 160 - financial report reads past the API cap and excludes internal fields for its owner
+  ---
+  duration_ms: 16.478384
+  type: 'test'
+  ...
+# Subtest: another guest cannot read financial history
+ok 161 - another guest cannot read financial history
+  ---
+  duration_ms: 2.01047
+  type: 'test'
+  ...
+# Subtest: administrator retains audit detail
+ok 162 - administrator retains audit detail
+  ---
+  duration_ms: 3.137009
+  type: 'test'
+  ...
+# Subtest: method disabled administratively cannot create payment even if browser sends it
+ok 163 - method disabled administratively cannot create payment even if browser sends it
+  ---
+  duration_ms: 2.675711
+  type: 'test'
+  ...
+# Subtest: settings reject fractions and invalid provider instead of silently coercing money rules
+ok 164 - settings reject fractions and invalid provider instead of silently coercing money rules
+  ---
+  duration_ms: 0.696667
+  type: 'test'
+  ...
+# Subtest: installment policy comes from property configuration with explicit interest payer
+ok 165 - installment policy comes from property configuration with explicit interest payer
+  ---
+  duration_ms: 0.362705
+  type: 'test'
+  ...
+# Subtest: refund reconciliation refreshes confirmed totals and does not deny a partial confirmation
+ok 166 - refund reconciliation refreshes confirmed totals and does not deny a partial confirmation
+  ---
+  duration_ms: 849.285563
+  type: 'test'
+  ...
+# Subtest: reservation opens guarantee and financial history through actual buttons
+ok 167 - reservation opens guarantee and financial history through actual buttons
+  ---
+  duration_ms: 439.138024
+  type: 'test'
+  ...
+# Subtest: admin cannot dispatch capture inside the provider expiry safety margin
+ok 168 - admin cannot dispatch capture inside the provider expiry safety margin
+  ---
+  duration_ms: 209.28197
+  type: 'test'
+  ...
+# Subtest: reservation without a guarantee still records an occurrence and does not call a payment endpoint
+ok 169 - reservation without a guarantee still records an occurrence and does not call a payment endpoint
+  ---
+  duration_ms: 369.856967
+  type: 'test'
+  ...
+# Subtest: occurrence is recorded independently without capture request
+ok 170 - occurrence is recorded independently without capture request
+  ---
+  duration_ms: 376.53003
+  type: 'test'
+  ...
+# Subtest: captured guarantee offers refund with bounded amount and does not claim unknown refund succeeded
+ok 171 - captured guarantee offers refund with bounded amount and does not claim unknown refund succeeded
+  ---
+  duration_ms: 521.445185
+  type: 'test'
+  ...
+# Subtest: administrative payment settings submit explicit methods, gateway and deadlines
+ok 172 - administrative payment settings submit explicit methods, gateway and deadlines
+  ---
+  duration_ms: 198.367391
+  type: 'test'
+  ...
+# Subtest: new commercial policy UI sends hours separately and preserves configured zero
+ok 173 - new commercial policy UI sends hours separately and preserves configured zero
+  ---
+  duration_ms: 219.729096
+  type: 'test'
+  ...
+# Subtest: new experience credit UI links item and requires decision before refund approval
+ok 174 - new experience credit UI links item and requires decision before refund approval
+  ---
+  duration_ms: 181.387428
+  type: 'test'
+  ...
+# Subtest: normalizes Brazilian and international phones and rejects invalid input
+ok 175 - normalizes Brazilian and international phones and rejects invalid input
+  ---
+  duration_ms: 2.764875
+  type: 'test'
+  ...
+# Subtest: reuses one guest for direct and external stays; edit changes contact, not financial reservation
+ok 176 - reuses one guest for direct and external stays; edit changes contact, not financial reservation
+  ---
+  duration_ms: 3.662758
+  type: 'test'
+  ...
+# Subtest: does not trust invented, duplicate, failed external periods or steal another guest link
+ok 177 - does not trust invented, duplicate, failed external periods or steal another guest link
+  ---
+  duration_ms: 2.187804
+  type: 'test'
+  ...
+# Subtest: reads all pages beyond default API row cap and fails loudly on DB error
+ok 178 - reads all pages beyond default API row cap and fails loudly on DB error
+  ---
+  duration_ms: 26.471216
+  type: 'test'
+  ...
+# Subtest: UI creates contact, links two stays, edits phone, unlinks, and escapes names
+ok 179 - UI creates contact, links two stays, edits phone, unlinks, and escapes names
+  ---
+  duration_ms: 1451.793323
+  type: 'test'
+  ...
+# Subtest: UI shows unavailable contact service without hiding the admin shell
+ok 180 - UI shows unavailable contact service without hiding the admin shell
+  ---
+  duration_ms: 165.300908
+  type: 'test'
+  ...
+# Subtest: publication preserves signed text, timestamps and refuses stale/unauthorized changes
+ok 181 - publication preserves signed text, timestamps and refuses stale/unauthorized changes
+  ---
+  duration_ms: 8409.40408
+  type: 'test'
+  ...
+# Subtest: listing access requires property scope, host role and explicit permission
+ok 182 - listing access requires property scope, host role and explicit permission
+  ---
+  duration_ms: 3.699114
+  type: 'test'
+  ...
+# Subtest: forged property id denied before database access
+ok 183 - forged property id denied before database access
+  ---
+  duration_ms: 1.117225
+  type: 'test'
+  ...
+# Subtest: listing updates preserve unrelated finance and availability; unknown fields are not mass assigned
+ok 184 - listing updates preserve unrelated finance and availability; unknown fields are not mass assigned
+  ---
+  duration_ms: 5.202336
+  type: 'test'
+  ...
+# Subtest: list query restricted to assigned properties on server
+ok 185 - list query restricted to assigned properties on server
+  ---
+  duration_ms: 0.625533
+  type: 'test'
+  ...
+# Subtest: public catalog excludes experiences, synthetic offers and discounts without editing saved catalog
+ok 186 - public catalog excludes experiences, synthetic offers and discounts without editing saved catalog
+  ---
+  duration_ms: 5.152151
+  type: 'test'
+  ...
+# Subtest: public rate has zero markup; checkout multipliers and cancellation policies are preserved
+ok 187 - public rate has zero markup; checkout multipliers and cancellation policies are preserved
+  ---
+  duration_ms: 0.947309
+  type: 'test'
+  ...
+# Subtest: server rejects experience variants and included packages even when supplied directly
+ok 188 - server rejects experience variants and included packages even when supplied directly
+  ---
+  duration_ms: 0.357339
+  type: 'test'
+  ...
+# Subtest: Airbnb promotion uses eligible nights only, excludes cleaning and preserves cents
+ok 189 - Airbnb promotion uses eligible nights only, excludes cleaning and preserves cents
+  ---
+  duration_ms: 3.053629
+  type: 'test'
+  ...
+# Subtest: confirmation snapshots use cents and legacy queued snapshots are converted only once
+ok 190 - confirmation snapshots use cents and legacy queued snapshots are converted only once
+  ---
+  duration_ms: 8836.562224
+  type: 'test'
+  ...
+# Subtest: development dispatch claims only the allowed recipient and leaves other messages queued
+ok 191 - development dispatch claims only the allowed recipient and leaves other messages queued
+  ---
+  duration_ms: 6711.246616
+  type: 'test'
+  ...
+# Subtest: pre-stay reminder follows dates, property time and timezone without resending delivered messages
+ok 192 - pre-stay reminder follows dates, property time and timezone without resending delivered messages
+  ---
+  duration_ms: 10388.112074
+  type: 'test'
+  ...
+# Subtest: delivery remains confirmed after late request, bounce and repeated open callbacks
+ok 193 - delivery remains confirmed after late request, bounce and repeated open callbacks
+  ---
+  duration_ms: 91.112016
+  type: 'test'
+  ...
+# Subtest: a late request does not erase failure, while delivery evidence can resolve it
+ok 194 - a late request does not erase failure, while delivery evidence can resolve it
+  ---
+  duration_ms: 21.757874
+  type: 'test'
+  ...
+# Subtest: database failure is retryable rather than acknowledged as stored
+ok 195 - database failure is retryable rather than acknowledged as stored
+  ---
+  duration_ms: 8.640199
+  type: 'test'
+  ...
+# Subtest: invalid provider timestamp returns a controlled error
+ok 196 - invalid provider timestamp returns a controlled error
+  ---
+  duration_ms: 2.602623
+  type: 'test'
+  ...
+# {"event":"pagbank_charge_rejected","operation":"cancel","http_status":422,"code":null,"hint":null}
+# {"event":"pagbank_charge_rejected","operation":"cancel","http_status":400,"code":"40007","hint":null}
+# Subtest: refund diagnostics retain only a fixed sandbox hint and never raw provider text
+ok 197 - refund diagnostics retain only a fixed sandbox hint and never raw provider text
+  ---
+  duration_ms: 31.023747
+  type: 'test'
+  ...
+# Subtest: declined Pix preserves its provider identity even when no QR code is issued
+ok 198 - declined Pix preserves its provider identity even when no QR code is issued
+  ---
+  duration_ms: 8.872426
+  type: 'test'
+  ...
+# Subtest: customer name rejects provider-forbidden symbols but keeps accented and compound names
+ok 199 - customer name rejects provider-forbidden symbols but keeps accented and compound names
+  ---
+  duration_ms: 5.009295
+  type: 'test'
+  ...
+# Subtest: Orders webhook selects the charge rather than the top-level order ID
+ok 200 - Orders webhook selects the charge rather than the top-level order ID
+  ---
+  duration_ms: 0.640805
+  type: 'test'
+  ...
+# Subtest: Pix uses exact server amount and 15 minute expiration
+ok 201 - Pix uses exact server amount and 15 minute expiration
+  ---
+  duration_ms: 0.632379
+  type: 'test'
+  ...
+# Subtest: card sends encrypted payload, no raw card number, and captures 100 percent
+ok 202 - card sends encrypted payload, no raw card number, and captures 100 percent
+  ---
+  duration_ms: 0.481455
+  type: 'test'
+  ...
+# Subtest: vaults a checkout card and uses only its token for a later uncharged guarantee
+ok 203 - vaults a checkout card and uses only its token for a later uncharged guarantee
+  ---
+  duration_ms: 7.795714
+  type: 'test'
+  ...
+# Subtest: checkout card response includes the provider token when storage was requested
+ok 204 - checkout card response includes the provider token when storage was requested
+  ---
+  duration_ms: 0.736028
+  type: 'test'
+  ...
+# Subtest: one and six installments charge the same booking total without a buyer fee
+ok 205 - one and six installments charge the same booking total without a buyer fee
+  ---
+  duration_ms: 0.29443
+  type: 'test'
+  ...
+# Subtest: buyer interest comes from the provider plan and keeps the item at the base price
+ok 206 - buyer interest comes from the provider plan and keeps the item at the base price
+  ---
+  duration_ms: 16.63683
+  type: 'test'
+  ...
+# Subtest: fees API returns exact buyer total for a card BIN and rejects inconsistent plans
+ok 207 - fees API returns exact buyer total for a card BIN and rejects inconsistent plans
+  ---
+  duration_ms: 13.735826
+  type: 'test'
+  ...
+# Subtest: fees API exposes only sanitized error codes for provider diagnostics
+ok 208 - fees API exposes only sanitized error codes for provider diagnostics
+  ---
+  duration_ms: 3.915766
+  type: 'test'
+  ...
+# Subtest: damage authorization is requested without immediate capture
+ok 209 - damage authorization is requested without immediate capture
+  ---
+  duration_ms: 0.25079
+  type: 'test'
+  ...
+# Subtest: guarantee lookup preserves the provider capture deadline
+ok 210 - guarantee lookup preserves the provider capture deadline
+  ---
+  duration_ms: 1.196679
+  type: 'test'
+  ...
+# Subtest: partial refund and capture preserve amount, sandbox URL and idempotency key
+ok 211 - partial refund and capture preserve amount, sandbox URL and idempotency key
+  ---
+  duration_ms: 5.834389
+  type: 'test'
+  ...
+# Subtest: uncertain refund response cannot confirm a refund
+ok 212 - uncertain refund response cannot confirm a refund
+  ---
+  duration_ms: 8.482982
+  type: 'test'
+  ...
+# Subtest: cancel response keeps only charge receipt and cumulative refund amount
+ok 213 - cancel response keeps only charge receipt and cumulative refund amount
+  ---
+  duration_ms: 3.015653
+  type: 'test'
+  ...
+# Subtest: direct charge consultation omits unsupported Accept header and retains refund summary
+ok 214 - direct charge consultation omits unsupported Accept header and retains refund summary
+  ---
+  duration_ms: 0.570032
+  type: 'test'
+  ...
+# Subtest: POST receipt retains the exact cumulative amount even when later GET omits summary
+ok 215 - POST receipt retains the exact cumulative amount even when later GET omits summary
+  ---
+  duration_ms: 14.525292
+  type: 'test'
+  ...
+# Subtest: first refund may be requested without summary but cannot be confirmed from PAID alone
+ok 216 - first refund may be requested without summary but cannot be confirmed from PAID alone
+  ---
+  duration_ms: 0.995819
+  type: 'test'
+  ...
+# Subtest: invalid amounts and expired Pix cannot produce an order
+ok 217 - invalid amounts and expired Pix cannot produce an order
+  ---
+  duration_ms: 0.29928
+  type: 'test'
+  ...
+# Subtest: provider request carries the bearer token and stable idempotency key
+ok 218 - provider request carries the bearer token and stable idempotency key
+  ---
+  duration_ms: 1.011028
+  type: 'test'
+  ...
+# Subtest: a definitive rejected order is distinct from an uncertain provider result
+ok 219 - a definitive rejected order is distinct from an uncertain provider result
+  ---
+  duration_ms: 17.185189
+  type: 'test'
+  ...
+# Subtest: webhook rejects modified payload or signature
+ok 220 - webhook rejects modified payload or signature
+  ---
+  duration_ms: 67.588089
+  type: 'test'
+  ...
+# Subtest: order lookup requires the exact charge and reads nested refund amount
+ok 221 - order lookup requires the exact charge and reads nested refund amount
+  ---
+  duration_ms: 5.375285
+  type: 'test'
+  ...
+# Subtest: new webhook signature accepts only matching ECDSA payload
+ok 222 - new webhook signature accepts only matching ECDSA payload
+  ---
+  duration_ms: 179.122497
+  type: 'test'
+  ...
+# Subtest: host cannot access another property or edit global templates
+ok 223 - host cannot access another property or edit global templates
+  ---
+  duration_ms: 1.506031
+  type: 'test'
+  ...
+# Subtest: worker needs both module permission and own assignment
+ok 224 - worker needs both module permission and own assignment
+  ---
+  duration_ms: 0.816077
+  type: 'test'
+  ...
+# Subtest: hub does not leak evidence, activity or financial amounts through nested reservations
+ok 225 - hub does not leak evidence, activity or financial amounts through nested reservations
+  ---
+  duration_ms: 3.535398
+  type: 'test'
+  ...
+# Subtest: a block rejects direct booking and approved date-change hold, but allows adjacent checkout dates
+ok 226 - a block rejects direct booking and approved date-change hold, but allows adjacent checkout dates
+  ---
+  duration_ms: 8852.801087
+  type: 'test'
+  ...
+# Subtest: a reservation and an active modification each prevent maintenance blocking
+ok 227 - a reservation and an active modification each prevent maintenance blocking
+  ---
+  duration_ms: 16.751725
+  type: 'test'
+  ...
+# Subtest: cancelled blocks release inventory and inactive records do not conflict
+ok 228 - cancelled blocks release inventory and inactive records do not conflict
+  ---
+  duration_ms: 4.195687
+  type: 'test'
+  ...
+# Subtest: cleaning points cover seven distinct required areas
+ok 229 - cleaning points cover seven distinct required areas
+  ---
+  duration_ms: 9.682606
+  type: 'test'
+  ...
+# Subtest: rejects MIME spoofing, SVG and oversized photo payloads
+ok 230 - rejects MIME spoofing, SVG and oversized photo payloads
+  ---
+  duration_ms: 7.676108
+  type: 'test'
+  ...
+# Subtest: photo URLs cannot be requested for another property or unassigned task
+ok 231 - photo URLs cannot be requested for another property or unassigned task
+  ---
+  duration_ms: 2.331996
+  type: 'test'
+  ...
+# Subtest: multicalendar, imported details, property filter and reservation tabs preserve correct actions
+ok 232 - multicalendar, imported details, property filter and reservation tabs preserve correct actions
+  ---
+  duration_ms: 1952.621658
+  type: 'test'
+  ...
+# Subtest: visitor explicitly chooses a rate; message equals displayed summary; no login/payment calls
+ok 233 - visitor explicitly chooses a rate; message equals displayed summary; no login/payment calls
+  ---
+  duration_ms: 722.869677
+  type: 'test'
+  ...
+# Subtest: changed quote requires review and removes WhatsApp link; failed quote discards previous price
+ok 234 - changed quote requires review and removes WhatsApp link; failed quote discards previous price
+  ---
+  duration_ms: 667.618201
+  type: 'test'
+  ...
+# Subtest: reload stores only choices and refreshes the quote before restoring summary
+ok 235 - reload stores only choices and refreshes the quote before restoring summary
+  ---
+  duration_ms: 270.648604
+  type: 'test'
+  ...
+# Subtest: clipboard failure provides the exact prepared message for manual copying
+ok 236 - clipboard failure provides the exact prepared message for manual copying
+  ---
+  duration_ms: 182.928195
+  type: 'test'
+  ...
+# Subtest: commercial experience requires an explicit condition and clears a prior quote when deselected
+ok 237 - commercial experience requires an explicit condition and clears a prior quote when deselected
+  ---
+  duration_ms: 835.85628
+  type: 'test'
+  ...
+# Subtest: lodging-only escape keeps offer context without promising an included experience
+ok 238 - lodging-only escape keeps offer context without promising an included experience
+  ---
+  duration_ms: 138.924926
+  type: 'test'
+  ...
+# Subtest: first launch shows one Escapada and only the total; no tariff or experience selection
+ok 239 - first launch shows one Escapada and only the total; no tariff or experience selection
+  ---
+  duration_ms: 107.89804
+  type: 'test'
+  ...
+# Subtest: first-launch price change requires a second explicit review and failure clears the total
+ok 240 - first-launch price change requires a second explicit review and failure clears the total
+  ---
+  duration_ms: 211.281424
+  type: 'test'
+  ...
+# Subtest: consultation rejects financial, hold and admin operations before forwarding
+ok 241 - consultation rejects financial, hold and admin operations before forwarding
+  ---
+  duration_ms: 311.499424
+  type: 'test'
+  ...
+# Subtest: production build requires reviewed profile, exact project and public key
+ok 242 - production build requires reviewed profile, exact project and public key
+  ---
+  duration_ms: 1.230692
+  type: 'test'
+  ...
+# Subtest: test products cannot be included in a production catalog
+ok 243 - test products cannot be included in a production catalog
+  ---
+  duration_ms: 0.648316
+  type: 'test'
+  ...
+# Subtest: database launch guard blocks direct holds while preserving existing/admin/imported reservations
+ok 244 - database launch guard blocks direct holds while preserving existing/admin/imported reservations
+  ---
+  duration_ms: 8683.265296
+  type: 'test'
+  ...
+# Subtest: production shared engine refuses direct payment despite spoofed DEV headers before database access
+ok 245 - production shared engine refuses direct payment despite spoofed DEV headers before database access
+  ---
+  duration_ms: 1260.656006
+  type: 'test'
+  ...
+# Subtest: public proxies use fixed consultation target and require production approval
+ok 246 - public proxies use fixed consultation target and require production approval
+  ---
+  duration_ms: 2.236767
+  type: 'test'
+  ...
+# Subtest: seven day boundary is inclusive for both plans
+ok 247 - seven day boundary is inclusive for both plans
+  ---
+  duration_ms: 1.447393
+  type: 'test'
+  ...
+# Subtest: after withdrawal: full early refund, partial late refund, cleaning and unprovided package intact
+ok 248 - after withdrawal: full early refund, partial late refund, cleaning and unprovided package intact
+  ---
+  duration_ms: 0.550274
+  type: 'test'
+  ...
+# Subtest: non-refundable after withdrawal returns only cleaning and unprovided experience
+ok 249 - non-refundable after withdrawal returns only cleaning and unprovided experience
+  ---
+  duration_ms: 0.16245
+  type: 'test'
+  ...
+# Subtest: started stay requires review and cannot produce automatic amount
+ok 250 - started stay requires review and cannot produce automatic amount
+  ---
+  duration_ms: 0.167917
+  type: 'test'
+  ...
+# Subtest: commercial 24h boundary is inclusive, separate from accepted additional window
+ok 251 - commercial 24h boundary is inclusive, separate from accepted additional window
+  ---
+  duration_ms: 0.308474
+  type: 'test'
+  ...
+# Subtest: commercial window never rewrites old rules and rejects malformed hours
+ok 252 - commercial window never rewrites old rules and rejects malformed hours
+  ---
+  duration_ms: 0.86141
+  type: 'test'
+  ...
+# Subtest: commercial window still sends an already started stay to individual review
+ok 253 - commercial window still sends an already started stay to individual review
+  ---
+  duration_ms: 0.298128
+  type: 'test'
+  ...
+# Subtest: every local variant exists and original gallery images resolve
+ok 254 - every local variant exists and original gallery images resolve
+  ---
+  duration_ms: 451.11776
+  type: 'test'
+  ...
+# Subtest: hidden carousel photos have no request URL until activated
+ok 255 - hidden carousel photos have no request URL until activated
+  ---
+  duration_ms: 36.100908
+  type: 'test'
+  ...
+# Subtest: new uploads resolve both variants; legacy photos retain their original URL
+ok 256 - new uploads resolve both variants; legacy photos retain their original URL
+  ---
+  duration_ms: 16.368123
+  type: 'test'
+  ...
+# Subtest: upload compressor preserves aspect ratio, caps width and closes the bitmap
+ok 257 - upload compressor preserves aspect ratio, caps width and closes the bitmap
+  ---
+  duration_ms: 46.725248
+  type: 'test'
+  ...
+# Subtest: small uploads are not enlarged and failed encodes are rejected
+ok 258 - small uploads are not enlarged and failed encodes are rejected
+  ---
+  duration_ms: 20.275149
+  type: 'test'
+  ...
+# Subtest: request is idempotent, requires availability, cannot be created for tomorrow
+ok 259 - request is idempotent, requires availability, cannot be created for tomorrow
+  ---
+  duration_ms: 45.512743
+  type: 'test'
+  ...
+# Subtest: guest cannot approve or read another guest request; approval expires in one hour
+ok 260 - guest cannot approve or read another guest request; approval expires in one hour
+  ---
+  duration_ms: 4.963516
+  type: 'test'
+  ...
+# Subtest: approval rechecks occupied dates and repeated decision cannot change rejection
+ok 261 - approval rechecks occupied dates and repeated decision cannot change rejection
+  ---
+  duration_ms: 5.521007
+  type: 'test'
+  ...
+# Subtest: Brazil midnight expires pending requests without permitting checkout
+ok 262 - Brazil midnight expires pending requests without permitting checkout
+  ---
+  duration_ms: 0.943077
+  type: 'test'
+  ...
+# Subtest: arrival time is required and valid, preserved for review
+ok 263 - arrival time is required and valid, preserved for review
+  ---
+  duration_ms: 1.088556
+  type: 'test'
+  ...
+# Subtest: guest sees approval warning and sends a request without invoking payment
+ok 264 - guest sees approval warning and sends a request without invoking payment
+  ---
+  duration_ms: 234.080088
+  type: 'test'
+  ...
+# Subtest: admin opens urgent request and approves explicitly, without charging
+ok 265 - admin opens urgent request and approves explicitly, without charging
+  ---
+  duration_ms: 50.9405
+  type: 'test'
+  ...
+# Subtest: remembered session survives page initialization and uses persistent storage
+ok 266 - remembered session survives page initialization and uses persistent storage
+  ---
+  duration_ms: 164.771101
+  type: 'test'
+  ...
+# Subtest: temporary session is removed from persistent storage and logout clears both
+ok 267 - temporary session is removed from persistent storage and logout clears both
+  ---
+  duration_ms: 19.702788
+  type: 'test'
+  ...
+# Subtest: reopening without temporary session does not restore a previous persistent token
+ok 268 - reopening without temporary session does not restore a previous persistent token
+  ---
+  duration_ms: 27.570286
+  type: 'test'
+  ...
+# Subtest: fresh stored showcase returns immediately without calendar or quotation calls
+ok 269 - fresh stored showcase returns immediately without calendar or quotation calls
+  ---
+  duration_ms: 2.217322
+  type: 'test'
+  ...
+# Subtest: stale snapshot refreshes behind one atomic lease without blocking display
+ok 270 - stale snapshot refreshes behind one atomic lease without blocking display
+  ---
+  duration_ms: 1.366995
+  type: 'test'
+  ...
+# Subtest: snapshot over five minutes old is never shown as current price
+ok 271 - snapshot over five minutes old is never shown as current price
+  ---
+  duration_ms: 0.425878
+  type: 'test'
+  ...
+# Subtest: expired cache cannot hide a failed pricing consultation
+ok 272 - expired cache cannot hide a failed pricing consultation
+  ---
+  duration_ms: 0.622769
+  type: 'test'
+  ...
+# Subtest: discount, pause, package price and date changes invalidate stored identity
+ok 273 - discount, pause, package price and date changes invalidate stored identity
+  ---
+  duration_ms: 21.127597
+  type: 'test'
+  ...
+# Subtest: contract copied from chosen quote and cannot be rewritten
+ok 274 - contract copied from chosen quote and cannot be rewritten
+  ---
+  duration_ms: 5608.771191
+  type: 'test'
+  ...
+# Subtest: confirmation events generate concrete preference and daily checklists once
+ok 275 - confirmation events generate concrete preference and daily checklists once
+  ---
+  duration_ms: 40.42935
+  type: 'test'
+  ...
+# Subtest: catalog edits and pause do not change bought composition; cancel keeps audited preparation
+ok 276 - catalog edits and pause do not change bought composition; cancel keeps audited preparation
+  ---
+  duration_ms: 29.702221
+  type: 'test'
+  ...
+# Subtest: date or property changes cancel obsolete services and update preparation
+ok 277 - date or property changes cancel obsolete services and update preparation
+  ---
+  duration_ms: 102.353204
+  type: 'test'
+  ...
+# Subtest: daily capacity counts contracted service dates and preserves prior frequency after catalog edits
+ok 278 - daily capacity counts contracted service dates and preserves prior frequency after catalog edits
+  ---
+  duration_ms: 142.268322
+  type: 'test'
+  ...
+# Subtest: lodging-only catalog permits empty packages while requiring a property
+ok 279 - lodging-only catalog permits empty packages while requiring a property
+  ---
+  duration_ms: 4.152119
+  type: 'test'
+  ...
+# Subtest: experience entry includes the selected extra in the first tariff comparison
+ok 280 - experience entry includes the selected extra in the first tariff comparison
+  ---
+  duration_ms: 919.366227
+  type: 'test'
+  ...
+# Subtest: manual journey asks purpose with dates and combines package, tariff and extras before common login
+ok 281 - manual journey asks purpose with dates and combines package, tariff and extras before common login
+  ---
+  duration_ms: 733.773966
+  type: 'test'
+  ...
+# Subtest: storefront uses review then the same mandatory login without exposing payment or terms
+ok 282 - storefront uses review then the same mandatory login without exposing payment or terms
+  ---
+  duration_ms: 925.165014
+  type: 'test'
+  ...
+# Subtest: authenticated guest goes from selection to data, terms and payment without repeating login
+ok 283 - authenticated guest goes from selection to data, terms and payment without repeating login
+  ---
+  duration_ms: 572.45285
+  type: 'test'
+  ...
+# Subtest: direct checkout never substitutes an unavailable advertised tariff
+ok 284 - direct checkout never substitutes an unavailable advertised tariff
+  ---
+  duration_ms: 164.920804
+  type: 'test'
+  ...
+# Subtest: reload of the same offer preserves extras, explicit tariff and preferences; another offer link does not
+ok 285 - reload of the same offer preserves extras, explicit tariff and preferences; another offer link does not
+  ---
+  duration_ms: 644.180795
+  type: 'test'
+  ...
+# Subtest: dates submitted on home skip repeated date screen and preserve purpose until an explicit choice
+ok 286 - dates submitted on home skip repeated date screen and preserve purpose until an explicit choice
+  ---
+  duration_ms: 73.336573
+  type: 'test'
+  ...
+# Subtest: one-night search does not offer a two-night package and purpose changes survive reload URL
+ok 287 - one-night search does not offer a two-night package and purpose changes survive reload URL
+  ---
+  duration_ms: 134.141178
+  type: 'test'
+  ...
+# Subtest: stay-only offers can be managed without placeholder experiences
+ok 288 - stay-only offers can be managed without placeholder experiences
+  ---
+  duration_ms: 58.929285
+  type: 'test'
+  ...
+# Subtest: offer discount allocated to contracted components, optional extra full price
+ok 289 - offer discount allocated to contracted components, optional extra full price
+  ---
+  duration_ms: 1.183664
+  type: 'test'
+  ...
+# Subtest: discount belongs to explicit offer, configurable or disabled
+ok 290 - discount belongs to explicit offer, configurable or disabled
+  ---
+  duration_ms: 0.564447
+  type: 'test'
+  ...
+# Subtest: all tariffs apply to dynamic accommodation before discount
+ok 291 - all tariffs apply to dynamic accommodation before discount
+  ---
+  duration_ms: 0.342676
+  type: 'test'
+  ...
+# Subtest: cent allocation handles tiny and large integer amounts without lost cents
+ok 292 - cent allocation handles tiny and large integer amounts without lost cents
+  ---
+  duration_ms: 1.822856
+  type: 'test'
+  ...
+# Subtest: two nights and flexible duration follow configuration; no global three-night minimum
+ok 293 - two nights and flexible duration follow configuration; no global three-night minimum
+  ---
+  duration_ms: 3.526238
+  type: 'test'
+  ...
+# Subtest: preferences use only allowed choices and required choice is enforced before purchase
+ok 294 - preferences use only allowed choices and required choice is enforced before purchase
+  ---
+  duration_ms: 4.532929
+  type: 'test'
+  ...
+# Subtest: PMS loads and saves a lodging-only offer with the calendar minimum and pause preserved
+ok 295 - PMS loads and saves a lodging-only offer with the calendar minimum and pause preserved
+  ---
+  duration_ms: 527.291652
+  type: 'test'
+  ...
+# Subtest: storefront cache is preview-only, and forwards only the public dev feed
+ok 296 - storefront cache is preview-only, and forwards only the public dev feed
+  ---
+  duration_ms: 52.183307
+  type: 'test'
+  ...
+# Subtest: minimum storefront extends holidays, rechecks new nights and keeps one duration per arrival
+ok 297 - minimum storefront extends holidays, rechecks new nights and keeps one duration per arrival
+  ---
+  duration_ms: 63.857605
+  type: 'test'
+  ...
+# Subtest: minimum duration respects offer ceiling, extended-stay rules and unavailable calendars
+ok 298 - minimum duration respects offer ceiling, extended-stay rules and unavailable calendars
+  ---
+  duration_ms: 3.001657
+  type: 'test'
+  ...
+# Subtest: weekday storefront obeys offer durations, periods and excludes every weekend night
+ok 299 - weekday storefront obeys offer durations, periods and excludes every weekend night
+  ---
+  duration_ms: 2.997735
+  type: 'test'
+  ...
+# Subtest: storefront checks service feasibility, keeps both durations, and uses final server quote
+ok 300 - storefront checks service feasibility, keeps both durations, and uses final server quote
+  ---
+  duration_ms: 6.792881
+  type: 'test'
+  ...
+# Subtest: paused or unpromoted offers do not trigger external rate queries
+ok 301 - paused or unpromoted offers do not trigger external rate queries
+  ---
+  duration_ms: 4.641958
+  type: 'test'
+  ...
+# Subtest: minimum showcase completes each chosen period with available peers instead of hiding a more expensive chalet
+ok 302 - minimum showcase completes each chosen period with available peers instead of hiding a more expensive chalet
+  ---
+  duration_ms: 7.904058
+  type: 'test'
+  ...
+# Subtest: period columns keep chalet order, unique dates, accurate links and facility photos; unavailable chalets are omitted and remaining rows fill the column
+ok 303 - period columns keep chalet order, unique dates, accurate links and facility photos; unavailable chalets are omitted and remaining rows fill the column
+  ---
+  duration_ms: 609.9775
+  type: 'test'
+  ...
+# Subtest: concurrent home queries share a short cache and catalog edits invalidate it
+ok 304 - concurrent home queries share a short cache and catalog edits invalidate it
+  ---
+  duration_ms: 5.162509
+  type: 'test'
+  ...
+# Subtest: home renders dated price cards and duration filters; links carry explicit offer and dates
+ok 305 - home renders dated price cards and duration filters; links carry explicit offer and dates
+  ---
+  duration_ms: 377.806359
+  type: 'test'
+  ...
+# Subtest: storefront preview never persists quote rows or enables payments
+ok 306 - storefront preview never persists quote rows or enables payments
+  ---
+  duration_ms: 76.11999
+  type: 'test'
+  ...
+# Subtest: first visit reserves storefront space and consumes the early request without a second fetch
+ok 307 - first visit reserves storefront space and consumes the early request without a second fetch
+  ---
+  duration_ms: 219.826855
+  type: 'test'
+  ...
+# Subtest: weekend suggestions prioritize Friday or Saturday arrivals over cheap Sunday spillovers
+ok 308 - weekend suggestions prioritize Friday or Saturday arrivals over cheap Sunday spillovers
+  ---
+  duration_ms: 4.835169
+  type: 'test'
+  ...
+# Subtest: unity cleanup reconstructs sample-exact without added latency at phone sample rates
+ok 309 - unity cleanup reconstructs sample-exact without added latency at phone sample rates
+  ---
+  duration_ms: 480.534717
+  type: 'test'
+  ...
+# Subtest: steady low noise is reduced and stronger cleanup is reversible
+ok 310 - steady low noise is reduced and stronger cleanup is reversible
+  ---
+  duration_ms: 385.686445
+  type: 'test'
+  ...
+# Subtest: tail attenuation preserves the transient and cannot alter a stationary tone
+ok 311 - tail attenuation preserves the transient and cannot alter a stationary tone
+  ---
+  duration_ms: 464.007481
+  type: 'test'
+  ...
+# Subtest: v2 parameters survive persistence; malformed DSP data and future versions fail closed
+ok 312 - v2 parameters survive persistence; malformed DSP data and future versions fail closed
+  ---
+  duration_ms: 2.741173
+  type: 'test'
+  ...
+# Subtest: guest sanitization cannot impersonate team, publish directly, store prices or use another owner media
+ok 313 - guest sanitization cannot impersonate team, publish directly, store prices or use another owner media
+  ---
+  duration_ms: 6908.952671
+  type: 'test'
+  ...
+# Subtest: public profile fields are explicit and mentions are bounded
+ok 314 - public profile fields are explicit and mentions are bounded
+  ---
+  duration_ms: 11.46409
+  type: 'test'
+  ...
+# Subtest: community tables and privileged RPCs deny direct client writes; own profile read uses RLS
+ok 315 - community tables and privileged RPCs deny direct client writes; own profile read uses RLS
+  ---
+  duration_ms: 75.2667
+  type: 'test'
+  ...
+# Subtest: guest save, moderation, notifications, mentions, edits and ownership execute atomically in Postgres
+ok 316 - guest save, moderation, notifications, mentions, edits and ownership execute atomically in Postgres
+  ---
+  duration_ms: 94.786387
+  type: 'test'
+  ...
+# Subtest: follow and like retries do not duplicate notifications
+ok 317 - follow and like retries do not duplicate notifications
+  ---
+  duration_ms: 33.161124
+  type: 'test'
+  ...
+# Subtest: invites are single-use, expire and cannot be self-redeemed
+ok 318 - invites are single-use, expire and cannot be self-redeemed
+  ---
+  duration_ms: 14.844393
+  type: 'test'
+  ...
+# Subtest: anonymous callers cannot mutate community and non-admin cannot moderate
+ok 319 - anonymous callers cannot mutate community and non-admin cannot moderate
+  ---
+  duration_ms: 2.010493
+  type: 'test'
+  ...
+# Subtest: public feed excludes disabled guest profiles and only projects accepted public mentions
+ok 320 - public feed excludes disabled guest profiles and only projects accepted public mentions
+  ---
+  duration_ms: 1.51131
+  type: 'test'
+  ...
+# Subtest: account defaults to community but charge links and reservations tab preserve private flow
+ok 321 - account defaults to community but charge links and reservations tab preserve private flow
+  ---
+  duration_ms: 658.894124
+  type: 'test'
+  ...
+# Subtest: private storage only permits own paths and requires guest eligibility for video
+ok 322 - private storage only permits own paths and requires guest eligibility for video
+  ---
+  duration_ms: 18.909415
+  type: 'test'
+  ...
+# Subtest: public profile follows and unfollows through explicit actions; public text is escaped
+ok 323 - public profile follows and unfollows through explicit actions; public text is escaped
+  ---
+  duration_ms: 99.197053
+  type: 'test'
+  ...
+# Subtest: Meu Villegram saves opt-in profile, accepts mentions, reads notifications and creates companion link
+ok 324 - Meu Villegram saves opt-in profile, accepts mentions, reads notifications and creates companion link
+  ---
+  duration_ms: 663.456457
+  type: 'test'
+  ...
+# Subtest: public people API awaits database builders and returns safe fields; service errors stay failures
+ok 325 - public people API awaits database builders and returns safe fields; service errors stay failures
+  ---
+  duration_ms: 2.202459
+  type: 'test'
+  ...
+# Subtest: profile accepts @ and uppercase before native validation, normalizes the API value and explains avatar eligibility
+ok 326 - profile accepts @ and uppercase before native validation, normalizes the API value and explains avatar eligibility
+  ---
+  duration_ms: 151.2265
+  type: 'test'
+  ...
+# Subtest: avatar crop waits for the single profile save and account opens in Watch, not own posts
+ok 327 - avatar crop waits for the single profile save and account opens in Watch, not own posts
+  ---
+  duration_ms: 237.170076
+  type: 'test'
+  ...
+# Subtest: avatar server validates size/type, derives own path, and removes upload if profile save fails
+ok 328 - avatar server validates size/type, derives own path, and removes upload if profile save fails
+  ---
+  duration_ms: 12.87082
+  type: 'test'
+  ...
+# Subtest: profile Trips group by month and day in Brazil, retain dates and edit destinations
+ok 329 - profile Trips group by month and day in Brazil, retain dates and edit destinations
+  ---
+  duration_ms: 148.985802
+  type: 'test'
+  ...
+# Subtest: database denies direct anonymous/authenticated writes and drafts stay service-only
+ok 330 - database denies direct anonymous/authenticated writes and drafts stay service-only
+  ---
+  duration_ms: 8982.423522
+  type: 'test'
+  ...
+# Subtest: natural view keys and generation identities deduplicate retries with different UUIDs
+ok 331 - natural view keys and generation identities deduplicate retries with different UUIDs
+  ---
+  duration_ms: 28.753247
+  type: 'test'
+  ...
+# Subtest: invalid publication cover/status and client payment signals fail in the database
+ok 332 - invalid publication cover/status and client payment signals fail in the database
+  ---
+  duration_ms: 12.86855
+  type: 'test'
+  ...
+# Subtest: fixed stay metadata requires exact choices and rejects stored prices or malformed dates
+ok 333 - fixed stay metadata requires exact choices and rejects stored prices or malformed dates
+  ---
+  duration_ms: 51.898913
+  type: 'test'
+  ...
+# Subtest: TUS resumes a failed second chunk from the server offset without duplicating the file
+ok 334 - TUS resumes a failed second chunk from the server offset without duplicating the file
+  ---
+  duration_ms: 436.54017
+  type: 'test'
+  ...
+# Subtest: manual editor saves draft, retains identity during edit, publishes and archives
+ok 335 - manual editor saves draft, retains identity during edit, publishes and archives
+  ---
+  duration_ms: 2357.998366
+  type: 'test'
+  ...
+# Subtest: retrying a failed video poster upload preserves the already uploaded video
+ok 336 - retrying a failed video poster upload preserves the already uploaded video
+  ---
+  duration_ms: 499.151032
+  type: 'test'
+  ...
+# Subtest: native publication clicks and Enter preserve published status during subsequent edits
+ok 337 - native publication clicks and Enter preserve published status during subsequent edits
+  ---
+  duration_ms: 819.010523
+  type: 'test'
+  ...
+# Subtest: uploaded video can be published by clicking the actual button and saved edits keep the file identity
+ok 338 - uploaded video can be published by clicking the actual button and saved edits keep the file identity
+  ---
+  duration_ms: 663.796867
+  type: 'test'
+  ...
+# Subtest: cover generation seeks a decoded frame and rejects a black canvas instead of uploading it
+ok 339 - cover generation seeks a decoded frame and rejects a black canvas instead of uploading it
+  ---
+  duration_ms: 19.867105
+  type: 'test'
+  ...
+# Subtest: visual composer gates empty steps and keeps media, cover, crop and text when returning
+ok 340 - visual composer gates empty steps and keeps media, cover, crop and text when returning
+  ---
+  duration_ms: 722.751575
+  type: 'test'
+  ...
+# Subtest: composer opens its library, edits published posts, and does not restart video while typing or switching steps
+ok 341 - composer opens its library, edits published posts, and does not restart video while typing or switching steps
+  ---
+  duration_ms: 582.807972
+  type: 'test'
+  ...
+# Subtest: slow media upload locks the composer, recovers after failure, and reports preview media errors
+ok 342 - slow media upload locks the composer, recovers after failure, and reports preview media errors
+  ---
+  duration_ms: 232.427005
+  type: 'test'
+  ...
+# Subtest: scene controls remain on the photo with no framing sliders
+ok 343 - scene controls remain on the photo with no framing sliders
+  ---
+  duration_ms: 191.50865
+  type: 'test'
+  ...
+# Subtest: holding and dragging photo thumbnails changes order while retaining the selected cover; keyboard also works
+ok 344 - holding and dragging photo thumbnails changes order while retaining the selected cover; keyboard also works
+  ---
+  duration_ms: 1193.43591
+  type: 'test'
+  ...
+# Subtest: Quero estes dias quotes both tariffs, reprices packages, and saves only explicit dates and rate
+ok 345 - Quero estes dias quotes both tariffs, reprices packages, and saves only explicit dates and rate
+  ---
+  duration_ms: 573.145399
+  type: 'test'
+  ...
+# Subtest: photo crop dialog moves its preview immediately and encodes only on rotate or confirmation
+ok 346 - photo crop dialog moves its preview immediately and encodes only on rotate or confirmation
+  ---
+  duration_ms: 55.359273
+  type: 'test'
+  ...
+# Subtest: changing dates while a quote is pending cannot show the old total or publish it
+ok 347 - changing dates while a quote is pending cannot show the old total or publish it
+  ---
+  duration_ms: 310.111388
+  type: 'test'
+  ...
+# Subtest: direct photo pinch and drag preserve the live element and save bounded framing
+ok 348 - direct photo pinch and drag preserve the live element and save bounded framing
+  ---
+  duration_ms: 369.991382
+  type: 'test'
+  ...
+# Subtest: photo gestures clamp zoom, cancel between scenes, and overlay controls work without touch
+ok 349 - photo gestures clamp zoom, cancel between scenes, and overlay controls work without touch
+  ---
+  duration_ms: 534.122139
+  type: 'test'
+  ...
+# Subtest: white insertion marker follows before/after slots and cancelling a drag preserves order
+ok 350 - white insertion marker follows before/after slots and cancelling a drag preserves order
+  ---
+  duration_ms: 1245.366607
+  type: 'test'
+  ...
+# Subtest: photo moves freely on both axes even at original zoom and cannot be lost outside canvas
+ok 351 - photo moves freely on both axes even at original zoom and cannot be lost outside canvas
+  ---
+  duration_ms: 700.759283
+  type: 'test'
+  ...
+# Subtest: automatic generation opens its library and previews without replacing unsaved composition
+ok 352 - automatic generation opens its library and previews without replacing unsaved composition
+  ---
+  duration_ms: 130.997124
+  type: 'test'
+  ...
+# Subtest: generating zero new posts exposes existing automatic previews with a clear explanation
+ok 353 - generating zero new posts exposes existing automatic previews with a clear explanation
+  ---
+  duration_ms: 114.307817
+  type: 'test'
+  ...
+# Subtest: automatic library preview accepts the real Signature versioned cover through server validation
+ok 354 - automatic library preview accepts the real Signature versioned cover through server validation
+  ---
+  duration_ms: 320.318106
+  type: 'test'
+  ...
+# Subtest: guest composer reuses photo upload and framing but sends moderation without exposing commercial controls
+ok 355 - guest composer reuses photo upload and framing but sends moderation without exposing commercial controls
+  ---
+  duration_ms: 411.076628
+  type: 'test'
+  ...
+# Subtest: text on scene supports color, transparent background, keyboard positioning and survives save/edit
+ok 356 - text on scene supports color, transparent background, keyboard positioning and survives save/edit
+  ---
+  duration_ms: 595.417916
+  type: 'test'
+  ...
+# Subtest: empty scene opens the file picker; progress disappears after success and new uploads cancel the old notice
+ok 357 - empty scene opens the file picker; progress disappears after success and new uploads cancel the old notice
+  ---
+  duration_ms: 402.712849
+  type: 'test'
+  ...
+# Subtest: failed upload stays actionable and retry hides progress only after success
+ok 358 - failed upload stays actionable and retry hides progress only after success
+  ---
+  duration_ms: 178.242123
+  type: 'test'
+  ...
+# Subtest: holding enables photo pan while explicit media options preserve trash and remaining cover
+ok 359 - holding enables photo pan while explicit media options preserve trash and remaining cover
+  ---
+  duration_ms: 1027.477999
+  type: 'test'
+  ...
+# Subtest: pan, pinch, text tools and cancelled touches never open the media trash
+ok 360 - pan, pinch, text tools and cancelled touches never open the media trash
+  ---
+  duration_ms: 2467.173366
+  type: 'test'
+  ...
+# Subtest: video keeps native controls; hold exposes removal and switching scenes dismisses trash
+ok 361 - video keeps native controls; hold exposes removal and switching scenes dismisses trash
+  ---
+  duration_ms: 1392.401231
+  type: 'test'
+  ...
+# Subtest: canvas navigation preserves thumbnails, text and cover when advancing and returning
+ok 362 - canvas navigation preserves thumbnails, text and cover when advancing and returning
+  ---
+  duration_ms: 689.341896
+  type: 'test'
+  ...
+# Subtest: new photos fill the scene; the standalone framing icon toggles and preserves saved framing
+ok 363 - new photos fill the scene; the standalone framing icon toggles and preserves saved framing
+  ---
+  duration_ms: 353.729132
+  type: 'test'
+  ...
+# Subtest: fill removes dragged gaps and stale zoom in one click, persists it and can show the whole photo
+ok 364 - fill removes dragged gaps and stale zoom in one click, persists it and can show the whole photo
+  ---
+  duration_ms: 457.862053
+  type: 'test'
+  ...
+# Subtest: approver alert opens the pending queue without discarding a composition; approving clears the queue
+ok 365 - approver alert opens the pending queue without discarding a composition; approving clears the queue
+  ---
+  duration_ms: 174.886341
+  type: 'test'
+  ...
+# Subtest: horizontal swipe rolls filters without moving photo; held drag pans and cancellation does not select filter
+ok 366 - horizontal swipe rolls filters without moving photo; held drag pans and cancellation does not select filter
+  ---
+  duration_ms: 745.754014
+  type: 'test'
+  ...
+# Subtest: new moment centers upload canvas and vertical photo movement stays scrollable
+ok 367 - new moment centers upload canvas and vertical photo movement stays scrollable
+  ---
+  duration_ms: 717.212102
+  type: 'test'
+  ...
+# Subtest: six photos can be scrolled to the last and reordered with cover identity preserved
+ok 368 - six photos can be scrolled to the last and reordered with cover identity preserved
+  ---
+  duration_ms: 716.658453
+  type: 'test'
+  ...
+# Subtest: icon modes change the whole photo collection without adding or removing authored text
+ok 369 - icon modes change the whole photo collection without adding or removing authored text
+  ---
+  duration_ms: 433.914552
+  type: 'test'
+  ...
+# Subtest: media validator persists allowed effects, rejects arbitrary CSS and invalid playback rates
+ok 370 - media validator persists allowed effects, rejects arbitrary CSS and invalid playback rates
+  ---
+  duration_ms: 5.478528
+  type: 'test'
+  ...
+# Subtest: watermark avoids occupied corners and omits itself if all are occupied
+ok 371 - watermark avoids occupied corners and omits itself if all are occupied
+  ---
+  duration_ms: 28.404807
+  type: 'test'
+  ...
+# Subtest: photo export burns guest text and branding, removes commercial layers and emits JPEG
+ok 372 - photo export burns guest text and branding, removes commercial layers and emits JPEG
+  ---
+  duration_ms: 71.85715
+  type: 'test'
+  ...
+# Subtest: video export uses MP4, preserves audio and selected speed, and releases recording resources
+ok 373 - video export uses MP4, preserves audio and selected speed, and releases recording resources
+  ---
+  duration_ms: 69.989426
+  type: 'test'
+  ...
+# Subtest: carousel opens on the selected filter, wraps, applies modes and closes from the keyboard
+ok 374 - carousel opens on the selected filter, wraps, applies modes and closes from the keyboard
+  ---
+  duration_ms: 175.191371
+  type: 'test'
+  ...
+# Subtest: horizontal carousel gestures advance once, suppress the following click and leave vertical scrolling free
+ok 375 - horizontal carousel gestures advance once, suppress the following click and leave vertical scrolling free
+  ---
+  duration_ms: 111.157479
+  type: 'test'
+  ...
+# Subtest: every showcase escape joins the initial feed without a click: offers-first
+ok 376 - every showcase escape joins the initial feed without a click: offers-first
+  ---
+  duration_ms: 2653.928361
+  type: 'test'
+  ...
+# Subtest: every showcase escape joins the initial feed without a click: publications-first
+ok 377 - every showcase escape joins the initial feed without a click: publications-first
+  ---
+  duration_ms: 1181.598838
+  type: 'test'
+  ...
+# Subtest: same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh
+ok 378 - same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh
+  ---
+  duration_ms: 235.768711
+  type: 'test'
+  ...
+# Subtest: following feed remains limited to followed publications
+ok 379 - following feed remains limited to followed publications
+  ---
+  duration_ms: 431.548935
+  type: 'test'
+  ...
+# Subtest: private composer previews retain the saved immersive headline
+ok 380 - private composer previews retain the saved immersive headline
+  ---
+  duration_ms: 174.479463
+  type: 'test'
+  ...
+# Subtest: silence stays original, bounded gain respects peaks, clipping never pretends recovery
+ok 381 - silence stays original, bounded gain respects peaks, clipping never pretends recovery
+  ---
+  duration_ms: 508.599855
+  type: 'test'
+  ...
+# Subtest: stationary noise is not boosted and narrow persistent hum is detected
+ok 382 - stationary noise is not boosted and narrow persistent hum is detected
+  ---
+  duration_ms: 321.372088
+  type: 'test'
+  ...
+# Subtest: automatic cuts retain manual trims, silence, order and optional sounds
+ok 383 - automatic cuts retain manual trims, silence, order and optional sounds
+  ---
+  duration_ms: 290.148177
+  type: 'test'
+  ...
+# Subtest: versioned treatment persists only bounded parameters and validates legacy objects
+ok 384 - versioned treatment persists only bounded parameters and validates legacy objects
+  ---
+  duration_ms: 8.56094
+  type: 'test'
+  ...
+# Subtest: feed and conventional home use the same named icons and reset inherited navigation formatting
+ok 385 - feed and conventional home use the same named icons and reset inherited navigation formatting
+  ---
+  duration_ms: 4211.654019
+  type: 'test'
+  ...
+# Subtest: offer CTA keeps its full booking link and has an explicit accessible button format
+ok 386 - offer CTA keeps its full booking link and has an explicit accessible button format
+  ---
+  duration_ms: 1723.779366
+  type: 'test'
+  ...
+# Subtest: mobile teaching gesture expires without advancing, appears once, and disappears when reading
+ok 387 - mobile teaching gesture expires without advancing, appears once, and disappears when reading
+  ---
+  duration_ms: 1146.840612
+  type: 'test'
+  ...
+# Subtest: desktop navigation is labelled and enlarged; reduced motion receives a static mobile hint
+ok 388 - desktop navigation is labelled and enlarged; reduced motion receives a static mobile hint
+  ---
+  duration_ms: 810.087314
+  type: 'test'
+  ...
+# Subtest: primary action uses equal reel gutters and social actions display counts with accessible names
+ok 389 - primary action uses equal reel gutters and social actions display counts with accessible names
+  ---
+  duration_ms: 870.937662
+  type: 'test'
+  ...
+# Subtest: oval countdown tracks a whole photo cycle and freezes during pause, hidden tabs and reading
+ok 390 - oval countdown tracks a whole photo cycle and freezes during pause, hidden tabs and reading
+  ---
+  duration_ms: 709.528168
+  type: 'test'
+  ...
+# Subtest: video countdown follows actual playback metadata and keeps its ring when toggling pause
+ok 391 - video countdown follows actual playback metadata and keeps its ring when toggling pause
+  ---
+  duration_ms: 323.204825
+  type: 'test'
+  ...
+# Subtest: late video events after moving to a photo do not crash or attribute completion to the new reel
+ok 392 - late video events after moving to a photo do not crash or attribute completion to the new reel
+  ---
+  duration_ms: 233.438765
+  type: 'test'
+  ...
+# Subtest: booking header and steps occupy normal document rows with a bounded three-column layout
+ok 393 - booking header and steps occupy normal document rows with a bounded three-column layout
+  ---
+  duration_ms: 269.65063
+  type: 'test'
+  ...
+# Subtest: feed preserves the exact top alignment selected in the composer for photos and videos
+ok 394 - feed preserves the exact top alignment selected in the composer for photos and videos
+  ---
+  duration_ms: 693.57938
+  type: 'test'
+  ...
+# Subtest: the feed preserves zoom and both scene coordinates outside its motion animation
+ok 395 - the feed preserves zoom and both scene coordinates outside its motion animation
+  ---
+  duration_ms: 453.038024
+  type: 'test'
+  ...
+# Subtest: photo playback respects the saved order even when a different photo is selected as the cover
+ok 396 - photo playback respects the saved order even when a different photo is selected as the cover
+  ---
+  duration_ms: 235.148439
+  type: 'test'
+  ...
+# Subtest: the feed retains free photo translation as well as zoom
+ok 397 - the feed retains free photo translation as well as zoom
+  ---
+  duration_ms: 224.469449
+  type: 'test'
+  ...
+# Subtest: following entry sends the current session and keeps login optional for discovery
+ok 398 - following entry sends the current session and keeps login optional for discovery
+  ---
+  duration_ms: 68.352864
+  type: 'test'
+  ...
+# Subtest: embedded booking and login navigation leave the player frame
+ok 399 - embedded booking and login navigation leave the player frame
+  ---
+  duration_ms: 173.464969
+  type: 'test'
+  ...
+# Subtest: scene text appears outside the photo transform and changes with the scene
+ok 400 - scene text appears outside the photo transform and changes with the scene
+  ---
+  duration_ms: 189.301329
+  type: 'test'
+  ...
+# Subtest: comment survives login return on the same publication and is sent only after explicit resubmission
+ok 401 - comment survives login return on the same publication and is sent only after explicit resubmission
+  ---
+  duration_ms: 227.716508
+  type: 'test'
+  ...
+# Subtest: like asks for login before sending and returns to the selected publication
+ok 402 - like asks for login before sending and returns to the selected publication
+  ---
+  duration_ms: 228.401139
+  type: 'test'
+  ...
+# Subtest: rejected authenticated like forces an actual login instead of redirecting a stale session back
+ok 403 - rejected authenticated like forces an actual login instead of redirecting a stale session back
+  ---
+  duration_ms: 476.88257
+  type: 'test'
+  ...
+# Subtest: leaving a later reel updates this history entry and restores the same publication after rebuilding the feed
+ok 404 - leaving a later reel updates this history entry and restores the same publication after rebuilding the feed
+  ---
+  duration_ms: 213.478665
+  type: 'test'
+  ...
+# Subtest: social totals use server count beyond page size and comments show escaped author and Brasilia timestamp
+ok 405 - social totals use server count beyond page size and comments show escaped author and Brasilia timestamp
+  ---
+  duration_ms: 203.889106
+  type: 'test'
+  ...
+# Subtest: Moments identifies the property site on shared entries and preserves quoted offer context
+ok 406 - Moments identifies the property site on shared entries and preserves quoted offer context
+  ---
+  duration_ms: 215.88658
+  type: 'test'
+  ...
+# Subtest: guest Trips retain their caption and only a discreet linked property action
+ok 407 - guest Trips retain their caption and only a discreet linked property action
+  ---
+  duration_ms: 228.304874
+  type: 'test'
+  ...
+# Subtest: storefront entry keeps the four shortcuts through Trip changes and opens the complete feed
+ok 408 - storefront entry keeps the four shortcuts through Trip changes and opens the complete feed
+  ---
+  duration_ms: 609.563949
+  type: 'test'
+  ...
+# villegram_attribution_unavailable
+# Subtest: independent posts validate status, links, bounded media and safe destinations
+ok 409 - independent posts validate status, links, bounded media and safe destinations
+  ---
+  duration_ms: 18.869778
+  type: 'test'
+  ...
+# Subtest: video requires private owner path, a separate poster, known duration and format
+ok 410 - video requires private owner path, a separate poster, known duration and format
+  ---
+  duration_ms: 5.706103
+  type: 'test'
+  ...
+# Subtest: eligibility removes archived, future, expired and unavailable catalog links
+ok 411 - eligibility removes archived, future, expired and unavailable catalog links
+  ---
+  duration_ms: 1.006725
+  type: 'test'
+  ...
+# Subtest: generation uses registered photos, stable identities, real descriptions and no variable prices
+ok 412 - generation uses registered photos, stable identities, real descriptions and no variable prices
+  ---
+  duration_ms: 8.558877
+  type: 'test'
+  ...
+# Subtest: automation settings bound publication frequency and disable categories explicitly
+ok 413 - automation settings bound publication frequency and disable categories explicitly
+  ---
+  duration_ms: 7.061879
+  type: 'test'
+  ...
+# Subtest: signals reject forged payments and invalid identity/time
+ok 414 - signals reject forged payments and invalid identity/time
+  ---
+  duration_ms: 5.714839
+  type: 'test'
+  ...
+# Subtest: funnel deduplicates view IDs and derives paid reservations from finance, not browser
+ok 415 - funnel deduplicates view IDs and derives paid reservations from finance, not browser
+  ---
+  duration_ms: 1.413533
+  type: 'test'
+  ...
+# Subtest: server attribution requires matching recent view and is optional to checkout
+ok 416 - server attribution requires matching recent view and is optional to checkout
+  ---
+  duration_ms: 3.616966
+  type: 'test'
+  ...
+# Subtest: recommendation uses explicit interest/declarations, diversifies and never uses dwell time
+ok 417 - recommendation uses explicit interest/declarations, diversifies and never uses dwell time
+  ---
+  duration_ms: 245.69565
+  type: 'test'
+  ...
+# Subtest: mobile publication preserves a single main action, reading pauses and explicit navigation
+ok 418 - mobile publication preserves a single main action, reading pauses and explicit navigation
+  ---
+  duration_ms: 352.365295
+  type: 'test'
+  ...
+# Subtest: signals persist a view through reload, exclude pause/hidden time, retry idempotent events
+ok 419 - signals persist a view through reload, exclude pause/hidden time, retry idempotent events
+  ---
+  duration_ms: 52.524718
+  type: 'test'
+  ...
+# Subtest: privacy opt-out blocks viewer telemetry
+ok 420 - privacy opt-out blocks viewer telemetry
+  ---
+  duration_ms: 34.25016
+  type: 'test'
+  ...
+# Subtest: sharing an independent publication pauses the scene and preserves its unique link
+ok 421 - sharing an independent publication pauses the scene and preserves its unique link
+  ---
+  duration_ms: 292.684544
+  type: 'test'
+  ...
+# Subtest: old showcase cards still open the exact offer dates after publications are loaded
+ok 422 - old showcase cards still open the exact offer dates after publications are loaded
+  ---
+  duration_ms: 459.69457
+  type: 'test'
+  ...
+# Subtest: empty feed exposes the existing site and dates instead of a blank screen
+ok 423 - empty feed exposes the existing site and dates instead of a blank screen
+  ---
+  duration_ms: 60.382991
+  type: 'test'
+  ...
+# Subtest: video metadata cannot omit duration/size or disguise video as a photo
+ok 424 - video metadata cannot omit duration/size or disguise video as a photo
+  ---
+  duration_ms: 1.213724
+  type: 'test'
+  ...
+# Subtest: return restores a lazy photo and scrolling beyond the first reel preserves active tracking
+ok 425 - return restores a lazy photo and scrolling beyond the first reel preserves active tracking
+  ---
+  duration_ms: 146.707652
+  type: 'test'
+  ...
+# Subtest: a shared offer waits for current offer data and opens the same publication on desktop
+ok 426 - a shared offer waits for current offer data and opens the same publication on desktop
+  ---
+  duration_ms: 78.685741
+  type: 'test'
+  ...
+# Subtest: delayed live offers update the current reel counter without resetting playback or reading
+ok 427 - delayed live offers update the current reel counter without resetting playback or reading
+  ---
+  duration_ms: 525.289746
+  type: 'test'
+  ...
+# Subtest: an updated feed immediately enables or disables the next control without rerendering the current post
+ok 428 - an updated feed immediately enables or disables the next control without rerendering the current post
+  ---
+  duration_ms: 253.013612
+  type: 'test'
+  ...
+# Subtest: fixed-date reels open their quoted dates and tariff directly, with or without a package, and show the live total
+ok 429 - fixed-date reels open their quoted dates and tariff directly, with or without a package, and show the live total
+  ---
+  duration_ms: 235.749941
+  type: 'test'
+  ...
+# Subtest: automatic catalog photos with cache versions survive generation and preview validation
+ok 430 - automatic catalog photos with cache versions survive generation and preview validation
+  ---
+  duration_ms: 3.885695
+  type: 'test'
+  ...
+# Not implemented: HTMLMediaElement's play() method
+# Not implemented: HTMLMediaElement's pause() method
+# Not implemented: HTMLMediaElement's pause() method
+# Subtest: Story sharing prepares original video, copies chalet and mention, and shares files on a separate click
+ok 431 - Story sharing prepares original video, copies chalet and mention, and shares files on a separate click
+  ---
+  duration_ms: 153.217849
+  type: 'test'
+  ...
+# Subtest: Story sharing falls back to saving photos without file-share support and retains links on media failure
+ok 432 - Story sharing falls back to saving photos without file-share support and retains links on media failure
+  ---
+  duration_ms: 204.042366
+  type: 'test'
+  ...
+# Subtest: share opens compact destination icons and prepares media only after selecting Instagram
+ok 433 - share opens compact destination icons and prepares media only after selecting Instagram
+  ---
+  duration_ms: 108.836083
+  type: 'test'
+  ...
+# Subtest: review alerts and queue only disclose pending guest posts to authorized approvers
+ok 434 - review alerts and queue only disclose pending guest posts to authorized approvers
+  ---
+  duration_ms: 6.693011
+  type: 'test'
+  ...
+# Subtest: approver sees a live persistent count and direct queue link, errors do not claim zero, logout removes it
+ok 435 - approver sees a live persistent count and direct queue link, errors do not claim zero, logout removes it
+  ---
+  duration_ms: 304.228783
+  type: 'test'
+  ...
+# Subtest: hidden tabs do not poll and guest accounts cannot keep an approver badge after switching identity
+ok 436 - hidden tabs do not poll and guest accounts cannot keep an approver badge after switching identity
+  ---
+  duration_ms: 140.961447
+  type: 'test'
+  ...
+# Subtest: DEV-only service rejects another project before touching the database
+ok 437 - DEV-only service rejects another project before touching the database
+  ---
+  duration_ms: 593.624249
+  type: 'test'
+  ...
+# Subtest: anonymous interactions and guest publication writes require the correct authentication/role
+ok 438 - anonymous interactions and guest publication writes require the correct authentication/role
+  ---
+  duration_ms: 383.790342
+  type: 'test'
+  ...
+# Subtest: public telemetry cannot confirm payment and unauthenticated callers cannot claim a reservation
+ok 439 - public telemetry cannot confirm payment and unauthenticated callers cannot claim a reservation
+  ---
+  duration_ms: 173.735628
+  type: 'test'
+  ...
+# Subtest: production refuses guest publishing and social writes despite DEV header or logged guest
+ok 440 - production refuses guest publishing and social writes despite DEV header or logged guest
+  ---
+  duration_ms: 218.35581
+  type: 'test'
+  ...
+# Subtest: share metadata names the registered property, escapes text and preserves safe dates
+ok 441 - share metadata names the registered property, escapes text and preserves safe dates
+  ---
+  duration_ms: 5.138918
+  type: 'test'
+  ...
+# Subtest: share handler does not publish production or accept unsafe identities
+ok 442 - share handler does not publish production or accept unsafe identities
+  ---
+  duration_ms: 1.285534
+  type: 'test'
+  ...
+# Subtest: reel booking choices validate real dates and tariff, strip prices, and permit accommodation without a package
+ok 443 - reel booking choices validate real dates and tariff, strip prices, and permit accommodation without a package
+  ---
+  duration_ms: 5.599047
+  type: 'test'
+  ...
+# Subtest: read-only stay query returns both complete tariffs and no card until an explicit tariff is chosen
+ok 444 - read-only stay query returns both complete tariffs and no card until an explicit tariff is chosen
+  ---
+  duration_ms: 1.301105
+  type: 'test'
+  ...
+# Subtest: package inclusion and price updates use the booking result without embedding a historical total
+ok 445 - package inclusion and price updates use the booking result without embedding a historical total
+  ---
+  duration_ms: 0.496094
+  type: 'test'
+  ...
+# Subtest: fixed-date posts never fall back to random calendar dates when their stay becomes unavailable
+ok 446 - fixed-date posts never fall back to random calendar dates when their stay becomes unavailable
+  ---
+  duration_ms: 1.342905
+  type: 'test'
+  ...
+# Subtest: publication framing preserves signed translation and rejects nonfinite or excessive offsets
+ok 447 - publication framing preserves signed translation and rejects nonfinite or excessive offsets
+  ---
+  duration_ms: 0.568753
+  type: 'test'
+  ...
+# Subtest: text layers validate bounds, reject CSS injection and retain only public presentation fields
+ok 448 - text layers validate bounds, reject CSS injection and retain only public presentation fields
+  ---
+  duration_ms: 8.316785
+  type: 'test'
+  ...
+# Subtest: avatar crop geometry covers circle, clamps edges, preserves proportions and supports portrait/landscape
+ok 449 - avatar crop geometry covers circle, clamps edges, preserves proportions and supports portrait/landscape
+  ---
+  duration_ms: 107.414127
+  type: 'test'
+  ...
+# Subtest: visitor text is escaped and remains a separate layer from cropped media
+ok 450 - visitor text is escaped and remains a separate layer from cropped media
+  ---
+  duration_ms: 92.29793
+  type: 'test'
+  ...
+# Subtest: inline text begins focused, commits on outside click and never creates a full image panel
+ok 451 - inline text begins focused, commits on outside click and never creates a full image panel
+  ---
+  duration_ms: 172.684763
+  type: 'test'
+  ...
+# Subtest: pinch resizes text and one pointer drags it without bubbling to photo gestures
+ok 452 - pinch resizes text and one pointer drags it without bubbling to photo gestures
+  ---
+  duration_ms: 95.555068
+  type: 'test'
+  ...
+# Subtest: formatting flags survive server validation and the visitor renderer; invalid flags are rejected
+ok 453 - formatting flags survive server validation and the visitor renderer; invalid flags are rejected
+  ---
+  duration_ms: 82.5731
+  type: 'test'
+  ...
+# Subtest: empty text is discarded, pasted markup remains plain text and delete removes the whole block
+ok 454 - empty text is discarded, pasted markup remains plain text and delete removes the whole block
+  ---
+  duration_ms: 52.505805
+  type: 'test'
+  ...
+# Subtest: formatting follows selected words across blur and color controls without touching another box
+ok 455 - formatting follows selected words across blur and color controls without touching another box
+  ---
+  duration_ms: 416.846918
+  type: 'test'
+  ...
+# Subtest: switching boxes clears old word selection and applies style only to the active box
+ok 456 - switching boxes clears old word selection and applies style only to the active box
+  ---
+  duration_ms: 153.850226
+  type: 'test'
+  ...
+# Subtest: editing text rebases selected-word formatting instead of moving it to another word
+ok 457 - editing text rebases selected-word formatting instead of moving it to another word
+  ---
+  duration_ms: 98.964938
+  type: 'test'
+  ...
+# Subtest: server rejects overlapping or malicious ranges and preserves whitespace offsets
+ok 458 - server rejects overlapping or malicious ranges and preserves whitespace offsets
+  ---
+  duration_ms: 0.908904
+  type: 'test'
+  ...
+# Subtest: mixed timeline validates and persists trims, transitions and synchronized sound, while guest ownership stays enforced
+ok 459 - mixed timeline validates and persists trims, transitions and synchronized sound, while guest ownership stays enforced
+  ---
+  duration_ms: 4.997601
+  type: 'test'
+  ...
+# Subtest: invalid timeline edits and arbitrary audio URLs cannot enter saved publications
+ok 460 - invalid timeline edits and arbitrary audio URLs cannot enter saved publications
+  ---
+  duration_ms: 1.865553
+  type: 'test'
+  ...
+# Subtest: legacy publications remain valid and have no generated sound or timeline values
+ok 461 - legacy publications remain valid and have no generated sound or timeline values
+  ---
+  duration_ms: 0.329466
+  type: 'test'
+  ...
+# Subtest: mixed sequence uses displayed seconds after speed and locates every scene across a boundary
+ok 462 - mixed sequence uses displayed seconds after speed and locates every scene across a boundary
+  ---
+  duration_ms: 120.374364
+  type: 'test'
+  ...
+# Subtest: changing speed or photo duration keeps the selected sound inside the shortened scene
+ok 463 - changing speed or photo duration keeps the selected sound inside the shortened scene
+  ---
+  duration_ms: 17.978795
+  type: 'test'
+  ...
+# Subtest: media configuration requires property identity and commercial audio provenance
+ok 464 - media configuration requires property identity and commercial audio provenance
+  ---
+  duration_ms: 6.154788
+  type: 'test'
+  ...
+# Subtest: holiday rules are explicit and celebrations do not masquerade as low demand
+ok 465 - holiday rules are explicit and celebrations do not masquerade as low demand
+  ---
+  duration_ms: 4.369351
+  type: 'test'
+  ...
+# Subtest: interaction writes require validated authentication and never change finance
+ok 466 - interaction writes require validated authentication and never change finance
+  ---
+  duration_ms: 12.586718
+  type: 'test'
+  ...
+# Subtest: reel keeps contract links, escapes comments and cleans lifecycle on close
+ok 467 - reel keeps contract links, escapes comments and cleans lifecycle on close
+  ---
+  duration_ms: 1076.016376
+  type: 'test'
+  ...
+# Subtest: amenity editor preserves custom entries and sends explicit property scope
+ok 468 - amenity editor preserves custom entries and sends explicit property scope
+  ---
+  duration_ms: 532.072397
+  type: 'test'
+  ...
+1..468
+# tests 468
+# suites 0
+# pass 468
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 54978.838457
