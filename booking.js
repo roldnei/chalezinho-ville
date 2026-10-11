@@ -809,6 +809,18 @@ async function continueWhatsApp(){
  }catch(e){state.quote=null;state.rate=null;$('#summary-content').textContent='Consulta indisponível. Consulte novamente antes de continuar.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível reconfirmar os valores e a disponibilidade. Faça uma nova consulta.');}
  finally{whatsappBusy=false;$('#step-next').disabled=!state.rate||(!state.rateConfirmed&&!priceChangePending);}
 }
-async function copyWhatsAppSummary(){if(!whatsappMessage)return;try{await navigator.clipboard.writeText(whatsappMessage);if(await navigator.clipboard.readText()!==whatsappMessage)throw Error('clipboard_unverified');$('#whatsapp-status').textContent='Resumo copiado. Cole no WhatsApp para solicitar a finalização.'}catch{document.querySelector('#whatsapp-manual-copy')?.remove();const field=document.createElement('textarea');field.id='whatsapp-manual-copy';field.className='consultation-summary';field.style.width='100%';field.style.minHeight='220px';field.value=whatsappMessage;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();$('#whatsapp-status').textContent='Selecione e copie o resumo abaixo.'}}
+async function copyWhatsAppSummary(){
+ if(!whatsappMessage)return;
+ const message=whatsappMessage;
+ document.querySelector('#whatsapp-manual-copy')?.remove();
+ const field=document.createElement('textarea');field.id='whatsapp-manual-copy';field.className='consultation-summary';field.style.width='100%';field.style.minHeight='220px';field.value=message;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();
+ $('#whatsapp-status').textContent='Selecione e copie o resumo abaixo. Tentando também a cópia automática…';
+ let timer;
+ try{
+  await Promise.race([(async()=>{await navigator.clipboard.writeText(message);if(await navigator.clipboard.readText()!==message)throw Error('clipboard_unverified')})(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('clipboard_timeout')),1500)})]);
+  if(whatsappMessage===message&&field.isConnected)$('#whatsapp-status').textContent='Resumo copiado. Cole no WhatsApp para solicitar a finalização.';
+ }catch{if(whatsappMessage===message&&field.isConnected)$('#whatsapp-status').textContent='Selecione e copie o resumo abaixo.'}
+ finally{clearTimeout(timer)}
+}
 init();
 })();

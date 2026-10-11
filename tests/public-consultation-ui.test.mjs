@@ -17,6 +17,10 @@ test('reload stores only choices and refreshes the quote before restoring summar
 
 test('clipboard failure provides the exact prepared message for manual copying',async()=>{const f=await fixture();try{f.choose();await f.w.VilleTest.continueWhatsApp();await f.w.VilleTest.copyWhatsAppSummary();const text=f.w.document.querySelector('#whatsapp-manual-copy');assert.ok(text);assert.equal(text.readOnly,true);assert.equal(text.value,new URL(f.w.document.querySelector('#whatsapp-open').href).searchParams.get('text'));assert.doesNotMatch(text.value,/Invalid Date/);assert.match(f.w.document.querySelector('#whatsapp-status').textContent,/Selecione e copie/);}finally{f.w.close()}});
 
+test('pending clipboard permission immediately exposes manual copy and cannot leave stale status after a new quote',async()=>{
+ const f=await fixture();try{f.choose();await f.w.VilleTest.continueWhatsApp();Object.defineProperty(f.w.navigator,'clipboard',{value:{writeText:()=>new Promise(()=>{}),readText:()=>new Promise(()=>{})}});const copying=f.w.VilleTest.copyWhatsAppSummary();assert.ok(f.w.document.querySelector('#whatsapp-manual-copy'));await f.w.VilleTest.continueWhatsApp();assert.equal(f.w.document.querySelector('#whatsapp-manual-copy'),null);await copying;assert.match(f.w.document.querySelector('#whatsapp-status').textContent,/Resumo atualizado/);}finally{f.w.close()}
+});
+
 test('commercial experience requires an explicit condition and clears a prior quote when deselected',async()=>{
  const f=await fixture();try{const {w}=f;const p={id:'romance',name:'Noite Romântica',status:'active',package_type:'romantic',price_cents:49900,description:'Clima e conexão',details:{commercial_pricing:{cash_cents:49900,card_cents:54900,max_installments:4}},experience_variants:[{id:'romance-variant',active:true,price_cents:49900}],experience_media:[{media_url:'assets/experiencia-romance.webp'}],experience_property_eligibility:[{property_id:1}]};
  w.VilleTest.state.config.experience_products=[p];w.VilleTest.renderExperienceList('romantic');
