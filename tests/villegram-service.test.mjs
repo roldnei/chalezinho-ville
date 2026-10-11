@@ -13,3 +13,21 @@ test('DEV-only service rejects another project before touching the database',asy
 test('anonymous interactions and guest publication writes require the correct authentication/role',async()=>{const anon=await handler(),like=await anon.request({operation:'like',publication_id:id,liked:true});assert.equal(like.status,401);assert.equal(anon.writes(),0);const guest=await handler({logged:true}),save=await guest.request({operation:'save',publication:{status:'published'}});assert.equal(save.status,403);assert.equal(guest.writes(),0)});
 test('public telemetry cannot confirm payment and unauthenticated callers cannot claim a reservation',async()=>{const s=await handler();let r=await s.request({operation:'signals',events:[{event_id:id,publication_id:id,visitor_id:id,session_id:id,view_id:id,kind:'payment_confirmed'}]});assert.equal(r.status,400);r=await s.request({operation:'attribute',reservation_id:id});assert.equal(r.status,401);assert.equal(s.writes(),0)});
 test('production refuses guest publishing and social writes despite DEV header or logged guest',async()=>{for(const logged of [false,true]){const s=await handler({project:'https://irxsaladqhbzhkoaclxy.supabase.co',logged});for(const operation of ['guest_save','guest_profile_save','like','comment','follow','moderate','generate_due']){const r=await s.request({operation,feature:true,environment:'development'});assert.equal(r.status,403);assert.equal((await r.json()).error,'feature_not_released');}assert.equal(s.writes(),0)}});
+
+// Exercise the HTTP feed operation with catalog/query fixtures, while retaining
+// the real eligibility rules. Public DEV must permit review of approved moments.
+async function feedHandler(project){
+ let serve;const rows=[
+  {id:'guest',source:'guest_submission',title:'Momento aprovado',status:'published',published_at:'2020-01-01',media:[]},
+  {id:'pending',source:'guest_submission',title:'Ainda em análise',status:'pending_review',published_at:'2020-01-01',media:[]},
+  {id:'team',source:'manual',title:'Conheça os chalés',status:'published',published_at:'2020-01-01',media:[]}
+ ];
+ const db={from(table){let data=table==='villegram_publications'?rows:table==='villegram_automation'?{max_offers:6}:[];return {select(){return this},eq(key,value){if(Array.isArray(data))data=data.filter(r=>r[key]===value);return this},order(){return this},limit(){return this},single(){return this},then(resolve){return Promise.resolve({data,error:null}).then(resolve)}}}};
+ const source=await readFile(new URL('../supabase/functions/villegram-content/index.ts',import.meta.url),'utf8');
+ vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:{},require(name){return name.startsWith('npm:')?{createClient:()=>db}:name.includes('release-policy')?release:name.includes('villegram-publications')?publications:name.includes('villegram-community')?{communityPublic:async(_,posts)=>posts}:name.includes('villegram-stay')?{resolvePublicationStay:async p=>p}:{commentText}},Deno:{env:{get:k=>k==='SUPABASE_URL'?project:'test-key'},serve:fn=>serve=fn},Response,URL,console});
+ return serve(new Request(project+'/functions/v1/villegram-content?operation=public_feed'));
+}
+test('public DEV feed includes approved guest moments; production keeps community closed',async()=>{
+ const devResponse=await feedHandler(dev);assert.equal(devResponse.status,200);assert.deepEqual((await devResponse.json()).publications.map(p=>p.id),['guest','team']);
+ const prodResponse=await feedHandler('https://irxsaladqhbzhkoaclxy.supabase.co');assert.equal(prodResponse.status,200);assert.deepEqual((await prodResponse.json()).publications.map(p=>p.id),['team']);
+});
