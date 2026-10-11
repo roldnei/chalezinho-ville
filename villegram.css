@@ -173,3 +173,20 @@
 /* Storefront dialogs keep navigation clear of the Trip controls and reading sheets. */
 #villegram.vg-with-nav:not(:has(.vg-caption-short)) .vg-controls{bottom:calc(148px + env(safe-area-inset-bottom))}
 #villegram.vg-with-nav:not(:has(.vg-caption-short)) .vg-purchase{bottom:calc(220px + env(safe-area-inset-bottom));max-height:calc(100dvh - 325px)}
+
+/* Automatic escapes use a compact reading card, preserving room for real photos. */
+#villegram.vg-escape .vg-purchase{padding:18px 20px 12px;border-radius:20px 20px 0 0;background:linear-gradient(#17130fb8,#17130fe8);touch-action:pan-y;overscroll-behavior:contain;max-height:calc(100dvh - 265px)}
+#villegram.vg-escape .vg-purchase>:not(details){touch-action:pan-y}
+#villegram.vg-escape .vg-story{margin:0 0 12px}
+#villegram.vg-escape .vg-story h2{font-size:clamp(24px,3vw,30px);line-height:1.2;margin:4px 0}
+#villegram.vg-escape .vg-story small{letter-spacing:.03em;font-size:13px}
+#villegram.vg-escape .vg-escape-dates{font:600 20px/1.3 'DM Sans',sans-serif;margin:0 0 4px}
+#villegram.vg-escape .vg-escape-guests{font-size:13px;color:#e5d5b3;margin:0 0 12px}
+#villegram.vg-escape .vg-price{font-size:32px;line-height:1.2}
+#villegram.vg-escape .vg-escape-total{font-size:12px;line-height:1.5;color:#e5d5b3;margin:3px 0}
+#villegram.vg-escape .vg-escape-condition{font-size:13px;margin:4px 0 8px}
+#villegram.vg-escape summary{font-size:14px;min-height:44px;padding:12px 0}
+#villegram.vg-escape .vg-escape-alternatives{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:5px}
+#villegram.vg-escape .vg-escape-alternatives a{display:flex;align-items:center;font-size:12px;text-underline-offset:3px}
+#villegram.vg-escape details[open]{max-height:35dvh}
+@media(max-width:380px){#villegram.vg-escape .vg-purchase{padding:14px 16px 8px}#villegram.vg-escape .vg-escape-dates{font-size:18px}#villegram.vg-escape .vg-escape-total{max-width:265px}}
