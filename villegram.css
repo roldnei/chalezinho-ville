@@ -174,8 +174,8 @@
 #villegram.vg-with-nav:not(:has(.vg-caption-short)) .vg-controls{bottom:calc(148px + env(safe-area-inset-bottom))}
 #villegram.vg-with-nav:not(:has(.vg-caption-short)) .vg-purchase{bottom:calc(220px + env(safe-area-inset-bottom));max-height:calc(100dvh - 325px)}
 
-/* Automatic escapes use a compact reading card, preserving room for real photos. */
-#villegram.vg-escape .vg-purchase{padding:18px 20px 12px;border-radius:20px 20px 0 0;background:linear-gradient(#17130fb8,#17130fe8);touch-action:pan-y;overscroll-behavior:contain;max-height:calc(100dvh - 265px)}
+/* Escapes keep one readable text flow directly over the real photo. */
+#villegram.vg-escape .vg-purchase{padding:18px 20px 12px;border-radius:0;background:transparent;text-shadow:0 1px 3px #000,0 3px 12px #000b;touch-action:pan-y;overscroll-behavior:contain;max-height:calc(100dvh - 350px)}
 #villegram.vg-escape .vg-purchase>:not(details){touch-action:pan-y}
 #villegram.vg-escape .vg-story{margin:0 0 12px}
 #villegram.vg-escape .vg-story h2{font-size:clamp(24px,3vw,30px);line-height:1.2;margin:4px 0}
@@ -190,3 +190,6 @@
 #villegram.vg-escape .vg-escape-alternatives a{display:flex;align-items:center;font-size:12px;text-underline-offset:3px}
 #villegram.vg-escape details[open]{max-height:35dvh}
 @media(max-width:380px){#villegram.vg-escape .vg-purchase{padding:14px 16px 8px}#villegram.vg-escape .vg-escape-dates{font-size:18px}#villegram.vg-escape .vg-escape-total{max-width:265px}}
+
+#villegram.vg-escape .vg-picture:after{inset:0;background:linear-gradient(180deg,transparent 30%,#0002 60%,#0008 100%)}
+#villegram.vg-escape .vg-story small,#villegram.vg-escape .vg-escape-guests,#villegram.vg-escape .vg-escape-total{color:#fff5e5}
