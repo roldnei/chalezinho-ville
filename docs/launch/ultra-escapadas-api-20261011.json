@@ -1,0 +1,297 @@
+{
+  "checked_at": "2026-10-11T12:47:21.979267+00:00",
+  "real_api_quotes": [
+    {
+      "property": "CH3",
+      "nights": 2,
+      "category": "weekday",
+      "condition": "cash",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 172263,
+      "quote_id": null,
+      "discount_cents": 9067
+    },
+    {
+      "property": "CH3",
+      "nights": 2,
+      "category": "weekday",
+      "condition": "card",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 175113,
+      "quote_id": null,
+      "discount_cents": 9217
+    },
+    {
+      "property": "CH2",
+      "nights": 2,
+      "category": "weekday",
+      "condition": "cash",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 179474,
+      "quote_id": null,
+      "discount_cents": 9446
+    },
+    {
+      "property": "CH2",
+      "nights": 2,
+      "category": "weekday",
+      "condition": "card",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 182324,
+      "quote_id": null,
+      "discount_cents": 9596
+    },
+    {
+      "property": "CH1",
+      "nights": 2,
+      "category": "weekday",
+      "condition": "cash",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 183435,
+      "quote_id": null,
+      "discount_cents": 9655
+    },
+    {
+      "property": "CH1",
+      "nights": 2,
+      "category": "weekday",
+      "condition": "card",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-21",
+      "total_cents": 186285,
+      "quote_id": null,
+      "discount_cents": 9805
+    },
+    {
+      "property": "CH3",
+      "nights": 3,
+      "category": "weekday",
+      "condition": "cash",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-22",
+      "total_cents": 229320,
+      "quote_id": null,
+      "discount_cents": 12070
+    },
+    {
+      "property": "CH2",
+      "nights": 3,
+      "category": "weekday",
+      "condition": "cash",
+      "check_in": "2026-10-26",
+      "check_out": "2026-10-29",
+      "total_cents": 231828,
+      "quote_id": null,
+      "discount_cents": 12202
+    },
+    {
+      "property": "CH3",
+      "nights": 3,
+      "category": "weekday",
+      "condition": "card",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-22",
+      "total_cents": 232170,
+      "quote_id": null,
+      "discount_cents": 12220
+    },
+    {
+      "property": "CH2",
+      "nights": 3,
+      "category": "weekday",
+      "condition": "card",
+      "check_in": "2026-10-26",
+      "check_out": "2026-10-29",
+      "total_cents": 234678,
+      "quote_id": null,
+      "discount_cents": 12352
+    },
+    {
+      "property": "CH1",
+      "nights": 3,
+      "category": "weekday",
+      "condition": "cash",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-22",
+      "total_cents": 253868,
+      "quote_id": null,
+      "discount_cents": 13362
+    },
+    {
+      "property": "CH1",
+      "nights": 3,
+      "category": "weekday",
+      "condition": "card",
+      "check_in": "2026-10-19",
+      "check_out": "2026-10-22",
+      "total_cents": 256718,
+      "quote_id": null,
+      "discount_cents": 13512
+    },
+    {
+      "property": "CH1",
+      "nights": 2,
+      "category": "celebration",
+      "condition": "cash",
+      "check_in": "2026-10-24",
+      "check_out": "2026-10-26",
+      "total_cents": 218500,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH1",
+      "nights": 2,
+      "category": "celebration",
+      "condition": "card",
+      "check_in": "2026-10-24",
+      "check_out": "2026-10-26",
+      "total_cents": 221500,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH3",
+      "nights": 2,
+      "category": "celebration",
+      "condition": "cash",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 222250,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH3",
+      "nights": 2,
+      "category": "celebration",
+      "condition": "card",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 225250,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH2",
+      "nights": 2,
+      "category": "celebration",
+      "condition": "cash",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 226870,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH2",
+      "nights": 2,
+      "category": "celebration",
+      "condition": "card",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-19",
+      "total_cents": 229870,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH3",
+      "nights": 3,
+      "category": "celebration",
+      "condition": "cash",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-20",
+      "total_cents": 271970,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH3",
+      "nights": 3,
+      "category": "celebration",
+      "condition": "card",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-20",
+      "total_cents": 274970,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH1",
+      "nights": 3,
+      "category": "celebration",
+      "condition": "cash",
+      "check_in": "2026-10-24",
+      "check_out": "2026-10-27",
+      "total_cents": 278120,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH2",
+      "nights": 3,
+      "category": "celebration",
+      "condition": "cash",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-20",
+      "total_cents": 280000,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH1",
+      "nights": 3,
+      "category": "celebration",
+      "condition": "card",
+      "check_in": "2026-10-24",
+      "check_out": "2026-10-27",
+      "total_cents": 281120,
+      "quote_id": null,
+      "discount_cents": 0
+    },
+    {
+      "property": "CH2",
+      "nights": 3,
+      "category": "celebration",
+      "condition": "card",
+      "check_in": "2026-10-17",
+      "check_out": "2026-10-20",
+      "total_cents": 283000,
+      "quote_id": null,
+      "discount_cents": 0
+    }
+  ],
+  "negative_cases": {
+    "past": {
+      "status": 400,
+      "error": "offer_expired"
+    },
+    "out_window": {
+      "status": 400,
+      "error": "offer_period"
+    },
+    "one_night": {
+      "status": 400,
+      "error": "offer_duration"
+    },
+    "payment": {
+      "status": 403,
+      "error": "consultation_operation_not_allowed"
+    },
+    "hold": {
+      "status": 403,
+      "error": "consultation_operation_not_allowed"
+    },
+    "moments_refresh": {
+      "status": 200,
+      "total_cents": 172263
+    }
+  },
+  "window_start": "2026-10-12",
+  "window_end": "2026-11-01"
+}

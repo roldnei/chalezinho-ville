@@ -27,6 +27,7 @@ export function isCelebration(start:string,end:string,settings:Row={}){for(let d
 function shift(date: string, n: number) {
   const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
 }
+function weekendArrival(date:string){return [5,6].includes(new Date(date+'T12:00:00Z').getUTCDay())}
 export function weekdayWindows(today: string, settings: Row, offer: Row) {
   const result: {check_in: string; check_out: string; nights: number}[] = [];
   for (let offset = 1; offset <= settings.horizon_days; offset++) {
@@ -65,7 +66,7 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
       }
     }
     // Check backup windows too: an inexpensive date can have no preparation capacity.
-    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 2));
+    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||Number(weekendArrival(b.check_in))-Number(weekendArrival(a.check_in))||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 2));
   }
   const cards: Row[] = [];
   const bounded = candidates.slice(0, 60);

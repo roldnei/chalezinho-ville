@@ -60,3 +60,11 @@ test('first visit reserves storefront space and consumes the early request witho
   assert.equal(w.document.querySelector('.showcase-track').getAttribute('aria-busy'),'false');assert.equal(w.document.querySelectorAll('.showcase-placeholder').length,0);
  }finally{w.close()}
 });
+
+test('weekend suggestions prioritize Friday or Saturday arrivals over cheap Sunday spillovers',async()=>{
+ const offer={id:'weekend',name:'Escapada',status:'active',min_nights:2,property_ids:[1],showcase:{enabled:true,nights:[2,3],horizon_days:21,celebrations:true}};
+ const result=await weekdayShowcase({today:'2026-10-11',catalog:async()=>({offers:[offer],products:[]}),sources:async()=>({}),search:async(start)=>[{id:1,code:'CH1',available:true,base_price:new Date(start+'T12:00:00Z').getUTCDay()===0?1:200}],quote:async()=>({rate_options:[{selectable:true,code:'non_refundable',name:'Não reembolsável',total_amount_cents:123456,contract_snapshot:{gross_cents:123456,discount_cents:0}}],experiences:[]})});
+ const weekends=result.cards.filter(c=>c.category==='celebration');assert.ok(weekends.length);
+ assert.ok(weekends.every(c=>[5,6].includes(new Date(c.check_in+'T12:00:00Z').getUTCDay())));
+ assert.deepEqual(new Set(weekends.map(c=>c.nights)),new Set([2,3]));
+});
