@@ -1206,7 +1206,7 @@ async function modificationAction(req:Request,body:any,development:boolean){
 async function opsData(req:Request){
   const user=await currentUser(req);
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
-  const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}] = await Promise.all([
+  const results = await Promise.all([
     admin.from("modification_requests").select("*,reservations(confirmation_code,check_in,check_out,total_amount,properties(name))").order("created_at",{ascending:false}).limit(50),
     admin.from("guarantees").select("*,reservations(confirmation_code,properties(name)),incidents!incidents_guarantee_id_fkey(*),guarantee_refunds(id,state,requested_cents,confirmed_cents,provider_error_code)").order("created_at",{ascending:false}).limit(50),
     admin.from("payments").select("id,reservation_id,provider,method,installments,amount_cents,status,created_at,reservations(confirmation_code,properties(name))").order("created_at",{ascending:false}).limit(50),
@@ -1216,6 +1216,8 @@ async function opsData(req:Request){
     admin.from("property_integrations").select("property_id,provider,environment_key,external_listing_id,active").order("provider"),
     admin.from("notification_outbox").select("id,template_code,status,send_after,attempt_count,max_attempts,last_error,created_at,reservations(confirmation_code)").order("created_at",{ascending:false}).limit(50)
   ]);
+  if(results.some(result=>result.error))return json({ok:false,error:"ops_data_unavailable"},503);
+  const [{data:mods},{data:guarantees},{data:payments},{data:charges},{data:settings},{data:properties},{data:integrations},{data:notifications}]=results;
   const bookingConfigured=(await calendars.channels("booking")).listings.map((x:any)=>({name:x.name,configured:x.ok}));
   return json({ok:true,modifications:mods||[],guarantees:guarantees||[],payments:payments||[],charges:charges||[],settings:settings||null,properties:properties||[],integrations:integrations||[],booking_configured:bookingConfigured,notifications:notifications||[]});
 }
@@ -1340,7 +1342,7 @@ async function adminReservationAction(req:Request,body:any){
     const guestPhone=String(body?.guest_phone||"").trim().slice(0,50)||null;
     const total=Math.max(0,Number(body?.total_amount||0));
     if(!propertyId||!validDate(checkIn)||!validDate(checkOut)||checkOut<=checkIn||!guestName) return json({ok:false,error:"invalid_reservation"},400);
-    const [{data:property},{data:occupied},{data:changeHolds},{data:blocks},airbnb,booking]=await Promise.all([
+    const [propertyQ,occupiedQ,changeHoldsQ,blocksQ,airbnb,booking]=await Promise.all([
       admin.from("properties").select("id,name,max_guests,cleaning_fee,active").eq("id",propertyId).single(),
       admin.from("reservations").select("id").eq("property_id",propertyId).in("status",["hold","pending_payment","confirmed"]).lt("check_in",checkOut).gt("check_out",checkIn).limit(1),
       admin.from("post_booking_charges").select("id").eq("kind","modification").eq("target_property_id",propertyId).in("status",["awaiting_payment","processing","paid"]).gt("expires_at",new Date().toISOString()).lt("target_check_in",checkOut).gt("target_check_out",checkIn).limit(1),
@@ -1348,6 +1350,8 @@ async function adminReservationAction(req:Request,body:any){
       airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
       bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
     ]);
+    if([propertyQ,occupiedQ,changeHoldsQ,blocksQ].some(result=>result.error))return json({ok:false,error:"availability_unavailable"},503);
+    const property=propertyQ.data,occupied=occupiedQ.data,changeHolds=changeHoldsQ.data,blocks=blocksQ.data;
     if(!property||!property.active) return json({ok:false,error:"property_not_found"},404);
     if(guests>Number(property.max_guests)) return json({ok:false,error:"capacity"},409);
     const externalBlocked=(source:any)=>{
