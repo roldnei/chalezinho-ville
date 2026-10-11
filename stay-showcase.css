@@ -28,7 +28,7 @@
 /* A period is one horizontal slide, with a fixed chalet order inside it. */
 .showcase-period{flex:0 0 390px;min-width:0;scroll-snap-align:start;align-self:flex-start}
 .showcase-period[hidden]{display:none}
-.showcase-period>header{padding:18px 20px;background:#39291d;color:#fff;border-radius:14px 14px 0 0}
+.showcase-period>header{position:static;width:auto;display:block;z-index:auto;padding:18px 20px;background:#39291d;color:#fff;border-radius:14px 14px 0 0}
 .showcase-period>header small{font-size:10px;letter-spacing:.15em;color:#dfc7a9}
 .showcase-period>header h3{font:600 23px/1.3 'DM Sans',sans-serif;margin:6px 0}
 .showcase-period>header p{font-size:12px;margin:0;color:#e8dfd3}
