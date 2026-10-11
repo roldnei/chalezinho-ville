@@ -53,6 +53,7 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
   const horizon = Math.max(...offers.map((o: Row) => showcaseSettings(o.showcase).horizon_days));
   const input = await sources(shift(today, 1), shift(today, horizon + 8));
   const candidates: Row[] = [];
+  const allCandidates: Row[] = [];
   const searches = new Map<string, Promise<Row[]>>();
   const lookup=(start:string,end:string)=>{
     const key=start+':'+end;
@@ -86,14 +87,23 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
         const groupKey = property.id + ':' + window.nights+':'+(window as Row).category;
         const rows = grouped.get(groupKey) || [];
         const reservations=Array.isArray(input)?input[1]?.data||[]:[];const gap=reservations.some((r:Row)=>r.property_id===property.id&&r.status==='confirmed'&&r.check_out===window.check_in)&&reservations.some((r:Row)=>r.property_id===property.id&&r.status==='confirmed'&&r.check_in===window.check_out);
-        rows.push({offer, property,gap, ...window,holiday:holidayStay(window.check_in,window.check_out,settings)}); grouped.set(groupKey, rows);
+        const candidate={offer, property,gap, ...window,holiday:holidayStay(window.check_in,window.check_out,settings)};
+        rows.push(candidate);allCandidates.push(candidate);grouped.set(groupKey, rows);
       }
     }
     // Check backup windows too: an inexpensive date can have no preparation capacity.
     for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||(offer.showcase.duration_mode==='minimum'?Number(b.holiday)-Number(a.holiday):0)||Number(weekendArrival(b.check_in))-Number(weekendArrival(a.check_in))||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 2));
   }
   const cards: Row[] = [];
-  const bounded = candidates.slice(0, 60);
+  // Minimum-mode comparisons must quote every eligible chalet in each chosen
+  // period. Per-property curation alone omitted available comparison rows.
+  const periodKey=(c:Row)=>[c.offer.id,c.check_in,c.check_out].join(':');
+  const seeds=candidates.slice(0,60),expanded=new Map<string,Row>();
+  for(const seed of seeds){
+    const peers=seed.offer.showcase.duration_mode==='minimum'?allCandidates.filter(c=>periodKey(c)===periodKey(seed)):[seed];
+    for(const c of peers)expanded.set(periodKey(c)+':'+c.property.id,c);
+  }
+  const bounded=[...expanded.values()].slice(0,60);
   for (let i = 0; i < bounded.length; i += 4) {
     const results = await Promise.all(bounded.slice(i, i + 4).map(async c => {
       try {
@@ -121,11 +131,21 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
   for (const c of cards.sort((a, b) => Number(b.gap)-Number(a.gap)||Number(a.category==='celebration')-Number(b.category==='celebration')||a.total_cents - b.total_cents || a.check_in.localeCompare(b.check_in))) {
     const key=c.property_id+':'+c.offer_id+':'+c.nights+':'+c.category;const rows = groups.get(key) || []; rows.push(c); groups.set(key, rows);
   }
-  const selected: Row[] = [];
+  const selected: Row[] = cards.filter(c=>offers.find((o:Row)=>o.id===c.offer_id)?.showcase.duration_mode==='minimum');
+  for(const [key,rows] of groups)groups.set(key,rows.filter(c=>!selected.includes(c)));
   while (selected.length < 24 && [...groups.values()].some(rows => rows.length)) {
     for (const rows of groups.values()) { if (rows.length && selected.length < 24) selected.push(rows.shift()!); }
   }
   const publicOffers=data.offers.map((o:Row)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products||[],id)])),packages:(data.products||[]).filter((p:Row)=>o.product_ids?.includes(p.id))}));
   const properties=(Array.isArray(input)?input[0]?.data||[]:[]).map((p:Row)=>({id:p.id,code:p.code,name:p.name,cover_image:p.cover_image,gallery:p.gallery||[]}));
-  return {cards: selected,offers:publicOffers,properties, checked_at, horizon_days: horizon,window_start:shift(today,1),window_end:shift(today,horizon)};
+  const period_status:Row[]=[];
+  for(const seed of bounded){
+    if(seed.offer.showcase.duration_mode!=='minimum'||!selected.some(c=>c.offer_id===seed.offer.id&&c.check_in===seed.check_in&&c.check_out===seed.check_out))continue;
+    for(const property of await lookup(seed.check_in,seed.check_out)){
+      if(!seed.offer.property_ids.map(Number).includes(Number(property.id))||selected.some(c=>c.offer_id===seed.offer.id&&c.check_in===seed.check_in&&c.check_out===seed.check_out&&Number(c.property_id)===Number(property.id)))continue;
+      if(period_status.some(s=>s.offer_id===seed.offer.id&&s.check_in===seed.check_in&&s.check_out===seed.check_out&&Number(s.property_id)===Number(property.id)))continue;
+      period_status.push({offer_id:seed.offer.id,check_in:seed.check_in,check_out:seed.check_out,property_id:property.id,property_code:property.code,min_stay:property.min_stay,reason:Number(property.min_stay)>seed.nights?'minimum_stay':property.available?'quote_unavailable':property.unavailable_reason||'unavailable'});
+    }
+  }
+  return {cards: selected,period_status,offers:publicOffers,properties, checked_at, horizon_days: horizon,window_start:shift(today,1),window_end:shift(today,horizon)};
 }

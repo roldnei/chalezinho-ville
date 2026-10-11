@@ -24,3 +24,34 @@
 .showcase-placeholder{flex:0 0 330px;height:680px;background:#fff;border:1px solid #ded5c7;border-radius:14px;overflow:hidden}.showcase-placeholder>div{height:220px;background:#e9e1d7}.showcase-placeholder>span{display:block;height:24px;background:#eee7de;margin:24px;width:70%;border-radius:5px}.showcase-placeholder>span:last-child{height:50px;width:80%}@media(max-width:800px){.showcase-placeholder{flex-basis:calc(100vw - 64px);max-width:350px}}
 
 .showcase-search form{grid-template-columns:1fr 1fr .8fr 1.3fr auto}.showcase-search button:disabled{opacity:.55;cursor:wait}@media(max-width:800px){.showcase-search form{grid-template-columns:1fr 1fr}.showcase-search label:nth-child(3){grid-column:auto}.showcase-search label:nth-child(4),.showcase-search button{grid-column:1/-1}}
+
+/* A period is one horizontal slide, with a fixed chalet order inside it. */
+.showcase-period{flex:0 0 390px;min-width:0;scroll-snap-align:start;align-self:flex-start}
+.showcase-period[hidden]{display:none}
+.showcase-period>header{padding:18px 20px;background:#39291d;color:#fff;border-radius:14px 14px 0 0}
+.showcase-period>header small{font-size:10px;letter-spacing:.15em;color:#dfc7a9}
+.showcase-period>header h3{font:600 23px/1.3 'DM Sans',sans-serif;margin:6px 0}
+.showcase-period>header p{font-size:12px;margin:0;color:#e8dfd3}
+.showcase-period-rows{display:grid;gap:10px;background:#e8ddce;padding:10px;border-radius:0 0 14px 14px}
+.showcase-period .showcase-card,.showcase-unavailable{display:grid;grid-template-columns:104px minmax(0,1fr);gap:10px;padding:12px;min-width:0;max-width:none;border:1px solid #ded5c7;border-radius:10px;background:#fff;color:#30251d}
+.showcase-period .showcase-card[hidden]{display:none}
+.showcase-period .showcase-photo{height:128px;width:104px;border-radius:7px;overflow:hidden}
+.showcase-period .showcase-photo img{object-fit:cover;object-position:50% 75%}
+.showcase-period [data-property=CH1] .showcase-photo img{object-position:50% 60%}
+.showcase-period .showcase-card-copy{padding:0;display:block}
+.showcase-card-copy h4{font:600 18px/1.25 'DM Sans',sans-serif;margin:0;color:#30251d}
+.showcase-period .showcase-price{margin:7px 0 0;gap:3px}
+.showcase-period .showcase-price strong{font-size:23px;color:#30251d}
+.showcase-period .showcase-price>span{font-size:11px;line-height:1.4;color:#695b4e}
+.showcase-row-actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.showcase-period .showcase-row-actions .primary-action,.showcase-period .showcase-row-actions button{display:flex;align-items:center;justify-content:center;min-height:44px;padding:9px 6px;border-radius:7px;font:500 12px/1.3 'DM Sans',sans-serif;text-align:center;text-decoration:none;cursor:pointer}
+.showcase-period .showcase-row-actions .primary-action{background:#39291d;color:#fff}
+.showcase-period .showcase-row-actions .villegram-watch{margin:0;border:1px solid #9b805e;background:transparent;color:#513e29}
+.showcase-period .showcase-row-actions button:disabled{cursor:default;opacity:.55;border:1px solid #b9afa2;background:#e8e2d9;color:#51463b}
+.showcase-period details{grid-column:1/-1;font-size:11px;color:#695b4e}
+.showcase-period summary{font-size:11px;text-decoration:none}
+.showcase-unavailable .showcase-photo{opacity:.65}
+.showcase-unavailable p{font-size:12px;line-height:1.5;color:#695b4e}
+.showcase-unavailable-dates{grid-column:1/-1;color:#513e29;font-size:12px;text-underline-offset:3px}
+@media(max-width:800px){.showcase-period{flex-basis:calc(100vw - 56px);max-width:390px}.showcase-track{gap:12px;scroll-padding-left:0}.showcase-period>header{padding:14px 16px}.showcase-period>header h3{font-size:22px}.showcase-period-rows{padding:8px;gap:8px}.showcase-period .showcase-card,.showcase-unavailable{grid-template-columns:88px minmax(0,1fr);padding:10px;gap:8px}.showcase-period .showcase-photo{width:88px;height:126px}.showcase-card-copy h4{font-size:17px}.showcase-period .showcase-price strong{font-size:21px}.showcase-period .showcase-row-actions .primary-action,.showcase-period .showcase-row-actions button{font-size:11px}}
+@media(prefers-reduced-motion:reduce){.showcase-track{scroll-behavior:auto}}

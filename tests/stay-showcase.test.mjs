@@ -45,6 +45,30 @@ test('paused or unpromoted offers do not trigger external rate queries',async()=
  const result=await weekdayShowcase({today:'2026-10-05',catalog:async()=>({offers:[{status:'paused',showcase:{enabled:true}},{status:'active',showcase:{enabled:false}}]}),sources:()=>{throw Error('unexpected')}});
  assert.deepEqual(result.cards,[]);
 });
+
+test('minimum showcase completes each chosen period with available peers instead of hiding a more expensive chalet',async()=>{
+ const offer={id:'compare',name:'Hospedagem',status:'active',product_ids:[],property_ids:[1,2,3],min_nights:2,max_nights:7,showcase:{enabled:true,nights:[2],horizon_days:21,celebrations:true,duration_mode:'minimum'}};
+ const result=await weekdayShowcase({today:'2026-10-11',catalog:async()=>({offers:[offer],products:[]}),sources:async()=>({}),search:async(start)=>[1,2,3].map(id=>({id,code:'CH'+id,available:!(id===2&&start==='2026-10-12'),min_stay:2,base_price:(Number(start.slice(-2))+id)%5*100})),quote:async(body)=>({rate_options:[{selectable:true,code:'non_refundable',name:'Não reembolsável',total_amount_cents:10000+body.property_id,contract_snapshot:{gross_cents:10000+body.property_id,discount_cents:0}}],experiences:[]})});
+ for(const c of result.cards)assert.deepEqual(result.cards.filter(p=>p.check_in===c.check_in&&p.check_out===c.check_out).map(p=>p.property_id).sort(),c.check_in==='2026-10-12'?[1,3]:[1,2,3]);
+ assert.ok(result.period_status.some(s=>s.property_id===2&&s.check_in==='2026-10-12'&&s.reason==='unavailable'));
+});
+
+test('period columns keep chalet order, unique dates, accurate links and facility photos; missing rows cannot be booked',async()=>{
+ const dom=new JSDOM('<main><section class="hero"></section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;
+ try{
+  const properties=[1,2,3].map(id=>({id,code:'CH'+id,name:['Ville Signature','Ville Essenza','Ville Amore'][id-1]}));
+  const make=(id,start,end,nights)=>({property_id:id,property_code:'CH'+id,property_name:properties[id-1].name,offer_id:'stay',offer_name:'Hospedagem e limpeza',check_in:start,check_out:end,nights,guests:2,rate_code:'non_refundable',rate_name:'Não reembolsável',total_cents:100000+id,experiences:[]});
+  const cards=[make(3,'2026-10-17','2026-10-19',2),make(1,'2026-10-17','2026-10-19',2),make(2,'2026-10-17','2026-10-19',2),make(3,'2026-10-18','2026-10-21',3)];
+  let opened;w.Villegram={configure:()=>{},open:c=>opened=c};w.VilleOffers={esc:s=>String(s??''),label:c=>c.name};w.CHALEZINHO_CONFIG={bookingEngine:'https://qa.example/engine',environment:'development'};w.HTMLElement.prototype.scrollTo=()=>{};
+  w.fetch=async()=>({ok:true,json:async()=>({ok:true,cards,properties,offers:[],checked_at:new Date().toISOString(),period_status:[{property_code:'CH1',check_in:'2026-10-18',check_out:'2026-10-21',reason:'minimum_stay',min_stay:4}]})});
+  w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([]);
+  const doc=w.document,columns=[...doc.querySelectorAll('.showcase-period')];assert.equal(columns.length,2);
+  assert.deepEqual([...columns[0].querySelectorAll('[data-property]')].map(e=>e.dataset.property),['CH1','CH2','CH3']);
+  for(const row of columns[0].querySelectorAll('.showcase-card')){const query=new URL(row.querySelector('a').href).searchParams;assert.equal(query.get('chalet'),row.dataset.property);assert.equal(query.get('check_in'),'2026-10-17');assert.equal(query.get('check_out'),'2026-10-19');row.querySelector('[data-villegram]').click();assert.equal(opened.property_code,row.dataset.property);assert.equal(opened.check_in,'2026-10-17');assert.match(row.querySelector('img').src,/piscina|banheira/)}
+  assert.match(columns[1].textContent,/Mínimo de 4 noites/);assert.equal(columns[1].querySelectorAll('.showcase-unavailable button:disabled').length,4);assert.equal(columns[1].querySelectorAll('.showcase-unavailable .primary-action').length,0);
+  doc.querySelector('[data-nights="2"]').click();assert.equal(columns[1].hidden,true);assert.equal(columns[0].hidden,false);
+ }finally{w.close()}
+});
 test('concurrent home queries share a short cache and catalog edits invalidate it',async()=>{
  let calls=0,version=1;
  const deps={today:'2031-04-01',catalog:async()=>({offers:[{id:'cached-offer',updated_at:version,status:'active',min_nights:1,property_ids:[1],showcase:{enabled:true,nights:[2],horizon_days:14}}],products:[]}),sources:async()=>{calls++;return{}},search:async()=>[],quote:async()=>{throw Error('unexpected')}};
