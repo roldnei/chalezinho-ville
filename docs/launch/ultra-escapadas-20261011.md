@@ -2,6 +2,8 @@
 
 Executado somente no DEV `pxfqmnhqodqyaaqeyjgr`, branch `feature/staged-whatsapp-launch`. PROD `irxsaladqhbzhkoaclxy` consultado apenas para confirmar taxas comerciais. Vercel `prj_qXld7h9Z3I7mV9mZKuXJ4yQ1j3dc`, equipe `team_YfhCyXyWKAtieREJ6eXj3szW`. Nenhuma publicação, promoção ou alteração de produção.
 
+Prévia READY verificada: https://chalezinho-ville-ck9fg1un6-roldneicosta-4140.vercel.app/index.html?view=site — commit de implementação `d347771e72618609855501e4245878615ee94775`, deployment `dpl_2cCfGQEdaeiE3dtBc4LndGfLnFDJ`. Edge DEV booking-engine v65.
+
 ## Comercial e geração
 
 Duas configurações ativas: **Escapada Ultra Premium · à vista** e **Escapada Ultra Premium · cartão**, com a mesma composição aprovada (pétalas/ambientação, frutas, escolha Vinho/Espumante e queijos). Experiência R$539 à vista ou R$569 no cartão, até 4x sem juros. O parcelamento anunciado pertence à experiência; hospedagem é consultada no atendimento.
@@ -25,6 +27,7 @@ Para escapadas cadastradas com início/fim fixos, `end_date` significa última s
 - API real recusou entrada passada, fora de 21 dias, duração de uma noite, operações de pagamento e hold. Atualização de oferta compartilhada pelo Ville Moments conferiu o mesmo total.
 - SQL DEV real: oferta transacional com última entrada ontem foi pausada, com auditoria. ROLLBACK removeu integralmente o cadastro e evento de teste. `anon` sem EXECUTE da rotina privada.
 - Chrome remoto real: home carregou os 24 cards, condições explícitas e filtros 2/3 noites. Entrada da vitrine chegou à revisão Amore 19–21/10, com ambas tarifas desmarcadas. Seleção explícita de Não reembolsável exibiu total R$1.722,63: hospedagem R$982,30 + limpeza R$292 + Ultra R$539 - desconto R$90,67. Escolha de bebida encontrou proteção de credenciais do navegador, que continuou restringindo observação após recarregar. **Não declarar a jornada visual completa de WhatsApp homologada nesta atualização.** Mensagem/resumo, reconsulta e invalidação têm evidência JSDOM; preços têm evidência de API real.
+- Inspeção móvel em Chrome remoto, iframe real 390 × 844: Ville Moments carregou fotos reais e as quatro opções inferiores. `documentWidth` e viewport ambos 390, sem overflow horizontal. A inspeção desse quadro foi de apresentação/navegação, não representa conclusão da compra/WhatsApp em celular. Capturas em `evidence/ultra-escapadas-vitrine-20261011.jpg` e `evidence/ultra-escapadas-mobile-20261011.jpg`.
 - Nenhum teste enviou mensagem real, criou pagamento ou reserva. Nenhum aparelho físico utilizado.
 - PMS: configuração e status persistidos conferidos via SQL/API, catálogo público conferido e pausa automática testada. Nova condição cash/card tem campo no editor e validação do servidor; roundtrip autenticado visual desse novo campo permanece pendente. Testes históricos do PMS continuam em `staged-whatsapp-20261011.md`.
 
