@@ -1,4 +1,4 @@
-import {commercialPricing,experienceCommercial} from '../_shared/experience-commercial.ts';
+import {commercialPricing,experienceCommercial,offerExperiencePreferences} from '../_shared/experience-commercial.ts';
 import {consultationActions,launchAdminActions,releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {villegramStayQuote} from '../_shared/villegram-stay.ts';
 import {isCelebration} from "../_shared/stay-showcase.ts";
@@ -351,7 +351,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
       const included=offer?.product_ids.includes(prod.id)||false;
       if(!included&&prod.details?.standalone_enabled===false)throw Error("experience_not_sold_separately");
       for(const c of experienceComponents(prod.details)){const key=c.name.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();if(seenComponents.has(key))throw Error("experience_component_conflict");seenComponents.add(key)}
-      const preferences=body.experience_preferences?.[prod.id]||{},condition=experienceCommercial(prod,preferences);
+      const preferences=offerExperiencePreferences(offer,prod,body.experience_preferences?.[prod.id]||{}),condition=experienceCommercial(prod,preferences);
       const variant={...v,price_cents:condition?.price_cents??v.price_cents};
       experienceTotal+=Number(variant.price_cents||0);
       expSnapshots.push({variant,product:prod,included,composition:{...compositionSnapshot({...prod,price_cents:variant.price_cents},preferences),...(condition?{commercial_condition:condition}: {})}});
@@ -2153,7 +2153,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
        const q=await createQuote({property_id:property.id,check_in:body.check_in,check_out:body.check_out,guests:2,stay_offer_id:offer.id},development,null,null,list,false,data);
        const rate=q.rate_options.filter((r:any)=>r.selectable).sort((a:any,b:any)=>a.total_amount_cents-b.total_amount_cents)[0];
        if(!rate)return json({ok:false,error:'quote_unavailable'},409);
-       return json({ok:true,card:{offer_id:offer.id,offer_name:offer.name,property_id:property.id,property_code:property.code,property_name:property.name,image:offer.villegram?.photos?.find((p:any)=>p.property_id===property.id)?.url||property.cover_image,check_in:body.check_in,check_out:body.check_out,nights:nights(body.check_in,body.check_out),guests:2,rate_code:rate.code,rate_name:rate.name,total_cents:rate.total_amount_cents,gross_cents:rate.contract_snapshot.gross_cents,discount_cents:rate.contract_snapshot.discount_cents,experiences:q.experiences.map((p:any)=>p.composition),category:isCelebration(body.check_in,body.check_out,offer.showcase)?'celebration':'weekday'}});
+       return json({ok:true,card:{offer_id:offer.id,offer_name:offer.name,property_id:property.id,property_code:property.code,property_name:property.name,image:offer.villegram?.photos?.find((p:any)=>p.property_id===property.id)?.url||property.cover_image,check_in:body.check_in,check_out:body.check_out,nights:nights(body.check_in,body.check_out),guests:2,rate_code:rate.code,rate_name:rate.name,total_cents:rate.total_amount_cents,gross_cents:rate.contract_snapshot.gross_cents,discount_cents:rate.contract_snapshot.discount_cents,experiences:q.experiences.map((p:any)=>p.composition),commercial_condition:q.experiences.find((p:any)=>p.composition?.commercial_condition)?.composition.commercial_condition||null,category:isCelebration(body.check_in,body.check_out,offer.showcase)?'celebration':'weekday'}});
       }catch{return json({ok:false,error:'offer_unavailable'},409)}
     }
     if(action==="stay_showcase"){

@@ -19,7 +19,9 @@ export function showcaseSettings(input: Row = {}) {
   if (!nights.length || nights.length > 4 || nights.some(n => !Number.isInteger(n) || n < 1 || n > 7)
     || !Number.isInteger(horizon_days) || horizon_days < 14 || horizon_days > 90) throw Error('invalid_showcase');
   const holidays=Array.isArray(input.holidays)?input.holidays:[];if(holidays.length>100||holidays.some((d:any)=>typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw Error('invalid_showcase');
-  return {enabled: input.enabled === true, nights, horizon_days,celebrations:input.celebrations===true,celebration_discount:input.celebration_discount===true,holidays};
+  const condition=input.commercial_condition||null;
+  if(condition&&!['cash','card'].includes(condition))throw Error('invalid_showcase');
+  return {enabled: input.enabled === true, nights, horizon_days,celebrations:input.celebrations===true,celebration_discount:input.celebration_discount===true,holidays,...(condition?{commercial_condition:condition}:{})};
 }
 export function isCelebration(start:string,end:string,settings:Row={}){for(let d=start;d<end;d=shift(d,1)){const day=new Date(d+'T12:00:00Z').getUTCDay();if(day<1||day>4||nationalHolidays2026.includes(d)||settings.holidays?.includes(d))return true}return false}
 function shift(date: string, n: number) {
@@ -81,7 +83,8 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
           check_in: c.check_in, check_out: c.check_out, nights: c.nights, guests: 2,
           rate_code: rate.code, rate_name: rate.name, total_cents: rate.total_amount_cents,
           gross_cents: rate.contract_snapshot.gross_cents, discount_cents: rate.contract_snapshot.discount_cents,
-          experiences: q.experiences.map((p: Row) => p.composition), cancellation_policy: rate.cancellation_policy};
+          experiences: q.experiences.map((p: Row) => p.composition), cancellation_policy: rate.cancellation_policy,
+          commercial_condition:q.experiences.find((p:Row)=>p.composition?.commercial_condition)?.composition.commercial_condition||null};
       } catch { return null; }
     }));
     cards.push(...results.filter(Boolean));
@@ -92,10 +95,10 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
     const key=c.property_id+':'+c.offer_id+':'+c.nights+':'+c.category;const rows = groups.get(key) || []; rows.push(c); groups.set(key, rows);
   }
   const selected: Row[] = [];
-  while (selected.length < 18 && [...groups.values()].some(rows => rows.length)) {
-    for (const rows of groups.values()) { if (rows.length && selected.length < 18) selected.push(rows.shift()!); }
+  while (selected.length < 24 && [...groups.values()].some(rows => rows.length)) {
+    for (const rows of groups.values()) { if (rows.length && selected.length < 24) selected.push(rows.shift()!); }
   }
   const publicOffers=data.offers.map((o:Row)=>({...o,issues_by_property:Object.fromEntries(o.property_ids.map((id:number)=>[id,offerIssues(o,data.products||[],id)])),packages:(data.products||[]).filter((p:Row)=>o.product_ids?.includes(p.id))}));
   const properties=(Array.isArray(input)?input[0]?.data||[]:[]).map((p:Row)=>({id:p.id,code:p.code,name:p.name,cover_image:p.cover_image,gallery:p.gallery||[]}));
-  return {cards: selected,offers:publicOffers,properties, checked_at, horizon_days: horizon};
+  return {cards: selected,offers:publicOffers,properties, checked_at, horizon_days: horizon,window_start:shift(today,1),window_end:shift(today,horizon)};
 }

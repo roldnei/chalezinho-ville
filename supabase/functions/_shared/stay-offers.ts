@@ -1,7 +1,12 @@
 import {validateVillegram} from "./villegram.ts";
 import {showcaseSettings} from "./stay-showcase.ts";
+import {brazilClock,shiftDate} from './availability.ts';
 type Row = Record<string, any>;
 const fail = (code: string): never => {throw new Error(code)};
+/** end_date is the last checkout; a dated offer expires after its last possible check-in. */
+export function offerExpired(offer:Row,today=brazilClock().date){
+ return !!offer.end_date&&shiftDate(offer.end_date,-Number(offer.min_nights||1))<today;
+}
 export function experienceComponents(details: Row = {}) {
   const raw = details.components ?? (details.includes || []).map((name: string) => ({name, quantity: 1, frequency: 'arrival'}));
   if (!Array.isArray(raw) || raw.length > 60) fail('invalid_components');
@@ -33,11 +38,15 @@ export function validateStayOffer(input: Row) {
 export function offerIssues(offer: Row, products: Row[], propertyId?: number, dates?: {check_in:string;check_out:string}, now=Date.now()) {
   const issues: string[]=[];
   if(offer.status!=='active')issues.push('offer_paused');
+  const today=brazilClock(new Date(now)).date;
+  if(offerExpired(offer,today))issues.push('offer_expired');
   if(propertyId&&!offer.property_ids?.map(Number).includes(propertyId))issues.push('offer_property_incompatible');
   if(dates){
     const nights=Math.round((Date.parse(dates.check_out+'T12:00:00Z')-Date.parse(dates.check_in+'T12:00:00Z'))/86400000);
     if(nights<offer.min_nights||offer.max_nights&&nights>offer.max_nights)issues.push('offer_duration');
     if(offer.start_date&&dates.check_in<offer.start_date||offer.end_date&&dates.check_out>offer.end_date)issues.push('offer_period');
+    if(dates.check_in<today)issues.push('offer_expired');
+    if(offer.showcase?.enabled&&dates.check_in>shiftDate(today,showcaseSettings(offer.showcase).horizon_days))issues.push('offer_period');
   }
   const categories=new Set(),components=new Set();
   for(const id of offer.product_ids||[]){
@@ -47,6 +56,7 @@ export function offerIssues(offer: Row, products: Row[], propertyId?: number, da
     if(!experienceComponents(p.details).length)issues.push('package_components_required');
     if(!p.experience_variants?.some((v:Row)=>v.active))issues.push('package_unavailable');
     if(p.details?.offer_enabled===false)issues.push('package_not_for_offers');
+    if(p.details?.commercial_pricing&&!offer.showcase?.commercial_condition)issues.push('commercial_condition_required');
     if(propertyId&&!p.experience_property_eligibility?.some(x=>Number(x.property_id)===propertyId))issues.push('package_property_incompatible');
     if(p.inventory!=null&&p.inventory<1)issues.push('package_out_of_stock');
     // Exact lead time uses the property check-in time and timezone in experience_sale_issue.

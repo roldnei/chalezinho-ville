@@ -40,7 +40,7 @@ test('home renders dated price cards and duration filters; links carry explicit 
   const doc=w.document;assert.equal(doc.querySelector('.trust-strip').nextElementSibling.id,'estadias-completas');assert.equal(doc.querySelectorAll('.showcase-card').length,2);assert.equal(doc.querySelector('[name=guests]').value,'2');assert.ok(doc.querySelector('[name=purpose]'));assert.equal(doc.querySelector('[name=stay_offer]'),null);
   const q=new URL(doc.querySelector('.showcase-card a').href).searchParams;assert.equal(q.get('stay_offer'),'offer');assert.equal(q.get('check_in'),'2026-10-13');assert.equal(q.get('rate'),'non_refundable');assert.match(doc.querySelector('.showcase-price').textContent,/1.234,56/);
   doc.querySelector('.showcase-filters [data-nights="2"]').click();assert.equal(doc.querySelector('.showcase-card[data-nights="3"]').hidden,true);
-  assert.match(doc.querySelector('.showcase-price-note').textContent,/preços dos pacotes ainda são de teste/);
+  assert.match(doc.querySelector('.showcase-price-note').textContent,/Valores consultados no catálogo/);
  }finally{dom.window.close()}
 });
 test('storefront preview never persists quote rows or enables payments',async()=>{

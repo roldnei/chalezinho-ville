@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {commercialPricing,experienceCommercial} from '../supabase/functions/_shared/experience-commercial.ts';
+import {commercialPricing,experienceCommercial,offerExperiencePreferences} from '../supabase/functions/_shared/experience-commercial.ts';
 import {priceStayOffer} from '../supabase/functions/_shared/stay-offers.ts';
 test('commercial prices come only from the server catalog; a condition is required',()=>{
  for(const [cash,card] of [[49900,54900],[53900,56900]]){
@@ -16,4 +16,14 @@ test('commercial prices come only from the server catalog; a condition is requir
 });
 test('invalid commercial setup cannot be saved or priced',()=>{
  for(const value of [{cash_cents:0,card_cents:54900,max_installments:4},{cash_cents:49900,card_cents:1,max_installments:4},{cash_cents:49900,card_cents:54900,max_installments:13}])assert.throws(()=>commercialPricing(value),/invalid_commercial_pricing/);
+});
+
+test('named escape fixes cash/card server condition and refuses browser substitution',()=>{
+ const p={id:'ultra',details:{commercial_pricing:{cash_cents:53900,card_cents:56900,max_installments:4}}};
+ for(const code of ['cash','card']){
+  const offer={product_ids:['ultra'],showcase:{commercial_condition:code}};
+  const prefs=offerExperiencePreferences(offer,p,{Bebida:'Vinho',price_cents:1});
+  assert.equal(prefs.Bebida,'Vinho');assert.equal(experienceCommercial(p,prefs).price_cents,code==='cash'?53900:56900);
+  assert.throws(()=>offerExperiencePreferences(offer,p,{_commercial_condition:code==='cash'?'card':'cash'}),/commercial_condition_mismatch/);
+ }
 });
