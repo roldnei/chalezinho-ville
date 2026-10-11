@@ -1,0 +1,29 @@
+✔ minimum storefront extends holidays, rechecks new nights and keeps one duration per arrival (33.633181ms)
+✔ minimum duration respects offer ceiling, extended-stay rules and unavailable calendars (2.231131ms)
+✔ weekday storefront obeys offer durations, periods and excludes every weekend night (1.229303ms)
+✔ storefront checks service feasibility, keeps both durations, and uses final server quote (5.191229ms)
+✔ paused or unpromoted offers do not trigger external rate queries (0.588516ms)
+✔ minimum showcase completes each chosen period with available peers instead of hiding a more expensive chalet (3.900323ms)
+✔ period columns keep chalet order, unique dates, accurate links and facility photos; unavailable chalets are omitted and remaining rows fill the column (231.662339ms)
+✔ concurrent home queries share a short cache and catalog edits invalidate it (1.902176ms)
+✔ home renders dated price cards and duration filters; links carry explicit offer and dates (70.105638ms)
+✔ storefront preview never persists quote rows or enables payments (17.321168ms)
+✔ first visit reserves storefront space and consumes the early request without a second fetch (51.885148ms)
+✔ weekend suggestions prioritize Friday or Saturday arrivals over cheap Sunday spillovers (3.670763ms)
+✔ every showcase escape joins the initial feed without a click: offers-first (2068.997819ms)
+✔ every showcase escape joins the initial feed without a click: publications-first (1626.541338ms)
+✔ same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh (365.07344ms)
+✔ following feed remains limited to followed publications (142.147595ms)
+✔ private composer previews retain the saved immersive headline (96.473591ms)
+✔ media configuration requires property identity and commercial audio provenance (4.160704ms)
+✔ holiday rules are explicit and celebrations do not masquerade as low demand (3.029269ms)
+✔ interaction writes require validated authentication and never change finance (4.541359ms)
+✔ reel keeps contract links, escapes comments and cleans lifecycle on close (563.783751ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6201.176273
