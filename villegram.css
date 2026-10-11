@@ -195,6 +195,7 @@
 #villegram.vg-escape .vg-story small,#villegram.vg-escape .vg-escape-guests,#villegram.vg-escape .vg-escape-total{color:#fff5e5}
 
 /* More space between the offer's identity, stay, price and actions. */
+#villegram.vg-escape .vg-purchase>*{flex-shrink:0}
 #villegram.vg-escape .vg-purchase{display:flex;flex-direction:column;align-items:stretch;padding:20px 28px 12px}
 #villegram.vg-escape.vg-with-nav .vg-purchase{bottom:calc(180px + env(safe-area-inset-bottom));max-height:calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
 #villegram.vg-escape .vg-story{margin:0 0 24px}
