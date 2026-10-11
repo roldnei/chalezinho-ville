@@ -36,7 +36,7 @@
 .showcase-period .showcase-card{display:grid;grid-template-rows:minmax(128px,1fr) auto auto;grid-template-columns:104px minmax(0,1fr);gap:10px;padding:12px;min-width:0;max-width:none;border:1px solid #ded5c7;border-radius:10px;background:#fff;color:#30251d}
 .showcase-period .showcase-card[hidden]{display:none}
 .showcase-period .showcase-photo{height:128px;width:104px;border-radius:7px;overflow:hidden}
-.showcase-period .showcase-photo img{object-fit:cover}
+.showcase-period .showcase-photo img{position:absolute;inset:0;object-fit:cover}
 .showcase-period .showcase-card-copy{padding:0;display:block}
 .showcase-card-copy h4{font:600 18px/1.25 'DM Sans',sans-serif;margin:0;color:#30251d}
 .showcase-period .showcase-price{margin:7px 0 0;gap:3px}
