@@ -214,3 +214,15 @@
 #villegram.vg-escape .vg-escape-alternatives a+a{border-left:1px solid #ffffff40}
 @media(max-width:380px){#villegram.vg-escape .vg-purchase{padding-left:22px;padding-right:22px}#villegram.vg-escape .vg-escape-dates{font-size:18px}}
 @media(max-height:740px){#villegram.vg-escape .vg-story{margin-bottom:16px}#villegram.vg-escape .vg-story h2{font-size:26px}#villegram.vg-escape .vg-escape-guests{margin-bottom:18px}#villegram.vg-escape .vg-price{font-size:32px}#villegram.vg-escape .vg-escape-total{margin-bottom:12px}#villegram.vg-escape details{margin-bottom:16px}#villegram.vg-escape .vg-escape-alternatives{margin-top:14px}}
+
+/* Keep the introduction above a separate commercial area near the bottom. */
+#villegram.vg-escape.vg-with-nav .vg-purchase{bottom:calc(156px + env(safe-area-inset-bottom));max-height:calc(100dvh - 260px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+#villegram.vg-escape .vg-story{margin-bottom:clamp(54px,8dvh,80px)}
+#villegram.vg-escape .vg-escape-selection{display:flex;flex-direction:column;align-items:stretch}
+#villegram.vg-escape .vg-escape-selection>*{flex-shrink:0}
+#villegram.vg-escape .vg-escape-guests{margin-bottom:14px}
+#villegram.vg-escape .vg-escape-total{margin-bottom:12px}
+#villegram.vg-escape details{margin-bottom:14px}
+#villegram.vg-escape .vg-escape-alternatives{order:1;margin:4px 0 16px}
+#villegram.vg-escape .vg-escape-selection .vg-primary{order:2}
+@media(max-height:740px){#villegram.vg-escape .vg-story{margin-bottom:40px}}
