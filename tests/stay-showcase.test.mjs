@@ -4,6 +4,26 @@ import {readFile} from 'node:fs/promises';
 import {JSDOM} from 'jsdom';
 import {showcaseSettings, weekdayWindows, weekdayShowcase, cachedWeekdayShowcase} from '../supabase/functions/_shared/stay-showcase.ts';
 
+test('minimum storefront extends holidays, rechecks new nights and keeps one duration per arrival',async()=>{
+ const offer={id:'stay-only',name:'Hospedagem',status:'active',product_ids:[],property_ids:[1,2,3],min_nights:2,max_nights:7,showcase:{enabled:true,nights:[2],horizon_days:21,celebrations:true,duration_mode:'minimum'}};
+ const calls=[];
+ const result=await weekdayShowcase({today:'2026-10-11',catalog:async()=>({offers:[offer],products:[]}),sources:async()=>({}),search:async(start,end)=>{
+   calls.push([start,end]);const nights=(Date.parse(end)-Date.parse(start))/86400000;
+   return [1,2,3].map(id=>({id,code:'CH'+id,name:'Ville',min_stay:start==='2026-10-12'?3:2,available:nights>=(start==='2026-10-12'?3:2)&&!(id===2&&start==='2026-10-12'),base_price:500}));
+ },quote:async(body)=>({rate_options:[{selectable:true,code:'non_refundable',name:'Não reembolsável',total_amount_cents:125000,accommodation_amount_cents:110000,cleaning_fee_cents:15000,contract_snapshot:{gross_cents:125000,discount_cents:0}}],experiences:[]})});
+ const holiday=result.cards.filter(c=>c.check_in==='2026-10-12');assert.ok(holiday.length);assert.ok(holiday.every(c=>c.nights===3&&c.check_out==='2026-10-15'&&c.holiday&&c.property_id!==2));
+ assert.ok(result.cards.some(c=>c.nights===2));assert.ok(calls.some(([s,e])=>s==='2026-10-12'&&e==='2026-10-15'));
+ assert.equal(new Set(result.cards.map(c=>c.property_id+':'+c.check_in)).size,result.cards.length);
+ assert.ok(result.cards.every(c=>c.experiences.length===0&&c.discount_cents===0&&c.total_cents===c.accommodation_cents+c.cleaning_cents&&c.check_in>'2026-10-11'&&c.check_in<='2026-11-01'));
+});
+
+test('minimum duration respects offer ceiling, extended-stay rules and unavailable calendars',async()=>{
+ const offer={id:'ceiling',status:'active',property_ids:[1],min_nights:2,max_nights:3,showcase:{enabled:true,nights:[2],horizon_days:21,celebrations:true,duration_mode:'minimum'}};
+ let quoted=0;
+ const result=await weekdayShowcase({today:'2026-10-11',catalog:async()=>({offers:[offer],products:[]}),sources:async()=>({}),search:async(start,end)=>[{id:1,min_stay:start==='2026-10-12'?4:3,available:false,unavailable_reason:end===start?'minimum_stay':'calendar_unavailable'}],quote:()=>{quoted++;throw Error('must not quote')}});
+ assert.equal(result.cards.length,0);assert.equal(quoted,0);
+});
+
 test('weekday storefront obeys offer durations, periods and excludes every weekend night',()=>{
  const settings=showcaseSettings({enabled:true,nights:[2,3],horizon_days:30});
  const rows=weekdayWindows('2026-10-05',settings,{min_nights:2,max_nights:2,start_date:'2026-10-12',end_date:'2026-10-24'});

@@ -26,7 +26,7 @@ export function validateStayOffer(input: Row) {
   const product_ids=[...new Set(input.product_ids||[])] as string[];
   const min_nights=Number(input.min_nights??1),max_nights=input.max_nights?Number(input.max_nights):null;
   const discount_bps=Number(input.discount_bps??500),media=Array.isArray(input.media)?input.media:[];
-  if(!name||!description||!property_ids.length||!product_ids.length||property_ids.some(x=>!Number.isSafeInteger(x)||x<1)
+  if(!name||!description||!property_ids.length||property_ids.some(x=>!Number.isSafeInteger(x)||x<1)
     ||product_ids.some(x=>!/^[-a-f0-9]{36}$/i.test(x))||product_ids.length>12||media.length>20
     ||!Number.isInteger(min_nights)||min_nights<1||min_nights>365||max_nights!==null&&(!Number.isInteger(max_nights)||max_nights<min_nights||max_nights>365)
     ||!Number.isInteger(discount_bps)||discount_bps<0||discount_bps>10000)fail('invalid_offer');

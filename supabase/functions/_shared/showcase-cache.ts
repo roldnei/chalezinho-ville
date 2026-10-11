@@ -29,5 +29,5 @@ export async function persistentShowcase({admin,key,build,background,now=Date.no
 export async function showcaseCacheKey(today:string,catalog:Row){
  const bytes=new TextEncoder().encode(JSON.stringify(catalog));
  const digest=await crypto.subtle.digest('SHA-256',bytes);
- return 'showcase-v4:'+today+':'+[...new Uint8Array(digest)].map(n=>n.toString(16).padStart(2,'0')).join('');
+  return 'showcase-v5:'+today+':'+[...new Uint8Array(digest)].map(n=>n.toString(16).padStart(2,'0')).join('');
 }

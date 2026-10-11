@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {priceStayOffer,validateStayOffer,offerIssues,compositionSnapshot} from '../supabase/functions/_shared/stay-offers.ts';
 const offer={discount_enabled:true,discount_bps:500};
 const lines=[{key:'accommodation',gross_cents:100001,included:true},{key:'cleaning',gross_cents:15000,included:true},{key:'romance',gross_cents:29999,included:true},{key:'extra',gross_cents:12345,included:false}];
+test('stay-only offers can be managed without placeholder experiences',()=>{
+ const o=validateStayOffer({name:'Hospedagem e limpeza',description:'Somente hospedagem',property_ids:[1],product_ids:[],discount_enabled:false,discount_bps:0,status:'active',showcase:{enabled:true,nights:[2],horizon_days:21,celebrations:true,duration_mode:'minimum'}});
+ assert.deepEqual(o.product_ids,[]);assert.deepEqual(offerIssues(o,[],1),[]);assert.equal(o.showcase.duration_mode,'minimum');
+ assert.throws(()=>validateStayOffer({...o,property_ids:[]}),/invalid_offer/);
+});
 test('offer discount allocated to contracted components, optional extra full price',()=>{
  const p=priceStayOffer(lines,offer);assert.equal(p.discount_cents,7250);assert.equal(p.total_cents,150095);assert.equal(p.lines[3].discount_cents,0);assert.equal(p.lines.reduce((s,l)=>s+l.discount_cents,0),7250);assert.equal(p.lines.reduce((s,l)=>s+l.net_cents,0),p.total_cents);
 });

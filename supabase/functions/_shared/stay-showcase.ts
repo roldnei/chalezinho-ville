@@ -21,17 +21,19 @@ export function showcaseSettings(input: Row = {}) {
   const holidays=Array.isArray(input.holidays)?input.holidays:[];if(holidays.length>100||holidays.some((d:any)=>typeof d!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(d)))throw Error('invalid_showcase');
   const condition=input.commercial_condition||null;
   if(condition&&!['cash','card'].includes(condition))throw Error('invalid_showcase');
-  return {enabled: input.enabled === true, nights, horizon_days,celebrations:input.celebrations===true,celebration_discount:input.celebration_discount===true,holidays,...(condition?{commercial_condition:condition}:{})};
+  if(input.duration_mode&&!['fixed','minimum'].includes(input.duration_mode))throw Error('invalid_showcase');
+  return {enabled: input.enabled === true, nights, horizon_days,celebrations:input.celebrations===true,celebration_discount:input.celebration_discount===true,holidays,...(condition?{commercial_condition:condition}:{}),...(input.duration_mode==='minimum'?{duration_mode:'minimum'}:{})};
 }
 export function isCelebration(start:string,end:string,settings:Row={}){for(let d=start;d<end;d=shift(d,1)){const day=new Date(d+'T12:00:00Z').getUTCDay();if(day<1||day>4||nationalHolidays2026.includes(d)||settings.holidays?.includes(d))return true}return false}
 function shift(date: string, n: number) {
   const d = new Date(date + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10);
 }
+function holidayStay(start:string,end:string,settings:Row){for(let d=start;d<end;d=shift(d,1))if(nationalHolidays2026.includes(d)||settings.holidays?.includes(d))return true;return false}
 function weekendArrival(date:string){return [5,6].includes(new Date(date+'T12:00:00Z').getUTCDay())}
 export function weekdayWindows(today: string, settings: Row, offer: Row) {
   const result: {check_in: string; check_out: string; nights: number}[] = [];
   for (let offset = 1; offset <= settings.horizon_days; offset++) {
-    for (const nights of settings.nights) {
+    for (const nights of settings.duration_mode==='minimum'?[Math.max(2,offer.min_nights,Math.min(...settings.nights))]:settings.nights) {
       const check_in = shift(today, offset), check_out = shift(check_in, nights);
       if (nights < offer.min_nights || offer.max_nights && nights > offer.max_nights
         || offer.start_date && check_in < offer.start_date || offer.end_date && check_out > offer.end_date) continue;
@@ -52,21 +54,43 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
   const input = await sources(shift(today, 1), shift(today, horizon + 8));
   const candidates: Row[] = [];
   const searches = new Map<string, Promise<Row[]>>();
+  const lookup=(start:string,end:string)=>{
+    const key=start+':'+end;
+    if(!searches.has(key))searches.set(key,search(start,end,input));
+    return searches.get(key)!;
+  };
   for (const offer of offers) {
     const grouped = new Map<string, Row[]>();
-    for (const window of weekdayWindows(today, showcaseSettings(offer.showcase), offer)) {
-      const key = window.check_in + ':' + window.check_out;
-      if (!searches.has(key)) searches.set(key, search(window.check_in, window.check_out, input));
-      for (const property of await searches.get(key)!) {
+    const settings=showcaseSettings(offer.showcase);
+    for (const initialWindow of weekdayWindows(today, settings, offer)) {
+      for (const initialProperty of await lookup(initialWindow.check_in,initialWindow.check_out)) {
+        let property=initialProperty,window:Row={...initialWindow};
+        if(settings.duration_mode==='minimum'){
+          // Availability owns the minimum (PriceLabs + property rules). Extend and
+          // recheck the whole stay, including any newly occupied nights.
+          for(let attempt=0;attempt<7;attempt++){
+            const required=Math.max(initialWindow.nights,Number(property?.min_stay||1));
+            if(!Number.isInteger(required)||required>7||offer.max_nights&&required>offer.max_nights){property=null;break}
+            if(required<=window.nights)break;
+            window={check_in:window.check_in,check_out:shift(window.check_in,required),nights:required};
+            if(offer.end_date&&window.check_out>offer.end_date){property=null;break}
+            property=(await lookup(window.check_in,window.check_out)).find((p:Row)=>Number(p.id)===Number(initialProperty.id));
+            if(!property)break;
+          }
+          if(!property||window.nights<Number(property.min_stay||1))continue;
+          const celebration=isCelebration(window.check_in,window.check_out,settings);
+          if(celebration&&!settings.celebrations)continue;
+          if(celebration)window.category='celebration';
+        }
         if (!property.available || !offer.property_ids.map(Number).includes(Number(property.id))) continue;
         const groupKey = property.id + ':' + window.nights+':'+(window as Row).category;
         const rows = grouped.get(groupKey) || [];
         const reservations=Array.isArray(input)?input[1]?.data||[]:[];const gap=reservations.some((r:Row)=>r.property_id===property.id&&r.status==='confirmed'&&r.check_out===window.check_in)&&reservations.some((r:Row)=>r.property_id===property.id&&r.status==='confirmed'&&r.check_in===window.check_out);
-        rows.push({offer, property,gap, ...window}); grouped.set(groupKey, rows);
+        rows.push({offer, property,gap, ...window,holiday:holidayStay(window.check_in,window.check_out,settings)}); grouped.set(groupKey, rows);
       }
     }
     // Check backup windows too: an inexpensive date can have no preparation capacity.
-    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||Number(weekendArrival(b.check_in))-Number(weekendArrival(a.check_in))||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 2));
+    for (const rows of grouped.values()) candidates.push(...rows.sort((a, b) => Number(b.gap)-Number(a.gap)||(offer.showcase.duration_mode==='minimum'?Number(b.holiday)-Number(a.holiday):0)||Number(weekendArrival(b.check_in))-Number(weekendArrival(a.check_in))||a.property.base_price - b.property.base_price || a.check_in.localeCompare(b.check_in)).slice(0, 2));
   }
   const cards: Row[] = [];
   const bounded = candidates.slice(0, 60);
@@ -79,10 +103,12 @@ export async function weekdayShowcase({catalog, today, sources, search, quote}: 
         if (!rate) return null;
         const media=c.offer.villegram?.photos?.filter((m:Row)=>m.property_id===Number(c.property.id));
         const reservations=Array.isArray(input)?input[1]?.data||[]:[];const gap=reservations.some((r:Row)=>r.property_id===c.property.id&&r.status==='confirmed'&&r.check_out===c.check_in)&&reservations.some((r:Row)=>r.property_id===c.property.id&&r.status==='confirmed'&&r.check_in===c.check_out);
-        return {category:c.category||'weekday',gap, demand_reason:gap?'Intervalo livre entre reservas confirmadas. Avaliação por calendário, sem histórico suficiente de procura.':'Sugestão por regras de calendário. Não representa previsão de baixa demanda; histórico de procura insuficiente.',offer_id: c.offer.id, offer_name: c.offer.name, property_id: c.property.id, property_code: c.property.code,
+        return {category:c.category||'weekday',holiday:c.holiday,gap, demand_reason:gap?'Intervalo livre entre reservas confirmadas. Avaliação por calendário, sem histórico suficiente de procura.':'Sugestão por regras de calendário. Não representa previsão de baixa demanda; histórico de procura insuficiente.',offer_id: c.offer.id, offer_name: c.offer.name, property_id: c.property.id, property_code: c.property.code,
           property_name: c.property.name, image: media?.[0]?.url || c.offer.media?.[0] || c.property.cover_image,
           check_in: c.check_in, check_out: c.check_out, nights: c.nights, guests: 2,
           rate_code: rate.code, rate_name: rate.name, total_cents: rate.total_amount_cents,
+          rate_options:q.rate_options.filter((r:Row)=>r.selectable).map((r:Row)=>({code:r.code,name:r.name,total_cents:r.total_amount_cents})),
+          accommodation_cents:rate.accommodation_amount_cents,cleaning_cents:rate.cleaning_fee_cents,
           gross_cents: rate.contract_snapshot.gross_cents, discount_cents: rate.contract_snapshot.discount_cents,
           experiences: q.experiences.map((p: Row) => p.composition), cancellation_policy: rate.cancellation_policy,
           commercial_condition:q.experiences.find((p:Row)=>p.composition?.commercial_condition)?.composition.commercial_condition||null};

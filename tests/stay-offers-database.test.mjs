@@ -30,6 +30,7 @@ before(async()=>{
  insert into experience_products(id,name,status,details,price_cents) values('${product}','Romance','active','{"components":[{"name":"Bebida","quantity":1,"frequency":"arrival","choices":["Vinho","Espumante"]},{"name":"Frutas","quantity":2,"frequency":"daily","choices":[]}]}',10000);`);
  await db.exec(await readFile(new URL('../supabase/migrations/20261005201531_romantic_stay_offers.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261005203843_experience_service_day_capacity.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261011151601_stay_only_showcase.sql',import.meta.url),'utf8'));
 });
 after(()=>db.close());
 async function booking(){
@@ -72,4 +73,10 @@ test('daily capacity counts contracted service dates and preserves prior frequen
  assert.equal((await one("select experience_sale_issue($1,2,'2030-01-02','2030-01-04') as issue",[product])).issue,null,'catalog changes do not rewrite the first booking service frequency');
  const {r:daily}=await booking();await db.query("update reservations set status='confirmed' where id=$1",[daily.id]);await db.query("update experience_orders set status='active' where reservation_id=$1",[daily.id]);
  assert.equal((await one("select experience_sale_issue($1,2,'2030-01-02','2030-01-04') as issue",[product])).issue,'experience_capacity');
+});
+
+test('lodging-only catalog permits empty packages while requiring a property',async()=>{
+ const row=await one("insert into stay_offers(name,description,property_ids,product_ids,discount_enabled,discount_bps) values('Hospedagem','Sem experiência',array[1]::bigint[],array[]::uuid[],false,0) returning product_ids");
+ assert.deepEqual(row.product_ids,[]);
+ await assert.rejects(db.query("insert into stay_offers(name,description,property_ids,product_ids) values('Inválida','Sem chalé',array[]::bigint[],array[]::uuid[])"),/stay_offers_properties_required/);
 });
