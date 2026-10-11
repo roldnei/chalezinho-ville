@@ -6,8 +6,8 @@
  // same photograph as Essenza's petal cover, so do not count it as a variant.
  const comparisonPhotos={
   CH1:[{url:'assets/ch1-capa-casal-spa.webp',alt:'Casal no spa do Ville Signature, com espuma e o chalé ao fundo',position:'50% 62%'},{url:'assets/experiencia-piscina-nova.webp',alt:'Spa e piscina do Ville Signature em primeiro plano, chalé ao fundo',position:'50% 65%'},{url:'assets/ch1-08-spa-piscina-chale-noite.webp',alt:'Spa e piscina iluminados do Ville Signature à noite',position:'50% 68%'},{url:'assets/ch1-04-piscina-chale-dia.webp',alt:'Piscina privativa e chalé Ville Signature durante o dia',position:'50% 65%'}],
-  CH2:[{url:'assets/manifesto-hidro-romance-1.webp',alt:'Hidro do Ville Essenza em primeiro plano',position:'50% 80%'},{url:'assets/03-banheira-cama.webp',alt:'Hidro iluminada do Ville Essenza junto à janela',position:'100% 50%',scale:1.7},{url:'assets/experiencia-coracao-hidro.webp',alt:'Hidro do Ville Essenza junto ao ambiente romântico',position:'25% 48%',scale:1.6}],
-  CH3:[{url:'assets/03-banheira-petalas-compartilhada.webp',alt:'Hidromassagem do catálogo Ville Amore com pétalas',position:'50% 80%'},{url:'assets/04-experiencia-compartilhada.webp',alt:'Hidro do Ville Amore junto à janela, detalhe da foto do catálogo',position:'100% 38%',scale:2.8}]
+  CH2:[{url:'assets/manifesto-hidro-romance-1.webp',alt:'Hidro do Ville Essenza em primeiro plano',position:'50% 80%'},{url:'assets/experiencia-coracao-hidro.webp',alt:'Hidro do Ville Essenza junto ao ambiente romântico',position:'25% 48%',scale:1.6}],
+  CH3:[{url:'assets/03-banheira-petalas-compartilhada.webp',alt:'Hidromassagem do catálogo Ville Amore com pétalas',position:'50% 80%'},{url:'assets/03-banheira-cama.webp',alt:'Hidro junto à janela no ambiente compartilhado do catálogo Ville Amore',position:'100% 50%',scale:1.7}]
  };
  const order=p=>({CH1:0,CH2:1,CH3:2}[p.code]??99);
  window.VilleShowcase={async load(offers){
