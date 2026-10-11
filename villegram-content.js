@@ -5,7 +5,7 @@
  const liveOffers=()=>offerCards.filter(c=>c.check_in>=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
  const pages={CH1:'chale-premium.html',CH2:'chale-com-hidro.html',CH3:'chale-romantico.html'};
  // The opening Trip is a presentation derived from the active catalog, not a booking or guest publication.
- const introPhotos={CH1:{url:'assets/ch1-04-piscina-chale-dia-opt-w1152.webp',alt:'Piscina privativa do Ville Signature com o chalé ao fundo',position:65},CH2:{url:'assets/03-banheira-cama-opt-w1200.webp',alt:'Interior do Ville Essenza com cama e hidromassagem',position:50},CH3:{url:'assets/03-banheira-petalas-compartilhada-opt-w1200.webp',alt:'Hidromassagem com pétalas do Ville Amore',position:80}};
+ const introPhotos={CH1:{url:'assets/ch1-04-piscina-chale-dia-opt-w1152.webp',alt:'Piscina privativa do Ville Signature com o chalé ao fundo',position:65},CH2:{url:'assets/03-banheira-cama-opt-w1200.webp',alt:'Interior do Ville Essenza com cama e hidromassagem',position:50},CH3:{url:'assets/amore.webp',alt:'Interior privativo do Ville Amore com cama e cozinha',position:50}};
  function introduction(){
   if(new URLSearchParams(location.search).get('feed')==='following')return null;
   // The editorial catalog owns publication eligibility. Showcase properties are
