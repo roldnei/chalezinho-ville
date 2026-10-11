@@ -9,6 +9,7 @@
   document.querySelectorAll('.booking-intro>p').forEach(e=>e.textContent='Consulte disponibilidade e o preço total da sua escapada. Continue pelo WhatsApp, sem cadastro obrigatório.');
   document.querySelectorAll('.reservation-steps span:last-child').forEach(e=>e.textContent='3 · WhatsApp');
   for(const id of ['#trip-purpose-initial','#trip-purpose-review']){const field=document.querySelector(id);if(field)field.closest('label').hidden=true;}
+  const heading=document.querySelector('.review-purpose')?.parentElement?.querySelector('h3');if(heading)heading.textContent='Sua escapada';
   const choice=document.querySelector('#checkout-stay-mode')?.closest('label');if(choice){for(const n of choice.childNodes)if(n.nodeType===3)n.textContent='Escapada';}
   const confidence=document.querySelector('.booking-confidence');if(confidence)confidence.innerHTML='<div><strong>Preço completo para suas datas</strong><span>Total da escapada para seus dias</span></div><div><strong>Finalize com nosso atendimento</strong><span>A consulta não confirma nem bloqueia datas</span></div><div><strong>Disponibilidade reconfirmada</strong><span>Valores sujeitos à nova consulta no atendimento</span></div>';
  }
