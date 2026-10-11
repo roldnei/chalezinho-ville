@@ -22,7 +22,7 @@ test('closing a paid receipt permits a new search but an uncertain payment retai
 });
 function fixture(session={user:{id:'guest'}}){
  const dom=new JSDOM(html,{url:'https://qa.example/reservar.html?resume=1',runScripts:'outside-only'}),w=dom.window,calls=[];
- w.$=s=>w.document.querySelector(s);w.state={};w.sb={auth:{getSession:async()=>({data:{session}})}};
+ w.PUBLIC=false;w.$=s=>w.document.querySelector(s);w.state={};w.sb={auth:{getSession:async()=>({data:{session}})}};
  w.syncStayModes=()=>{};w.setCheckoutVisible=()=>{};w.showStep=n=>{w.$('#checkout-panel').dataset.step=n;w.$('#step-next').hidden=n===6};
  w.setFlowError=()=>{};w.VilleOffers={contractMarkup:()=>''};w.brlC=String;w.esc=String;
  w.api=async(action,body)=>{calls.push({action,body});return {reservation_status:'confirmed',payment_status:'paid'}};

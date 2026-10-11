@@ -22,7 +22,7 @@ async function paginated(table:string,columns:string,days:number){const rows:any
 Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response('ok',{headers:cors});
  // This function cannot operate on PROD, even if a caller spoofs its environment header.
- const target=releaseTarget(projectUrl);
+ let target;try{target=releaseTarget(projectUrl)}catch{return json({ok:false,error:'unknown_release_target'},403)}
  try{
  const query=new URL(req.url).searchParams,body=req.method==='POST'?await req.json():{},op=body.operation||query.get('operation')||'feed';
  if(target==='production'&&!['public_feed','feed','signals','admin_list','save_settings','generate','save','preview','report'].includes(op))return json({ok:false,error:'feature_not_released'},403);

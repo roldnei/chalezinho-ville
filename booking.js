@@ -187,7 +187,7 @@ function renderResults(list,{scroll=true}={}){
  if(scroll&&$("#checkout-modal").hidden)$("#booking-results").scrollIntoView({behavior:"smooth"});
 }
 
-async function openSameDayRequest(propertyId){
+async function openSameDayRequest(propertyId){if(PUBLIC){error('Para chegada hoje, fale com nosso atendimento. Nenhuma reserva foi criada.');return;}
  const p=state.search.find(x=>Number(x.id)===propertyId);if(!p)return;
  if(!state.session){const ret=new URLSearchParams({request_property:String(propertyId),check_in:$('#book-in').value,check_out:$('#book-out').value,guests:$('#book-guests').value,purpose:$('#trip-purpose-initial').value});location.href='auth.html?mode=login&return='+encodeURIComponent('reservar.html?'+ret);return}
  let dialog=$('#same-day-dialog');if(!dialog){dialog=document.createElement('dialog');dialog.id='same-day-dialog';dialog.className='same-day-dialog';document.body.appendChild(dialog)}
@@ -226,7 +226,7 @@ function showStep(n){
  $('#step-next').textContent=PUBLIC?'Continuar pelo WhatsApp':n===2?'Continuar para identificação':'Ir para pagamento de teste';setFlowError('');
 }
 async function generateQuote(withExperiences){
- if(PUBLIC){state.quote=null;state.rate=null;}if(PUBLIC){clearWhatsApp();$('#summary-content').textContent='Atualizando a consulta…';$('#checkout-rate-options').textContent=''}
+ if(PUBLIC){state.quote=null;state.rate=null;}if(PUBLIC){clearWhatsApp();$('#summary-content').textContent='Atualizando a consulta…';if($('#checkout-rate-options'))$('#checkout-rate-options').textContent=''}
  const controls=['#stay-mode','#checkout-stay-mode','#step-next'].map($).filter(Boolean);controls.forEach(x=>x.disabled=true);
  try{
  const chosen=withExperiences?Object.values(state.selectedByProduct):[];
@@ -715,7 +715,7 @@ async function updateFastQuote(){
  state.fastUpdating=true;$('#step-next').disabled=true;
  const controls=$$('#direct-extras button, #offer-choices select, #checkout-rate-options input, #checkout-stay-mode, #trip-purpose-review');controls.forEach(b=>b.disabled=true);
  try{await refreshQuoteAfterExperiences();if(!state.rate)throw new Error('tariff_unavailable');if(state.stage==='review')renderReview();else renderSummary();setFlowError(PUBLIC?'Consulta atualizada. Confira o total antes de continuar.':'Reserva atualizada. Confira o total e aceite os termos antes de pagar.')}
- catch(e){state.rate=null;setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar esta escolha. Remova o adicional ou consulte outras opções.');}
+ catch(e){state.rate=null;state.quote=null;$('#summary-content').textContent='Consulta indisponível. Revise sua seleção e consulte novamente.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível confirmar esta escolha. Remova o adicional ou consulte outras opções.');}
  finally{state.fastUpdating=false;controls.forEach(b=>b.disabled=false);$('#step-next').disabled=!state.rate||!state.rateConfirmed;}
 }
 function redirectIdentity(mode){saveResume();location.href='auth.html?mode='+mode+'&return='+encodeURIComponent('reservar.html?resume=1'+(pagbankSandbox?'&pagbank=sandbox':''))}
@@ -757,7 +757,7 @@ function initStayModes(){
  if(!$('#checkout-modal').hidden){
   const code=state.rateCode,confirmed=state.rateConfirmed;state.fastUpdating=true;$('#step-next').disabled=true;$('#checkout-stay-mode').disabled=true;
   try{await generateQuote(false);state.rate=state.quote.rate_options.find(r=>r.code===code&&r.selectable)||state.quote.rate_options.find(r=>r.selectable)||null;state.rateCode=state.rate?.code;state.rateConfirmed=confirmed&&state.rateCode===code;if(!state.rate)throw Error('tariff_unavailable');renderReview()}
-  catch(e){state.rate=null;$('#summary-content').textContent='';$('#checkout-rate-options').textContent='';setFlowError(window.VilleOffers.issues[e.message]||'Esta experiência não está disponível. Escolha outra opção.')}finally{state.fastUpdating=false;$('#checkout-stay-mode').disabled=false;$('#step-next').disabled=!state.rate||!state.rateConfirmed}
+  catch(e){state.rate=null;$('#summary-content').textContent='';if($('#checkout-rate-options'))$('#checkout-rate-options').textContent='';setFlowError(window.VilleOffers.issues[e.message]||'Esta experiência não está disponível. Escolha outra opção.')}finally{state.fastUpdating=false;$('#checkout-stay-mode').disabled=false;$('#step-next').disabled=!state.rate||!state.rateConfirmed}
  }
  }}
  refreshStayOptions();syncStayModes();
