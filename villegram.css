@@ -193,3 +193,23 @@
 
 #villegram.vg-escape .vg-picture:after{inset:0;background:linear-gradient(180deg,transparent 30%,#0002 60%,#0008 100%)}
 #villegram.vg-escape .vg-story small,#villegram.vg-escape .vg-escape-guests,#villegram.vg-escape .vg-escape-total{color:#fff5e5}
+
+/* More space between the offer's identity, stay, price and actions. */
+#villegram.vg-escape .vg-purchase{display:flex;flex-direction:column;align-items:stretch;padding:20px 28px 12px}
+#villegram.vg-escape.vg-with-nav .vg-purchase{bottom:calc(180px + env(safe-area-inset-bottom));max-height:calc(100dvh - 300px - env(safe-area-inset-top) - env(safe-area-inset-bottom))}
+#villegram.vg-escape .vg-story{margin:0 0 24px}
+#villegram.vg-escape .vg-story small{display:block;margin:0 0 9px;line-height:1.4}
+#villegram.vg-escape .vg-story h2{font-size:clamp(28px,3vw,34px);line-height:1.2;margin:0}
+#villegram.vg-escape .vg-escape-dates{margin:0 0 8px;line-height:1.4}
+#villegram.vg-escape .vg-escape-guests{margin:0 0 26px;line-height:1.5}
+#villegram.vg-escape .vg-price{font-size:36px;line-height:1.2;margin:0 0 8px}
+#villegram.vg-escape .vg-escape-total{margin:0 0 18px;font-size:12px;line-height:1.6}
+#villegram.vg-escape .vg-escape-condition{margin:0 0 18px;line-height:1.5}
+#villegram.vg-escape details{margin:0 0 22px;flex:none}
+#villegram.vg-escape summary{padding:8px 0;line-height:1.5}
+#villegram.vg-escape .vg-purchase .vg-primary{margin:0;min-height:56px;padding:16px 20px;line-height:1.4;flex:none}
+#villegram.vg-escape .vg-escape-alternatives{margin:20px 0 0;gap:12px}
+#villegram.vg-escape .vg-escape-alternatives a{flex:1;min-width:0;justify-content:center;text-align:center;font-size:12px;line-height:1.5;padding:6px 4px;min-height:44px;text-decoration:none}
+#villegram.vg-escape .vg-escape-alternatives a+a{border-left:1px solid #ffffff40}
+@media(max-width:380px){#villegram.vg-escape .vg-purchase{padding-left:22px;padding-right:22px}#villegram.vg-escape .vg-escape-dates{font-size:18px}}
+@media(max-height:740px){#villegram.vg-escape .vg-story{margin-bottom:16px}#villegram.vg-escape .vg-story h2{font-size:26px}#villegram.vg-escape .vg-escape-guests{margin-bottom:18px}#villegram.vg-escape .vg-price{font-size:32px}#villegram.vg-escape .vg-escape-total{margin-bottom:12px}#villegram.vg-escape details{margin-bottom:16px}#villegram.vg-escape .vg-escape-alternatives{margin-top:14px}}
