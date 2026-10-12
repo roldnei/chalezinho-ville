@@ -236,6 +236,24 @@
 #villegram.vg-escape.vg-with-social .vg-story,#villegram.vg-escape.vg-with-social .vg-escape-selection>:not(.vg-primary):not(.vg-escape-alternatives){padding-right:64px}
 #villegram .vg-status,#villegram:has(.vg-caption-short) .vg-status{position:fixed;top:calc(164px + env(safe-area-inset-top));left:20px;right:76px;bottom:auto;margin:0;padding:8px 10px;border-radius:8px;background:#17130fea;font-size:12px;line-height:1.4;pointer-events:none}
 
+/* Offer actions remain in the visible flow, without a nested scrolling box. */
+#villegram.vg-escape .vg-purchase{max-height:none!important;overflow:visible;bottom:80px;padding:12px 20px}
+#villegram.vg-escape.vg-with-nav .vg-purchase{bottom:calc(156px + env(safe-area-inset-bottom))}
+#villegram.vg-escape .vg-story{margin-bottom:18px}
+#villegram.vg-escape .vg-escape-guests{margin-bottom:8px}
+#villegram.vg-escape .vg-escape-total{margin-bottom:4px}
+#villegram.vg-escape details{margin-bottom:4px}
+#villegram.vg-escape .vg-escape-alternatives{margin:0 0 6px}
+#villegram.vg-escape details[open]{position:absolute;bottom:116px;left:20px;right:20px;z-index:6;max-height:50dvh;overflow:auto}
+@media(max-height:740px){
+ #villegram.vg-escape .vg-story{margin-bottom:8px}
+ #villegram.vg-escape .vg-story small{margin-bottom:2px}
+ #villegram.vg-escape .vg-story h2{font-size:24px}
+ #villegram.vg-escape .vg-escape-dates{font-size:18px;margin-bottom:2px}
+ #villegram.vg-escape .vg-escape-guests{margin-bottom:4px}
+ #villegram.vg-escape .vg-price{font-size:28px;margin-bottom:2px}
+ #villegram.vg-escape .vg-purchase .vg-primary{min-height:48px;padding:10px 14px}
+}
 /* One opening Trip introduces the three chalets with synchronized destinations. */
 #villegram.vg-intro .vg-purchase{bottom:calc(124px + env(safe-area-inset-bottom));padding:16px 20px;max-height:calc(100dvh - 290px);overflow:auto;touch-action:pan-y}
 #villegram.vg-intro.vg-with-nav .vg-controls{bottom:auto}
