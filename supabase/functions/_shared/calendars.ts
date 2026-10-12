@@ -149,3 +149,11 @@ export function calendarService(admin:any,projectUrl:string){
  }
  return {channels,configuration,exportFeed};
 }
+
+// Booking iCal blocks are midnight-to-midnight; compare actual stay hours.
+export function bookingStayOverlap(start:string,end:string,block:CalendarPeriod,property:any={},preparationDays=0){
+ const point=(day:string,time:string)=>Date.parse(day+'T00:00:00Z')+(Number(time.slice(0,2))*60+Number(time.slice(3,5)))*60000;
+ const arrival=point(start,property.check_in_time||'15:00'),departure=point(end,property.check_out_time||'11:00');
+ const padding=Math.max(0,Number(preparationDays)||0)*86400000;
+ return arrival<Date.parse(block.end+'T00:00:00Z')+padding&&departure>Date.parse(block.start+'T00:00:00Z')-padding;
+}

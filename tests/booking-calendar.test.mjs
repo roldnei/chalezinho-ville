@@ -1,6 +1,6 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import ts from 'typescript';
 const code=ts.transpileModule(await readFile(new URL('../supabase/functions/_shared/calendars.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,calendarHttpResponse,calendarPeriodKey}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,calendarHttpResponse,calendarPeriodKey,bookingStayOverlap}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 const wrap=body=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'+body+'END:VCALENDAR\r\n';
 const event='BEGIN:VEVENT\r\nUID:external\r\nDTSTART;VALUE=DATE:20270310\r\nDTEND;VALUE=DATE:20270312\r\nEND:VEVENT\r\n';
 test('valid empty calendar and exclusive checkout parse correctly',()=>{assert.deepEqual(parseCalendar(wrap('')),[]);assert.deepEqual(parseCalendar(wrap(event)),[{start:'2027-03-10',end:'2027-03-12'}]);});
@@ -42,4 +42,13 @@ test('configuration reads all sources beyond the API cap',async()=>{
  const rows=Array.from({length:1201},(_,i)=>({id:String(i),label:'Calendar '+i}));
  const db={from(t){return {select(){return this},is(){return this},order(){return this},range(a,b){return Promise.resolve({data:rows.slice(a,b+1)})},then(resolve){return Promise.resolve({data:[]}).then(resolve)}}}};
  assert.equal((await calendarService(db,'https://example.test').configuration()).sources.length,1201);
+});
+
+test('Booking midnight blocks reject previous-night stays but allow checkout before and arrival after block',()=>{
+ const block={start:'2026-10-12',end:'2026-10-13'};
+ assert.equal(bookingStayOverlap('2026-10-11','2026-10-12',block),true);
+ assert.equal(bookingStayOverlap('2026-10-10','2026-10-11',block),false);
+ assert.equal(bookingStayOverlap('2026-10-13','2026-10-14',block),false);
+ assert.equal(bookingStayOverlap('2026-10-12','2026-10-13',block),true);
+ assert.equal(bookingStayOverlap('2026-10-11','2026-10-12',block,{check_out_time:'00:00'}),false);
 });

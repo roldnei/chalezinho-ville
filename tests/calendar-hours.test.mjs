@@ -18,7 +18,7 @@ test('same-day turnover uses same lane while preserving four-hour gap',()=>{
  assert.equal((html.match(/top:8px/g)||[]).length,2);assert.doesNotMatch(html,/top:52px/);
 });
 test('clipped period retains departure morning and respects custom property hours',()=>{
- const e={property_id:1,start:'2026-09-30',end:'2026-10-01',source:'booking'};
+ const e={property_id:1,start:'2026-09-30',end:'2026-10-01',source:'airbnb'};
  const html=scope.calendarRow(p,bounds,[],[e]);assert.match(html,/left:0%/);assert.match(html,/11:00/);
  const t=scope.calendarInterval({start:'2026-10-09',end:'2026-10-10'},{check_in_time:'16:30',check_out_time:'10:15'});assert.equal((t.end-t.start)/3600000,17.75);
 });

@@ -14,7 +14,7 @@ import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-reques
 import {brazilClock,availabilityDefaults,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
-import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey} from "../_shared/calendars.ts";
+import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey,bookingStayOverlap} from "../_shared/calendars.ts";
 import {experiencePaymentEntries} from "../_shared/finance/experience-payment-entries.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
@@ -267,7 +267,7 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
     const decision=availabilityDecision(sameDayApproval?{...rules,lead_days:0,same_day_cutoff:"23:59"}:rules,start,end,pr?.min_stay);
     const occupied=(x:any)=>preparationOverlap(start,end,x.start,x.end,rules.preparation_days);
     const airbnbOccupied=!cal?.ok || (cal.periods||[]).some(occupied);
-    const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some(occupied));
+    const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some((x:any)=>bookingStayOverlap(start,end,x,p,rules.preparation_days)));
     const channelOccupied=airbnbOccupied||bookingOccupied;
     const dbOccupied=dbActive.some((x:any)=>Number(x.property_id)===Number(p.id)&&occupied({start:x.check_in,end:x.check_out}))
       || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id)&&occupied({start:x.target_check_in,end:x.target_check_out}))
@@ -1354,11 +1354,11 @@ async function adminReservationAction(req:Request,body:any){
     const property=propertyQ.data,occupied=occupiedQ.data,changeHolds=changeHoldsQ.data,blocks=blocksQ.data;
     if(!property||!property.active) return json({ok:false,error:"property_not_found"},404);
     if(guests>Number(property.max_guests)) return json({ok:false,error:"capacity"},409);
-    const externalBlocked=(source:any)=>{
+    const externalBlocked=(source:any,isBooking=false)=>{
       const listing=(source?.listings||[]).find((x:any)=>x.name===property.name);
-      return !listing?.ok || (listing.periods||[]).some((x:any)=>overlaps(x.start,x.end,checkIn,checkOut));
+      return !listing?.ok || (listing.periods||[]).some((x:any)=>isBooking?bookingStayOverlap(checkIn,checkOut,x,property):overlaps(x.start,x.end,checkIn,checkOut));
     };
-    if(occupied?.length||changeHolds?.length||blocks?.length||externalBlocked(airbnb)||(booking.configured&&externalBlocked(booking))) return json({ok:false,error:"occupied"},409);
+    if(occupied?.length||changeHolds?.length||blocks?.length||externalBlocked(airbnb)||(booking.configured&&externalBlocked(booking,true))) return json({ok:false,error:"occupied"},409);
     const code=crypto.randomUUID().replaceAll("-","").slice(0,10).toUpperCase();
     const cleaning=Number(property.cleaning_fee||0);
     const {data,error}=await admin.from("reservations").insert({
