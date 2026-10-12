@@ -22,8 +22,9 @@ Aplicar somente este conjunto revisado, nesta ordem, comparando **nomes e conte�
 | `20261012192148_multichannel_reconciliation_hardening.sql` | Conflitos de datas, edição, conferência antecipada, lease de falha |
 | `20261012193354_multichannel_dispatch_target.sql` | Destino operacional próprio, validação de configuração ausente |
 | `20261012220612_multichannel_current_stays_only.sql` | Impede geração retroativa e arquiva pendências históricas sem apagar evidências |
+| `20261012221154_multichannel_fixture_isolation.sql` | Identificação explícita de testes e exclusão da geração operacional |
 
-O arquivo `production-reviewed.sql` é um roteiro psql com transação única e `ON_ERROR_STOP`. Ele provisiona apenas o destino PROD conhecido, aplica as cinco migrações e deixa o cron **inativo**. Ele **não foi executado em produção**. Revise antes de usar. Em ambientes com migrações parcialmente aplicadas, pare e reconcilie o histórico; não force repetição de DDL nem execute `db push` indiscriminadamente.
+O arquivo `production-reviewed.sql` é um roteiro psql com transação única e `ON_ERROR_STOP`. Ele provisiona apenas o destino PROD conhecido, aplica as seis migrações e deixa o cron **inativo**. Ele **não foi executado em produção**. Revise antes de usar. Em ambientes com migrações parcialmente aplicadas, pare e reconcilie o histórico; não force repetição de DDL nem execute `db push` indiscriminadamente.
 
 ## Serviços e frontend
 

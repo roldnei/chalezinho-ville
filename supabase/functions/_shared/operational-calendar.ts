@@ -26,7 +26,9 @@ export function parseOperationalCalendar(raw:string,provider:string){
 }
 
 export function operationSummary(stays:any[],tasks:any[],today:string,now=new Date()){
- const active=stays.filter(s=>s.status==='confirmed');
+ const fixtureIds=new Set(stays.filter(s=>s.is_test).map(s=>s.id));
+ tasks=tasks.filter(t=>!fixtureIds.has(t.stay_id));
+ const active=stays.filter(s=>!s.is_test&&s.status==='confirmed');
  return {arrivals:active.filter(s=>s.check_in===today),departures:active.filter(s=>s.check_out===today),
   expected:active.filter(s=>s.check_in<=today&&s.check_out>today&&!s.checked_out_at),
   present:active.filter(s=>s.checked_in_at&&!s.checked_out_at),

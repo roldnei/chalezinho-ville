@@ -160,3 +160,21 @@ test('future arrival creates one task per stage; actual checkout retains already
  assert.equal((await one('select status from ops_tasks where id=$1',[departure.id])).status,'pending');
  assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[stay.id])).n,2);
 });
+
+test('explicit fixture isolation archives open tasks and survives reservation updates and date changes',async()=>{
+ await db.exec(await readFile(new URL('../supabase/migrations/20261012221154_multichannel_fixture_isolation.sql',import.meta.url),'utf8'));
+ const r=await one("insert into reservations(property_id,check_in,check_out,status,source) values(2,'2097-01-01','2097-01-03','confirmed','direct') returning *");
+ const s=await one('select * from ops_stays where reservation_id=$1',[r.id]);
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[s.id])).n,2);
+ await db.query('update ops_stays set is_test=true where id=$1',[s.id]);
+ assert.equal((await one("select count(*)::int n from ops_tasks where stay_id=$1 and status='superseded'",[s.id])).n,2);
+ await db.query("update reservations set check_in='2097-02-01',check_out='2097-02-03' where id=$1",[r.id]);
+ await db.exec('select ops_refresh_tasks(); select ops_refresh_tasks()');
+ assert.equal((await one('select is_test from ops_stays where id=$1',[s.id])).is_test,true);
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[s.id])).n,2);
+ assert.equal((await one('select status from reservations where id=$1',[r.id])).status,'confirmed');
+ const test=await one("insert into ops_stays(property_id,channel,origin,payment_origin,is_test,check_in,check_out) values(2,'direct','manual','not_recorded',true,'2096-01-01','2096-01-03') returning *");
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[test.id])).n,0);
+ const real=await one("insert into ops_stays(property_id,channel,origin,payment_origin,guest_name,check_in,check_out) values(2,'direct','manual','not_recorded','Teste is not a classification rule','2096-01-03','2096-01-05') returning *");
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[real.id])).n,2);
+});

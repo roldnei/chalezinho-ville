@@ -19,3 +19,8 @@ test('operational summary distinguishes projected dates, attendance, cancelled s
  const s=operationSummary(stays,[{status:'pending',due_at:'2026-10-12T15:00:00Z'},{status:'approved',due_at:'2026-10-12T15:00:00Z'}],'2026-10-12',new Date('2026-10-12T19:00:00Z'));
  assert.deepEqual(s.arrivals.map(x=>x.id),['b']);assert.deepEqual(s.departures.map(x=>x.id),['a']);assert.equal(s.present.length,0);assert.equal(s.expected.length,1);assert.equal(s.overdue.length,1);
 });
+test('explicit fixtures do not contribute to operational summaries',()=>{
+ const stay={id:'fixture',is_test:true,status:'confirmed',check_in:'2026-10-12',check_out:'2026-11-01',checked_in_at:'2026-10-12T15:00:00Z'};
+ const s=operationSummary([stay],[{stay_id:'fixture',status:'pending',due_at:'2026-10-12T15:00:00Z'}],'2026-10-12',new Date('2026-10-12T19:00:00Z'));
+ for(const items of Object.values(s))assert.equal(items.length,0);
+});

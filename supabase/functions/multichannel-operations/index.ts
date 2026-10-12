@@ -46,10 +46,11 @@ async function hub(a:any){
   admin.from('profiles').select('id,full_name,role,pms_property_ids,pms_permissions,pms_access_status').in('role',['admin','host','staff','service_provider']).then(checked),
   admin.from('ops_sync_runs').select('*').order('started_at',{ascending:false}).limit(60).then(checked)
  ]);
- const visibleTasks=tasks.filter(t=>taskAccess(a,t));
+ const fixtureIds=new Set(stays.filter(s=>s.is_test).map(s=>s.id));
+ const visibleTasks=tasks.filter(t=>!fixtureIds.has(t.stay_id)&&taskAccess(a,t));
  const assignedStayIds=new Set(visibleTasks.map(t=>t.stay_id));
  const guestAccess=a.role==='admin'||a.pms_permissions?.reservations===true;
- const visibleStays=stays.filter(s=>propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null});
+ const visibleStays=stays.filter(s=>!s.is_test&&propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null});
  const sourceIds=new Set(sources.filter(s=>propertyAccess(a,s.property_id)).map(s=>s.id));
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  return {ok:true,operator:a,server_now:new Date().toISOString(),today,properties:properties.filter(p=>propertyAccess(a,p.id)),stays:visibleStays,tasks:visibleTasks,
