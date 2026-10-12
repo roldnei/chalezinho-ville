@@ -1,0 +1,29 @@
+✔ provider evidence, not occupancy, classifies Airbnb/Booking stays (3.447032ms)
+✔ timestamp, invalid dates, malformed and recurring feeds never invent stays (0.780768ms)
+✔ operational summary distinguishes projected dates, attendance, cancelled stays and overdue work (1.178552ms)
+✔ real-shaped Airbnb stay creates distinct tasks, unknown guest and no invented attendance (4056.243089ms)
+✔ sync repeats idempotently, fenced claim rejects concurrency (13.123951ms)
+✔ blocks and ambiguous periods do not generate stays/tasks (5.620532ms)
+✔ missing event and calendar failure retain stay and tasks with divergence (8.296655ms)
+✔ manual record links to imported event without duplicates; external money stays separate (14.328469ms)
+✔ native confirmed reservation feeds operation; hold never creates tasks (8.06321ms)
+✔ date change retains prior tasks, checklist version and evidence history (10.401807ms)
+✔ same-day turnover gets high priority and tight window is flagged (8.099124ms)
+✔ photo/checklist completion, immutable evidence and authorization (56.887913ms)
+✔ template edit versions do not rewrite task snapshot (4.839844ms)
+✔ manual metadata edits persist; linked identity and stale edits are rejected (9.583452ms)
+✔ calendar date overlap is retained for human review without changing stay/tasks (17.153377ms)
+✔ explicit cancellation cancels future tasks and reappearance does not reactivate (18.430149ms)
+✔ stale sequence records divergence and reconciliation failure releases only its lease (14.573716ms)
+✔ departure results/photos are rejected before due time and manual windows are validated (3.345553ms)
+✔ direct REST roles cannot read operational data or invoke privileged RPCs (2.085155ms)
+✔ both hosts receive shared counts and unknown OTA guest remains explicitly unknown (114.890508ms)
+✔ query failure supplies unknown count and an error instead of empty operation (13.166012ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4477.379878

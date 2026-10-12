@@ -1,0 +1,68 @@
+[
+  {
+    "endpoint": "public-consultation",
+    "action": "search",
+    "status": 400,
+    "ok": false,
+    "error": "invalid_dates",
+    "quote_id": null,
+    "listings": 0,
+    "rates": []
+  },
+  {
+    "endpoint": "public-consultation",
+    "action": "quote",
+    "status": 200,
+    "ok": true,
+    "error": null,
+    "quote_id": null,
+    "listings": 0,
+    "rates": [
+      "non_refundable"
+    ]
+  },
+  {
+    "endpoint": "public-consultation",
+    "action": "start_payment",
+    "status": 403,
+    "ok": false,
+    "error": "consultation_operation_not_allowed",
+    "quote_id": null,
+    "listings": 0,
+    "rates": []
+  },
+  {
+    "endpoint": "multichannel-operations",
+    "action": "scheduled_sync",
+    "status": 403,
+    "ok": false,
+    "error": "forbidden",
+    "quote_id": null,
+    "listings": 0,
+    "rates": []
+  },
+  {
+    "endpoint": "public-consultation",
+    "action": "search-corrected",
+    "status": 200,
+    "ok": true,
+    "listings": 3,
+    "quote_ids": [
+      null,
+      null,
+      null
+    ]
+  },
+  {
+    "test": "anonymous /rest/v1/ops_stays",
+    "status": 401
+  },
+  {
+    "test": "anonymous /storage/v1/object/public",
+    "status": 400
+  },
+  {
+    "test": "anonymous /rest/v1/rpc/ops_mutate",
+    "status": 401
+  }
+]

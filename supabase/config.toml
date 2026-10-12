@@ -4,3 +4,7 @@ verify_jwt = false
 # DEV-only function authenticates all team/social writes inside its handler.
 [functions.villegram-content]
 verify_jwt = false
+
+# Custom auth: getUser + active operator scope, or Vault-backed scheduler secret.
+[functions.multichannel-operations]
+verify_jwt = false
