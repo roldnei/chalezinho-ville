@@ -3,7 +3,7 @@ import {communityOperation,communityPublic} from '../_shared/villegram-community
 import {resolvePublicationStay} from '../_shared/villegram-stay.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2';
 import {publicationInput,automationInput,eligiblePublication,generatePublications,signalInput,summarizePublications,recordVillegramBooking} from '../_shared/villegram-publications.ts';
-import {commentText} from '../_shared/villegram.ts';
+import {commentText,villegramService} from '../_shared/villegram.ts';
 const projectUrl=Deno.env.get('SUPABASE_URL')!,admin=createClient(projectUrl,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-chalezinho-env','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
 const json=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers:{...cors,'Content-Type':'application/json','Cache-Control':'no-store'}});
@@ -46,6 +46,11 @@ Deno.serve(async req=>{
   await recordVillegramBooking(admin,r.data.id,body.attribution,u.id);return json({ok:true});
  }
  if(op==='social'||op==='like'||op==='comment'||op==='remove_comment'){
+  if(!body.publication_id&&body.offer_id){
+   const offer=await admin.from('stay_offers').select('name,status').eq('id',body.offer_id).maybeSingle();
+   if(offer.error||!offer.data||offer.data.status!=='active'||target==='production'&&!commercialItem(offer.data))return json({ok:false,error:'offer_unavailable'},404);
+   return await villegramService({admin,currentUser:async()=>u,userIsAdmin:async()=>isAdmin,json})(req,{...body,operation:op==='social'?'list':op==='remove_comment'?'remove':op},true);
+  }
   const p=await admin.from('villegram_publications').select('id,status,source,author_id').eq('id',body.publication_id).maybeSingle();if(!p.data||p.data.status!=='published'&&!isAdmin)return json({ok:false,error:'publication_unavailable'},404);
   if(p.data.source==='guest_submission'&&!isAdmin){const profile=await admin.from('villegram_profiles').select('is_public').eq('id',p.data.author_id).maybeSingle();if(!profile.data?.is_public)return json({ok:false,error:'publication_unavailable'},404);}
   if(op!=='social'&&!u)return json({ok:false,error:'authentication_required'},401);
