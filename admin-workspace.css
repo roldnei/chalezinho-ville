@@ -63,3 +63,6 @@
 .calendar-property-name:hover{text-decoration:underline;text-underline-offset:4px}.calendar-property-name:focus-visible{outline:2px solid #c49b65;outline-offset:2px}
 .calendar-time-help{margin:0 0 12px}.calendar-time-help summary{cursor:pointer;font-size:12px}.calendar-time-help summary span{margin-left:10px;color:#d6b48c}.calendar-time-help p{margin:8px 0;line-height:1.5}
 @media(max-width:760px){.admin-calendar-grid{grid-template-columns:100px minmax(var(--calendar-width),1fr);min-width:calc(100px + var(--calendar-width))}.admin-calendar-grid .calendar-property{padding:6px 8px}.admin-calendar-grid .calendar-property .calendar-property-name{font-size:14px}}
+
+/* Date-width columns; stay hours are represented only by bar geometry. */
+.calendar-track>i{background-image:none}.calendar-days span{padding:6px 0}.admin-calendar-grid .calendar-event{height:28px!important;min-height:28px;padding:3px 5px}.admin-calendar-grid .calendar-event strong{font-size:11px;line-height:1.2}
