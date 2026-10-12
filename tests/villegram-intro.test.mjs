@@ -1,10 +1,9 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {createHash} from 'node:crypto';
 import {JSDOM} from 'jsdom';
 const source=name=>readFile(new URL('../'+name,import.meta.url),'utf8');
-const properties=[{id:1,code:'CH1',name:'Ville Signature',active:true},{id:2,code:'CH2',name:'Ville Essenza',active:true},{id:3,code:'CH3',name:'Ville Amore',active:true}];
+const properties=[{id:1,code:'CH1',name:'Ville Signature',active:true,cover_image:'https://photos.example/signature.webp',tagline:'Piscina aquecida privativa'},{id:2,code:'CH2',name:'Ville Essenza',active:true,cover_image:'https://photos.example/essenza.webp'},{id:3,code:'CH3',name:'Ville Amore',active:true,cover_image:'https://photos.example/amore.webp'}];
 const publication={id:'4069a585-7cc6-48ad-9263-567358a45c0c',type:'property',property_id:1,title:'Signature',caption:'Original preservado',cta:'property',media:[{kind:'photo',url:'assets/ch1-capa-casal-spa.webp'}],cover_index:0};
 test('late showcase projection cannot remove the opening chalet Trip',async()=>{
  const p=await page({query:'?view=moments'});
@@ -35,7 +34,7 @@ test('first discovery Trip presents three distinct facility photos and each chal
   assert.ok(d.querySelector('#villegram.vg-intro'));assert.match(d.querySelector('.vg-story').textContent,/3 CHALÉS.*Ville Signature.*Piscina aquecida privativa/);
   const photos=[...d.querySelectorAll('.vg-scene img')],paths=photos.map(img=>img.getAttribute('src')||img.dataset.src);
   assert.equal(photos.length,3);assert.equal(new Set(paths).size,3);
-  const hashes=await Promise.all(paths.map(async path=>createHash('sha256').update(await readFile(new URL('../'+path,import.meta.url))).digest('hex')));assert.equal(new Set(hashes).size,3);
+  assert.deepEqual(paths,properties.map(p=>p.cover_image));
   const destinations=['chale-premium.html','chale-com-hidro.html','chale-romantico.html'];
   for(let i=0;i<3;i++){
    d.querySelector(`[data-intro-scene="${i}"]`).click();
