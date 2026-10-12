@@ -85,16 +85,19 @@ export function developmentApprovalCalendar(raw:string,projectUrl:string,sourceI
   return ['DTSTART;VALUE=DATE:20261003','DTEND;VALUE=DATE:20261004','SUMMARY:Airbnb (Not available)','UID:7f662ec65913-56c7709c9d5df3f7460a68f540e05ddd@airbnb.com'].every(line=>lines.includes(line))?'':event;
  });
 }
-export async function fetchCalendar(url:string,provider:string,projectUrl='',sourceId=''){
+export async function fetchCalendarRaw(url:string,provider:string){
  const safe=calendarUrl(url,provider);
- if(provider==='ical')return parseCalendar(await genericCalendarBody(safe));
+ if(provider==='ical')return await genericCalendarBody(safe);
  const r=await fetch(safe,{redirect:'error',signal:AbortSignal.timeout(8000),headers:{'User-Agent':'ChalezinhoVille/1.0'}});
  if(!r.ok)throw new Error('calendar_unreachable');
  if(Number(r.headers.get('content-length')||0)>2097152)throw new Error('calendar_too_large');
  const reader=r.body?.getReader();if(!reader)throw new Error('invalid_calendar');
  let size=0,raw='';const decoder=new TextDecoder();
  while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>2097152){await reader.cancel();throw new Error('calendar_too_large')}raw+=decoder.decode(value,{stream:true})}raw+=decoder.decode();
- return parseCalendar(developmentApprovalCalendar(raw,projectUrl,sourceId));
+ return raw;
+}
+export async function fetchCalendar(url:string,provider:string,projectUrl='',sourceId=''){
+ return parseCalendar(developmentApprovalCalendar(await fetchCalendarRaw(url,provider),projectUrl,sourceId));
 }
 export function calendarText(events:Array<CalendarPeriod&{uid:string;updated?:string}>,now=new Date()){
  const stamp=(v:string)=>new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');
@@ -144,7 +147,8 @@ export function calendarService(admin:any,projectUrl:string){
   const reservations=checked(await admin.from('reservations').select('id,check_in,check_out,status,hold_expires_at,updated_at,source').eq('property_id',id).in('status',['confirmed','hold','pending_payment']).gte('check_out',past));
   const blocks=checked(await admin.from('pms_calendar_blocks').select('id,start_date,end_date,updated_at').eq('property_id',id).eq('status','active').gte('end_date',past));
   const changes=checked(await admin.from('post_booking_charges').select('id,target_check_in,target_check_out,expires_at,created_at').eq('kind','modification').eq('target_property_id',id).in('status',['awaiting_payment','processing','paid']).gt('expires_at',now));
-  const events=[...reservations.filter((r:any)=>!['booking','airbnb'].includes(r.source)&&(r.status==='confirmed'||!r.hold_expires_at||r.hold_expires_at>now)).map((r:any)=>({uid:'reservation-'+r.id,start:r.check_in,end:r.check_out,updated:r.updated_at})),...blocks.map((b:any)=>({uid:'block-'+b.id,start:b.start_date,end:b.end_date,updated:b.updated_at})),...changes.map((c:any)=>({uid:'change-'+c.id,start:c.target_check_in,end:c.target_check_out,updated:c.created_at}))];
+  const manualStays=checked(await admin.from('ops_stays').select('id,check_in,check_out,updated_at,channel').is('reservation_id',null).eq('origin','manual').eq('status','confirmed').eq('property_id',id).gte('check_out',past));
+  const events=[...manualStays.filter((s:any)=>!['airbnb','booking'].includes(s.channel)).map((s:any)=>({uid:'operational-stay-'+s.id,start:s.check_in,end:s.check_out,updated:s.updated_at})),...reservations.filter((r:any)=>!['booking','airbnb'].includes(r.source)&&(r.status==='confirmed'||!r.hold_expires_at||r.hold_expires_at>now)).map((r:any)=>({uid:'reservation-'+r.id,start:r.check_in,end:r.check_out,updated:r.updated_at})),...blocks.map((b:any)=>({uid:'block-'+b.id,start:b.start_date,end:b.end_date,updated:b.updated_at})),...changes.map((c:any)=>({uid:'change-'+c.id,start:c.target_check_in,end:c.target_check_out,updated:c.created_at}))];
   return new Response(calendarText(events),{headers:{'Content-Type':'text/calendar; charset=utf-8','Content-Disposition':'inline; filename="availability.ics"','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
  }
  return {channels,configuration,exportFeed};

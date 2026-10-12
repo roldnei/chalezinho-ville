@@ -23,19 +23,5 @@ export async function taskPhotos(body:any,actor:any,admin:any,json:any){
   const photos=await Promise.all((data||[]).map(async(x:any)=>{const {data:s}=await admin.storage.from('cleaning-evidence').createSignedUrl(x.storage_path,900);const {storage_path,...safe}=x;return {...safe,signed_url:s?.signedUrl||null}}));
   return json({ok:true,points:photoPoints,photos});
  }
- if(body.operation!=='upload')return json({ok:false,error:'invalid_operation'},400);
- if(!['todo','in_progress','blocked'].includes(task.status))return json({ok:false,error:'task_photos_locked'},409);
- if(!photoPoints.some(p=>p.key===body.point_key))return json({ok:false,error:'invalid_photo_point'},400);
- const raw=String(body.base64||'');if(!raw||raw.length>699052)return json({ok:false,error:'photo_too_large'},413);
- let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(raw),c=>c.charCodeAt(0))}catch{return json({ok:false,error:'invalid_photo'},400)}
- if(!validPhoto(bytes,body.content_type))return json({ok:false,error:'invalid_photo'},400);
- const path=`${task.id}/${body.point_key}/${crypto.randomUUID()}.${body.content_type==='image/webp'?'webp':'jpg'}`;
- const {data:old}=await admin.from('pms_task_photos').select('storage_path').eq('task_id',task.id).eq('point_key',body.point_key).maybeSingle();
- const {error:up}=await admin.storage.from('cleaning-evidence').upload(path,bytes,{contentType:body.content_type,upsert:false});
- if(up)return json({ok:false,error:'photo_upload_failed'},500);
- const {data,error}=await admin.from('pms_task_photos').upsert({task_id:task.id,point_key:body.point_key,storage_path:path,content_type:body.content_type,size_bytes:bytes.length,uploaded_by:actor.id,uploaded_name:actor.name,created_at:new Date().toISOString()},{onConflict:'task_id,point_key'}).select('id').single();
- if(error){await admin.storage.from('cleaning-evidence').remove([path]);return json({ok:false,error:error.message.includes('task_photos_locked')?'task_photos_locked':'photo_save_failed'},409)}
- await admin.from('pms_activity_events').insert({task_id:task.id,actor_user_id:actor.id,event_type:'cleaning_photo_saved',details:{point_key:body.point_key,photo_id:data.id,size_bytes:bytes.length}});
- if(old?.storage_path)await admin.storage.from('cleaning-evidence').remove([old.storage_path]);
- return json({ok:true,photo_id:data.id,size_bytes:bytes.length});
+ return json({ok:false,error:'legacy_evidence_read_only'},409);
 }

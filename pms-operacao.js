@@ -1,6 +1,6 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENDPOINT=C.supabaseUrl+"/functions/v1/pms-operations";
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const initialView=new URLSearchParams(location.search).get("view");let session,state,view=["today","agenda","reservations","blocks","tasks","maintenance","indicators","templates","team"].includes(initialView)?initialView:"today",filters={status:"all",property:"all",search:""};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const initialView=new URLSearchParams(location.search).get("view");let session,state,view=["today","agenda","reservations","blocks","tasks","legacy_tasks","maintenance","indicators","templates","team"].includes(initialView)?initialView:"today",filters={status:"all",property:"all",search:""};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const saoDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const brazilTimeZone="America/Sao_Paulo";
@@ -93,8 +93,8 @@ async function loadCleaningPhotos(id){
  const box=document.querySelector('#cleaning-photos');if(!box)return;
  try{
   const d=await api('task_photos',{operation:'list',task_id:id});if(!box.isConnected)return;
-  const task=state.tasks.find(t=>t.id===id),editable=['todo','in_progress','blocked'].includes(task.status),missing=d.points.filter(p=>!d.photos.some(x=>x.point_key===p.key));
-  box.innerHTML=`<h3>Fotos da limpeza</h3><p>${d.points.length-missing.length} de ${d.points.length} pontos registrados. Confira nitidez, iluminação e limpeza antes de enviar.</p><div class="cleaning-photo-grid">${d.points.map(p=>{const photo=d.photos.find(x=>x.point_key===p.key);return `<article><h4>${esc(p.label)}</h4><p>${esc(p.hint)}</p>${photo?`<a href="${esc(photo.signed_url||'#')}" target="_blank" rel="noopener"><img src="${esc(photo.signed_url||'')}" alt="${esc(p.label)} — ampliar foto"></a><small>${esc(photo.uploaded_name)} · ${datetime(photo.created_at)} · ${Math.round(photo.size_bytes/1024)} KB</small>`:'<span class="photo-missing">Foto obrigatória pendente</span>'}${editable?`<label>${photo?'Substituir foto':'Adicionar foto'}<input type="file" accept="image/jpeg,image/png,image/webp" data-photo-point="${p.key}"></label>`:''}<p role="status"></p></article>`}).join('')}</div><p>${missing.length?'Faltam: '+missing.map(p=>esc(p.label)).join(', '):'Todas as fotos foram enviadas. A aprovação depende da vistoria.'}</p>`;
+  const task=state.tasks.find(t=>t.id===id),editable=false,missing=d.points.filter(p=>!d.photos.some(x=>x.point_key===p.key));
+  box.innerHTML=`<h3>Fotos históricas — etapa original não reclassificada</h3><p>${d.points.length-missing.length} de ${d.points.length} pontos registrados. Confira nitidez, iluminação e limpeza antes de enviar.</p><div class="cleaning-photo-grid">${d.points.map(p=>{const photo=d.photos.find(x=>x.point_key===p.key);return `<article><h4>${esc(p.label)}</h4><p>${esc(p.hint)}</p>${photo?`<a href="${esc(photo.signed_url||'#')}" target="_blank" rel="noopener"><img src="${esc(photo.signed_url||'')}" alt="${esc(p.label)} — ampliar foto"></a><small>${esc(photo.uploaded_name)} · ${datetime(photo.created_at)} · ${Math.round(photo.size_bytes/1024)} KB</small>`:'<span class="photo-missing">Foto obrigatória pendente</span>'}${editable?`<label>${photo?'Substituir foto':'Adicionar foto'}<input type="file" accept="image/jpeg,image/png,image/webp" data-photo-point="${p.key}"></label>`:''}<p role="status"></p></article>`}).join('')}</div><p>${missing.length?'Faltam: '+missing.map(p=>esc(p.label)).join(', '):'Todas as fotos foram enviadas. A aprovação depende da vistoria.'}</p>`;
   const submit=document.querySelector('[data-status="inspection"]');if(submit)submit.disabled=missing.length>0||!editable;
   box.querySelectorAll('[data-photo-point]').forEach(input=>input.onchange=async()=>{
    const file=input.files?.[0];if(!file)return;const message=input.closest('article').querySelector('[role="status"]');
@@ -106,5 +106,12 @@ async function loadCleaningPhotos(id){
  }catch{box.textContent='Não foi possível carregar as fotos. Feche e abra a tarefa para tentar novamente.'}
 }
 
+const previousTasks=renderTasks;
+renderToday=()=>window.VilleOperations.mount($("#content"),{sb});
+renderReservations=()=>window.VilleOperations.mount($("#content"),{sb,initial:"stays"});
+renderAgenda=()=>window.VilleOperations.mount($("#content"),{sb,initial:"next"});
+renderTasks=()=>window.VilleOperations.mount($("#content"),{sb,initial:"tasks"});
+renderTemplates=()=>window.VilleOperations.mount($("#content"),{sb,initial:"templates"});
+const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();return;}originalShow(next);if(["today","agenda","tasks","templates","reservations"].includes(next))$("#new-action").hidden=true;};
 boot();
 })();

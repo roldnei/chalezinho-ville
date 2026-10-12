@@ -93,7 +93,7 @@ async function syncTurnovers(actor:any){
 }
 
 async function hub(actor:any){
-  if(canManage(actor))await syncTurnovers(actor);
+  // Operational stays/tasks are now generated server-side, independently of panel visits.
   const start=new Date(Date.now()-365*86400000).toISOString(),end=new Date(Date.now()+730*86400000).toISOString();
   const [properties,tasks,issues,reservations,team,templates,attachments,blocks,notifications,activity]=await Promise.all([
     admin.from("properties").select("id,code,name,cover_image,active,check_in_time,check_out_time").eq("active",true).order("id"),
