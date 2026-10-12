@@ -5,20 +5,20 @@ import {JSDOM} from 'jsdom';
 import {releaseFeatures} from '../scripts/release-profile.mjs';
 const source=async name=>readFile(new URL('../'+name,import.meta.url),'utf8');
 const dev='https://pxfqmnhqodqyaaqeyjgr.supabase.co';
-test('DEV guest publishing is independent of checkout, while production remains closed',()=>{
+test('Ville Moments is independent of checkout and Feelings in both environments',()=>{
  assert.deepEqual(releaseFeatures({environment:'development',profile:'whatsapp'}),{feelings:false,guestPublications:true,social:true});
- assert.deepEqual(releaseFeatures({environment:'production',profile:'whatsapp'}),{feelings:false,guestPublications:false,social:false});
+ assert.deepEqual(releaseFeatures({environment:'production',profile:'whatsapp'}),{feelings:false,guestPublications:true,social:true});
  assert.deepEqual(releaseFeatures({environment:'development',profile:'checkout-development'}),{feelings:true,guestPublications:true,social:true});
 });
-test('WhatsApp account exposes guest navigation in DEV, keeps reservations reachable and hides it in production',async()=>{
+test('WhatsApp account exposes Moments and preserves private navigation in both environments',async()=>{
  for(const environment of ['development','production']){
   const dom=new JSDOM(await source('conta.html'),{url:dev+'/conta.html',runScripts:'outside-only'}),w=dom.window;
   try{
    w.CHALEZINHO_CONFIG={environment,releaseProfile:'whatsapp',features:releaseFeatures({environment,profile:'whatsapp'})};
    w.eval(await source('launch-ui.js'));w.eval(await source('account-navigation.js'));
    const button=w.document.querySelector('[data-account-mode="social"]');
-   assert.equal(w.getComputedStyle(button).display==='none',environment==='production');
-   assert.equal(w.document.querySelector('#community-root').hidden,environment==='production');
+   assert.equal(w.getComputedStyle(button).display==='none',false);
+   assert.equal(w.document.querySelector('#community-root').hidden,false);
    w.document.querySelector('[data-account-mode="private"]').click();
    assert.equal(w.document.querySelector('#account-private').hidden,false);
    assert.equal(w.document.querySelector('#community-root').hidden,true);

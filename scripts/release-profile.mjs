@@ -1,8 +1,7 @@
 export const DEV='pxfqmnhqodqyaaqeyjgr',PROD='irxsaladqhbzhkoaclxy';
-// Guest publishing stays available for DEV homologation independently of payments
-// and Feelings. Production requires a separate reviewed social release.
+// Ville Moments is independent of payments and Feelings.
 export function releaseFeatures(release){
- return {feelings:release.profile==='checkout-development',guestPublications:release.environment==='development',social:release.environment==='development'};
+ return {feelings:release.profile==='checkout-development',guestPublications:true,social:true};
 }
 export function releaseProfile(env){
  const profile=env.VILLE_RELEASE_PROFILE||'checkout-development';
