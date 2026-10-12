@@ -1,7 +1,7 @@
 export const DEV_PROJECT='pxfqmnhqodqyaaqeyjgr';
 export const PROD_PROJECT='irxsaladqhbzhkoaclxy';
 export const consultationActions=new Set(['config','property_media','stay_offers','search','quote','stay_showcase','villegram_quote','villegram_offer','legal_documents']);
-export const launchAdminActions=new Set(['admin_calendar','admin_hub','admin_property_action','admin_availability','experience_admin','experience_admin_action','stay_offer_action','admin_access_metrics','ops','ops_settings_action','admin_notification_action']);
+export const launchAdminActions=new Set(['admin_calendar','admin_guests','admin_hub','admin_property_action','admin_availability','experience_admin','experience_admin_action','stay_offer_action','admin_access_metrics','ops','ops_settings_action','admin_notification_action']);
 // Editing cleaning/guarantee values is an existing authenticated property task.
 // Enabling public payment methods is outside the WhatsApp launch scope.
 export function launchAdminOperationAllowed(action:string,body:any){
