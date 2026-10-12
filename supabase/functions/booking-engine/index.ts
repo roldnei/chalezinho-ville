@@ -2254,7 +2254,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     }
     if(action==="admin_guests"){
       const user=await currentUser(req);
-      if(!development||!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
+      if(!user||!await userIsAdmin(user))return json({ok:false,error:"admin_required"},403);
       try{return json(await guestDirectory(admin,body,user.id,async()=>{
         const response=await adminHubData(req,{start:localDate(-365),end:localDate(730)});
         if(!response.ok)throw Error("guest_directory_unavailable");
