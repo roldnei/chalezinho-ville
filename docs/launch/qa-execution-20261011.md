@@ -1,6 +1,6 @@
 # Homologação real do lançamento parcial — 11/10/2026
 
-Estado: **DEV validado parcialmente; produção NÃO publicada.** Este relatório complementa os relatórios anteriores e substitui suas afirmações de validação somente nos cenários listados aqui.
+Estado: **publicação parcial em preparação; consultar a atualização ao final para as alterações posteriores em PROD.** Este relatório complementa os relatórios anteriores e substitui suas afirmações de validação somente nos cenários listados aqui.
 
 ## Versões e isolamento
 
@@ -84,3 +84,18 @@ Retorno frontend identificado: deployment `dpl_GfCE3VYLNmxwSorGBUPYQjU6ys41`, co
 Código `64cc312dc299187cafa60c2a776caddda38a6027`, deployment DEV `dpl_5BsjSVdxURUcdfLrD4vxSZNQEqcv`, https://chalezinho-ville-lt1cvk9cc-roldneicosta-4140.vercel.app/ . A pausa foi repetida nesta versão: sem espera de TTL, após concluir a consulta, zero links “Quero estes dias” e mensagem de pausada. A oferta foi reativada e seu hash original restaurado novamente. A foto interna do Amore foi observada a 360×800 na prévia 2f1e6166; captura `outputs/launch-amore-interior-360.png`.
 
 Resultado final da revalidação: 20 opções retornaram na vitrine após reativação; outras cinco ofertas permaneceram pausadas. Captura desktop 1440×1000 `outputs/launch-amore-interior-1440.png` mostra interior, três seletores, botão Conhecer e navegação sem sobreposição. A suíte específica final passou 31/31 (publicações e caches), após as duas últimas correções; nenhuma alegação de nova suíte completa além dos 487 registrados acima.
+
+
+## Continuação autorizada — noite de 11/10
+
+O proprietário autorizou excluir reservas que não vieram de Booking/Airbnb, testes financeiros e vídeos de hóspedes identificados como testes. Snapshot privado integral das 51 tabelas públicas PROD salvo antes de qualquer alteração (`work/private-backups/prod-before-partial-launch-20261011.json`, fora do Git). Limpeza transacional por IDs e comparação integral das linhas com o snapshot: 47 reservas, 52 pagamentos e 25 garantias removidos, com dependências vinculadas. Nove integrações, um bloqueio de calendário e contas preservados. Nenhuma chamada de captura/cancelamento/estorno foi feita aos provedores nesta limpeza. A primeira tentativa foi rejeitada ainda nas guardas por tabela sem coluna id; nenhum DML havia sido executado, e a versão corrigida concluiu.
+
+Login do Airbnb confirmado no painel do anfitrião. A taxa de limpeza do Essenza está configurada em R$292 por estadia, sem taxa reduzida para estadias curtas. Isso explica exatamente os R$2 de diferença na comparação citada. A regra do site permanece R$290 por autorização explícita. Airbnb/Booking/PriceLabs não foram alterados. Evidência: `outputs/airbnb-essenza-cleaning-292.png`.
+
+Migration aditiva `partial_launch_compatibility` aplicada em PROD: calendários privados, ofertas, cache, publicações oficiais e compatibilidade de leitura do painel, além do bloqueio de novos holds diretos. Nenhum contrato, regra financeira existente ou usuário foi copiado de DEV. Teste PGlite verifica repetição, preservação, RLS e hold bloqueado. Seis feeds legítimos cadastrados por código do imóvel; limpeza R$290 nos três; uma Escapada ativa, sem produtos adicionais; geração automática de conteúdo desativada inicialmente.
+
+PROD booking-engine v66, public-consultation v1 e villegram-content v1 implantados. Respostas reais: consulta Essenza 17–19/10 retorna R$1531,65 e quote_id=null; vitrine retorna 20 cards; hold/start_payment/create_reservation/start_post_booking_payment com cabeçalho DEV falso retornam 403 public_checkout_disabled. O endpoint de busca usa start/end, não check_in/check_out; a chamada inicial com parâmetros incorretos retornou invalid_dates e não conta como falha da jornada.
+
+Endpoints antigos de QA encontrados em PROD foram guardados em backup privado e fechados: booking-engine-financial-preview v20, guarantee-preview v9, reservation-refund-preview v20. DEV permanece intacto. Os fontes de retorno estão em backups privados; não reabrir esses endpoints ao reverter apenas o frontend.
+
+Suite focada após a migration: 12/12 testes passaram. Variáveis de release PROD configuradas com perfil WhatsApp e chave publicável; atribuição automática de domínios foi temporariamente suspensa para validar o build antes de promover. Domínio oficial ainda apontava para dpl_GfCE3VYLNmxwSorGBUPYQjU6ys41 antes dessa preparação. Validação do build PROD e promoção permanecem em andamento; não afirmar publicação concluída.
