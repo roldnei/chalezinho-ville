@@ -9,7 +9,7 @@
 3. Inspecionar novamente PROD e a Vercel, pois pode haver avanço posterior. Base de produção observada nesta sessão: `4b54aee214493337b27edcc780bc1de155c632f3`; deployment `dpl_CSqwT4w5eHtc5gCQ3jyg6U2VmPDu`.
 4. Salvar definição/versionamento das funções atuais, configuração da Vercel, versão do banco e comprovar restauração do backup/PITR. Não exportar dados pessoais ou credenciais para o repositório.
 5. Revisar o delta de schema. As tabelas-base e pg_cron/pg_net/Vault consultados estavam presentes em PROD, mas `ops_stays` não existia e `finance_project_url` não estava provisionado. O procedimento cria `ops_project_url` próprio. Não copiar secrets DEV para PROD.
-6. Conferir permissões de equipe e horários por imóvel. Modelos padrão poderão criar tarefas históricas pendentes no backfill; não convertê-las em realizadas automaticamente. Planejar a triagem histórica com o administrador.
+6. Conferir permissões de equipe e horários por imóvel. A geração considera apenas hospedagens sem checkout registrado e com saída prevista hoje ou depois, no fuso de São Paulo. A quinta migração arquiva pendências históricas do backfill, preservando resultados e fotos. Não registra saída real por passagem do tempo.
 
 ## Migrações desta entrega
 
@@ -21,8 +21,9 @@ Aplicar somente este conjunto revisado, nesta ordem, comparando **nomes e conte�
 | `20261012163532_multichannel_schedule.sql` | Segredo próprio da rotina e job de 10 minutos |
 | `20261012192148_multichannel_reconciliation_hardening.sql` | Conflitos de datas, edição, conferência antecipada, lease de falha |
 | `20261012193354_multichannel_dispatch_target.sql` | Destino operacional próprio, validação de configuração ausente |
+| `20261012220612_multichannel_current_stays_only.sql` | Impede geração retroativa e arquiva pendências históricas sem apagar evidências |
 
-O arquivo `production-reviewed.sql` é um roteiro psql com transação única e `ON_ERROR_STOP`. Ele provisiona apenas o destino PROD conhecido, aplica as quatro migrações e deixa o cron **inativo**. Ele **não foi executado em produção**. Revise antes de usar. Em ambientes com migrações parcialmente aplicadas, pare e reconcilie o histórico; não force repetição de DDL nem execute `db push` indiscriminadamente.
+O arquivo `production-reviewed.sql` é um roteiro psql com transação única e `ON_ERROR_STOP`. Ele provisiona apenas o destino PROD conhecido, aplica as cinco migrações e deixa o cron **inativo**. Ele **não foi executado em produção**. Revise antes de usar. Em ambientes com migrações parcialmente aplicadas, pare e reconcilie o histórico; não force repetição de DDL nem execute `db push` indiscriminadamente.
 
 ## Serviços e frontend
 

@@ -16,6 +16,7 @@ end $$;
 \ir ../../supabase/migrations/20261012163532_multichannel_schedule.sql
 \ir ../../supabase/migrations/20261012192148_multichannel_reconciliation_hardening.sql
 \ir ../../supabase/migrations/20261012193354_multichannel_dispatch_target.sql
+\ir ../../supabase/migrations/20261012220612_multichannel_current_stays_only.sql
 -- Leave inactive until the reviewed Edge service has been deployed and verified.
 select cron.alter_job(jobid,active:=false) from cron.job where jobname='multichannel-operational-sync';
 commit;

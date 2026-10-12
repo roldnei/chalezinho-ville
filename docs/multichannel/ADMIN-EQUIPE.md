@@ -34,3 +34,5 @@ Estado: implementação em DEV; homologação visual de fotos e celular ainda pe
 - A ausência de evento ou falha de leitura mantém a hospedagem e gera divergência. Cancelamento explícito cancela tarefas futuras pertinentes; histórico concluído permanece.
 - Imagens novas são privadas, anexadas com autor/horário/item/etapa. Links assinados expiram em 5 minutos. Não compartilhe esses links.
 - HEIC não foi homologado. Use JPEG/PNG/WebP; limite de entrada 25 MB, compressão até 1600 px e 512 KiB. Câmera, orientação e recuperação após falha de rede precisam da validação pendente em celular real.
+
+A geração automática abrange hospedagens sem checkout registrado, com saída prevista hoje ou depois (America/Sao_Paulo). Reservas antigas continuam no histórico e não criam novas tarefas. As pendências retroativas da implantação foram arquivadas; fotos e resultados permanecem em **Todas, incluindo histórico**. Conferências geradas para hospedagens atuais continuam disponíveis após a saída até sua conclusão. Limpezas avulsas não são afetadas.

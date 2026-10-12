@@ -121,3 +121,42 @@ test('direct REST roles cannot read operational data or invoke privileged RPCs',
  await assert.rejects(db.query('select ops_mutate($1,$2,$3)',[admin,'manual_task',{}]),/permission denied/);
  await db.exec('reset role');
 });
+
+// Upgrade-path regression: old migrations above intentionally reproduce the
+// historical backfill, then this migration repairs it without losing evidence.
+test('current-only upgrade archives historical pending work and retains all evidence/results/manual work',async()=>{
+ const old=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) values(2,'direct','manual','not_recorded','2001-01-01','2001-01-03') returning *");
+ const task=await one("select * from ops_tasks where stay_id=$1 and stage='preparation'",[old.id]);
+ await mutate('result',{task_id:task.id,item_index:0,result:'ok',observation:'Must survive archive'});
+ const upload=crypto.randomUUID();await mutate('photo',{task_id:task.id,item_index:0,upload_id:upload,sha256:'historical',size_bytes:12,content_type:'image/jpeg'});
+ const manual=await mutate('manual_task',{property_id:1,stage:'preparation',title:'Avulsa histórica',scheduled_for:'2001-02-01T12:00:00Z',due_at:'2001-02-01T14:00:00Z'});
+ const before=await one('select (select count(*)::int from ops_tasks) tasks,(select count(*)::int from ops_evidence) photos,(select count(*)::int from ops_task_results) results');
+ await db.exec(await readFile(new URL('../supabase/migrations/20261012220612_multichannel_current_stays_only.sql',import.meta.url),'utf8'));
+ assert.equal((await one('select status from ops_tasks where id=$1',[task.id])).status,'superseded');
+ assert.equal((await one('select status from ops_tasks where id=$1',[manual.id])).status,'pending');
+ assert.deepEqual(await one('select (select count(*)::int from ops_tasks) tasks,(select count(*)::int from ops_evidence) photos,(select count(*)::int from ops_task_results) results'),before);
+ assert.equal((await one('select checked_out_at from ops_stays where id=$1',[old.id])).checked_out_at,null);
+});
+test('historical imports and recorded checkouts never generate tasks, including after repeated refresh',async()=>{
+ await sync([event('past-no-tasks','2002-01-01','2002-01-03')]);
+ const checked=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out,checked_out_at) values(2,'direct','manual','not_recorded','2098-01-01','2098-01-03',now()) returning *");
+ await db.exec('select ops_refresh_tasks(); select ops_refresh_tasks()');
+ assert.equal((await one("select count(*)::int n from ops_tasks t join ops_stays s on s.id=t.stay_id where s.external_id='past-no-tasks' or s.id=$1",[checked.id])).n,0);
+});
+test('São Paulo today remains eligible and yesterday is historical without inventing actual checkout',async()=>{
+ const today=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) select 2,'direct','manual','not_recorded',d-2,d from (select (now() at time zone 'America/Sao_Paulo')::date d) x returning *");
+ const yesterday=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) select 2,'direct','manual','not_recorded',d-4,d-1 from (select (now() at time zone 'America/Sao_Paulo')::date d) x returning *");
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[today.id])).n,2);
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[yesterday.id])).n,0);
+ assert.equal(today.checked_out_at,null);assert.equal(yesterday.checked_out_at,null);
+});
+test('future arrival creates one task per stage; actual checkout retains already scheduled departure inspection',async()=>{
+ const stay=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) values(2,'direct','manual','not_recorded','2099-01-01','2099-01-03') returning *");
+ await db.exec('select ops_refresh_tasks(); select ops_refresh_tasks()');
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[stay.id])).n,2);
+ const departure=await one("select * from ops_tasks where stay_id=$1 and stage='departure'",[stay.id]);
+ await db.query('update ops_stays set checked_out_at=now() where id=$1',[stay.id]);
+ await db.exec('select ops_refresh_tasks()');
+ assert.equal((await one('select status from ops_tasks where id=$1',[departure.id])).status,'pending');
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[stay.id])).n,2);
+});
