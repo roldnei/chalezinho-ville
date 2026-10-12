@@ -32,6 +32,7 @@ async function sync(){
    catch(e){failure=e instanceof Error?e.message:'calendar_unavailable';if(!['calendar_unreachable','fetch failed'].includes(failure)&&!failure.toLowerCase().includes('timeout'))break;if(attempt<3)await new Promise(r=>setTimeout(r,attempt*400));}
   }
   const applied=await admin.rpc('ops_apply_sync',{p_source:source.id,p_token:token,p_config_updated:source.updated_at,p_events:events,p_error:failure,p_attempts:Math.min(attempt,3)});
+  if(applied.error)checked(await admin.rpc('ops_fail_sync',{p_source:source.id,p_token:token,p_error:'database_reconciliation_failed'}));
   results.push({source_id:source.id,status:applied.error?'reconciliation_failed':failure?'failed':'success',events:events.length,error:applied.error?'database_reconciliation_failed':failure});
  }
  checked(await admin.rpc('ops_refresh_tasks',{}));
@@ -100,7 +101,7 @@ Deno.serve(async req=>{
   return json({ok:false,error:'invalid_action'},400);
  }catch(e){
   const message=e instanceof Error?e.message:'operation_unavailable';
-  const known=['permission_denied','admin_required','task_not_found','invalid_assignee','invalid_status','task_locked','departure_not_due','checklist_and_photos_required','inspection_required','invalid_item','upload_key_conflict','photo_upload_failed_retry','existing_stay_link_required','use_reservation_flow','manual_dates_required','already_linked','link_dates_or_property_differ','attendance_not_allowed','invalid_checklist'];
+  const known=['stay_changed_reload','linked_identity_locked','invalid_task_window','permission_denied','admin_required','task_not_found','invalid_assignee','invalid_status','task_locked','departure_not_due','checklist_and_photos_required','inspection_required','invalid_item','upload_key_conflict','photo_upload_failed_retry','existing_stay_link_required','use_reservation_flow','manual_dates_required','already_linked','link_dates_or_property_differ','attendance_not_allowed','invalid_checklist'];
   return json({ok:false,error:known.find(k=>message.includes(k))||'operation_unavailable'},known.some(k=>message.includes(k))?409:503);
  }
 });

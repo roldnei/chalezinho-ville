@@ -64,7 +64,7 @@ async function load(silent=false){
 function updateCounts(){
   const t=today(),todayRows=state.reservations.filter(r=>r.status==="confirmed"&&(r.check_in===t||r.check_out===t));
   const unread=state.notifications.filter(n=>!n.read_at).length;
-  $("#nav-today-count").textContent=todayRows.length;$("#nav-alert-count").textContent=unread;$("#top-alert-count").textContent=unread;
+  $("#nav-today-count").textContent=state.opsTodayCount??"—";$("#nav-alert-count").textContent=unread;$("#top-alert-count").textContent=unread;
   $("#nav-alert-count").hidden=!unread;$("#top-alert-count").hidden=!unread;
 }
 function showView(view){
@@ -756,7 +756,7 @@ openProperty=function(id){
  legacyProperty(id);const form=$('#property-form');const groups={photos:[],conditions:['cleaning_fee','guarantee_amount','max_installments','no_interest_installments','interest_payer'],details:['name','code','slug','property_type','max_guests','check_in_time','check_out_time','active']};form.querySelectorAll('label').forEach(l=>{const input=l.querySelector('input,select,textarea');if(input)l.hidden=!groups[key].includes(input.name)});form.querySelector('.property-media-editor').hidden=key!=='photos';$('#admin-modal-content h2').textContent={photos:'Fotos do imóvel',conditions:'Taxas e pagamento',details:'Dados do imóvel'}[key];$('#admin-modal-content .property-form-heading').insertAdjacentHTML('afterbegin','<button type="button" class="workspace-back" id="back-workspace">← '+esc(p.name)+'</button>');$('#back-workspace').onclick=()=>openProperty(id);
  });
 };
-renderToday=function(){window.VilleOperations.mount($("#admin-content"),{sb});};
+renderToday=function(){window.VilleOperations.mount($("#admin-content"),{sb,onSummary:summary=>{state.opsTodayCount=summary?new Set([...summary.arrivals,...summary.departures].map(s=>s.id)).size:null;$("#nav-today-count").textContent=state.opsTodayCount??"—";}});};
 setupWorkspace();
 
 boot();

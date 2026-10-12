@@ -18,6 +18,7 @@ before(async()=>{
  create table property_calendar_sources(id uuid primary key default gen_random_uuid(),property_id bigint,provider text,updated_at timestamptz default now(),enabled boolean default true,deleted_at timestamptz);
  `);
  await db.exec(await readFile(new URL('../supabase/migrations/20261012162927_multichannel_operations.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261012192148_multichannel_reconciliation_hardening.sql',import.meta.url),'utf8'));
  source=await one("insert into property_calendar_sources(property_id,provider) values(1,'airbnb') returning *");
 });
 after(()=>db.close());
@@ -71,4 +72,52 @@ test('photo/checklist completion, immutable evidence and authorization',async()=
 });
 test('template edit versions do not rewrite task snapshot',async()=>{
  const before=await one('select * from ops_tasks limit 1');await mutate('template',{stage:'preparation',name:'QA revisão',items:['Um item novo']});assert.deepEqual((await one('select checklist_snapshot from ops_tasks where id=$1',[before.id])).checklist_snapshot,before.checklist_snapshot);
+});
+
+test('manual metadata edits persist; linked identity and stale edits are rejected',async()=>{
+ const s=await mutate('save_stay',{property_id:2,channel:'direct',external_id:'QA-DIRECT',check_in:'2090-03-01',check_out:'2090-03-03'});
+ const changed=await mutate('save_stay',{...s,channel:'booking',external_id:'QA-BOOKING',expected_version:s.version});
+ assert.equal(changed.channel,'booking');assert.equal(changed.external_id,'QA-BOOKING');assert.equal(changed.payment_origin,'external_channel');
+ await assert.rejects(mutate('save_stay',{...changed,expected_version:999}),/stay_changed_reload/);
+ const linked=await one("select * from ops_stays where external_id='amore'");
+ await assert.rejects(mutate('save_stay',{...linked,channel:'direct'}),/linked_identity_locked/);
+});
+test('calendar date overlap is retained for human review without changing stay/tasks',async()=>{
+ const a=await mutate('save_stay',{property_id:1,channel:'direct',check_in:'2091-01-05',check_out:'2091-01-07'});
+ await sync([event('move-conflict','2091-01-01','2091-01-03')]);
+ const old=await one("select * from ops_stays where external_id='move-conflict'");
+ await sync([event('move-conflict','2091-01-05','2091-01-07')]);
+ const current=await one('select * from ops_stays where id=$1',[old.id]);
+ assert.deepEqual(current.check_in,old.check_in);assert.equal(current.version,old.version);
+ assert.equal((await one("select divergence from ops_calendar_events where uid='move-conflict'")).divergence,'date_change_overlap_review_required');
+});
+test('explicit cancellation cancels future tasks and reappearance does not reactivate',async()=>{
+ await sync([event('cancel-me','2092-01-01','2092-01-03')]);
+ await sync([{...event('cancel-me','2092-01-01','2092-01-03'),cancelled:true}]);
+ const stay=await one("select * from ops_stays where external_id='cancel-me'");assert.equal(stay.status,'cancelled');
+ assert.equal((await one("select count(*)::int n from ops_tasks where stay_id=$1 and status='cancelled'",[stay.id])).n,2);
+ await sync([event('cancel-me','2092-01-01','2092-01-03')]);
+ assert.equal((await one('select status from ops_stays where id=$1',[stay.id])).status,'cancelled');
+});
+test('stale sequence records divergence and reconciliation failure releases only its lease',async()=>{
+ await sync([{...event('seq','2093-01-01','2093-01-03'),sequence:3}]);
+ await sync([{...event('seq','2093-01-02','2093-01-04'),sequence:2}]);
+ assert.equal((await one("select divergence from ops_calendar_events where uid='seq'")).divergence,'stale_provider_sequence');
+ const token=(await one('select ops_claim_sync($1) token',[source.id])).token;
+ await one('select ops_fail_sync($1,$2,$3)',[source.id,crypto.randomUUID(),'wrong_worker']);
+ assert.equal((await one('select lease_id from ops_sync_state where source_id=$1',[source.id])).lease_id,token);
+ await one('select ops_fail_sync($1,$2,$3)',[source.id,token,'database_reconciliation_failed']);
+ assert.equal((await one('select lease_id from ops_sync_state where source_id=$1',[source.id])).lease_id,null);
+});
+test('departure results/photos are rejected before due time and manual windows are validated',async()=>{
+ const t=await one("select t.* from ops_tasks t join ops_stays s on s.id=t.stay_id where s.external_id='seq' and t.stage='departure'");
+ await assert.rejects(mutate('result',{task_id:t.id,item_index:0,result:'ok'}),/departure_not_due/);
+ await assert.rejects(mutate('photo',{task_id:t.id,item_index:0,upload_id:crypto.randomUUID()}),/departure_not_due/);
+ await assert.rejects(mutate('manual_task',{property_id:1,stage:'preparation',title:'QA',scheduled_for:'2093-02-01T15:00:00Z',due_at:'2093-02-01T14:00:00Z'}),/invalid_task_window/);
+});
+test('direct REST roles cannot read operational data or invoke privileged RPCs',async()=>{
+ await db.exec('set role authenticated');
+ await assert.rejects(db.query('select * from ops_evidence'),/permission denied/);
+ await assert.rejects(db.query('select ops_mutate($1,$2,$3)',[admin,'manual_task',{}]),/permission denied/);
+ await db.exec('reset role');
 });

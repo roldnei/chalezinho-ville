@@ -21,7 +21,9 @@ async function boot(){const x=await sb.auth.getSession();session=x.data.session;
 function bind(){$(".rail-nav").onclick=e=>{const b=e.target.closest("[data-view]");if(!b||!state)return;show(b.dataset.view);document.body.classList.remove("menu-open")};$("#menu-toggle").onclick=()=>document.body.classList.toggle("menu-open");$("#refresh").onclick=load;$("#new-action").onclick=()=>view==="templates"?openTemplate():view==="blocks"?openBlock():openNew(view==="maintenance"?"issue":"task");$("#sign-out").onclick=async()=>{await sb.auth.signOut();location.href="auth.html"};$$('[data-close-sheet]').forEach(b=>b.onclick=closeSheet);$$('[data-close-modal]').forEach(b=>b.onclick=closeModal);document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet();closeModal()}})}
 async function load(){$("#loading").hidden=false;$("#content").hidden=true;try{state=await api("hub");updateNavigation();updateCounts();show(view);$("#loading").hidden=true;$("#content").hidden=false;$("#pms-shell").setAttribute("aria-busy","false")}catch{$("#loading").innerHTML="<p>Não foi possível carregar a operação. Tente novamente em instantes.</p>"}}
 function updateNavigation(){const admin=state.operator?.role==="admin";$(".suite-nav").hidden=!admin;$(".admin-pms-entry").hidden=!(admin||state.operator?.role==="host"&&state.operator?.permissions?.manage_listings===true)}
-function updateCounts(){const t=saoDate(),today=state.tasks.filter(x=>localDay(x.scheduled_for)===t&&!["ready","cancelled"].includes(x.status));$("#today-count").textContent=today.length;$("#task-count").textContent=state.tasks.filter(x=>!["ready","cancelled"].includes(x.status)).length;$("#issue-count").textContent=state.issues.length}
+function updateCounts(){const summary=state.opsSummary;$("#today-count").textContent=summary?new Set([...summary.arrivals,...summary.departures].map(s=>s.id)).size:"—";$("#task-count").textContent=summary?summary.pending.length:"—";$("#issue-count").textContent=state.issues.length}
+function operationSummaryChanged(summary){state.opsSummary=summary;updateCounts()}
+
 function show(next){view=next;history.replaceState(null,"",location.pathname+"?view="+next);$$('[data-view]').forEach(b=>b.classList.toggle("active",b.dataset.view===next));const titles={today:["OPERAÇÃO DE HOJE","Tarefas de hoje"],agenda:["PRÓXIMOS MOVIMENTOS","Agenda operacional"],reservations:["JORNADA DO HÓSPEDE","Reservas"],blocks:["DISPONIBILIDADE OPERACIONAL","Bloqueios"],tasks:["ROTINA DA EQUIPE","Tarefas"],maintenance:["CUIDADO COM OS IMÓVEIS","Manutenção"],indicators:["LEITURA DA OPERAÇÃO","Indicadores"],templates:["PADRÃO DE ENTREGA","Checklists"],team:["PESSOAS E RESPONSABILIDADES","Equipe e acessos"]};const title=titles[next]||titles.today;$("#eyebrow").textContent=title[0];$("#page-title").textContent=title[1];$("#new-action").hidden=["indicators","reservations"].includes(next)||(next==="team"&&state.operator?.role!=="admin");$("#new-action").textContent=next==="team"?"+ Convidar pessoa":next==="maintenance"?"+ Nova ocorrência":next==="templates"?"+ Novo checklist":next==="blocks"?"+ Novo bloqueio":"+ Nova tarefa";if(next==="team")$("#new-action").onclick=openTeamInvite;else $("#new-action").onclick=()=>view==="templates"?openTemplate():view==="blocks"?openBlock():openNew(view==="maintenance"?"issue":"task");({today:renderToday,agenda:renderAgenda,reservations:renderReservations,blocks:renderBlocks,tasks:renderTasks,maintenance:renderMaintenance,indicators:renderIndicators,templates:renderTemplates,team:renderTeam}[next]||renderToday)()}
 function empty(text){return `<div class="empty">${esc(text)}</div>`}
 function activeReservations(){return state.reservations.filter(r=>r.status==="confirmed"&&r.check_in<=saoDate()&&r.check_out>saoDate())}
@@ -107,11 +109,12 @@ async function loadCleaningPhotos(id){
 }
 
 const previousTasks=renderTasks;
-renderToday=()=>window.VilleOperations.mount($("#content"),{sb});
-renderReservations=()=>window.VilleOperations.mount($("#content"),{sb,initial:"stays"});
-renderAgenda=()=>window.VilleOperations.mount($("#content"),{sb,initial:"next"});
-renderTasks=()=>window.VilleOperations.mount($("#content"),{sb,initial:"tasks"});
-renderTemplates=()=>window.VilleOperations.mount($("#content"),{sb,initial:"templates"});
-const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();return;}originalShow(next);if(["today","agenda","tasks","templates","reservations"].includes(next))$("#new-action").hidden=true;};
+renderToday=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
+renderReservations=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"stays"});
+renderAgenda=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"next"});
+renderTasks=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"tasks"});
+renderTemplates=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"templates"});
+renderIndicators=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
+const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();return;}originalShow(next);if(["today","agenda","tasks","templates","reservations","indicators"].includes(next))$("#new-action").hidden=true;};
 boot();
 })();
