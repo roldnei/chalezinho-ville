@@ -16,13 +16,13 @@ async function setup(t,{deferred=false,following=false}={}){
  w.fetch=async()=>({ok:true,json:async()=>{if(deferred)await ready;return feed}});
  w.eval(renderer);w.eval(content);return {w,resolve,settle:()=>new Promise(r=>setTimeout(r,20))};
 }
-for(const order of ['offers-first','publications-first'])test('offers are moderated when quotes arrive: '+order,async t=>{
+for(const order of ['offers-first','publications-first'])test('every valid escape remains reachable when quotes arrive: '+order,async t=>{
  const {w,resolve,settle}=await setup(t,{deferred:order==='offers-first'});if(order==='publications-first')await settle();
  const old=w.document.querySelector('.vg-reel');w.Villegram.configure([...escapes,escapes[0],{...escape(),check_in:'2000-01-01'}],[],[]);resolve();await settle();
- assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 5$/);
+ assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 28$/);
  if(old)assert.equal(w.document.querySelector('.vg-reel'),old,'delayed quotes must preserve playback');
- const seen=new Set();for(let i=0;i<5;i++){const cta=w.document.querySelector('.vg-primary');if(w.document.querySelector('.vg-escape'))seen.add(cta.getAttribute('href'));w.document.querySelector('[data-action=next]').click();}
- assert.equal(seen.size,1);assert.equal(w.document.querySelector('[data-action=next]').disabled,true);
+ const seen=new Set();for(let i=0;i<28;i++){const cta=w.document.querySelector('.vg-primary');if(w.document.querySelector('.vg-escape'))seen.add(cta.getAttribute('href'));w.document.querySelector('[data-action=next]').click();}
+ assert.equal(seen.size,24);assert.equal(w.document.querySelector('[data-action=next]').disabled,true);
 });
 test('same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh',async t=>{
  const {w,settle}=await setup(t);await settle();const two=escape(),three={...two,check_out:'2040-11-19',nights:3,total_cents:170000};w.Villegram.configure([two,three],[],[]);w.Villegram.open(three);
@@ -30,7 +30,7 @@ test('same arrival preserves the clicked departure, condition and total, without
  w.Villegram.configure([two,three],[],[]);assert.equal(w.document.querySelector('.vg-reel'),reel);assert.equal(w.document.querySelector('.vg-primary').href,href);assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 6$/);
  assert.equal(w.document.querySelector('details').open,false);assert.doesNotMatch(w.document.querySelector('.vg-escape-alternatives').textContent,/Somente hospedagem/);assert.doesNotMatch(w.document.querySelector('details').textContent,/Desconto.*100,00/);assert.equal(w.document.querySelector('h2').textContent,'Escapada Ultra Premium');assert.equal(w.document.querySelector('h3').textContent,'16 → 19 nov. · 2040');assert.equal(w.document.querySelector('.vg-bottom-nav').children.length,4);
  w.Villegram.openHome(three);w.Villegram.remember();assert.ok(w.history.state.villegramPosition.id.includes(three.check_out));
- w.Villegram.close();w.VillegramContent.enter();assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 5','normal entry resets the feed');
+ w.Villegram.close();w.VillegramContent.enter();assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 6','normal entry resets the feed');
 });
 test('following feed remains limited to followed publications',async t=>{const {w,settle}=await setup(t,{following:true});await settle();w.Villegram.configure(escapes,[],[]);assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 4$/)});
 
@@ -44,10 +44,10 @@ test('ranking balances recency, chalet interest and diversity while offers keep 
  const ranked=w.VillegramContent.rank([old,...fresh]);assert.equal(ranked[0].property_code,'CH2');assert.notEqual(ranked[0].publication.id,'old');
  assert.notEqual(w.VillegramContent.rank(fresh,ranked[0])[0].property_code,'CH2');
  const mixed=Array.from(w.VillegramContent.mix([...fresh,...escapes]));
- assert.equal(mixed.filter(c=>!c.publication).length,3);
- assert.deepEqual(mixed.flatMap((c,i)=>!c.publication?[i]:[]),[3,7,11]);
+ assert.equal(mixed.filter(c=>!c.publication).length,24);
+ assert.deepEqual(mixed.flatMap((c,i)=>!c.publication?[i]:[]).slice(0,4),[3,7,11,15]);
  assert.equal(new Set(mixed.filter(c=>!c.publication).map(c=>c.property_id)).size,3);
- assert.equal(w.VillegramContent.mix(escapes).length,3);assert.equal(w.VillegramContent.mix([fresh[0],...escapes]).length,2);
+ assert.equal(w.VillegramContent.mix(escapes).length,24);assert.equal(w.VillegramContent.mix([fresh[0],...escapes]).length,25);
 });
 
 test('page visits persist bounded local interest, expire and respect privacy preferences',async t=>{
