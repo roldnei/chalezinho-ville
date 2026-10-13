@@ -1,5 +1,5 @@
 {
-  "buildCommand": "node scripts/build-finance-preview.mjs",
+  "buildCommand": "VILLE_RELEASE_PROFILE=whatsapp node scripts/build-finance-preview.mjs",
   "outputDirectory": "dist",
   "functions": {
     "api/stay-showcase.js": {
