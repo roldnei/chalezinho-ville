@@ -16,13 +16,13 @@ async function setup(t,{deferred=false,following=false}={}){
  w.fetch=async()=>({ok:true,json:async()=>{if(deferred)await ready;return feed}});
  w.eval(renderer);w.eval(content);return {w,resolve,settle:()=>new Promise(r=>setTimeout(r,20))};
 }
-for(const order of ['offers-first','publications-first'])test('every showcase escape joins the initial feed without a click: '+order,async t=>{
+for(const order of ['offers-first','publications-first'])test('offers are moderated when quotes arrive: '+order,async t=>{
  const {w,resolve,settle}=await setup(t,{deferred:order==='offers-first'});if(order==='publications-first')await settle();
  const old=w.document.querySelector('.vg-reel');w.Villegram.configure([...escapes,escapes[0],{...escape(),check_in:'2000-01-01'}],[],[]);resolve();await settle();
- assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 28$/);
+ assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 5$/);
  if(old)assert.equal(w.document.querySelector('.vg-reel'),old,'delayed quotes must preserve playback');
- const seen=new Set();for(let i=0;i<28;i++){const cta=w.document.querySelector('.vg-primary');if(w.document.querySelector('.vg-escape'))seen.add(cta.getAttribute('href'));w.document.querySelector('[data-action=next]').click();}
- assert.equal(seen.size,24);assert.equal(w.document.querySelector('[data-action=next]').disabled,true);
+ const seen=new Set();for(let i=0;i<5;i++){const cta=w.document.querySelector('.vg-primary');if(w.document.querySelector('.vg-escape'))seen.add(cta.getAttribute('href'));w.document.querySelector('[data-action=next]').click();}
+ assert.equal(seen.size,1);assert.equal(w.document.querySelector('[data-action=next]').disabled,true);
 });
 test('same arrival preserves the clicked departure, condition and total, without duplicates on repeated refresh',async t=>{
  const {w,settle}=await setup(t);await settle();const two=escape(),three={...two,check_out:'2040-11-19',nights:3,total_cents:170000};w.Villegram.configure([two,three],[],[]);w.Villegram.open(three);
@@ -30,8 +30,29 @@ test('same arrival preserves the clicked departure, condition and total, without
  w.Villegram.configure([two,three],[],[]);assert.equal(w.document.querySelector('.vg-reel'),reel);assert.equal(w.document.querySelector('.vg-primary').href,href);assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 6$/);
  assert.equal(w.document.querySelector('details').open,false);assert.doesNotMatch(w.document.querySelector('.vg-escape-alternatives').textContent,/Somente hospedagem/);assert.doesNotMatch(w.document.querySelector('details').textContent,/Desconto.*100,00/);assert.equal(w.document.querySelector('h2').textContent,'Escapada Ultra Premium');assert.equal(w.document.querySelector('h3').textContent,'16 → 19 nov. · 2040');assert.equal(w.document.querySelector('.vg-bottom-nav').children.length,4);
  w.Villegram.openHome(three);w.Villegram.remember();assert.ok(w.history.state.villegramPosition.id.includes(three.check_out));
- w.Villegram.close();w.VillegramContent.enter();assert.equal(w.document.querySelector('.vg-primary').href,href,'return must restore the exact escape');
+ w.Villegram.close();w.VillegramContent.enter();assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 5','normal entry resets the feed');
 });
 test('following feed remains limited to followed publications',async t=>{const {w,settle}=await setup(t,{following:true});await settle();w.Villegram.configure(escapes,[],[]);assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 4$/)});
 
 test('private composer previews retain the saved immersive headline',async t=>{const {w,settle}=await setup(t);await settle();const preview={...escape(),preview:true};w.Villegram.configure([preview],[{id:preview.offer_id,villegram:{title:'Título imersivo salvo no editor'}}],[]);w.Villegram.open(preview);assert.equal(w.document.querySelector('h2').textContent,'Título imersivo salvo no editor');assert.equal(w.document.querySelector('.vg-price').textContent,'Consulte as datas para saber o total')});
+
+test('ranking balances recency, chalet interest and diversity while offers keep their cadence',async t=>{
+ const {w,settle}=await setup(t);await settle();
+ const fresh=Array.from({length:12},(_,i)=>({publication:{id:'p'+i,created_at:new Date().toISOString()},property_id:i%3+1,property_code:'CH'+(i%3+1)}));
+ const old={publication:{id:'old',created_at:'2000-01-01'},property_code:'CH2',property_id:2};
+ w.VillegramPreferences={score:code=>code==='CH2'?5:0};
+ const ranked=w.VillegramContent.rank([old,...fresh]);assert.equal(ranked[0].property_code,'CH2');assert.notEqual(ranked[0].publication.id,'old');
+ assert.notEqual(w.VillegramContent.rank(fresh,ranked[0])[0].property_code,'CH2');
+ const mixed=Array.from(w.VillegramContent.mix([...fresh,...escapes]));
+ assert.equal(mixed.filter(c=>!c.publication).length,3);
+ assert.deepEqual(mixed.flatMap((c,i)=>!c.publication?[i]:[]),[3,7,11]);
+ assert.equal(new Set(mixed.filter(c=>!c.publication).map(c=>c.property_id)).size,3);
+ assert.equal(w.VillegramContent.mix(escapes).length,3);
+});
+
+test('page visits persist bounded local interest, expire and respect privacy preferences',async t=>{
+ const {w,settle}=await setup(t);await settle();const script=await readFile(new URL('../villegram-preferences.js',import.meta.url),'utf8');
+ w.history.replaceState(null,'','/chale-com-hidro.html');w.eval(script);assert.ok(w.VillegramPreferences.score('CH2')>0);assert.equal(w.VillegramPreferences.score('CH1'),0);
+ w.localStorage.setItem('ville-moments-chalet-interest',JSON.stringify({CH2:{count:4,at:Date.now()-31*86400000}}));assert.equal(w.VillegramPreferences.score('CH2'),0);
+ Object.defineProperty(w.navigator,'globalPrivacyControl',{value:true});w.VillegramPreferences.visit('CH1');assert.equal(w.VillegramPreferences.score('CH1'),0);
+});
