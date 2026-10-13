@@ -1,5 +1,7 @@
 # Preflight de publicação — 13/10/2026
 
+> Histórico anterior à publicação. Backup, validação DEV da função candidata e publicação autorizada foram realizados posteriormente; veja `PUBLICADO-20261013.md` para o estado vigente e a pendência de login para conferência visual administrativa PROD.
+
 ## Situação
 
 Produção NÃO alterada. Recuperação do banco bloqueada por ausência de backup acessível. Revisão estática do pacote concluída; encontrada e corrigida geração legada no PMS. A alteração adicional ainda exige implantação DEV e verificação da função candidata antes de publicar. Não é aprovação de produção.

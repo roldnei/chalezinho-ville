@@ -1,6 +1,6 @@
 # Publicação futura e retorno — revisão obrigatória
 
-**Não executar em PROD nesta entrega. Homologação incompleta.**
+**Registro histórico de preparação.** A publicação autorizada em 13/10/2026 foi executada. Consulte `PUBLICADO-20261013.md` para versões, evidências e a conferência visual administrativa ainda pendente. As instruções abaixo documentam a preparação e o retorno; não reaplicar as migrações já instaladas.
 
 ## Antes de aprovar produção
 
