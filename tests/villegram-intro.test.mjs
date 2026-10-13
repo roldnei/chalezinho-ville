@@ -71,10 +71,10 @@ test('reduced motion keeps all three manual choices, while shared publications a
   }finally{p.close()}
  }
 });
-test('reload restores the selected intro chalet without importing a scene from another Trip',async()=>{
+test('reload always starts at the first intro scene',async()=>{
  for(const saved of [{id:'intro:chalets',photo:2},{id:publication.id,photo:7}]){
   const p=await page({saved});
-  try{assert.equal(p.w.document.querySelector('[data-intro-name]').textContent,saved.id==='intro:chalets'?'Ville Amore':'Ville Signature');assert.equal(p.w.document.querySelector('[data-intro-link]:not([hidden])').getAttribute('href'),saved.id==='intro:chalets'?'chale-romantico.html':'chale-premium.html')}
+  try{assert.equal(p.w.document.querySelector('[data-intro-name]').textContent,'Ville Signature');assert.equal(p.w.document.querySelector('[data-intro-link]:not([hidden])').getAttribute('href'),'chale-premium.html')}
   finally{p.close()}
  }
 });

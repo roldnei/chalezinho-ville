@@ -1,12 +1,12 @@
 # Ville Faxinas — validação de 13/10/2026
 
-Módulo independente implementado no repositório roldnei/chalezinho-ville. Base de inspeção: 2730681, branch feature/multichannel-operations-20261012; avanços até 16e78d6 incorporados: correção de campos de data no iPhone e conclusão guiada do PMS. Regras de preparação/saída do PMS mais recentes preservadas no adaptador. Produção, checkout e pagamentos de hospedagens não foram publicados ou substituídos por este trabalho.
+Módulo independente implementado no repositório roldnei/chalezinho-ville. Base de inspeção: 2730681, branch feature/multichannel-operations-20261012; avanços até 4d46933 incorporados (Ville Moments, preferências e proporção de ofertas preservados): correção de campos de data no iPhone e conclusão guiada do PMS. Regras de preparação/saída do PMS mais recentes preservadas no adaptador. Produção, checkout e pagamentos de hospedagens não foram publicados ou substituídos por este trabalho.
 
 ## Acesso e fluxos
 
 - `faxinas.html`: entrada pública, contratar ou trabalhar; os dois papéis na mesma conta.
 - `faxinas-admin.html`: administração exclusiva. O servidor revalida cada ação; esconder botões não é o controle de acesso.
-- Login: uma tela; criação de conta: uma tela com nome, celular, e-mail e senha compatível com o Auth existente. A confirmação de e-mail pode exigir abrir o link externo.
+- Login: uma tela; criação de conta: uma tela com nome, celular, e-mail e senha compatível com o Auth existente. Novos usuários precisam confirmar o e-mail. Há tela de confirmação, reenvio, correção de acesso e recuperação do login quando o Auth informa e-mail não confirmado. Contas já confirmadas usam o mesmo acesso; telefone informado não é apresentado como verificado.
 - Perfil: uma tela curta. A parte profissional aparece somente quando escolhida.
 - Imóvel: duas telas; foto não é obrigatória. Metragem desconhecida exige análise ou preço administrativo explícito, sem metragem inventada.
 - Pedido: duas telas após cadastrar o imóvel: dia/janela e revisão do preço/escopo/termos. Um imóvel é selecionado automaticamente.
@@ -55,7 +55,7 @@ A versão permite validar cadastro, pedidos e aceite, mas **não operar serviço
 4. **Concluir e homologar a integração de liquidação/EDI**, com fonte de confirmação do recebimento efetivo e conciliação de taxas do intermediador. O ledger possui a observação privada de liquidação, mas não há conector EDI habilitado neste ambiente. `CLEANING_SETTLEMENT_INTEGRATION` permanece ausente; não configurar `verified` sem concluir essa integração e testar os valores líquidos. Liberação de custódia só move para processando.
 5. O PagBank pode liberar custódia automaticamente em seu prazo máximo. Definir uma janela que cubra serviço/conferência/ocorrência e não prometer retenção indefinida. A criação é bloqueada quando o serviço excede a janela configurada.
 6. Verificar identidade e recebimento dos participantes reais, cadastrar a referência de autorização e liberar individualmente. Nada foi enviado a profissionais/proprietários externos.
-7. Cadastrar dados reais dos chalés (endereço, área, camas, materiais e acesso), vincular cada imóvel autorizado do PMS e definir sua profissional/regra. Não inventamos dados faltantes nem habilitamos imóveis reais automaticamente.
+7. Os imóveis ativos autorizados no PMS são carregados automaticamente na conta proprietária do mesmo ambiente ao entrar/salvar perfil. Completar endereço, cidade/bairro, quartos, banheiros, camas e dados de limpeza que não existem no PMS. Área continua desconhecida até informação ou orçamento assistido. Definir profissional/regra e habilitar a geração automática separadamente na administração.
 8. Revisar juridicamente termos, cancelamento, privacidade e tratamento de ocorrências. São propostas para revisão, não garantia de isenção ou seguro.
 9. Verificar URLs de retorno do Auth para o domínio definitivo de validação. A prévia mantém a proteção de acesso da Vercel existente.
 
@@ -64,3 +64,15 @@ Referências oficiais consultadas: [Pix com split](https://developer.pagbank.com
 ## Operação e retorno
 
 Publicação autorizada somente da prévia. Para interromper: desabilitar a geração por imóvel e pausar somente os dois jobs `cleaning-marketplace-*`; preservar tabelas/evidências/histórico. Retorno da interface é o deployment anterior. Nunca apagar o ledger ou copiar fixtures DEV para PROD. Produção exige revisão das migrações, dependências financeiras e validação visual antes de um novo pedido de publicação.
+
+## Ajuste de conta e importação do PMS — 13/10/2026
+
+- Importação idempotente no carregamento autenticado. Administrador ativo do PMS pode importar imóveis ativos; anfitrião importa apenas seus `pms_property_ids`. Participante da plataforma ou administrador exclusivo das faxinas não ganha acesso ao PMS. Conta bloqueada não importa. Identidade vem de `Auth.getUser()`, nunca de um ID enviado pelo navegador.
+- Importamos identificador, nome e tipo existentes, sem copiar taxa de limpeza da hospedagem nem presumir endereço, área, quartos, banheiros ou camas. Campos numéricos faltantes são nulos. Imóvel incompleto não pode receber preço nem pedido, mesmo com exceção administrativa. Depois de completar, os dados são preservados em novas entradas.
+- Vínculo existente pertence a um único imóvel/conta; importação não transfere propriedade nem sobrescreve dados preenchidos. Vincular ao PMS não ativa `Mostrar no PMS` ou geração automática.
+- Novos usuários precisam confirmar e-mail, com reenvio e espera visíveis. O backend também recusa usuário autenticado sem `email_confirmed_at`. O serviço Auth real no DEV está com `mailer_autoconfirm=false`; não foi alterada a autenticação das hospedagens. Celular continua sem OTP nessa etapa.
+- 78 testes do módulo passam, incluindo 12 novos testes de importação/isolamento/edição e confirmação/reenvio/negação no servidor. Evidência: `account-import-tests.txt`. A suíte completa atualizada está em `account-import-full-tests.txt`; um teste legado do Ville Moments foi atualizado para a nova regra existente de uma oferta por chalé, sem alterar seu comportamento.
+- Sete verificações remotas de leitura passam com Auth e Edge reais: `account-import-remote.json`. Importação positiva também validada no Postgres DEV em transação revertida: escopo de um imóvel, ausência de suposições, idempotência, orçamento pendente e ausência de privilégios de execução para o navegador. Nenhum vínculo QA foi mantido.
+- Após a transação revertida e chamadas HTTP: 26 estadias, 56 tarefas do PMS, 30 reservas, 34 pagamentos de hospedagem, zero pagamentos de faxina e zero vínculos QA ao PMS. Nenhuma alteração em produção.
+- As contas de produção e DEV permanecem separadas. Não copiamos usuários, senhas ou vínculos administrativos entre ambientes. A conta usada deve ser a do PMS correspondente ao ambiente da plataforma.
+- Entrega do e-mail na caixa real e retorno pelo domínio protegido da prévia ainda precisam de validação com um usuário convidado; os testes de interface/reenvio usam Auth simulado e não são prova de entrega SMTP. A exigência de confirmação e as chamadas remotas de Auth foram verificadas. URLs autorizadas de retorno devem incluir o domínio de validação.

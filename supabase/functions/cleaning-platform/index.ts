@@ -52,7 +52,9 @@ Deno.serve(async(req:Request)=>{
    const secret=req.headers.get('x-ops-secret')||'';if(!secret||!checked(await db.rpc('ops_verify_dispatch',{p_secret:secret})))return json({ok:false,error:'forbidden'},403);return json(await tick());
   }
   const user=await identity(req);if(!user)return json({ok:false,error:'login_required'},401);
+  if(!user.email_confirmed_at)return json({ok:false,error:'email_confirmation_required'},403);
   if(action==='hub'){
+   checked(await db.rpc('cleaning_import_pms',{p_actor:user.id}));
    checked(await db.rpc('cleaning_maintenance',{}));const hub=checked(await db.rpc('cleaning_read',{p_actor:user.id}));
    const c=checked(await db.from('cleaning_config').select('settings').eq('id',1).single());hub.financial_ready=credentialsReady(c.settings);return json({ok:true,...hub});
   }
