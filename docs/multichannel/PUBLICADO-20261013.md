@@ -45,7 +45,13 @@ Conferência às 09:33:13 de São Paulo:
 - Site oficial observado no navegador em 1440×900 e 360×800: home → datas 19–21/10, dois hóspedes → três chalés → Signature → resumo R$ 1.255,20 → botão Abrir WhatsApp. Nenhuma mensagem enviada, cobrança ou reserva criada.
 - API pública search HTTP 200 com opções; start_payment HTTP 403 `consultation_operation_not_allowed`; hub multicanal sem autenticação HTTP 403 `operator_required`.
 - Capturas reais: `production-desktop-20261013.jpg`, `production-mobile-20261013.jpg` e `pms-compat-dev-20261013.jpg`, na pasta de evidências acima. Emulação de viewport não equivale a aparelho Android físico.
-- **Pendente:** conferência visual autenticada do painel em PROD. A aba do domínio oficial permanece na tela de login; foi solicitado ao proprietário entrar. Os testes autenticados DEV não substituem essa última conferência PROD.
+- **Atualização após login:** painel PROD conferido no navegador em 1440×900: Hoje, Hospedagens, Calendários, fila com cinco tarefas, abertura do checklist de saída e PMS. As seis fontes mostram atualização concluída. Nenhuma tarefa real foi iniciada/concluída nem recebeu fotos de teste. A tentativa de viewport 360×800 nesta sessão não foi aplicada à aba (DOM permaneceu 1440×900), portanto não conta como validação móvel do painel autenticado.
+
+## Correção dos vínculos de hóspedes após publicação
+
+O proprietário identificou que os vínculos existentes em `guest_stay_links` não apareciam no hub novo, que lia apenas `ops_stays.guest_name`. Corrigido no commit `7eb8522e`: leitura dinâmica do cadastro por vínculo explícito de reserva ou calendário, imóvel, canal e período. Não houve migração, cópia de contato, alteração de datas, criação de hospedagens ou duplicação de tarefas. Identidades conflitantes não são resolvidas por adivinhação e permissões de acesso aos hóspedes continuam sendo respeitadas.
+
+Publicada `multichannel-operations` DEV v4 e PROD v2, SHA256 `5ce4929fb992f65bea99986f40b6d7ad33a0614f3ec6ea5f841786045b8198a5`. Frontend permanece no deployment original desta entrega. Onze testes de diretório/vínculos e 41 testes multicanais aprovados (52 nesta correção). Hub DEV recarregado sem erro; em PROD, nomes vinculados foram observados em Hoje, Hospedagens e PMS, e contato no formulário de detalhes, sem salvar dados reais. Captura local `production-linked-guest-20261013.jpg`; dados de contato não são incluídos no relatório.
 
 ## Backup e retorno
 
