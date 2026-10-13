@@ -60,3 +60,14 @@ Backup privado anterior às alterações: `C:\Users\Roldn\Documents\ChalezinhoVi
 Rollback frontend preservado: deployment `dpl_CSqwT4w5eHtc5gCQ3jyg6U2VmPDu`, commit `4b54aee214493337b27edcc780bc1de155c632f3`, https://chalezinho-ville-cp6rxhx84-roldneicosta-4140.vercel.app . Pacotes anteriores das funções estão no backup. Se necessário, pausar apenas o cron operacional, restaurar frontend/funções compatíveis e preservar ledger, tarefas, contatos, fotos e histórico; não apagar tabelas para reverter a publicação.
 
 O commit que adiciona este relatório é documental; a aplicação publicada continua no commit indicado acima.
+
+## Ajustes posteriores — presença, filtros e reserva Booking confirmada
+
+Publicado frontend `b9af1412ac3078931ab950fbd6cfa65516b33686`, deployment READY `dpl_2y3rgUJVWD4kZSx16dhyVw4bSreL` (https://chalezinho-ville-mupd6t1bc-roldneicosta-4140.vercel.app), incluindo o ajuste anterior `690846f1`. Função multichannel-operations PROD v3 / DEV v5, hash `41d927d8f129e6619aa717af32ef535f808efcccec97ad159af8fc8e3a1a050c`.
+
+- O relato de entrada sem efeito foi investigado: entrada existente às 09:45 de 13/10; tentativas subsequentes produziram attendance_not_allowed. Registro real preservado. Botões já realizados ficam desabilitados; entrada e saída têm formulário explícito, confirmação do horário atual, sucesso e erro visíveis. Saída exige referência de pelo menos cinco caracteres. Nenhuma saída real foi registrada pelo agente.
+- Campo esclarecido como total de hóspedes (adultos e crianças), sem alterar o valor informado pelo proprietário.
+- Indicadores Hoje viraram filtros de hospedagens e tarefas correspondentes, com Limpar filtro e estado aria-pressed.
+- Reserva Booking confirmada pelo proprietário/captura Pulse foi reconciliada manualmente no Signature, 11–13/10/2026, dois adultos, mantendo pagamento externo e o contato existente. Não se generalizou a classificação de todos os eventos CLOSED. Criada uma única tarefa de saída, sem preparação retroativa. Agora há cinco hospedagens e seis tarefas.
+- 33 testes UI/banco aprovados no ajuste de presença; teste transacional DEV de entrada e saída executou ambos com sucesso e ROLLBACK. Depois, 11 testes UI/vínculos aprovados incluindo filtros. Quantidades se sobrepõem e não devem ser somadas como suíte única.
+- Navegador PROD: entrada já registrada desabilitada; formulário de saída abriu sem persistir; Saídas previstas mostra duas hospedagens e duas tarefas de saída; Limpar filtro restaura seis tarefas. Captura local production-departures-filter-20261013.jpg. Um carregamento PMS falhou transitoriamente após atualização, recuperando no botão Atualizar; causa não determinada nesta rodada.
