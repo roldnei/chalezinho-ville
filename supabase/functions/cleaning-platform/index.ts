@@ -11,6 +11,7 @@ async function identity(req:Request){const token=(req.headers.get('authorization
 async function admin(id:string){return !!checked(await db.from('cleaning_admins').select('user_id').eq('user_id',id).eq('active',true).maybeSingle());}
 const credential=(env:string)=>Deno.env.get(env==='production'?'CLEANING_PAGBANK_PRODUCTION_TOKEN':'CLEANING_PAGBANK_SANDBOX_TOKEN')||'';
 function credentialsReady(settings:any){const p=settings.provider;return p?.enabled===true&&p.split_verified===true&&p.pix_custody_verified===true&&p.settlement_verified===true&&!!credential(p.environment)&&!!Deno.env.get('CLEANING_PAGBANK_PLATFORM_ACCOUNT')&&Deno.env.get('CLEANING_SETTLEMENT_INTEGRATION')==='verified';}
+function financialReady(settings:any){return settings.payment_method==='manual_pix'?settings.manual_pix?.enabled===true&&!!settings.manual_pix.key&&!!settings.manual_pix.recipient_name:credentialsReady(settings);}
 function guardEnvironment(env:string){const prod=url.includes('irxsaladqhbzhkoaclxy.');if(prod!==(env==='production'))throw Error('payment_environment_mismatch');}
 async function reconcile(pay:any){
  guardEnvironment(pay.environment);const order=await providerRequest(pay,credential(pay.environment),'/orders/'+pay.order_id);const observed=orderObservation(order,pay);checked(await db.rpc('cleaning_payment_observe',{p_payment:pay.id,p:observed}));return observed;
@@ -23,7 +24,7 @@ async function tick(){
  if(credentialsReady(c.settings)){
   const jobs=checked(await db.from('cleaning_jobs').select('*').eq('state','approved').eq('payout','authorized').eq('is_test',false).is('change_pending',null).limit(100));
   for(const j of jobs)try{const incidents=checked(await db.from('cleaning_incidents').select('id').eq('job_id',j.id).eq('state','open'));if(incidents.length)continue;
-   const pay=checked(await db.from('cleaning_payments').select('*').eq('job_id',j.id).eq('status','paid').order('attempt',{ascending:false}).limit(1).single());guardEnvironment(pay.environment);if(!pay.split_id)continue;
+   const pay=checked(await db.from('cleaning_payments').select('*').eq('job_id',j.id).eq('status','paid').order('attempt',{ascending:false}).limit(1).single());if(pay.provider!=='pagbank')continue;guardEnvironment(pay.environment);if(!pay.split_id)continue;
    await providerRequest(pay,credential(pay.environment),'/splits/'+pay.split_id+'/custody/release','POST',{receivers:[{account:{id:pay.receiver_id}},{account:{id:Deno.env.get('CLEANING_PAGBANK_PLATFORM_ACCOUNT')}}]});
    checked(await db.rpc('cleaning_payout_observe',{p_payment:pay.id,p:{status:'processing',reference:pay.split_id}}));
   }catch{failures.push(j.id);}
@@ -38,7 +39,7 @@ Deno.serve(async(req:Request)=>{
   if(action==='bootstrap'){
    const c=checked(await db.from('cleaning_config').select('settings,version').eq('id',1).single());
    const {pilot,public_registration,categories,beds,service,addons,terms,terms_version}=c.settings;
-   return json({ok:true,settings:{pilot,public_registration,categories,beds,service,addons,terms,terms_version},financial_ready:credentialsReady(c.settings),environment:url.includes('pxfqmnhqodqyaaqeyjgr.')?'development':'production'});
+   return json({ok:true,settings:{pilot,public_registration,categories,beds,service,addons,terms,terms_version},payment_method:c.settings.payment_method||'pagbank',financial_ready:financialReady(c.settings),environment:url.includes('pxfqmnhqodqyaaqeyjgr.')?'development':'production'});
   }
   if(action==='provider_webhook'){
    // Orders API signature; do not accept unsigned sandbox or recurring API
@@ -56,10 +57,11 @@ Deno.serve(async(req:Request)=>{
   if(action==='hub'){
    checked(await db.rpc('cleaning_import_pms',{p_actor:user.id}));
    checked(await db.rpc('cleaning_maintenance',{}));const hub=checked(await db.rpc('cleaning_read',{p_actor:user.id}));
-   const c=checked(await db.from('cleaning_config').select('settings').eq('id',1).single());hub.financial_ready=credentialsReady(c.settings);return json({ok:true,...hub});
+   const c=checked(await db.from('cleaning_config').select('settings').eq('id',1).single());hub.financial_ready=financialReady(c.settings);hub.payment_method=c.settings.payment_method||'pagbank';hub.manual=checked(await db.rpc('cleaning_manual_read',{p_actor:user.id}));return json({ok:true,...hub});
   }
   if(action==='job'){
    const detail=checked(await db.rpc('cleaning_read',{p_actor:user.id,p_job:b.job_id}));
+   detail.manual_payment=checked(await db.rpc('cleaning_manual_read',{p_actor:user.id,p_job:b.job_id}));
    detail.photos=await Promise.all(detail.photos.map(async(p:any)=>{const signed=checked(await db.storage.from('cleaning-evidence').createSignedUrl(p.path,120));const {path,...safe}=p;return {...safe,url:signed.signedUrl};}));return json({ok:true,...detail});
   }
   if(action==='upload'){
@@ -72,8 +74,15 @@ Deno.serve(async(req:Request)=>{
    if(upload.error){const existing=checked(await db.storage.from('cleaning-evidence').download(p.path));const found=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',await existing.arrayBuffer()))).map(x=>x.toString(16).padStart(2,'0')).join('');if(found!==hash)throw Error('upload_key_conflict');}
    checked(await db.rpc(photoCommand,{...photoArgs,p:{...params,complete:true}}));return json({ok:true,photo_id:p.id});
   }
+  if(action.startsWith('manual_')){
+   const commands=['claim','report','receiver','credit','not_received','refund','payout_start','payout'];const command=action.slice(7);
+   if(!commands.includes(command))return json({ok:false,error:'invalid_action'},400);
+   if(command==='claim'){const c=checked(await db.from('cleaning_config').select('settings').eq('id',1).single());guardEnvironment(c.settings.provider.environment);}
+   else if(!['receiver','report'].includes(command)){const pay=checked(await db.from('cleaning_payments').select('environment').eq('id',b.payment_id).single());guardEnvironment(pay.environment);}
+   return json({ok:true,result:checked(await db.rpc('cleaning_manual',{p_actor:user.id,p_action:command,p:b}))});
+  }
   if(action==='pix'){
-   const c=checked(await db.from('cleaning_config').select('settings').eq('id',1).single());if(!credentialsReady(c.settings))throw Error('financial_dependency_unavailable');guardEnvironment(c.settings.provider.environment);
+   const c=checked(await db.from('cleaning_config').select('settings').eq('id',1).single());if(c.settings.payment_method==='manual_pix')throw Error('payment_method_changed');if(!credentialsReady(c.settings))throw Error('financial_dependency_unavailable');guardEnvironment(c.settings.provider.environment);
    const taxId=String(b.tax_id||'').replace(/\D/g,'');if(!/^\d{11,14}$/.test(taxId))throw Error('payer_details_required');
    const member=checked(await db.from('cleaning_members').select('name,phone').eq('user_id',user.id).single());const phone=member.phone.replace(/\D/g,'').replace(/^55(?=\d{10,11}$)/,'');if(!/^\d{10,11}$/.test(phone)||!user.email)throw Error('payer_details_required');
    const pay=checked(await db.rpc('cleaning_payment_claim',{p_actor:user.id,p_job:b.job_id}));
@@ -91,7 +100,7 @@ Deno.serve(async(req:Request)=>{
   if(['process_refund','release_custody','tick'].includes(action)){
    if(!await admin(user.id))throw Error('cleaning_admin_required');if(action==='tick')return json(await tick());
    const j=checked(await db.from('cleaning_jobs').select('*').eq('id',b.job_id).single());if(j.is_test)throw Error('test_service_not_real');const pay=checked(await db.from('cleaning_payments').select('*').eq('job_id',j.id).eq('status','paid').single());
-   guardEnvironment(pay.environment);
+   if(pay.provider!=='pagbank')throw Error('payment_method_changed');guardEnvironment(pay.environment);
    if(action==='process_refund'){
     if(j.state!=='refund_pending'||j.payout==='paid')throw Error('refund_not_authorized');
     await providerRequest(pay,credential(pay.environment),'/charges/'+pay.charge_id+'/cancel','POST',{amount:{value:pay.amount_cents}});await reconcile(pay);return json({ok:true});
@@ -108,7 +117,7 @@ Deno.serve(async(req:Request)=>{
   if(!actions.includes(action))return json({ok:false,error:'invalid_action'},400);
   return json({ok:true,result:checked(await db.rpc('cleaning_mutate',{p_actor:user.id,p_action:action,p:b}))});
  }catch(e){const message=e instanceof Error?e.message:'unavailable';
-  const known=['login_required','cleaning_admin_required','pilot_not_released','registration_closed','invalid_member','invalid_property','invalid_availability','invalid_beds','invalid_categories','invalid_fee','invalid_configuration','invalid_scope','invalid_checklist','invalid_addons','invalid_property_rules','invalid_provider','provider_verification_required','configuration_changed_reload','property_not_found','job_not_found','worker_not_found','member_not_found','request_key_conflict','quote_changed_review','assisted_quote_required','invalid_job_window','service_unavailable','schedule_conflict','professional_required','worker_fee_exceeds_service','payment_not_allowed','financial_dependency_unavailable','receiver_verification_required','custody_window_invalid','payment_environment_mismatch','payer_details_required','provider_identity_mismatch','provider_reconciliation_required','provider_request_failed','custody_not_confirmed','custody_release_homologation_required','start_not_allowed','execution_not_allowed','invalid_item','upload_key_conflict','photo_too_large','invalid_photo','checklist_and_photos_required','review_not_allowed','incident_requires_review','description_required','incident_not_found','photo_not_found','resolution_required','invalid_decision','performed_service_required','invalid_rating','moderation_reason_required','refund_not_authorized','payout_not_allowed','pms_link_not_authorized','cannot_remove_self','test_service_not_real','change_not_allowed','proposal_changed_reload','execution_not_started','correction_photo_required'];
+  const known=['invalid_manual_pix','manual_pix_not_configured','manual_statement_required','bank_reference_already_used','payment_method_changed','payment_not_found','login_required','cleaning_admin_required','pilot_not_released','registration_closed','invalid_member','invalid_property','invalid_availability','invalid_beds','invalid_categories','invalid_fee','invalid_configuration','invalid_scope','invalid_checklist','invalid_addons','invalid_property_rules','invalid_provider','provider_verification_required','configuration_changed_reload','property_not_found','job_not_found','worker_not_found','member_not_found','request_key_conflict','quote_changed_review','assisted_quote_required','invalid_job_window','service_unavailable','schedule_conflict','professional_required','worker_fee_exceeds_service','payment_not_allowed','financial_dependency_unavailable','receiver_verification_required','custody_window_invalid','payment_environment_mismatch','payer_details_required','provider_identity_mismatch','provider_reconciliation_required','provider_request_failed','custody_not_confirmed','custody_release_homologation_required','start_not_allowed','execution_not_allowed','invalid_item','upload_key_conflict','photo_too_large','invalid_photo','checklist_and_photos_required','review_not_allowed','incident_requires_review','description_required','incident_not_found','photo_not_found','resolution_required','invalid_decision','performed_service_required','invalid_rating','moderation_reason_required','refund_not_authorized','payout_not_allowed','pms_link_not_authorized','cannot_remove_self','test_service_not_real','change_not_allowed','proposal_changed_reload','execution_not_started','correction_photo_required'];
   const code=known.find(k=>message.includes(k))||'unavailable';return json({ok:false,error:code},code==='cleaning_admin_required'?403:code==='unavailable'?503:409);
  }
 });

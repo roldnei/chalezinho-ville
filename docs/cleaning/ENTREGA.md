@@ -1,6 +1,6 @@
 # Ville Faxinas — validação de 13/10/2026
 
-Módulo independente implementado no repositório roldnei/chalezinho-ville. Base de inspeção: 2730681, branch feature/multichannel-operations-20261012; avanços até 4d46933 incorporados (Ville Moments, preferências e proporção de ofertas preservados): correção de campos de data no iPhone e conclusão guiada do PMS. Regras de preparação/saída do PMS mais recentes preservadas no adaptador. Produção, checkout e pagamentos de hospedagens não foram publicados ou substituídos por este trabalho.
+Módulo independente implementado no repositório roldnei/chalezinho-ville. Base de inspeção: 2730681, branch feature/multichannel-operations-20261012; avanços até 6804f1d incorporados (Ville Moments, preferências e proporção de ofertas preservados): correção de campos de data no iPhone e conclusão guiada do PMS. Regras de preparação/saída do PMS mais recentes preservadas no adaptador. Produção, checkout e pagamentos de hospedagens não foram publicados ou substituídos por este trabalho.
 
 ## Acesso e fluxos
 
@@ -47,7 +47,7 @@ Dois jobs novos e independentes de manutenção/conciliação executam a cada ci
 
 ## Bloqueios financeiros e configurações para operação real
 
-A versão permite validar cadastro, pedidos e aceite, mas **não operar serviços pagos reais** enquanto estas dependências estiverem pendentes. A UI informa o bloqueio; não gera QR Pix fictício nem afirma que o repasse foi pago.
+A versão continua publicada somente para validação. O modo **Pix manual** usa uma chave da administração e dispensa integração PagBank: exige cadastrar/liberar a chave, conferir identidade/titular/chave das profissionais, conferir créditos no banco e registrar repasses/devoluções já realizados. Dinheiro real deve usar o ambiente de operação real, que ainda não foi publicado por este trabalho. A lista abaixo se aplica **se o PagBank for escolhido**; suas pendências não bloqueiam o modo manual.
 
 1. Conta/aplicação PagBank habilitada especificamente para marketplace/split, Pix com custódia e autorização dos recebedores. A integração de hospedagem não comprova isso.
 2. Credenciais próprias do módulo no servidor: `CLEANING_PAGBANK_SANDBOX_TOKEN` ou `CLEANING_PAGBANK_PRODUCTION_TOKEN`, `CLEANING_PAGBANK_PLATFORM_ACCOUNT`. Não copiar credenciais de hospedagem para presumir habilitação.
@@ -76,3 +76,25 @@ Publicação autorizada somente da prévia. Para interromper: desabilitar a gera
 - Após a transação revertida e chamadas HTTP: 26 estadias, 56 tarefas do PMS, 30 reservas, 34 pagamentos de hospedagem, zero pagamentos de faxina e zero vínculos QA ao PMS. Nenhuma alteração em produção.
 - As contas de produção e DEV permanecem separadas. Não copiamos usuários, senhas ou vínculos administrativos entre ambientes. A conta usada deve ser a do PMS correspondente ao ambiente da plataforma.
 - Entrega do e-mail na caixa real e retorno pelo domínio protegido da prévia ainda precisam de validação com um usuário convidado; os testes de interface/reenvio usam Auth simulado e não são prova de entrega SMTP. A exigência de confirmação e as chamadas remotas de Auth foram verificadas. URLs autorizadas de retorno devem incluir o domínio de validação.
+
+## Pix manual para o começo do piloto — 13/10/2026
+
+O pagamento inicial pode usar a chave Pix da administração. O cliente transfere no aplicativo do próprio banco. A plataforma informa a chave, o titular e o valor exato; não gera QR, não transfere dinheiro, não divide saldo e não oferece custódia de intermediador nesse modo. A configuração inicial do DEV foi alterada para `manual_pix`, mas permanece **desabilitada e sem chave real** até o administrador preencher os dados. A integração PagBank continua disponível para uso futuro.
+
+Fluxo do cliente: aceite da profissional → ver chave/nome/valor → copiar chave e transferir no banco → “Já fiz o Pix” → aguardar conferência administrativa. O aviso não marca pagamento como recebido. Somente administrador autorizado e autenticado pode registrar o crédito, informando ID da transação, valor, data/hora e confirmação de conferência do extrato. A profissional continua sem endereço completo até a confirmação.
+
+Após a limpeza e conferência, o repasse fica autorizado. A administração faz o Pix à profissional no banco e registra a transferência efetivada. A indicação “vou fazer o repasse” move apenas para processando; o registro do lançamento bancário com valor líquido exato move para pago. A tela identifica que o recebimento foi registrado pela administração e informa a data do Pix. O prazo de conferência após aviso (inicial: 120 minutos) e a previsão de repasse após aprovação (inicial: 24 horas) são editáveis e ficam nas condições aceitas, junto com preços e taxas. Não há desconto escondido ou promessa de saldo imediato.
+
+Chaves de recebimento das profissionais ficam privadas. Elas podem informá-las após aprovação, sem aumentar o cadastro inicial. A administração confere identidade/titular/chave antes de emitir instruções de pagamento ao cliente. Alterar a chave exige nova conferência; instruções já emitidas preservam destino e destinatária registrados. A chave da administração não aparece na configuração pública nem no orçamento/contrato. Somente cliente responsável e administradores autorizados consultam a instrução de pagamento.
+
+Regras de segurança financeira: um ID bancário não pode quitar dois pagamentos; repetição do mesmo registro é idempotente. Outra transferência é registrada separadamente para análise/devolução, sem contar como segunda contratação. Valor divergente fica em análise e não confirma serviço nem aplica desconto. Créditos tardios não ressuscitam atribuições expiradas. Devoluções exigem lançamento bancário efetivado e valor integral do crédito; o crédito válido de um serviço só pode ser devolvido após decisão administrativa. Ocorrência ou mudança aberta impede repasse. Evidências e destinos registrados não podem ser apagados/sobrescritos.
+
+Condições anteriores não mudam de forma de pagamento silenciosamente. Contratos que já aceitaram PagBank exigem revisão administrativa para um novo acordo, enquanto novas solicitações usam o modo escolhido na configuração.
+
+Validação final: **652/652 testes completos**, incluindo **98 testes do módulo** e 20 novos testes de Pix manual/contrato anterior/interface. Evidências: `manual-pix-full-tests.txt` e `manual-pix-tests.txt`. Interfaces testadas em DOM ligado ao Postgres local; Auth e lançamentos bancários desses testes são simulados, sem transferência real. O fluxo positivo também passou no Postgres DEV em transação integralmente revertida: instrução, aviso sem pagamento, crédito administrativo, idempotência e autorização/processamento/registro de repasse. A execução foi uma fixture explícita; não houve faxina ou banco real.
+
+API Edge versão 5 publicada no DEV. Sete verificações HTTP públicas/negação sem autenticação estão em `manual-pix-remote-public.json`; não são testes de banco nem de sessão autenticada nessa versão. As verificações autenticadas anteriores permanecem como evidência das versões precedentes. Depois do rollback: 26 estadias, 56 tarefas, 30 reservas, 34 pagamentos de hospedagem, zero pagamentos de faxina, zero instruções manuais, zero lançamentos bancários e zero chaves reais cadastradas. Produção e fluxos de hospedagem preservados.
+
+Para o piloto real: cadastrar chave/titular da administração e dados conferidos das profissionais; liberar os participantes; aplicar/publicar o módulo no ambiente real em etapa própria e configurar o ambiente de pagamentos correspondente; combinar quem confere o extrato e executa os repasses/devoluções. A conferência manual exige essa rotina operacional. PagBank, webhook e credenciais não são requisitos desse modo. Continua pendente a validação de e-mail em caixa real e a QA visual em dispositivo real, relatadas acima.
+
+Referência: [Banco Central — receber Pix por chave ou dados de conta](https://bcb.gov.br/estabilidadefinanceira/pix-sobre).
