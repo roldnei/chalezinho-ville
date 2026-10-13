@@ -47,7 +47,7 @@ test('ranking balances recency, chalet interest and diversity while offers keep 
  assert.equal(mixed.filter(c=>!c.publication).length,3);
  assert.deepEqual(mixed.flatMap((c,i)=>!c.publication?[i]:[]),[3,7,11]);
  assert.equal(new Set(mixed.filter(c=>!c.publication).map(c=>c.property_id)).size,3);
- assert.equal(w.VillegramContent.mix(escapes).length,3);
+ assert.equal(w.VillegramContent.mix(escapes).length,3);assert.equal(w.VillegramContent.mix([fresh[0],...escapes]).length,2);
 });
 
 test('page visits persist bounded local interest, expire and respect privacy preferences',async t=>{

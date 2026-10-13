@@ -24,6 +24,7 @@
  function mix(pool){let organic=pool.filter(c=>!isAd(c)),ads=pool.filter(isAd);const output=[];let count=0;const take=list=>rank(list,output.at(-1))[0];
   // One offer per three publications, at most three offers, without an advertising tail.
   while(organic.length){const next=take(organic);output.push(next);organic=organic.filter(c=>c!==next);if(++count%3===0&&ads.length&&output.filter(isAd).length<3){const ad=take(ads);output.push(ad);ads=ads.filter(c=>c!==ad&&c.property_id!==ad.property_id)}}
+  if(count>0&&count<3&&ads.length)output.push(take(ads));
   // Short, diverse fallback when no editorial publications are available.
   if(!output.length)while(ads.length&&output.length<3){const ad=take(ads);output.push(ad);ads=ads.filter(c=>c!==ad&&c.property_id!==ad.property_id)}return output;
  }
