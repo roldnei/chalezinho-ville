@@ -58,3 +58,25 @@ test('failed attendance retains visible error and allows retry; guest count is e
 });
 
 test('fixtures returned by an older API are excluded from both host counters and operational UI',async()=>{const f=await fixture(false,true);try{assert.equal(f.callbacks[0].departures.length,1);assert.equal(f.callbacks[0].pending.length,0);assert.equal(f.callbacks[0].upcoming.length,0);assert.doesNotMatch(f.w.document.body.textContent,/Teste Oferta Completa/);f.w.document.querySelector('[data-tab="stays"]').click();assert.doesNotMatch(f.w.document.body.textContent,/Teste Oferta Completa/);}finally{f.close()}});
+
+
+async function taskFixture(stage,photos=[]){
+ const f=await fixture(),w=f.w,original=w.fetch,calls=[];
+ w.indexedDB={open(){const req={};setTimeout(()=>{req.result={close(){},transaction(){const tx={objectStore:()=>({getAll:()=>({result:[]})})};setTimeout(()=>tx.oncomplete?.(),0);return tx}};req.onsuccess()},0);return req}};
+ const task={id:'guided-task',stay_id:'qa-stay',property_id:3,stage,title:'Conferir',status:'pending',template_version:1,checklist_snapshot:['Banheiro','Cozinha']};
+ w.fetch=async(url,options)=>{const p=options?JSON.parse(options.body):{};calls.push(p);if(p.action==='task')return {ok:true,json:async()=>({ok:true,task,results:[],photos})};if(p.action==='complete_task'){task.status='inspection';return {ok:true,json:async()=>({ok:true})}}const response=await original();const data=await response.json();data.tasks=[task];data.summary.pending=[task];return {ok:true,json:async()=>data}};
+ w.document.querySelector('[data-refresh]').click();await tick();w.document.querySelector('[data-task]').click();await new Promise(r=>setTimeout(r,20));return {...f,calls};
+}
+test('entry walks one item at a time and saves only once at the end',async()=>{
+ const f=await taskFixture('preparation',[0,1].map(item_index=>({item_index,url:'photo.webp',stage:'preparation'})));try{const d=f.w.document;
+ assert.match(d.querySelector('.ops-wizard h3').textContent,/Banheiro/);assert.equal(d.querySelectorAll('[data-item]').length,0);
+ d.querySelector('[data-next]').click();assert.match(d.querySelector('.ops-wizard h3').textContent,/Cozinha/);
+ assert.equal(f.calls.filter(x=>x.action==='result'||x.action==='complete_task').length,0);
+ d.querySelector('[data-next]').click();d.querySelector('[data-finish]').click();await new Promise(r=>setTimeout(r,30));
+ assert.equal(f.calls.filter(x=>x.action==='complete_task').length,1);assert.equal(f.calls.find(x=>x.action==='complete_task').results.length,2);
+ }finally{f.close()}
+});
+test('entry cannot advance without photo; exit without damage needs no upload',async()=>{
+ const a=await taskFixture('preparation');try{a.w.document.querySelector('[data-next]').click();assert.match(a.w.document.querySelector('[data-wizard-message]').textContent,/Tire uma foto/)}finally{a.close()}
+ const b=await taskFixture('departure');try{const d=b.w.document;assert.equal(d.querySelector('[data-camera]'),null);d.querySelector('[data-no-damage]').click();d.querySelector('[data-finish]').click();await new Promise(r=>setTimeout(r,30));assert.equal(b.calls.find(x=>x.action==='complete_task').results.every(x=>x.result==='ok'),true);assert.equal(b.calls.some(x=>x.action==='upload'),false)}finally{b.close()}
+});

@@ -244,3 +244,22 @@ test('date changes do not resurrect intentionally archived stages; normal revisi
  await db.query("update ops_stays set check_in='2094-11-02',check_out='2094-11-04' where id=$1",[fresh.id]);
  assert.equal((await one("select count(*)::int n from ops_tasks where stay_id=$1 and status='pending'",[fresh.id])).n,2);
 });
+
+
+test('guided completion requires entry photos, only damage photos on exit, and submits atomically',async()=>{
+ await db.exec(await readFile(new URL('../supabase/migrations/20261013175542_task_guided_completion.sql',import.meta.url),'utf8'));
+ const make=async(stage)=>mutate('manual_task',{property_id:1,stage,title:'Guided QA',scheduled_for:'2020-01-01T11:00:00Z',due_at:'2020-01-01T12:00:00Z'});
+ const finish=(t,results,actor=admin)=>one('select ops_complete_task($1,$2) result',[actor,{task_id:t.id,results}]);
+ const results=t=>t.checklist_snapshot.map((_,item_index)=>({item_index,result:'ok',observation:''}));
+ const entry=await make('preparation');await assert.rejects(finish(entry,results(entry)),/checklist_and_photos_required/);
+ assert.equal((await one('select count(*)::int n from ops_task_results where task_id=$1',[entry.id])).n,0);
+ const exit=await make('departure');await assert.rejects(finish(exit,results(exit),other),/task_not_found/);
+ const done=await finish(exit,results(exit));assert.equal(done.result.status,'inspection');assert.equal(done.result.approved_by,null);
+ await finish(exit,results(exit));assert.equal((await one('select status from ops_tasks where id=$1',[exit.id])).status,'inspection');
+ const damaged=await make('departure'),r=results(damaged);r[0]={item_index:0,result:'issue',observation:'Vidro trincado'};
+ await assert.rejects(finish(damaged,r),/checklist_and_photos_required/);
+ assert.equal((await one('select count(*)::int n from ops_task_results where task_id=$1',[damaged.id])).n,0);
+ const upload=crypto.randomUUID();await mutate('photo',{task_id:damaged.id,item_index:0,upload_id:upload,content_type:'image/webp',size_bytes:100,sha256:'a'.repeat(64)});
+ await db.query("insert into storage.objects values('operation-evidence',$1)",[damaged.id+'/'+upload]);await mutate('photo',{task_id:damaged.id,item_index:0,upload_id:upload,content_type:'image/webp',size_bytes:100,sha256:'a'.repeat(64),complete:true});
+ r[0].observation='';await assert.rejects(finish(damaged,r),/checklist_and_photos_required/);r[0].observation='Vidro trincado';assert.equal((await finish(damaged,r)).result.status,'inspection');
+});

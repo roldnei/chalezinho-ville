@@ -83,6 +83,7 @@ Deno.serve(async req=>{
   if(body.action==='hub')return json(await hub(a));
   if(body.action==='sync'){if(a.role!=='admin')return json({ok:false,error:'admin_required'},403);return json(await sync());}
   if(body.action==='task')return await taskDetail(a,String(body.task_id||''));
+  if(body.action==='complete_task')return json({ok:true,result:checked(await admin.rpc('ops_complete_task',{p_actor:a.id,p:body}))});
   if(body.action==='upload'){
    const base64=String(body.base64||'');if(!base64||base64.length>699052)return json({ok:false,error:'photo_too_large'},413);
    let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(base64),c=>c.charCodeAt(0));}catch{return json({ok:false,error:'invalid_photo'},400);}
