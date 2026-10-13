@@ -98,3 +98,19 @@ API Edge versão 5 publicada no DEV. Sete verificações HTTP públicas/negaçã
 Para o piloto real: cadastrar chave/titular da administração e dados conferidos das profissionais; liberar os participantes; aplicar/publicar o módulo no ambiente real em etapa própria e configurar o ambiente de pagamentos correspondente; combinar quem confere o extrato e executa os repasses/devoluções. A conferência manual exige essa rotina operacional. PagBank, webhook e credenciais não são requisitos desse modo. Continua pendente a validação de e-mail em caixa real e a QA visual em dispositivo real, relatadas acima.
 
 Referência: [Banco Central — receber Pix por chave ou dados de conta](https://bcb.gov.br/estabilidadefinanceira/pix-sobre).
+
+## Listas com muitos cadastros — 13/10/2026
+
+Participantes, imóveis/PMS, serviços administrativos e recebimentos aparecem em linhas de resumo. O botão com texto abre os campos apenas quando necessário. Pagamentos manuais e chaves das profissionais têm listas separadas; chaves bancárias ficam dentro da edição, fora do resumo e do índice de pesquisa.
+
+Todas essas listas têm pesquisa sem distinção de acentos/maiúsculas, filtros por situação, opções de 10/25/50 itens e navegação anterior/próxima com contagem. A pesquisa considera todos os registros autorizados recebidos, não apenas a página visível. Participantes também podem ser encontrados pelo celular com ou sem pontuação. A lista de imóveis do proprietário continua filtrada pela conta, inclusive para administradores acessando a tela pública.
+
+Na área do participante, imóveis e suas faxinas também usam pesquisa e paginação; o botão Editar/Completar do imóvel abre diretamente o cadastro de duas etapas, sem expandir outro cartão. A tela inicial mostra até quatro profissionais, com acesso ao catálogo completo pesquisável e filtro de favoritas. Resumos, filtros, botões e edição têm disposição responsiva, foco visível e rótulos de texto. Não há ação dependente de gesto escondido.
+
+A troca de filtro ou página mantém os mesmos formulários e os valores digitados; uma marca avisa sobre alterações não salvas. Pesquisa/página/quantidade são lembradas durante esta aba, separadamente por conta e lista. Esses controles não salvam preços, permissões ou dados pessoais no armazenamento persistente e não alteram os endpoints existentes. Não há migração nem alteração de dados do PMS, pagamentos ou produção. A paginação é feita sobre o conjunto autorizado que a API já fornece; não é anunciada como paginação SQL para volume ilimitado.
+
+Evidências: `lists-tests.txt` contém 11 cenários com 37 registros, incluindo última página, 10/25/50, acentos/celular, filtros combinados, lista vazia, preservação de edição, isolamento de conta/tela, nomes com HTML, envio da liberação/integração/Pix para o registro correto, imóveis de outros proprietários ocultos e pesquisa/favoritas no catálogo. Os lançamentos bancários desses testes são locais e simulados; nenhum dinheiro é movimentado.
+
+A regressão completa passou em 663/663 testes (`lists-full-tests.txt`). Após o ajuste final para abrir a edição do imóvel direto no botão da linha, os 17 testes das listas/interface foram repetidos e passaram (`lists-ui-final-tests.txt`). O build mantém o ambiente DEV e publica o novo módulo de listas como asset. A verificação HTTP da prévia usa o conector autorizado da Vercel. O navegador remoto chegou à autenticação da Vercel, sem sessão; também não consegue acessar o servidor local. Por isso não há evidência nova de dispositivo real, zoom de fonte ou rede limitada, nem captura de tela apresentada como validação visual. A proteção da prévia permanece habilitada.
+
+Referências de organização: [Carbon — data tables](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/guidelines) e [Atlassian — DynamicTable](https://developer.atlassian.com/platform/forge/ui-kit/components/dynamic-table/).

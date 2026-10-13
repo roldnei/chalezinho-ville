@@ -1,0 +1,19 @@
+✔ 37 registrations paginate in 10/25/50 and never disappear from the last page (124.061241ms)
+✔ search finds accents, mixed case, multiple words and a formatted phone across every page (43.456605ms)
+✔ filters combine with search and reset clearly from a no-result state (42.075979ms)
+✔ editing then searching and paging retains the same form, values and submit handler (41.160875ms)
+✔ list state survives redraws, clamps after a removal and stays isolated by account and screen (88.625804ms)
+✔ untrusted names remain text and empty lists have no useless pager or reset (10.46142ms)
+✔ admin edits exactly the searched participant on page 4 and submits the original permission action (100.17984ms)
+✔ PMS property search retains independent integration controls and exact property id (93.833028ms)
+✔ manual Pix lists separate receivers and payments; a searched bank credit goes only to its payment (155.196254ms)
+✔ owner searches 37 authorized properties and edits the correct property without exposing another owner (94.944457ms)
+✔ home limits professional previews; full directory searches all 37 and favorites preserve the search (53.864865ms)
+ℹ tests 11
+ℹ suites 0
+ℹ pass 11
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1253.94716
