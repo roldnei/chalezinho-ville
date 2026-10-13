@@ -4,6 +4,20 @@ import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
 const js=readFileSync('operations-workspace.js','utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+
+test('today indicators filter stays and the corresponding task stage; clear restores all',async()=>{
+ const f=await fixture();try{
+  const w=f.w,base=await (await w.fetch()).json(),s=base.stays[0];
+  const tasks=['preparation','departure'].map(stage=>({id:stage,stay_id:s.id,property_id:s.property_id,stage,status:'pending',scheduled_for:'2026-10-12T14:00:00Z',due_at:'2026-10-12T15:00:00Z'}));
+  base.tasks=tasks;base.summary.pending=tasks;base.summary.arrivals=[];
+  w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
+  w.document.querySelector('[data-today-filter="departures"]').click();
+  assert.equal(w.document.querySelectorAll('[data-stay]').length,1);assert.deepEqual([...w.document.querySelectorAll('[data-task]')].map(x=>x.dataset.task),['departure']);
+  assert.equal(w.document.querySelector('[data-today-filter="departures"]').getAttribute('aria-pressed'),'true');
+  w.document.querySelector('[data-today-filter="arrivals"]').click();assert.equal(w.document.querySelectorAll('[data-stay],[data-task]').length,0);
+  w.document.querySelector('[data-clear-filter]').click();assert.equal(w.document.querySelectorAll('[data-task]').length,2);assert.equal(w.document.querySelector('[data-clear-filter]'),null);
+ }finally{f.close()}
+});
 const fixture=async(fail=false,withTest=false)=>{
  const dom=new JSDOM('<div id="root"></div>',{url:'https://qa.invalid',runScripts:'outside-only'}),w=dom.window;
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://qa.invalid'};

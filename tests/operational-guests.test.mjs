@@ -24,6 +24,7 @@ test('edits and unlinking take effect on the next read with no copied contact da
  assert.equal(read(stay,[event],[link],[]).guest_name,null);
 });
 test('supports native reservation and legacy exact keys; conflicting links do not choose a guest',()=>{
+ assert.equal(read(stay,[],[{...link,stay_key:'ops:stay'}]).guest_name,contacts[0].name);
  assert.equal(read({...stay,reservation_id:'reservation'},[],[{...link,reservation_id:'reservation',stay_key:'reservation:reservation'}]).guest_name,contacts[0].name);
  const legacy={...link,stay_key:'airbnb:2:2026-10-09:2026-10-13'};
  assert.equal(read(stay,[event],[legacy]).guest_name,contacts[0].name);
