@@ -1,3 +1,4 @@
+import {taskPhotos} from '../pms-operations/photos.ts';
 import {listingsAction} from '../pms-operations/listings.ts';
 // Partial production release: preserve existing PMS operations while adding the scoped listing editor.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -69,7 +70,7 @@ async function syncTurnovers(actorId:string){
 }
 
 async function hub(actor:any){
-  if(canManage(actor))await syncTurnovers(actor.id);
+  // Multichannel database triggers and cron own task generation; panel reads never generate legacy tasks.
   const start=new Date(Date.now()-365*86400000).toISOString(),end=new Date(Date.now()+730*86400000).toISOString();
   const [properties,tasks,issues,reservations,team,templates,attachments,blocks,notifications,activity]=await Promise.all([
     admin.from("properties").select("id,code,name,cover_image,active,check_in_time,check_out_time").eq("active",true).order("id"),
@@ -217,7 +218,7 @@ async function reservationAction(body:any,actor:any){
     const {data,error}=await admin.from("reservations").update({operational_status:"preparing",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservationId).select().single();
     if(error)return json({ok:false,error:"check_out_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservationId,new_value:{checked_out_at:data.checked_out_at,operational_status:"preparing"}});
-    await syncTurnovers(actor.id);
+    // The reservation update triggers the multichannel ledger; do not create legacy turnover tasks.
     return json({ok:true,reservation:data});
   }
   if(operation==="no_show"){
@@ -360,6 +361,7 @@ Deno.serve(async request=>{
   const body=await request.json().catch(()=>({}));
   if(body.action==="listings")return listingsAction(body,actor,admin,json);
   if(body.action==="hub")return hub(actor);
+  if(body.action==="task_photos")return taskPhotos(body,actor,admin,json);
   if(body.action==="task_action")return taskAction(body,actor);
   if(body.action==="block_action")return blockAction(body,actor);
   if(body.action==="reservation_action")return reservationAction(body,actor);

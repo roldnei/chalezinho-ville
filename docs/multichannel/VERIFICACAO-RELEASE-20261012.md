@@ -158,3 +158,6 @@ Navegador funcionário: https://chalezinho-ville-7t1h6fpim-roldneicosta-4140.ver
 Evidências em outputs/release-20261012: staff-api-permissions.json, staff-photo-permissions.json, staff-other-property.json, staff-suspended.json, staff-upload-failed.jpg, staff-submitted.jpg, staff-admin-approved.jpg, staff-approved-history.jpg.
 
 Produção continua sem mudanças. Backup recuperável ainda não comprovado; preflight/diff final e publicação continuam pendentes. Fonte Booking só fornece bloqueios no conjunto observado. Não declarar homologação global ou publicação concluída com base neste teste de funcionário.
+
+## Preflight adicional — 13/10/2026
+Revisão e bloqueios atualizados em PREFLIGHT-20261013.md. Corrigidas chamadas legadas do PMS no pacote local; 537 testes passaram. Backup segue ausente no painel e publicação não executada.

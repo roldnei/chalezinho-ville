@@ -250,7 +250,7 @@ async function reservationAction(body:any,actor:any){
     const {data,error}=await admin.from("reservations").update({operational_status:"preparing",checked_out_at:reservation.checked_out_at||now,updated_at:now}).eq("id",reservationId).select().single();
     if(error)return json({ok:false,error:"check_out_failed"},500);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"reservation_check_out",entity_type:"reservation",entity_id:reservationId,new_value:{checked_out_at:data.checked_out_at,operational_status:"preparing"}});
-    await syncTurnovers(actor);
+    // The reservation update triggers the multichannel ledger; do not create legacy turnover tasks.
     return json({ok:true,reservation:data});
   }
   if(operation==="no_show"){
