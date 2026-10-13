@@ -232,3 +232,9 @@ test('ended video advances once and stale events cannot skip the next Trip',asyn
 test('preview completion never navigates to another Trip',async()=>{
  const {w,advance}=await setup({preview:true});try{advance(6500);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 2');assert.equal(w.document.querySelector('[data-action=pause]').getAttribute('aria-label'),'Continuar apresentação')}finally{w.close()}
 });
+
+test('guest scene text is displayed once without copied title or caption controls',async()=>{
+ const {d,w}=await setup();const text='Meu mergulho 🌴',guest={...card,publication_id:'guest-text',publication:{...publication,id:'guest-text',type:'property',source:'guest_submission',cta:'property',author_name:'Ana',title:text,caption:text,media:[{kind:'photo',url:'a.webp',text_layers:[{text,x:50,y:30,size:6,color:'#ffffff',background:'transparent'}]}]},property_url:'chale-premium.html'};
+ w.Villegram.configurePublications([guest],[],[]);w.Villegram.openHome(guest);
+ assert.equal(w.document.querySelector('.vg-text-sticker').textContent,text);assert.equal(w.document.querySelector('.vg-story h2'),null);assert.equal(w.document.querySelector('.vg-caption-short'),null);assert.equal(w.document.querySelector('[data-action=caption]'),null);assert.ok(w.document.querySelector('.vg-guest-property'));w.Villegram.close();d.window.close();
+});

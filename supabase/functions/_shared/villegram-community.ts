@@ -10,7 +10,13 @@ export function profileInput(raw:Row={}){
 export function avatarBytes(value:unknown){
  if(typeof value!=='string'||!value||value.length>1400000||!/^[A-Za-z0-9+/]+={0,2}$/.test(value))throw Error('invalid_avatar');
  let bytes:Uint8Array;try{bytes=Uint8Array.from(atob(value),c=>c.charCodeAt(0))}catch{throw Error('invalid_avatar')}
- if(bytes.length>1024*1024||bytes.length<16||String.fromCharCode(...bytes.slice(0,4))!=='RIFF'||String.fromCharCode(...bytes.slice(8,12))!=='WEBP')throw Error('invalid_avatar');return bytes;
+ if(bytes.length>1024*1024||bytes.length<16)throw Error('invalid_avatar');avatarFormat(bytes);return bytes;
+}
+export function avatarFormat(bytes:Uint8Array){
+ if(String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP')return {extension:'webp',contentType:'image/webp'};
+ if(bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return {extension:'jpg',contentType:'image/jpeg'};
+ if([137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v))return {extension:'png',contentType:'image/png'};
+ throw Error('invalid_avatar');
 }
 export function guestInput(raw:Row,projectUrl:string,userId:string){
  // Guest author, source, moderation, commercial links and dates are server-controlled.
@@ -78,8 +84,8 @@ export async function communityOperation(ctx:any){
  if(op==='community_save_profile'){
   const value=profileInput(body.profile),rights=await eligible();
   const previous=await mine();let uploaded:string|null=null;
-  if(body.profile.avatar_data){const bytes=avatarBytes(body.profile.avatar_data);uploaded=u.id+'/'+crypto.randomUUID()+'.webp';const result=await db.storage.from('villegram-media').upload(uploaded,bytes,{contentType:'image/webp',upsert:false});if(result.error)return fail('avatar_upload_failed',503);value.avatar_path=uploaded;}
-  else if(value.avatar_path){if(!/\.(webp|jpg)$/i.test(value.avatar_path))return fail('invalid_avatar');await mediaExists(value.avatar_path);}
+  if(body.profile.avatar_data){const bytes=avatarBytes(body.profile.avatar_data),format=avatarFormat(bytes);uploaded=u.id+'/'+crypto.randomUUID()+'.'+format.extension;const result=await db.storage.from('villegram-media').upload(uploaded,bytes,{contentType:format.contentType,upsert:false});if(result.error)return fail('avatar_upload_failed',503);value.avatar_path=uploaded;}
+  else if(value.avatar_path){if(!/\.(webp|jpg|png)$/i.test(value.avatar_path))return fail('invalid_avatar');await mediaExists(value.avatar_path);}
   const r=await db.from('villegram_profiles').upsert({...value,id:u.id,can_post:rights.allowed,updated_at:new Date().toISOString(),consented_at:previous?.consented_at||(value.is_public?new Date().toISOString():null)}).select().single();
   if(r.error){if(uploaded)await db.storage.from('villegram-media').remove([uploaded]);return fail(r.error.code==='23505'?'handle_taken':'profile_save_failed',409)}return ok({profile:r.data});
  }

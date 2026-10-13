@@ -282,3 +282,16 @@
 #villegram .vg-intro-choices button[aria-pressed=true]{border-color:#dfc48b;background:#b59a6140;color:#fff5df}
 #villegram.vg-intro .vg-purchase .vg-primary{margin:0;min-height:54px}
 @media(max-height:680px){#villegram.vg-intro .vg-purchase{padding:12px 20px;bottom:calc(124px + env(safe-area-inset-bottom))}#villegram.vg-intro .vg-story{margin-bottom:12px}#villegram.vg-intro .vg-story h2{font-size:28px}#villegram .vg-intro-choices{margin-bottom:12px}}
+
+/* Date and reading panels fit native mobile controls without overlapping the close button. */
+#villegram .vg-sheet{overflow-x:hidden}
+#villegram .vg-sheet>button[data-sheet-close]{position:absolute;right:16px;top:16px;float:none;width:44px;height:44px;min-height:44px;padding:0}
+#villegram .vg-sheet>h3{padding-right:54px;margin:0 0 20px;overflow-wrap:anywhere}
+#villegram .vg-sheet-body,#villegram .vg-dates,#villegram .vg-dates label{min-width:0;max-width:100%}
+#villegram .vg-dates{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+#villegram .vg-dates label{margin:0;display:grid;gap:6px}
+#villegram .vg-dates input,#villegram .vg-dates select{box-sizing:border-box;min-width:0;max-width:100%;width:100%;margin:0;min-height:48px;font-size:16px}
+#villegram .vg-dates input[type=date]{appearance:none;-webkit-appearance:none;text-align:left}
+#villegram .vg-dates input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
+#villegram .vg-dates button{justify-self:stretch;margin:0;white-space:normal}
+#villegram .vg-price-before{display:block;font-size:16px;color:#f1dfbf;margin-bottom:4px;text-decoration-thickness:1px}

@@ -166,3 +166,11 @@ test('profile Trips group by month and day in Brazil, retain dates and edit dest
  assert.equal(posts[0].id,'old','input order remains intact');
  dom.window.close();
 });
+
+test('avatar accepts Safari JPEG and PNG output with matching storage type and own path',async()=>{
+ const samples=[{name:'jpg',mime:'image/jpeg',bytes:new Uint8Array([255,216,255,224,...Array(20).fill(0)])},{name:'png',mime:'image/png',bytes:new Uint8Array([137,80,78,71,13,10,26,10,...Array(20).fill(0)])}];
+ for(const sample of samples){const uploads=[];const db={from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},upsert(value){this.value=value;return this},single(){return this},then(resolve){return Promise.resolve({data:this.value||(['reservations','villegram_invites'].includes(table)?[]:null),error:null}).then(resolve)}}},storage:{from(){return {upload:async(path,bytes,options)=>{uploads.push({path,bytes,options});return {error:null}}}}}};
+ const avatar_data=Buffer.from(sample.bytes).toString('base64');assert.equal(avatarBytes(avatar_data).length,sample.bytes.length);
+ const result=await communityOperation({db,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'safari',display_name:'Teste Safari',is_public:true,avatar_data}},isAdmin:false});assert.equal(result.status,200);assert.ok(uploads[0].path.startsWith(owner+'/'));assert.ok(uploads[0].path.endsWith('.'+sample.name));assert.equal(uploads[0].options.contentType,sample.mime);
+ }
+});
