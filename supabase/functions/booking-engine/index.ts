@@ -224,8 +224,9 @@ async function searchSources(start:string,end:string){
   return Promise.all([
     retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone").eq("active",true).order("id")),
     retryDb("search_reservations",async()=>{
-      const [native,external]=await Promise.all([admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"]),admin.from("ops_stays").select("id,property_id,check_in,check_out,status").is("reservation_id",null).eq("is_test",false).eq("status","confirmed").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7))]);
-      return {data:[...(native.data||[]),...(external.data||[])],error:native.error||external.error};
+      const [native,external,fixtures]=await Promise.all([admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"]),admin.from("ops_stays").select("id,property_id,check_in,check_out,status").is("reservation_id",null).eq("is_test",false).eq("status","confirmed").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)),admin.from("ops_stays").select("reservation_id").eq("is_test",true).not("reservation_id","is",null)]);
+      const fixtureIds=new Set((fixtures.data||[]).map((row:any)=>row.reservation_id));
+      return {data:[...(native.data||[]).filter((row:any)=>!fixtureIds.has(row.id)),...(external.data||[])],error:native.error||external.error||fixtures.error};
     }),
     retryDb("search_change_holds",()=>admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
       .eq("kind","modification").in("status",["awaiting_payment","processing","paid"])

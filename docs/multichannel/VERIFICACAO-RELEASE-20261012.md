@@ -2,7 +2,7 @@
 
 ## Resultado
 
-**Produção não publicada. Homologação autenticada bloqueada por sessão DEV ainda na tela de login.** Não considerar upload, acesso às fotos por funcionário, aprovação e comparação visual Central/PMS aprovados com base nos testes SQL.
+**Produção não publicada.** A sessão administrativa foi validada e os uploads/aprovações foram exercitados no navegador DEV. O complemento abaixo atualiza as linhas anteriormente bloqueadas por login. Permanecem pendentes funcionário, retentativa após falha real de upload e recuperação do banco PROD. Booking-engine DEV atualizado e verificado na v75.
 
 Produção preservada: https://chalezinhoville.com.br, commit `4b54aee214493337b27edcc780bc1de155c632f3`, deployment `dpl_CSqwT4w5eHtc5gCQ3jyg6U2VmPDu`. Fonte de comparação do código: remoto `feature/multichannel-operations-20261012`, HEAD inicial `118fe7e713f5803559a530e8adeb70a5e493bd60`, conferido antes das alterações e antes do envio.
 
@@ -13,7 +13,7 @@ Produção preservada: https://chalezinhoville.com.br, commit `4b54aee214493337b
 - Saída informada pelo proprietário tem campo de data e referência próprios, sem inventar horário efetivo. Amore 09–12/10 reconciliado somente em DEV. Suas duas tarefas foram criadas às 13h43 de 12/10, após saída prevista, estavam pendentes e sem fotos/resultados; arquivadas com motivo, sem exclusão.
 - Fixtures explícitas não impedem a conciliação de hospedagens reais nem o inventário operacional. Isso destravou Essenza 09–13/10, antes barrado por sobreposição com teste. Apenas sua conferência de saída foi criada.
 - Indicadores distinguem estadia prevista, presença registrada dentro da janela e saída prevista vencida a conferir. Preparação inexistente deixa de ser exibida como pendência criada.
-- Filtros de fixtures acrescentados às consultas de hospedagens operacionais na busca e exportação iCal. Estes últimos ajustes do booking-engine ainda exigem deploy/verificação da função completa em DEV; não foram aplicados a PROD.
+- Filtros de fixtures acrescentados às consultas de hospedagens operacionais na busca e exportação iCal. Ajustes publicados e verificados no booking-engine DEV v75; não foram aplicados a PROD.
 
 ## Banco DEV antes/depois
 
@@ -89,10 +89,49 @@ Roteiro PROD atualizado com as nove migrações e bloqueio de instalação se su
 
 ## Pendências concretas para publicar
 
-1. Login DEV administrativo e sessão separada de funcionário para terminar UI, fotos, autorização HTTP com JWT, recarga/retentativa e comparação Central/PMS.
-2. Publicar e testar o pacote revisado do booking-engine DEV; manter wrapper PMS de PROD, sem substituição cega pela função completa DEV.
-3. Confirmar backup/recuperação disponível e sua restauração; apenas o procedimento foi preparado, não há ensaio comprovado de restauração.
+1. Sessão separada de funcionário para testar UI e autorização HTTP/fotos; retentativa após falha real de transporte. Login administrativo, upload, recarga e aprovação já verificados, conforme complemento abaixo.
+2. Booking-engine DEV v75 publicado e verificado. Para PROD, preservar o wrapper PMS existente, sem substituição cega pela função completa DEV.
+3. Painel PROD Backups inspecionado: “Free Plan does not include project backups.” Confirmar backup externo recuperável ou habilitação de backups pelo proprietário. Não foi contratado plano nem executado restore.
 4. Revalidar diff, HEAD remoto, build/variáveis e fontes imediatamente antes de eventual produção. O checkout/PagBank completo continua preservado no código e desativado no lançamento WhatsApp.
 5. Reconciliar em PROD a saída Amore com a mesma evidência do proprietário quando o ledger for instalado, sem copiar a linha DEV. Revisar qualquer registro Booking ambíguo com a equipe.
 
 Retorno: restaurar deployment anterior se necessário, pausar somente o cron multicanal, preservar ledger, fotos, resultados e histórico. Preferir correções aditivas no banco. Não apagar dados para reverter a interface.
+
+## Complemento autenticado — 12/10/2026, 22h (São Paulo)
+
+Prévia: https://chalezinho-ville-7t1h6fpim-roldneicosta-4140.vercel.app, commit ab79456450e03fc4581e3564cf301c6dca5ac2df. Nenhuma mudança de código nesta rodada; 532 testes refere-se à execução anterior.
+
+| Verificação antes bloqueada | Resultado atualizado |
+|---|---|
+| Preparação, checklist, upload e aprovação admin | Aprovada no navegador: seis resultados e seis fotos, reload preservou tudo |
+| Saída e fotos separadas | Aprovada no PMS: cinco resultados e cinco fotos, aprovação observada |
+| Central/PMS | Central móvel, checklist desktop, PMS móvel e desktop verificados; cinco pendentes reais |
+| Funcionário e download negado por escopo | Ainda sem sessão visual; RPC anterior não substitui esta jornada |
+| Retentativa com falha real de transporte | Pendente; não foi simulado sucesso |
+| Backup PROD | Bloqueio confirmado no painel: plano Free sem backups |
+
+Preparação DEV fac5f58b-bde4-4ce8-9423-c060cb906ece criada pela Central: envio incompleto recusado, seis itens/fotos enviados pelo seletor em 360×800, atribuição/início, recarga, envio e aprovação. Banco confirmou approved, seis ready e seis objetos no Storage.
+
+Saída DEV e99afc12-d69c-4537-bebf-3e78ff502a65 criada como fixture por RPC SQL, executada pelo PMS em 360×800: cinco itens/fotos e aprovação; banco confirmou approved, cinco ready e cinco objetos no Storage.
+
+Imagens de catálogo com nota explícita em cada item: não representam vistoria real. Não foram fabricados metadados de upload. Ambas as tarefas/evidências foram depois vinculadas à fixture existente 65a61a78-d65d-417f-9fd9-10cdb3fc0117 (is_test=true) somente para isolamento, preservando notas, fotos e resultados. Não representam operação daquela estadia histórica. Nenhuma exclusão. Fila real retornou a cinco tarefas.
+
+Capturas em outputs/release-20261012:
+- admin-mobile.jpg e admin-mobile-after.jpg: /admin.html, 360×800, indicadores e fila.
+- checklist-approved-desktop.jpg: /admin.html, 1440×900, executor/aprovador e foto.
+- pms-desktop.jpg: /pms-operacao.html?view=today, 1440×900.
+- pms-mobile.jpg: mesma URL, 360×800.
+- departure-approved-mobile.jpg: mesma URL, 360×800, saída de homologação.
+- production-backup-unavailable.jpg: Supabase PROD /database/backups/scheduled.
+
+A captura inicialmente chamada admin-desktop foi renomeada admin-mobile-after por conter viewport efetivo móvel. Não foi tratada como prova desktop. Emulação não comprova Android físico. Nenhuma mensagem, cobrança, migração ou publicação PROD nesta rodada. O seletor de responsável não apresentou QA staff para CH1; não foram alteradas permissões para fabricar aprovação. Sessão de funcionário solicitada ao proprietário.
+
+## Fechamento da verificação do booking-engine — 12/10/2026
+
+A função DEV foi atualizada de v73 para v74 preservando seus 31 arquivos remotos e aplicando apenas os filtros revisados. Na regressão, a data 15–17/02/2027 continuou bloqueada por uma reserva nativa confirmada cuja hospedagem operacional tinha is_test=true. Corrigido também esse caminho: busca e exportação eliminam reservation_id explicitamente marcados no ledger de testes, sem usar nomes. Nenhuma reserva foi cancelada ou apagada.
+
+Versão final DEV: booking-engine v75 ACTIVE, sha 016186cbcd777837214c2ecdaccfbd5225a76dca4d6c22ca54c2460ad1f5cd0e. Verificação API após correção: CH1 disponível no período que antes retornava occupied. Navegador na prévia 7t1h6fpim confirmou três opções, Ville Signature disponível e fluxo WhatsApp. Captura: outputs/release-20261012/native-fixture-search-fixed.jpg. JSON antes/depois: booking-engine-v74-search.json e booking-engine-v75-search.json.
+
+Exportação iCal CH1 por HTTP real (pg_net 28075): status 200, BEGIN:VCALENDAR presente, UID da reserva fixture 64ad00f4-515b-4f0a-a0b9-a29de03f1212 ausente. Token privado não registrado no relatório.
+
+Tipagem do booking-engine aprovada. Suíte completa repetida após correção: 532/532, zero falhas, 53,9 s (tests-native-fixture-fix.txt). Produção permanece sem alterações. Pendentes essenciais: funcionário no navegador/API/fotos, retentativa de upload após falha real e recuperação confirmada do banco. Não declarar publicação concluída.

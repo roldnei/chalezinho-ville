@@ -1,0 +1,23 @@
+{
+  "ok": true,
+  "listings": [
+    {
+      "code": "CH1",
+      "available": true,
+      "unavailable_reason": null,
+      "from_stay_price": 2230.4
+    },
+    {
+      "code": "CH2",
+      "available": true,
+      "unavailable_reason": null,
+      "from_stay_price": 1800.3
+    },
+    {
+      "code": "CH3",
+      "available": true,
+      "unavailable_reason": null,
+      "from_stay_price": 1813.5
+    }
+  ]
+}

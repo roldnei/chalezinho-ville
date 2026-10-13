@@ -1,0 +1,52 @@
+[
+  {
+    "start": "2026-10-19",
+    "end": "2026-10-21",
+    "ok": true,
+    "listings": [
+      {
+        "code": "CH1",
+        "available": true,
+        "from_stay_price": 1459.3,
+        "offer_issues": []
+      },
+      {
+        "code": "CH2",
+        "available": true,
+        "from_stay_price": 1288.8,
+        "offer_issues": []
+      },
+      {
+        "code": "CH3",
+        "available": true,
+        "from_stay_price": 1225,
+        "offer_issues": []
+      }
+    ]
+  },
+  {
+    "start": "2027-02-15",
+    "end": "2027-02-17",
+    "ok": true,
+    "listings": [
+      {
+        "code": "CH1",
+        "available": false,
+        "from_stay_price": null,
+        "offer_issues": null
+      },
+      {
+        "code": "CH2",
+        "available": true,
+        "from_stay_price": 1800.3,
+        "offer_issues": []
+      },
+      {
+        "code": "CH3",
+        "available": true,
+        "from_stay_price": 1813.5,
+        "offer_issues": []
+      }
+    ]
+  }
+]
