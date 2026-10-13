@@ -1,0 +1,8 @@
+{
+  "http": 403,
+  "scenario": "Suspended fixture has no operational access",
+  "response": {
+    "ok": false,
+    "error": "operator_required"
+  }
+}

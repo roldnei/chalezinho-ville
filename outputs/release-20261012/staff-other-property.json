@@ -1,0 +1,8 @@
+{
+  "response": {
+    "ok": false,
+    "error": "task_not_found"
+  },
+  "scenario": "CH1 staff cannot read CH2 task",
+  "http": 404
+}

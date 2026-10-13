@@ -2,7 +2,7 @@
 
 ## Resultado
 
-**Produção não publicada.** A sessão administrativa foi validada e os uploads/aprovações foram exercitados no navegador DEV. O complemento abaixo atualiza as linhas anteriormente bloqueadas por login. Permanecem pendentes funcionário, retentativa após falha real de upload e recuperação do banco PROD. Booking-engine DEV atualizado e verificado na v75.
+**Produção não publicada.** A sessão administrativa foi validada e os uploads/aprovações foram exercitados no navegador DEV. O complemento abaixo atualiza as linhas anteriormente bloqueadas por login. Funcionário, isolamento e retentativa após rejeição real do upload aprovados em 13/10. Permanece pendente comprovar recuperação do banco PROD e executar o preflight de publicação. Booking-engine DEV atualizado e verificado na v75.
 
 Produção preservada: https://chalezinhoville.com.br, commit `4b54aee214493337b27edcc780bc1de155c632f3`, deployment `dpl_CSqwT4w5eHtc5gCQ3jyg6U2VmPDu`. Fonte de comparação do código: remoto `feature/multichannel-operations-20261012`, HEAD inicial `118fe7e713f5803559a530e8adeb70a5e493bd60`, conferido antes das alterações e antes do envio.
 
@@ -57,12 +57,12 @@ Booking tem fontes reais acessíveis, mas não foi possível homologar uma reser
 | Próprias/diretas, bloqueio, ambiguidade, alteração/cancelamento/falha | Aprovada em transação DEV | RPC real, fixtures com rollback, sem efeitos financeiros |
 | Lease concorrente/idempotência | Aprovada no banco | Segunda reivindicação rejeitada; não teste de carga distribuída |
 | Troca no mesmo dia | Aprovada em teste local | Prioridade e janela insuficiente; ainda sem jornada visual |
-| Funcionário autorizado e fora do imóvel | Aprovada em RPC DEV | Fora do escopo recusado; sem sessão visual do funcionário |
+| Funcionário autorizado e fora do imóvel | Aprovada no navegador/API DEV | Login próprio, tarefa atribuída CH1, CH2 recusado HTTP 404 |
 | Hub/tarefa sem autenticação | Aprovada por HTTP | 403 operator_required |
 | Rotina sem segredo | Aprovada por HTTP | 403 forbidden |
-| Fotos: upload móvel, retentativa, recarga, download permitido/negado | Bloqueada | Login DEV pendente; nenhum upload simulado tratado como real |
-| Checklist, aprovação, comparação das duas etapas na UI | Bloqueada | Falta sessão administrador e funcionário |
-| Central/PMS móvel/desktop | Bloqueada | Tela privada no login |
+| Fotos: upload móvel, retentativa, recarga, download permitido/negado | Aprovada no navegador/API DEV | Upload móvel anterior; falha de autorização, fila após reload e reenvio real em 13/10; não teste de desconexão física |
+| Checklist, aprovação, comparação das duas etapas na UI | Aprovada | Preparação/saída admin anteriores; preparação com executor funcionário e aprovação por outra sessão em 13/10 |
+| Central/PMS móvel/desktop | Aprovada nos cenários descritos | Capturas autenticadas 360×800 e 1440×900; funcionário 1280×720 |
 | Público: home → datas → estadia → resumo WhatsApp | Observada no navegador | Prévia 118fe7e7, 1440×900 e 360×800; sem pagamento, sem mensagem enviada |
 | Android físico | Não testado | Viewport emulado não é aparelho físico |
 | Produção e verificação pós-publicação | Bloqueada | Critérios essenciais ainda não atendidos |
@@ -89,7 +89,7 @@ Roteiro PROD atualizado com as nove migrações e bloqueio de instalação se su
 
 ## Pendências concretas para publicar
 
-1. Sessão separada de funcionário para testar UI e autorização HTTP/fotos; retentativa após falha real de transporte. Login administrativo, upload, recarga e aprovação já verificados, conforme complemento abaixo.
+1. Funcionário e retentativa concluídos em 13/10, conforme complemento abaixo. Desconexão física de rede não exercitada; foi usada rejeição real de autorização do upload.
 2. Booking-engine DEV v75 publicado e verificado. Para PROD, preservar o wrapper PMS existente, sem substituição cega pela função completa DEV.
 3. Painel PROD Backups inspecionado: “Free Plan does not include project backups.” Confirmar backup externo recuperável ou habilitação de backups pelo proprietário. Não foi contratado plano nem executado restore.
 4. Revalidar diff, HEAD remoto, build/variáveis e fontes imediatamente antes de eventual produção. O checkout/PagBank completo continua preservado no código e desativado no lançamento WhatsApp.
@@ -135,3 +135,26 @@ Versão final DEV: booking-engine v75 ACTIVE, sha 016186cbcd777837214c2ecdaccfbd
 Exportação iCal CH1 por HTTP real (pg_net 28075): status 200, BEGIN:VCALENDAR presente, UID da reserva fixture 64ad00f4-515b-4f0a-a0b9-a29de03f1212 ausente. Token privado não registrado no relatório.
 
 Tipagem do booking-engine aprovada. Suíte completa repetida após correção: 532/532, zero falhas, 53,9 s (tests-native-fixture-fix.txt). Produção permanece sem alterações. Pendentes essenciais: funcionário no navegador/API/fotos, retentativa de upload após falha real e recuperação confirmada do banco. Não declarar publicação concluída.
+
+
+## Complemento funcionário — 13/10/2026, 08h40 (São Paulo)
+
+Teste solicitado pelo proprietário concluído em DEV. Nenhuma alteração de código, migração ou função nesta rodada. Os 532 testes automatizados são da rodada anterior, não foram recontados como nova execução.
+
+Conta sintética ce25efbf-173e-4a0d-8fef-05ec5d317835, papel staff, somente CH1, permissão housekeeping. Criada para homologação e confirmação de e-mail controlada em DEV; não prova entrega de e-mail. Login de senha realizado no formulário real. Tarefa 947f78dd-6648-4406-b5aa-17916806a0d9.
+
+- Antes da atribuição: zero tarefas/hóspedes na API. Após atribuição: somente sua tarefa no navegador.
+- Leitura da tarefa própria: HTTP 200; outra tarefa CH1 e tarefa CH2: HTTP 404 task_not_found.
+- Sincronizar como staff: HTTP 403 admin_required; aprovar como staff: HTTP 409 admin_required. Sem botão de aprovação na tarefa enviada.
+- Falha real de upload provocada retirando temporariamente apenas a atribuição da fixture. Servidor rejeitou task_not_found, UI mostrou reenvio pendente. Após reload/restauração da atribuição, foto recuperada e enviada. Item reenviado terminou com exatamente uma foto, sem duplicação. Não foi simulada desconexão de rede.
+- Seis resultados e seis fotos enviadas pelo seletor real; seis objetos confirmados no Storage. As imagens são de catálogo, não vistoria real.
+- Envio para vistoria pelo funcionário; aprovação na sessão administrativa separada fa2184f3-3843-4c77-9354-c1b8b53f384a. Banco confirmou approved, executed_by=staff e approved_by=admin; funcionário recarregou e viu Aprovada no histórico.
+- Foto própria assinada: HTTP 200, 59116 bytes; objeto conhecido de outra tarefa: acesso negado/oculto (HTTP 400 com corpo 404 not_found). Tokens/URLs assinados não registrados.
+- Finalização: logout visível, acesso operacional da conta suspenso; API confirmou HTTP 403 operator_required. Arquivo temporário de credenciais removido. Conta e histórico preservados.
+- Tarefa e seis evidências vinculadas à fixture is_test 65a61a78-d65d-417f-9fd9-10cdb3fc0117 para isolamento, com nota de que não representam operação da estadia histórica. Nenhuma tarefa real alterada.
+
+Navegador funcionário: https://chalezinho-ville-7t1h6fpim-roldneicosta-4140.vercel.app/pms-operacao.html?view=today (ab794564); administrador: https://chalezinho-ville-32jaip0l0-roldneicosta-4140.vercel.app/admin.html (118fe7e7), ambas no mesmo DEV. Aprovação entre versões foi observada, não alegada como teste de um único build. Viewport efetivo desta rodada 1280×720.
+
+Evidências em outputs/release-20261012: staff-api-permissions.json, staff-photo-permissions.json, staff-other-property.json, staff-suspended.json, staff-upload-failed.jpg, staff-submitted.jpg, staff-admin-approved.jpg, staff-approved-history.jpg.
+
+Produção continua sem mudanças. Backup recuperável ainda não comprovado; preflight/diff final e publicação continuam pendentes. Fonte Booking só fornece bloqueios no conjunto observado. Não declarar homologação global ou publicação concluída com base neste teste de funcionário.

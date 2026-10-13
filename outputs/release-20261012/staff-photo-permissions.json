@@ -1,0 +1,8 @@
+{
+  "task_status": "approved",
+  "own_photo_status": 200,
+  "own_photo_bytes": 59116,
+  "photo_count": 6,
+  "other_photo_status": 400,
+  "other_photo_response": "{\"statusCode\":\"404\",\"error\":\"not_found\",\"message\":\"Object not found\",\"code\":\"NoSuchKey\"}"
+}

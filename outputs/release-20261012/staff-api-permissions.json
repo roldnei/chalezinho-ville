@@ -1,0 +1,30 @@
+[
+  {
+    "action": "task",
+    "task_id": "947f78dd-6648-4406-b5aa-17916806a0d9",
+    "status": 200,
+    "ok": true,
+    "error": null
+  },
+  {
+    "action": "task",
+    "task_id": "fac5f58b-bde4-4ce8-9423-c060cb906ece",
+    "status": 404,
+    "ok": false,
+    "error": "task_not_found"
+  },
+  {
+    "action": "sync",
+    "task_id": null,
+    "status": 403,
+    "ok": false,
+    "error": "admin_required"
+  },
+  {
+    "action": "status",
+    "task_id": "947f78dd-6648-4406-b5aa-17916806a0d9",
+    "status": 409,
+    "ok": false,
+    "error": "admin_required"
+  }
+]
