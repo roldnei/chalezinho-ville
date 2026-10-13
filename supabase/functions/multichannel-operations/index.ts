@@ -3,6 +3,7 @@ import {createClient} from 'npm:@supabase/supabase-js@2.57.4';
 import {fetchCalendarRaw} from '../_shared/calendars.ts';
 import {parseOperationalCalendar,operationSummary} from '../_shared/operational-calendar.ts';
 import {validPhoto} from '../pms-operations/photos.ts';
+import {operationalGuests} from '../_shared/operational-guests.ts';
 const projectUrl=Deno.env.get('SUPABASE_URL')||'';
 const admin=createClient(projectUrl,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')||'',{auth:{persistSession:false,autoRefreshToken:false}});
 const headers={'access-control-allow-origin':'*','access-control-allow-headers':'authorization,apikey,content-type,x-ops-secret','access-control-allow-methods':'POST,OPTIONS','cache-control':'no-store'};
@@ -16,8 +17,8 @@ async function actor(req:Request){
  const p=checked(await admin.from('profiles').select('id,role,full_name,pms_property_ids,pms_permissions,pms_access_status').eq('id',data.user.id).maybeSingle());
  return p&&p.pms_access_status==='active'&&['admin','host','staff','service_provider'].includes(p.role)?p:null;
 }
-async function all(table:string,columns='*'){
- const result:any[]=[];for(let offset=0;;offset+=500){const rows=checked(await admin.from(table).select(columns).order('id').range(offset,offset+499));result.push(...rows);if(rows.length<500)return result;}
+async function all(table:string,columns='*',order='id'){
+ const result:any[]=[];for(let offset=0;;offset+=500){const rows=checked(await admin.from(table).select(columns).order(order).range(offset,offset+499));result.push(...rows);if(rows.length<500)return result;}
 }
 async function sync(){
  const sources=checked(await admin.from('property_calendar_sources').select('*').eq('enabled',true).is('deleted_at',null));
@@ -50,7 +51,11 @@ async function hub(a:any){
  const visibleTasks=tasks.filter(t=>!fixtureIds.has(t.stay_id)&&taskAccess(a,t));
  const assignedStayIds=new Set(visibleTasks.map(t=>t.stay_id));
  const guestAccess=a.role==='admin'||a.pms_permissions?.reservations===true;
- const visibleStays=stays.filter(s=>!s.is_test&&propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null,departure_report_note:null});
+ let visibleStays=stays.filter(s=>!s.is_test&&propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null,departure_report_note:null});
+ if(guestAccess){
+  const [links,contacts]=await Promise.all([all('guest_stay_links','stay_key,guest_id,reservation_id,property_id,source,check_in,check_out','stay_key'),all('guest_contacts','id,name,phone')]);
+  visibleStays=operationalGuests(visibleStays,events,links,contacts);
+ }
  const sourceIds=new Set(sources.filter(s=>propertyAccess(a,s.property_id)).map(s=>s.id));
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  return {ok:true,operator:a,server_now:new Date().toISOString(),today,properties:properties.filter(p=>propertyAccess(a,p.id)),stays:visibleStays,tasks:visibleTasks,
