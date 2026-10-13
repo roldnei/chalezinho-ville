@@ -178,3 +178,69 @@ test('explicit fixture isolation archives open tasks and survives reservation up
  const real=await one("insert into ops_stays(property_id,channel,origin,payment_origin,guest_name,check_in,check_out) values(2,'direct','manual','not_recorded','Teste is not a classification rule','2096-01-03','2096-01-05') returning *");
  assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[real.id])).n,2);
 });
+
+test('time-aware eligibility never backfills preparation or expired departure, preserves legitimate tasks',async()=>{
+ await db.exec(await readFile(new URL('../supabase/migrations/20261013010000_multichannel_task_time_eligibility.sql',import.meta.url),'utf8'));
+ const current=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) select 2,'direct','manual','not_recorded',d-1,d+1 from (select (now() at time zone 'America/Sao_Paulo')::date d) x returning *");
+ assert.deepEqual((await db.query('select stage from ops_tasks where stay_id=$1',[current.id])).rows.map(x=>x.stage),['departure']);
+ const departure=await one('select * from ops_tasks where stay_id=$1',[current.id]);
+ await db.query('update ops_stays set checked_out_at=now() where id=$1',[current.id]);
+ await db.exec('select ops_refresh_tasks(); select ops_refresh_tasks()');
+ assert.equal((await one('select status from ops_tasks where id=$1',[departure.id])).status,'pending');
+ const expired=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) select 2,'direct','manual','not_recorded',d-3,d-1 from (select (now() at time zone 'America/Sao_Paulo')::date d) x returning *");
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[expired.id])).n,0);
+ assert.equal(expired.checked_out_at,null);
+});
+
+test('checkout today uses configured time, never date alone',async()=>{
+ await db.exec("update properties set check_out_time='00:00' where id=2");
+ const s=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) select 2,'direct','manual','not_recorded',d-2,d from (select (now() at time zone 'America/Sao_Paulo')::date d) x returning *");
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[s.id])).n,0);
+ assert.equal(s.checked_out_at,null);
+ await db.exec("update properties set check_out_time='11:00' where id=2");
+});
+
+test('dated owner departure evidence prevents generation without inventing checkout time',async()=>{
+ const s=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out,departure_reported_on,departure_report_note) values(2,'direct','manual','not_recorded','2095-01-01','2095-01-03','2095-01-02','Owner reported departure; time unknown') returning *");
+ await db.exec('select ops_refresh_tasks()');
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[s.id])).n,0);
+ assert.equal(s.checked_out_at,null);
+});
+
+test('archived stages remain archived after refresh and guest metadata edits',async()=>{
+ const s=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) values(2,'direct','manual','not_recorded','2094-06-01','2094-06-03') returning *");
+ await db.query("update ops_tasks set status='superseded' where stay_id=$1",[s.id]);
+ await db.query("update ops_stays set guest_name='Corrected guest' where id=$1",[s.id]);
+ await db.exec('select ops_refresh_tasks(); select ops_refresh_tasks()');
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[s.id])).n,2);
+ assert.equal((await one("select count(*)::int n from ops_tasks where stay_id=$1 and status='superseded'",[s.id])).n,2);
+});
+
+test('explicit fixtures do not obstruct real imports or manual stays',async()=>{
+ await db.exec("insert into ops_stays(property_id,channel,origin,payment_origin,is_test,check_in,check_out) values(1,'direct','manual','not_recorded',true,'2094-08-01','2094-08-05')");
+ await sync([event('real-over-fixture','2094-08-01','2094-08-03')]);
+ assert.equal((await one("select stay_id is not null linked from ops_calendar_events where uid='real-over-fixture'")).linked,true);
+ const real=await one("select * from ops_stays where external_id='real-over-fixture'");
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[real.id])).n,2);
+ const direct=await mutate('save_stay',{property_id:1,channel:'direct',check_in:'2094-08-03',check_out:'2094-08-05'});
+ assert.ok(direct.id);
+});
+
+test('test operational stays never block native inventory, real stays still do',async()=>{
+ await db.exec(await readFile(new URL('../supabase/migrations/20261013011000_multichannel_fixture_inventory.sql',import.meta.url),'utf8'));
+ await db.exec("insert into ops_stays(property_id,channel,origin,payment_origin,is_test,check_in,check_out) values(2,'direct','manual','not_recorded',true,'2094-09-01','2094-09-03')");
+ await db.exec("insert into reservations(property_id,check_in,check_out,status,source) values(2,'2094-09-01','2094-09-03','confirmed','direct')");
+ await db.exec("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) values(2,'direct','manual','not_recorded','2094-09-05','2094-09-07')");
+ await assert.rejects(db.exec("insert into reservations(property_id,check_in,check_out,status,source) values(2,'2094-09-05','2094-09-07','confirmed','direct')"),/operational_period_occupied/);
+});
+
+test('date changes do not resurrect intentionally archived stages; normal revisions still regenerate',async()=>{
+ await db.exec(await readFile(new URL('../supabase/migrations/20261013012000_multichannel_archival_persistence.sql',import.meta.url),'utf8'));
+ const archived=await one("select * from ops_stays where check_in='2094-06-01'");
+ await db.query("update ops_stays set check_in='2094-06-02',check_out='2094-06-04' where id=$1",[archived.id]);
+ await db.exec('select ops_refresh_tasks()');
+ assert.equal((await one('select count(*)::int n from ops_tasks where stay_id=$1',[archived.id])).n,2);
+ const fresh=await one("insert into ops_stays(property_id,channel,origin,payment_origin,check_in,check_out) values(2,'direct','manual','not_recorded','2094-11-01','2094-11-03') returning *");
+ await db.query("update ops_stays set check_in='2094-11-02',check_out='2094-11-04' where id=$1",[fresh.id]);
+ assert.equal((await one("select count(*)::int n from ops_tasks where stay_id=$1 and status='pending'",[fresh.id])).n,2);
+});

@@ -1,0 +1,131 @@
+diff --git a/admin.html b/admin.html
+index d973909b..7c544a7a 100644
+--- a/admin.html
++++ b/admin.html
+@@ -12,7 +12,7 @@
+   <link rel="preconnect" href="https://fonts.googleapis.com">
+   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+-<script src="image-manifest.js?v=1"></script><script src="responsive-images.js?v=1"></script><link rel="stylesheet" href="amenities.css?v=3"><script src="amenities.js?v=review3"></script><link rel="stylesheet" href="stay-offers.css?v=1"><script src="stay-offers.js?v=lodging-actions2" defer></script><link rel="stylesheet" href="ui-controls.css?v=1"><link rel="stylesheet" href="villegram-review-notifications.css?v=moments1"></head>
++<script src="image-manifest.js?v=1"></script><script src="responsive-images.js?v=1"></script><link rel="stylesheet" href="amenities.css?v=3"><script src="amenities.js?v=review3"></script><link rel="stylesheet" href="stay-offers.css?v=1"><script src="stay-offers.js?v=lodging-actions2" defer></script><link rel="stylesheet" href="ui-controls.css?v=1"><link rel="stylesheet" href="villegram-review-notifications.css?v=moments1"><link rel="stylesheet" href="operations-workspace.css?v=layout2"></head>
+ <body class="admin-body">
+   <div id="admin-app" class="admin-app" aria-busy="true">
+     <aside class="admin-sidebar">
+@@ -70,6 +70,7 @@
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+   <script src="app-config.js?v=review2"></script>
+   <script src="listing-editor.js?v=review2"></script>
++  <script src="operations-workspace.js?v=layout2"></script>
+   <script src="admin.js?v=property-mobile3"></script>
+ <script src="villegram-review-notifications.js?v=moments1"></script></body>
+ </html>
+diff --git a/admin.js b/admin.js
+index b8ad5237..5b1db77b 100644
+--- a/admin.js
++++ b/admin.js
+@@ -64,7 +64,7 @@ async function load(silent=false){
+ function updateCounts(){
+   const t=today(),todayRows=state.reservations.filter(r=>r.status==="confirmed"&&(r.check_in===t||r.check_out===t));
+   const unread=state.notifications.filter(n=>!n.read_at).length;
+-  $("#nav-today-count").textContent=todayRows.length;$("#nav-alert-count").textContent=unread;$("#top-alert-count").textContent=unread;
++  $("#nav-today-count").textContent=state.opsTodayCount??"—";$("#nav-alert-count").textContent=unread;$("#top-alert-count").textContent=unread;
+   $("#nav-alert-count").hidden=!unread;$("#top-alert-count").hidden=!unread;
+ }
+ function showView(view){
+@@ -756,6 +756,7 @@ openProperty=function(id){
+  legacyProperty(id);const form=$('#property-form');const groups={photos:[],conditions:['cleaning_fee','guarantee_amount','max_installments','no_interest_installments','interest_payer'],details:['name','code','slug','property_type','max_guests','check_in_time','check_out_time','active']};form.querySelectorAll('label').forEach(l=>{const input=l.querySelector('input,select,textarea');if(input)l.hidden=!groups[key].includes(input.name)});form.querySelector('.property-media-editor').hidden=key!=='photos';$('#admin-modal-content h2').textContent={photos:'Fotos do imóvel',conditions:'Taxas e pagamento',details:'Dados do imóvel'}[key];$('#admin-modal-content .property-form-heading').insertAdjacentHTML('afterbegin','<button type="button" class="workspace-back" id="back-workspace">← '+esc(p.name)+'</button>');$('#back-workspace').onclick=()=>openProperty(id);
+  });
+ };
++renderToday=function(){window.VilleOperations.mount($("#admin-content"),{sb,onSummary:summary=>{state.opsTodayCount=summary?new Set([...summary.arrivals,...summary.departures].map(s=>s.id)).size:null;$("#nav-today-count").textContent=state.opsTodayCount??"—";}});};
+ setupWorkspace();
+ 
+ boot();
+diff --git a/operations-workspace.css b/operations-workspace.css
+new file mode 100644
+index 00000000..b47025ad
+--- /dev/null
++++ b/operations-workspace.css
+@@ -0,0 +1,14 @@
++.ville-ops{min-width:0;max-width:100%;--ops-line:#dedfd7;--ops-ink:#213d32;--ops-panel:#fff;--ops-soft:#eaf0e7;--ops-tag:#edf0e9;--ops-muted:#6d6045;--ops-link:#285e43;color:var(--ops-ink);font-size:15px;line-height:1.5;padding-bottom:75px}.ville-ops header,.ville-ops .ops-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}.ville-ops header h2{font-size:28px;margin:5px 0 15px}.ville-ops small{font-size:11px;letter-spacing:.03em}.ville-ops nav{display:flex;gap:8px;overflow:auto;padding:8px 0 14px}.ville-ops button{cursor:pointer;border:1px solid var(--ops-line);background:var(--ops-panel);border-radius:12px;padding:10px 15px;color:var(--ops-ink);font:inherit;min-height:44px}.ville-ops nav button[aria-current=page],.ville-ops button[type=submit]{background:#244b3c;color:white}.ville-ops button:disabled{opacity:.5;cursor:wait}.ville-ops .ops-message:empty{display:none}.ville-ops .ops-message{padding:12px;background:#fdf0d4;border-radius:10px}.ops-sync-summary{font-size:13px;color:var(--ops-muted);padding:12px 0}.ops-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,285px),1fr));gap:14px}.ops-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}.ops-kpis article{display:flex;flex-direction:column;padding:20px;background:var(--ops-soft);border-radius:16px}.ops-kpis strong{font-size:30px;font-weight:600}.ops-kpis span{font-size:13px}.ville-ops .ops-card{border:1px solid var(--ops-line);border-radius:16px;padding:18px;background:var(--ops-panel);text-align:left;overflow-wrap:anywhere}.ville-ops .ops-card h3{font-size:17px;margin:10px 0}.ville-ops .ops-card p{font-size:13px;margin:7px 0}.ops-tag{font-size:11px;background:var(--ops-tag);border-radius:20px;padding:5px 9px}.ops-warning{color:#8d4814!important;background:#fff0d8;padding:8px;border-radius:8px}.ops-detail{margin-top:20px}.ops-form{max-width:720px}.ville-ops label{display:flex;flex-direction:column;gap:6px;margin:10px 0;font-size:13px}.ville-ops input,.ville-ops select,.ville-ops textarea{width:100%;box-sizing:border-box;border:1px solid var(--ops-line);border-radius:9px;padding:12px;color:var(--ops-ink);background:var(--ops-panel);font:inherit;min-height:44px}.ville-ops textarea{min-height:80px}.ops-actions{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.ops-checklist{display:grid;gap:16px}.ops-photos{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0}.ops-photos a{display:flex;flex-direction:column;width:145px;color:var(--ops-link)}.ops-photos img{width:145px;height:110px;object-fit:cover;border-radius:8px}.ops-photos small{font-size:10px}.ville-ops progress{width:100%;accent-color:#325f47}.ville-ops [data-upload-queue]{background:#fff0d8;padding:5px;border-radius:8px}.ville-ops [data-upload-queue]:empty{display:none}.ville-ops [data-upload-queue] button{margin:5px}.ville-ops h3{margin-top:22px}.ville-ops a{color:var(--ops-link)}@media(max-width:650px){.ops-kpis{grid-template-columns:repeat(2,1fr)}.ops-kpis article{padding:14px}.ville-ops header h2{font-size:23px}.ville-ops nav{margin:0 -4px}.ville-ops nav button{white-space:nowrap;font-size:13px;padding:8px 11px}.ops-grid{grid-template-columns:1fr}.ville-ops .ops-card{padding:14px}}
++
++/* Embedded workspace: never inherit the public hero header's absolute layout. */
++.ville-ops>.ops-header{position:static;inset:auto;z-index:auto;padding:0;margin:0 0 12px;color:inherit;align-items:flex-start;gap:12px}
++.ville-ops>.ops-header>div{flex:1 1 220px;min-width:0}
++.ville-ops>.ops-header small{display:block}
++.ville-ops>.ops-header h2{margin:4px 0 0;line-height:1.2;overflow-wrap:anywhere}
++.ville-ops>.ops-header>button{flex:0 0 auto}
++.ville-ops>.ops-tabs{position:static;min-width:0;max-width:100%;margin:0;letter-spacing:normal;text-transform:none;overscroll-behavior-x:contain}
++.ville-ops>.ops-tabs>button{flex:0 0 auto;white-space:nowrap}
++
++/* Match the dark administrative hosts, with readable text and form surfaces. */
++.admin-body .ville-ops,.workspace .ville-ops{--ops-line:#48554b;--ops-ink:#e7eee8;--ops-panel:#1d241f;--ops-soft:#18291f;--ops-tag:#2a3c2f;--ops-muted:#c5b68d;--ops-link:#b0d7bd;color-scheme:dark}
++.ville-ops .ops-message,.ville-ops [data-upload-queue]{color:#213d32}
+diff --git a/pms-operacao.html b/pms-operacao.html
+index 0335972d..d8e3774f 100644
+--- a/pms-operacao.html
++++ b/pms-operacao.html
+@@ -8,7 +8,7 @@
+   <title>Operação da Estadia | Chalezinho Ville</title>
+   <link rel="icon" href="favicon.svg">
+   <link rel="stylesheet" href="pms-operacao.css?v=5"><link rel="stylesheet" href="admin-workspace.css?v=review2">
+-<link rel="stylesheet" href="ui-controls.css?v=1"></head>
++<link rel="stylesheet" href="ui-controls.css?v=1"><link rel="stylesheet" href="operations-workspace.css?v=layout2"></head>
+ <body>
+   <div id="pms-shell" class="shell" aria-busy="true">
+     <aside class="rail" id="pms-rail">
+@@ -55,6 +55,7 @@
+   </div>
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+   <script src="app-config.js?v=review2"></script>
++  <script src="operations-workspace.js?v=layout2"></script>
+   <script src="pms-operacao.js?v=review2"></script>
+ </body>
+ </html>
+diff --git a/pms-operacao.js b/pms-operacao.js
+index 818a87a3..0b42543c 100644
+--- a/pms-operacao.js
++++ b/pms-operacao.js
+@@ -1,6 +1,6 @@
+ (()=>{
+ const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENDPOINT=C.supabaseUrl+"/functions/v1/pms-operations";
+-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const initialView=new URLSearchParams(location.search).get("view");let session,state,view=["today","agenda","reservations","blocks","tasks","maintenance","indicators","templates","team"].includes(initialView)?initialView:"today",filters={status:"all",property:"all",search:""};
++const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const initialView=new URLSearchParams(location.search).get("view");let session,state,view=["today","agenda","reservations","blocks","tasks","legacy_tasks","maintenance","indicators","templates","team"].includes(initialView)?initialView:"today",filters={status:"all",property:"all",search:""};
+ const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+ const saoDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+ const brazilTimeZone="America/Sao_Paulo";
+@@ -21,7 +21,9 @@ async function boot(){const x=await sb.auth.getSession();session=x.data.session;
+ function bind(){$(".rail-nav").onclick=e=>{const b=e.target.closest("[data-view]");if(!b||!state)return;show(b.dataset.view);document.body.classList.remove("menu-open")};$("#menu-toggle").onclick=()=>document.body.classList.toggle("menu-open");$("#refresh").onclick=load;$("#new-action").onclick=()=>view==="templates"?openTemplate():view==="blocks"?openBlock():openNew(view==="maintenance"?"issue":"task");$("#sign-out").onclick=async()=>{await sb.auth.signOut();location.href="auth.html"};$$('[data-close-sheet]').forEach(b=>b.onclick=closeSheet);$$('[data-close-modal]').forEach(b=>b.onclick=closeModal);document.addEventListener("keydown",e=>{if(e.key==="Escape"){closeSheet();closeModal()}})}
+ async function load(){$("#loading").hidden=false;$("#content").hidden=true;try{state=await api("hub");updateNavigation();updateCounts();show(view);$("#loading").hidden=true;$("#content").hidden=false;$("#pms-shell").setAttribute("aria-busy","false")}catch{$("#loading").innerHTML="<p>Não foi possível carregar a operação. Tente novamente em instantes.</p>"}}
+ function updateNavigation(){const admin=state.operator?.role==="admin";$(".suite-nav").hidden=!admin;$(".admin-pms-entry").hidden=!(admin||state.operator?.role==="host"&&state.operator?.permissions?.manage_listings===true)}
+-function updateCounts(){const t=saoDate(),today=state.tasks.filter(x=>localDay(x.scheduled_for)===t&&!["ready","cancelled"].includes(x.status));$("#today-count").textContent=today.length;$("#task-count").textContent=state.tasks.filter(x=>!["ready","cancelled"].includes(x.status)).length;$("#issue-count").textContent=state.issues.length}
++function updateCounts(){const summary=state.opsSummary;$("#today-count").textContent=summary?new Set([...summary.arrivals,...summary.departures].map(s=>s.id)).size:"—";$("#task-count").textContent=summary?summary.pending.length:"—";$("#issue-count").textContent=state.issues.length}
++function operationSummaryChanged(summary){state.opsSummary=summary;updateCounts()}
++
+ function show(next){view=next;history.replaceState(null,"",location.pathname+"?view="+next);$$('[data-view]').forEach(b=>b.classList.toggle("active",b.dataset.view===next));const titles={today:["OPERAÇÃO DE HOJE","Tarefas de hoje"],agenda:["PRÓXIMOS MOVIMENTOS","Agenda operacional"],reservations:["JORNADA DO HÓSPEDE","Reservas"],blocks:["DISPONIBILIDADE OPERACIONAL","Bloqueios"],tasks:["ROTINA DA EQUIPE","Tarefas"],maintenance:["CUIDADO COM OS IMÓVEIS","Manutenção"],indicators:["LEITURA DA OPERAÇÃO","Indicadores"],templates:["PADRÃO DE ENTREGA","Checklists"],team:["PESSOAS E RESPONSABILIDADES","Equipe e acessos"]};const title=titles[next]||titles.today;$("#eyebrow").textContent=title[0];$("#page-title").textContent=title[1];$("#new-action").hidden=["indicators","reservations"].includes(next)||(next==="team"&&state.operator?.role!=="admin");$("#new-action").textContent=next==="team"?"+ Convidar pessoa":next==="maintenance"?"+ Nova ocorrência":next==="templates"?"+ Novo checklist":next==="blocks"?"+ Novo bloqueio":"+ Nova tarefa";if(next==="team")$("#new-action").onclick=openTeamInvite;else $("#new-action").onclick=()=>view==="templates"?openTemplate():view==="blocks"?openBlock():openNew(view==="maintenance"?"issue":"task");({today:renderToday,agenda:renderAgenda,reservations:renderReservations,blocks:renderBlocks,tasks:renderTasks,maintenance:renderMaintenance,indicators:renderIndicators,templates:renderTemplates,team:renderTeam}[next]||renderToday)()}
+ function empty(text){return `<div class="empty">${esc(text)}</div>`}
+ function activeReservations(){return state.reservations.filter(r=>r.status==="confirmed"&&r.check_in<=saoDate()&&r.check_out>saoDate())}
+@@ -93,8 +95,8 @@ async function loadCleaningPhotos(id){
+  const box=document.querySelector('#cleaning-photos');if(!box)return;
+  try{
+   const d=await api('task_photos',{operation:'list',task_id:id});if(!box.isConnected)return;
+-  const task=state.tasks.find(t=>t.id===id),editable=['todo','in_progress','blocked'].includes(task.status),missing=d.points.filter(p=>!d.photos.some(x=>x.point_key===p.key));
+-  box.innerHTML=`<h3>Fotos da limpeza</h3><p>${d.points.length-missing.length} de ${d.points.length} pontos registrados. Confira nitidez, iluminação e limpeza antes de enviar.</p><div class="cleaning-photo-grid">${d.points.map(p=>{const photo=d.photos.find(x=>x.point_key===p.key);return `<article><h4>${esc(p.label)}</h4><p>${esc(p.hint)}</p>${photo?`<a href="${esc(photo.signed_url||'#')}" target="_blank" rel="noopener"><img src="${esc(photo.signed_url||'')}" alt="${esc(p.label)} — ampliar foto"></a><small>${esc(photo.uploaded_name)} · ${datetime(photo.created_at)} · ${Math.round(photo.size_bytes/1024)} KB</small>`:'<span class="photo-missing">Foto obrigatória pendente</span>'}${editable?`<label>${photo?'Substituir foto':'Adicionar foto'}<input type="file" accept="image/jpeg,image/png,image/webp" data-photo-point="${p.key}"></label>`:''}<p role="status"></p></article>`}).join('')}</div><p>${missing.length?'Faltam: '+missing.map(p=>esc(p.label)).join(', '):'Todas as fotos foram enviadas. A aprovação depende da vistoria.'}</p>`;
++  const task=state.tasks.find(t=>t.id===id),editable=false,missing=d.points.filter(p=>!d.photos.some(x=>x.point_key===p.key));
++  box.innerHTML=`<h3>Fotos históricas — etapa original não reclassificada</h3><p>${d.points.length-missing.length} de ${d.points.length} pontos registrados. Confira nitidez, iluminação e limpeza antes de enviar.</p><div class="cleaning-photo-grid">${d.points.map(p=>{const photo=d.photos.find(x=>x.point_key===p.key);return `<article><h4>${esc(p.label)}</h4><p>${esc(p.hint)}</p>${photo?`<a href="${esc(photo.signed_url||'#')}" target="_blank" rel="noopener"><img src="${esc(photo.signed_url||'')}" alt="${esc(p.label)} — ampliar foto"></a><small>${esc(photo.uploaded_name)} · ${datetime(photo.created_at)} · ${Math.round(photo.size_bytes/1024)} KB</small>`:'<span class="photo-missing">Foto obrigatória pendente</span>'}${editable?`<label>${photo?'Substituir foto':'Adicionar foto'}<input type="file" accept="image/jpeg,image/png,image/webp" data-photo-point="${p.key}"></label>`:''}<p role="status"></p></article>`}).join('')}</div><p>${missing.length?'Faltam: '+missing.map(p=>esc(p.label)).join(', '):'Todas as fotos foram enviadas. A aprovação depende da vistoria.'}</p>`;
+   const submit=document.querySelector('[data-status="inspection"]');if(submit)submit.disabled=missing.length>0||!editable;
+   box.querySelectorAll('[data-photo-point]').forEach(input=>input.onchange=async()=>{
+    const file=input.files?.[0];if(!file)return;const message=input.closest('article').querySelector('[role="status"]');
+@@ -106,5 +108,13 @@ async function loadCleaningPhotos(id){
+  }catch{box.textContent='Não foi possível carregar as fotos. Feche e abra a tarefa para tentar novamente.'}
+ }
+ 
++const previousTasks=renderTasks;
++renderToday=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
++renderReservations=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"stays"});
++renderAgenda=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"next"});
++renderTasks=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"tasks"});
++renderTemplates=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"templates"});
++renderIndicators=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
++const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();return;}originalShow(next);if(["today","agenda","tasks","templates","reservations","indicators"].includes(next))$("#new-action").hidden=true;};
+ boot();
+ })();

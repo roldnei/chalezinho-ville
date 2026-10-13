@@ -24,3 +24,13 @@ test('explicit fixtures do not contribute to operational summaries',()=>{
  const s=operationSummary([stay],[{stay_id:'fixture',status:'pending',due_at:'2026-10-12T15:00:00Z'}],'2026-10-12',new Date('2026-10-12T19:00:00Z'));
  for(const items of Object.values(s))assert.equal(items.length,0);
 });
+
+test('configured departure time and dated report prevent false presence; unknown departure needs review',()=>{
+ const base={status:'confirmed',property_id:1,check_in:'2026-10-11',check_out:'2026-10-12',checked_in_at:'2026-10-11T18:00:00Z'};
+ const stays=[{...base,id:'unknown'},{...base,id:'reported',departure_reported_on:'2026-10-12'}];
+ const early=operationSummary(stays,[],'2026-10-12',new Date('2026-10-12T13:00:00Z'),[{id:1,check_out_time:'11:00:00'}]);
+ assert.deepEqual(early.present.map(s=>s.id),['unknown']);
+ const late=operationSummary(stays,[],'2026-10-12',new Date('2026-10-12T14:00:00Z'),[{id:1,check_out_time:'11:00:00'}]);
+ assert.equal(late.present.length,0);assert.equal(late.expected.length,0);assert.equal(late.upcoming.length,0);
+ assert.deepEqual(late.attendance_review.map(s=>s.id),['unknown']);
+});

@@ -50,11 +50,11 @@ async function hub(a:any){
  const visibleTasks=tasks.filter(t=>!fixtureIds.has(t.stay_id)&&taskAccess(a,t));
  const assignedStayIds=new Set(visibleTasks.map(t=>t.stay_id));
  const guestAccess=a.role==='admin'||a.pms_permissions?.reservations===true;
- const visibleStays=stays.filter(s=>!s.is_test&&propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null});
+ const visibleStays=stays.filter(s=>!s.is_test&&propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null,departure_report_note:null});
  const sourceIds=new Set(sources.filter(s=>propertyAccess(a,s.property_id)).map(s=>s.id));
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  return {ok:true,operator:a,server_now:new Date().toISOString(),today,properties:properties.filter(p=>propertyAccess(a,p.id)),stays:visibleStays,tasks:visibleTasks,
-  summary:operationSummary(visibleStays,visibleTasks,today),events:guestAccess?events.filter(e=>propertyAccess(a,e.property_id)):[],
+  summary:operationSummary(visibleStays,visibleTasks,today,new Date(),properties),events:guestAccess?events.filter(e=>propertyAccess(a,e.property_id)):[],
   sources:sources.filter(s=>sourceIds.has(s.id)&&!s.deleted_at).map(s=>({...s,sync:syncState.find(x=>x.source_id===s.id)||null})),
   runs:a.role==='admin'?runs:[],templates:a.role==='admin'?templates:[],team:a.role==='admin'?team.filter(m=>m.pms_access_status==='active'):team.filter(m=>m.id===a.id)};
 }

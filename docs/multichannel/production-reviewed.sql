@@ -4,6 +4,9 @@
 \set ON_ERROR_STOP on
 begin;
 do $$ begin
+ -- First installation currently has zero native reservations in PROD. Stop if that changes:
+ -- the original migration backfill must be extracted/deferred until final eligibility is installed.
+ if exists(select 1 from public.reservations where status='confirmed') then raise exception 'Native backfill must be reviewed and deferred before installation';end if;
  if to_regclass('public.ops_stays') is not null then raise exception 'Already installed: compare applied migration NAMES and stop';end if;
  if not exists(select 1 from pg_extension where extname='pg_cron') or not exists(select 1 from pg_extension where extname='pg_net') then raise exception 'Cron prerequisites missing';end if;
 end $$;
@@ -18,6 +21,9 @@ end $$;
 \ir ../../supabase/migrations/20261012193354_multichannel_dispatch_target.sql
 \ir ../../supabase/migrations/20261012220612_multichannel_current_stays_only.sql
 \ir ../../supabase/migrations/20261012221154_multichannel_fixture_isolation.sql
+\ir ../../supabase/migrations/20261013010000_multichannel_task_time_eligibility.sql
+\ir ../../supabase/migrations/20261013011000_multichannel_fixture_inventory.sql
+\ir ../../supabase/migrations/20261013012000_multichannel_archival_persistence.sql
 -- Leave inactive until the reviewed Edge service has been deployed and verified.
 select cron.alter_job(jobid,active:=false) from cron.job where jobname='multichannel-operational-sync';
 commit;

@@ -25,14 +25,22 @@ export function parseOperationalCalendar(raw:string,provider:string){
  });
 }
 
-export function operationSummary(stays:any[],tasks:any[],today:string,now=new Date()){
+export function operationSummary(stays:any[],tasks:any[],today:string,now=new Date(),properties:any[]=[]){
  const fixtureIds=new Set(stays.filter(s=>s.is_test).map(s=>s.id));
  tasks=tasks.filter(t=>!fixtureIds.has(t.stay_id));
  const active=stays.filter(s=>!s.is_test&&s.status==='confirmed');
+ const ended=(s:any)=>!!(s.checked_out_at||s.departure_reported_on);
+ const boundary=(s:any,stage:'check_in'|'check_out')=>{
+  const p=properties.find(p=>p.id===s.property_id);
+  const time=p?.[stage+'_time']||(stage==='check_in'?'15:00:00':'11:00:00');
+  return Date.parse(s[stage]+'T'+(time.length===5?time+':00':time)+'-03:00');
+ };
+ const current=(s:any)=>!ended(s)&&boundary(s,'check_in')<=now.getTime()&&boundary(s,'check_out')>now.getTime();
  return {arrivals:active.filter(s=>s.check_in===today),departures:active.filter(s=>s.check_out===today),
-  expected:active.filter(s=>s.check_in<=today&&s.check_out>today&&!s.checked_out_at),
-  present:active.filter(s=>s.checked_in_at&&!s.checked_out_at),
-  upcoming:active.filter(s=>s.check_in>today||s.check_out>today),
+  expected:active.filter(current),
+  present:active.filter(s=>s.checked_in_at&&current(s)),
+  upcoming:active.filter(s=>!ended(s)&&boundary(s,'check_out')>now.getTime()),
+  attendance_review:active.filter(s=>!ended(s)&&boundary(s,'check_out')<=now.getTime()),
   pending:tasks.filter(t=>!['approved','cancelled','superseded'].includes(t.status)),
   overdue:tasks.filter(t=>!['approved','cancelled','superseded'].includes(t.status)&&Date.parse(t.due_at)<now.getTime())};
 }

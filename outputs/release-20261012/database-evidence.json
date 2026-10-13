@@ -1,0 +1,152 @@
+{
+  "at": "2026-10-13T00:42:49.255556+00:00",
+  "tasks": [
+    {
+      "count": 1,
+      "stage": "departure",
+      "status": "superseded",
+      "is_test": false
+    },
+    {
+      "count": 23,
+      "stage": "preparation",
+      "status": "superseded",
+      "is_test": true
+    },
+    {
+      "count": 2,
+      "stage": "preparation",
+      "status": "pending",
+      "is_test": false
+    },
+    {
+      "count": 23,
+      "stage": "departure",
+      "status": "superseded",
+      "is_test": true
+    },
+    {
+      "count": 1,
+      "stage": "preparation",
+      "status": "superseded",
+      "is_test": false
+    },
+    {
+      "count": 3,
+      "stage": "departure",
+      "status": "pending",
+      "is_test": false
+    }
+  ],
+  "sources": [
+    {
+      "enabled": true,
+      "provider": "booking",
+      "last_error": null,
+      "event_count": 5,
+      "property_id": 1,
+      "last_success_at": "2026-10-13T00:40:02.105+00:00"
+    },
+    {
+      "enabled": true,
+      "provider": "airbnb",
+      "last_error": null,
+      "event_count": 2,
+      "property_id": 1,
+      "last_success_at": "2026-10-13T00:40:02.117+00:00"
+    },
+    {
+      "enabled": true,
+      "provider": "booking",
+      "last_error": null,
+      "event_count": 0,
+      "property_id": 2,
+      "last_success_at": "2026-10-13T00:40:02.298+00:00"
+    },
+    {
+      "enabled": true,
+      "provider": "airbnb",
+      "last_error": null,
+      "event_count": 3,
+      "property_id": 2,
+      "last_success_at": "2026-10-13T00:40:02.299+00:00"
+    },
+    {
+      "enabled": true,
+      "provider": "booking",
+      "last_error": null,
+      "event_count": 0,
+      "property_id": 3,
+      "last_success_at": "2026-10-13T00:40:02.325+00:00"
+    },
+    {
+      "enabled": true,
+      "provider": "airbnb",
+      "last_error": null,
+      "event_count": 4,
+      "property_id": 3,
+      "last_success_at": "2026-10-13T00:40:02.298+00:00"
+    }
+  ],
+  "real_stays": 4,
+  "test_stays": 22,
+  "latest_runs": [
+    {
+      "error": null,
+      "status": "success",
+      "attempts": 1,
+      "source_id": "c47bf61d-0fa0-4977-853a-6673c2766bb4",
+      "started_at": "2026-10-13T00:40:03.476162+00:00",
+      "event_count": 5,
+      "finished_at": "2026-10-13T00:40:03.804951+00:00"
+    },
+    {
+      "error": null,
+      "status": "success",
+      "attempts": 1,
+      "source_id": "2de92969-2832-4898-aa3e-0b2f55f4bc69",
+      "started_at": "2026-10-13T00:40:03.18541+00:00",
+      "event_count": 2,
+      "finished_at": "2026-10-13T00:40:03.443731+00:00"
+    },
+    {
+      "error": null,
+      "status": "success",
+      "attempts": 1,
+      "source_id": "91f67f0c-5b4c-4627-afc0-bb722a333ed8",
+      "started_at": "2026-10-13T00:40:02.798203+00:00",
+      "event_count": 3,
+      "finished_at": "2026-10-13T00:40:03.107411+00:00"
+    },
+    {
+      "error": null,
+      "status": "success",
+      "attempts": 1,
+      "source_id": "ae768a74-529b-4e40-8ca6-51a81f08c0b2",
+      "started_at": "2026-10-13T00:40:02.391933+00:00",
+      "event_count": 4,
+      "finished_at": "2026-10-13T00:40:02.747215+00:00"
+    },
+    {
+      "error": null,
+      "status": "success",
+      "attempts": 1,
+      "source_id": "2b3b1156-f965-4d70-9f7c-a430b8858d3f",
+      "started_at": "2026-10-13T00:40:01.626709+00:00",
+      "event_count": 0,
+      "finished_at": "2026-10-13T00:40:02.350556+00:00"
+    },
+    {
+      "error": null,
+      "status": "success",
+      "attempts": 1,
+      "source_id": "125ae68d-c79c-4559-bd13-519d35558f83",
+      "started_at": "2026-10-13T00:40:01.159265+00:00",
+      "event_count": 0,
+      "finished_at": "2026-10-13T00:40:01.561251+00:00"
+    }
+  ],
+  "photos_hash": "998e87ccd66aa598bced286a70581e67",
+  "results_hash": "4180facca63478b11a634f57362cf7c7",
+  "reservations_hash": "b12c7fcfcbddca2ef4adfe6a799cdb76"
+}
