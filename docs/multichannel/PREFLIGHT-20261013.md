@@ -43,3 +43,13 @@ Testes direcionados executam o caminho de checkout com banco controlado e verifi
 - Depois do backup, ainda fixar o pacote final, testar função candidata em DEV, conferir ambiente do build PROD, publicar e validar cron/fontes/UI sem operações financeiras ou mensagens reais.
 
 Suíte completa após a correção: 537/537, zero falhas, 97,1 s. Log: outputs/release-20261012/tests-preflight-20261013.txt. Nenhuma evidência local foi apresentada como teste da função remota candidata.
+
+## Backup manual executado — 13/10/2026, 09h09–09h20
+
+Substitui a pendência de ausência de qualquer cópia: criado arquivo local protegido fora do repositório, C:/Users/Roldn/Documents/ChalezinhoVille-Backups/PROD-20261013/backup-20261013.zip, 19.940.276 bytes. SHA-256 7f28576ca9500e05565be70af31aac23a4eeaacb7fd38a15e7f5f500c6af6231.
+
+Snapshot único de dados: 78 tabelas, 1.552 registros, incluindo os 45 contatos; definições schema/policies/triggers/grants preservadas; pacotes das 12 Edge Functions; 23 objetos Storage, 19.652.485 bytes, incluindo quatro privados copiados pelo painel autenticado. Nenhuma alteração PROD, limpeza ou substituição de dados.
+
+Recuperação local em PGlite: tabelas tipadas/enums e todas as linhas restauradas; hashes normalizados dos registros iguais em 78/78 tabelas. ZIP aberto e 44 arquivos comparados com manifesto. ACL local restrita ao usuário atual e SYSTEM. Conteúdo privado não foi adicionado ao Git.
+
+Limite: exportação lógica da aplicação, NÃO pg_dump integral. Teste não ativou triggers/RLS/cron/Edge nem recriou serviços de Auth/Storage. Sessões, segredos e infraestrutura gerenciada não integram a cópia. Procedimento/limites no LEIA-ME do arquivo. Portanto, recuperação dos dados verificada; reconstrução completa da plataforma não homologada. Publicação ainda não executada; correção adicional PMS necessita validação DEV antes do rollout.
