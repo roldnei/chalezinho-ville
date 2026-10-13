@@ -255,6 +255,10 @@
  #villegram.vg-escape .vg-purchase .vg-primary{min-height:48px;padding:10px 14px}
 }
 /* One opening Trip introduces the three chalets with synchronized destinations. */
+/* Keep mobile offer copy lower while reserving space for Trip navigation. */
+@media(max-width:700px){
+ #villegram.vg-escape.vg-with-nav:not(.vg-intro):not(:has(.vg-caption-short)) .vg-purchase{bottom:calc(172px + env(safe-area-inset-bottom))}
+}
 #villegram.vg-intro .vg-purchase{bottom:calc(124px + env(safe-area-inset-bottom));padding:16px 20px;max-height:calc(100dvh - 290px);overflow:auto;touch-action:pan-y}
 #villegram.vg-intro.vg-with-nav .vg-controls{bottom:auto}
 #villegram.vg-intro .vg-story{position:static;inset:auto;margin:0 0 20px;padding-right:0}
