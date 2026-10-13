@@ -63,6 +63,8 @@ O commit que adiciona este relatório é documental; a aplicação publicada con
 
 ## Ajustes posteriores — presença, filtros e reserva Booking confirmada
 
+Atualização de identificação: commit `2e4f878f2861873ad27b280880a80f58d62f99b1` inclui o nome do hóspede nos cards de tarefas que possuem hospedagem vinculada, respeitando os dados autorizados retornados pela API. Tarefas avulsas continuam sem hóspede. Onze testes UI/vínculos passaram nesta alteração, sem mudanças de banco.
+
 Publicado frontend `b9af1412ac3078931ab950fbd6cfa65516b33686`, deployment READY `dpl_2y3rgUJVWD4kZSx16dhyVw4bSreL` (https://chalezinho-ville-mupd6t1bc-roldneicosta-4140.vercel.app), incluindo o ajuste anterior `690846f1`. Função multichannel-operations PROD v3 / DEV v5, hash `41d927d8f129e6619aa717af32ef535f808efcccec97ad159af8fc8e3a1a050c`.
 
 - O relato de entrada sem efeito foi investigado: entrada existente às 09:45 de 13/10; tentativas subsequentes produziram attendance_not_allowed. Registro real preservado. Botões já realizados ficam desabilitados; entrada e saída têm formulário explícito, confirmação do horário atual, sucesso e erro visíveis. Saída exige referência de pelo menos cinco caracteres. Nenhuma saída real foi registrada pelo agente.
