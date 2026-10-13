@@ -95,3 +95,12 @@ test('intro uses each real chalet publication for social reads and freezes its i
   assert.equal(p.calls.some(c=>['like','comment','start_payment'].includes(c.body.operation||c.body.action)),false);
  }finally{p.close()}
 });
+
+
+test('opening Trip advances after all three chalet scenes finish',async()=>{
+ const p=await page();try{
+  p.advance(19500);
+  assert.equal(p.w.document.querySelector('#villegram').classList.contains('vg-intro'),false);
+  assert.match(p.w.document.querySelector('.vg-progress>span').textContent,/^2 de/);
+ }finally{p.close()}
+});

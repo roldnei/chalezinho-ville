@@ -99,7 +99,7 @@ test('oval countdown tracks a whole photo cycle and freezes during pause, hidden
  advance(3250);assert.equal(remaining(),25);w.document.querySelector('[data-action=pause]').click();assert.ok(w.document.querySelector('.vg-time-ring'));advance(20000);assert.equal(remaining(),25);
  w.document.querySelector('[data-action=pause]').click();advance(3250);assert.equal(remaining(),50);assert.equal(w.document.querySelectorAll('.vg-scene')[1].classList.contains('is-visible'),true);
  let hidden=true;Object.defineProperty(w.document,'hidden',{get:()=>hidden,configurable:true});w.document.dispatchEvent(new w.Event('visibilitychange'));advance(50000);assert.equal(remaining(),50);hidden=false;w.document.dispatchEvent(new w.Event('visibilitychange'));
- w.document.querySelector('[data-action=caption]').click();advance(30000);assert.equal(remaining(),50);w.document.querySelector('[data-sheet-close]').click();advance(6500);assert.equal(remaining(),0);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 2');
+ w.document.querySelector('[data-action=caption]').click();advance(30000);assert.equal(remaining(),50);w.document.querySelector('[data-sheet-close]').click();advance(6500);assert.equal(remaining(),0);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');
  w.document.querySelector('[data-action=next]').click();assert.equal(remaining(),0);d.window.close();
 });
 test('video countdown follows actual playback metadata and keeps its ring when toggling pause',async()=>{
@@ -210,4 +210,25 @@ test('storefront entry keeps the four shortcuts through Trip changes and opens t
   d.window.close();
  }
  const preview=await setup({home:false,preview:true});assert.equal(preview.w.document.querySelector('#villegram .vg-bottom-nav'),null);preview.d.window.close();
+});
+
+
+test('automatic completion stops at the final Trip and explicit play restarts it',async()=>{
+ const {w,advance}=await setup();try{
+  advance(6500);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');
+  advance(6500);assert.equal(w.document.querySelector('[data-action=pause]').getAttribute('aria-label'),'Continuar apresentação');
+  advance(6500);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');
+  w.document.querySelector('[data-action=pause]').click();assert.equal(w.document.querySelector('[data-action=pause]').getAttribute('aria-label'),'Pausar apresentação');
+  advance(3250);assert.equal(Number(w.document.querySelector('.vg-time-remaining').style.strokeDashoffset),50);
+ }finally{w.close()}
+});
+test('ended video advances once and stale events cannot skip the next Trip',async()=>{
+ const {w}=await setup({media:[{kind:'video',url:'clip.mp4'}]});try{
+  const video=w.document.querySelector('video');assert.equal(video.loop,false);
+  video.dispatchEvent(new w.Event('ended'));assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');
+  video.dispatchEvent(new w.Event('ended'));assert.equal(w.document.querySelector('.vg-progress>span').textContent,'2 de 2');
+ }finally{w.close()}
+});
+test('preview completion never navigates to another Trip',async()=>{
+ const {w,advance}=await setup({preview:true});try{advance(6500);assert.equal(w.document.querySelector('.vg-progress>span').textContent,'1 de 2');assert.equal(w.document.querySelector('[data-action=pause]').getAttribute('aria-label'),'Continuar apresentação')}finally{w.close()}
 });
