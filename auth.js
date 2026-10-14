@@ -4,6 +4,7 @@ if(!window.supabase?.createClient||!window.CHALEZINHO_CONFIG||!window.VilleSessi
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),DEV_BASE=location.origin;
 const accountHeading=document.querySelector('.auth-card > small');
 if(accountHeading)accountHeading.textContent='ÁREA DO HÓSPEDE'+(C.environment==='development'?' · DESENVOLVIMENTO':'');
+if(C.releaseProfile==='whatsapp')document.querySelectorAll('[data-online-payment-note]').forEach(e=>e.hidden=true);
 window.ChalezinhoAuth={sb};
 let anonymousId="";
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
