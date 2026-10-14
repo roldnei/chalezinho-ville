@@ -151,3 +151,10 @@ O aplicativo profissional mostra até três pedidos próprios pendentes em uma s
 A investigação também identificou um erro de digitação na cidade de um imóvel do usuário: Guarapaei em vez de Guarapari. A correção foi limitada à cidade daquele imóvel no DEV, com filtro de propriedade/titular/valor anterior e histórico auditado; o pedido existente, sua situação, preços e condições foram preservados. A conta do usuário continuava sendo a única profissional ativa aprovada/liberada, então ainda não poderia aceitar o próprio pedido. Não houve aprovação automática de participantes, alteração de produção ou pagamento.
 
 Validação: 35/35 testes afetados em `own-request-visibility-tests.txt`, incluindo identificação do pedido próprio, ausência de botão de aceite, total claramente identificado, aceite já realizado por outra conta, compatibilidade após corrigir uma cidade e preservação da cópia comercial. A verificação real confirmou a cidade corrigida no histórico e o pedido ainda aguardando outra profissional. O build permanece DEV.
+
+
+## Valor exibido no aplicativo profissional — 14/10/2026
+
+Ofertas, início, lista e detalhe do aplicativo profissional mostram somente o recebimento líquido combinado, identificado como “Você vai receber”. O aviso de pedidos próprios mantém imóvel, horário, situação e link para contratar, sem apresentar preço. Detalhes de adicionais continuam visíveis pelo escopo, sem mostrar valores brutos. O aplicativo de contratar mantém composição, taxas e total do proprietário; a gestão mantém a conferência financeira. Contratos, cálculo, pagamentos e condições aceitas não foram alterados.
+
+Validação: **36/36** cenários afetados passaram (`worker-net-display-tests.txt`). Um cenário usa a interface ligada ao Postgres local com rede/Auth simulados para confirmar que uma profissional com taxa fixa recebe R$ 90 e vê somente esse valor em oferta, início, lista e detalhe, enquanto o proprietário continua vendo R$ 110 e sua taxa de R$ 10. Os avisos de pedidos próprios não mostram moeda, antes ou depois do aceite. Build DEV e verificação sintática passaram. Sem transferências reais ou alterações no banco compartilhado nesta correção.
