@@ -9,7 +9,7 @@ const draft={title:'Meu momento',caption:'Café no chalé',status:'published',pr
 const db=new PGlite();
 before(async()=>{
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
- for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
  await db.exec(`insert into auth.users values('${owner}'),('${other}'),('${staff}');insert into properties values(1);insert into profiles values('${staff}','admin','active');insert into villegram_profiles(id,handle,display_name,is_public,can_post) values('${owner}','hospede','Nome público',true,true),('${other}','amiga','Amiga',true,true);`);
 });after(()=>db.close());
 test('guest sanitization cannot impersonate team, publish directly, store prices or use another owner media',()=>{
@@ -220,4 +220,11 @@ test('server-controlled posting permission admits a contributor without a reserv
   const result=await communityOperation({db:database,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'contributor',display_name:'Nome alterado',is_public:true,can_post:true}},isAdmin:false});
   assert.equal(result.status,200);assert.equal(written.can_post,granted);
  }
+});
+
+
+test('guest MOV stays a video and storage accepts only the authorized owner path',async()=>{
+ const p=guestInput({...draft,media:[{kind:'video',path:owner+'/'+other+'.mov',poster_path:owner+'/'+other+'.webp',duration:10,bytes:1024,fit:'contain',position:50}]},dev,owner);assert.equal(p.media[0].path,owner+'/'+other+'.mov');
+ await db.exec(`grant usage on schema auth,storage to authenticated;grant select on profiles to authenticated;grant select,insert on storage.objects to authenticated;alter table storage.objects enable row level security;set test.uid='${owner}';set role authenticated;`);
+ try{await db.query("insert into storage.objects(name,bucket_id) values($1,'villegram-media')",[owner+'/'+other+'.mov']);await assert.rejects(db.query("insert into storage.objects(name,bucket_id) values($1,'villegram-media')",[other+'/'+owner+'.mov']),/row-level security/);}finally{await db.exec('reset role')}
 });
