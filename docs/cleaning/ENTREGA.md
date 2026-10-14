@@ -143,3 +143,11 @@ O build entrega os arquivos dos três aplicativos e mantém a configuração DEV
 Referências: [PWAs distintas no mesmo domínio](https://web.dev/articles/building-multiple-pwas-on-the-same-domain), [identidade do manifest](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/id) e [service workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers).
 
 Os links dos manifests são absolutos e o escopo/início aceita a URL canônica sem barra final usada pelo servidor. Isso evita que a resolução relativa procure o manifest na pasta errada depois de um redirecionamento. Os 14 testes dos aplicativos foram repetidos após esse ajuste e passaram (`apps-install-final-tests.txt`). A configuração global de URLs da Vercel não foi alterada.
+
+## Pedido próprio visível para explicar a ausência de oferta — 13/10/2026
+
+O aplicativo profissional mostra até três pedidos próprios pendentes em uma seção identificada como pedidos de proprietário: imóvel, janela, situação, total do proprietário e link para abrir no aplicativo de contratar. Não oferece ação de aceite nem inclui esses pedidos nas ofertas disponíveis. Se outra profissional já aceitou, o aviso informa a pendência do Pix. QA e pedidos de outras pessoas ficam fora dessa seção. Isso evita interpretar uma lista vazia como perda do serviço, mantendo a regra de não aceitar o próprio pedido.
+
+A investigação também identificou um erro de digitação na cidade de um imóvel do usuário: Guarapaei em vez de Guarapari. A correção foi limitada à cidade daquele imóvel no DEV, com filtro de propriedade/titular/valor anterior e histórico auditado; o pedido existente, sua situação, preços e condições foram preservados. A conta do usuário continuava sendo a única profissional ativa aprovada/liberada, então ainda não poderia aceitar o próprio pedido. Não houve aprovação automática de participantes, alteração de produção ou pagamento.
+
+Validação: 35/35 testes afetados em `own-request-visibility-tests.txt`, incluindo identificação do pedido próprio, ausência de botão de aceite, total claramente identificado, aceite já realizado por outra conta, compatibilidade após corrigir uma cidade e preservação da cópia comercial. A verificação real confirmou a cidade corrigida no histórico e o pedido ainda aguardando outra profissional. O build permanece DEV.

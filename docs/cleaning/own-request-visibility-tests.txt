@@ -1,0 +1,43 @@
+✔ 37 registrations paginate in 10/25/50 and never disappear from the last page (177.42296ms)
+✔ search finds accents, mixed case, multiple words and a formatted phone across every page (61.245989ms)
+✔ filters combine with search and reset clearly from a no-result state (45.906989ms)
+✔ editing then searching and paging retains the same form, values and submit handler (45.527716ms)
+✔ list state survives redraws, clamps after a removal and stays isolated by account and screen (115.832164ms)
+✔ untrusted names remain text and empty lists have no useless pager or reset (10.748313ms)
+✔ admin edits exactly the searched participant on page 4 and submits the original permission action (148.020237ms)
+✔ PMS property search retains independent integration controls and exact property id (122.196012ms)
+✔ manual Pix lists separate receivers and payments; a searched bank credit goes only to its payment (200.276607ms)
+✔ owner searches 37 authorized properties and edits the correct property without exposing another owner (211.928675ms)
+✔ home limits professional previews; full directory searches all 37 and favorites preserve the search (95.015016ms)
+✔ an administrator using the personal app sees only owned/assigned non-test jobs, while management retains all history (50.894661ms)
+✔ an administrator with no personal requests sees an honest empty list and a direct request button instead of QA fixtures (28.458ms)
+✔ public gateway links to distinct owner and worker apps without a blended dashboard (2112.896727ms)
+✔ dual-role account owner app shows its request and owner navigation, without offers or management navigation (62.165694ms)
+✔ owner profile update preserves the professional role, region, availability and existing approval in real local SQL (59.474748ms)
+✔ dual-role professional app explains its own pending request, hides owner tools and cannot accept its own job (40.483609ms)
+✔ another approved professional accepts from its dedicated app through the actual local SQL boundary (48.932787ms)
+✔ professional profile changes retain the existing owner role and properties (43.498655ms)
+✔ non-administrator entering the administration URL gets an explicit denial without recursion or management controls (19.541311ms)
+✔ admin service links point to the dedicated administration app and auth callback recognizes all app continuations (58.185099ms)
+✔ owner/worker manifests have separate install identities and narrow scopes with valid PNG icons (34.220554ms)
+✔ service worker never intercepts APIs, private media, payment POSTs or PMS navigation (1.992952ms)
+✔ offline navigation uses a generic fallback, does not cache a signed-in screen and preserves unrelated caches (3.836618ms)
+✔ install registration uses only the cleaning scope; unsupported install prompt exposes clear mobile instructions (6.706875ms)
+✔ morning fixtures do not weaken the actual rejection of work crossing midnight (9.70772ms)
+✔ an administrator without a marketplace member can view the account screen without creating invalid or unwanted roles (29.650758ms)
+✔ a pending owner payment is displayed as already accepted, without an own-service accept action (26.769003ms)
+✔ correcting a known city typo makes a request visible to another compatible professional without changing its accepted price (19.446878ms)
+✔ large text, owner entry and public pilot message (2042.421615ms)
+✔ short owner profile persists through API and SQL with no identity requirements (38.27467ms)
+✔ two short property screens, no image requirement; one property autoselected (63.194339ms)
+✔ request shows exact composition and preserved scope before confirmation (65.330442ms)
+✔ network failure preserves input and produces plain correction message (30.236258ms)
+✔ exclusive administration rejects a normal member without importing admin UI (4.146516ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3037.820363
