@@ -65,3 +65,14 @@
 .community-post-date{display:block;margin:9px 0 0;font:400 12px/1.4 'DM Sans',sans-serif;color:#bcb7ae}
 .community-edit{font-size:14px;line-height:1.4}
 @media(max-width:380px){#community-root .community-search{grid-template-columns:minmax(0,1fr)}#community-root .community-search button{width:100%}}
+
+/* The embedded preview belongs to the profile scroll, never to the Trip gestures. */
+#community-watch-player{position:relative;max-width:440px;margin:auto;touch-action:pan-y}
+#community-watch-player:not(.is-expanded) iframe{pointer-events:none}
+#community-watch-player .community-watch-enter{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;width:100%;height:100%;margin:0;padding:20px;border:0;border-radius:20px;background:#0003;color:#fff;touch-action:pan-y;cursor:pointer}
+.community-watch-enter span{padding:16px 20px;border-radius:999px;background:#18130fee;border:1px solid #d9bc85;font:600 16px/1.4 'DM Sans',sans-serif;box-shadow:0 4px 24px #0008}
+#community-watch-player.is-expanded{position:fixed;inset:0;z-index:100000;max-width:none;margin:0;background:#100d0b;padding-top:calc(58px + env(safe-area-inset-top));height:100dvh;box-sizing:border-box;touch-action:auto}
+#community-root #community-watch-player.is-expanded iframe{pointer-events:auto;width:100%;height:100%;min-height:0;max-width:none;border:0;border-radius:0;margin:0}
+#community-watch-player .community-watch-back{position:absolute;top:env(safe-area-inset-top);left:12px;min-height:48px;margin:4px 0;padding:10px 16px;border:1px solid #8e795b;border-radius:12px;background:#251d14;color:#fff;font:600 15px/1.3 'DM Sans',sans-serif}
+#community-watch-player [hidden]{display:none!important}
+@media(max-width:700px){#community-root .community-watch-open{width:auto;height:auto}#community-root .community-watch-open>span{display:inline}}

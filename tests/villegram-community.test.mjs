@@ -192,3 +192,16 @@ test('profile saves marielen with mobile keyboard spacing and identifies the act
  assert.equal(calls.filter(c=>c.operation==='community_save_profile').length,count);
  dom.window.close();
 });
+
+test('profile preview leaves dragging to the page and full-screen Trips have an explicit return',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w}=await communityPage('conta.html','',()=>state),d=w.document,host=d.querySelector('#community-watch-player'),frame=host.querySelector('iframe');
+ assert.equal(frame.tabIndex,-1);assert.equal(host.querySelector('.community-watch-enter').hidden,false);
+ const css=await readFile(new URL('../villegram-community.css',import.meta.url),'utf8');
+ assert.match(css,/#community-watch-player:not\(\.is-expanded\) iframe\{pointer-events:none\}/);
+ assert.match(css,/\.community-watch-enter\{[^}]*touch-action:pan-y/);
+ host.querySelector('.community-watch-enter').click();assert.equal(host.classList.contains('is-expanded'),true);assert.equal(host.getAttribute('aria-modal'),'true');assert.equal(frame.tabIndex,0);assert.equal(d.documentElement.style.overflow,'hidden');assert.equal(host.querySelector('.community-watch-back').hidden,false);
+ host.querySelector('.community-watch-back').click();assert.equal(host.classList.contains('is-expanded'),false);assert.equal(d.documentElement.style.overflow,'');assert.equal(frame.tabIndex,-1);assert.equal(host.querySelector('iframe'),frame);
+ d.querySelector('.community-watch-open').click();assert.equal(host.classList.contains('is-expanded'),true);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(host.classList.contains('is-expanded'),false);assert.equal(d.documentElement.style.overflow,'');
+ dom.window.close();
+});
