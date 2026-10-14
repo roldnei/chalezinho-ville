@@ -44,6 +44,7 @@ async function renderSameDayRequests(){
 async function boot({afterRefundRefresh=false}={}){
  const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return="+encodeURIComponent("conta.html"+location.search+location.hash);return}
  $("#account-email").textContent=session.user.email||"";
+ window.VillegramAccount?.identity({display_name:session.user.user_metadata?.full_name||session.user.user_metadata?.name},"account");
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
   sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,operational_status,checked_in_at,checked_out_at,not_confirmed_at,not_confirmed_reason,cancelled_at,cancellation_actor,cancellation_reason,no_show_at,guests,rate_plan_code,contract_snapshot,stay_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image,check_in_time,check_out_time),payments(id,status,amount_cents,method,installments,metadata,created_at,updated_at),guarantees(id,status,amount_cents,captured_amount_cents,provider_capture_before,provider_error_code,attention_code),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,composition_snapshot))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
@@ -53,7 +54,7 @@ async function boot({afterRefundRefresh=false}={}){
   sb.from("post_booking_cart_items").select("id,reservation_id,target_variant_id,package_type,purchase_mode,amount_cents,description,snapshot,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   api("config")
  ]);
- profile=p;properties=props||[];mods=m||[];charges=ch||[];cartItems=cart||[];reservationsCache=reservations||[];paymentSettings=cfg?.payment_settings||{};
+ profile=p;window.VillegramAccount?.identity({display_name:profile?.full_name||session.user.user_metadata?.full_name||session.user.user_metadata?.name},"account");properties=props||[];mods=m||[];charges=ch||[];cartItems=cart||[];reservationsCache=reservations||[];paymentSettings=cfg?.payment_settings||{};
  $("#profile-name").value=profile?.full_name||"";$("#profile-phone").value=profile?.phone||"";
  if(profile?.role==="admin"){$("#ops-link").hidden=false;$("#experience-admin-link").hidden=false}
  renderExperienceCart(reservationsCache);
@@ -684,7 +685,7 @@ async function acceptModification(id,btn){
  catch(e){btn.disabled=false;alert("Não foi possível confirmar a alteração agora. Tente novamente.")}
 }
 async function cancelModification(id,btn){btn.disabled=true;try{await api("modification_action",{operation:"guest_cancel",request_id:id});location.reload()}catch(e){btn.disabled=false;alert("Não foi possível cancelar a solicitação agora. Tente novamente.")}}
-$("#profile-form").addEventListener("submit",async e=>{e.preventDefault();const {error}=await sb.from("profiles").update({full_name:$("#profile-name").value.trim(),phone:$("#profile-phone").value.trim()}).eq("id",session.user.id);$("#account-message").textContent=error?"Não foi possível atualizar seus dados agora. Tente novamente.":"Dados atualizados."});
+$("#profile-form").addEventListener("submit",async e=>{e.preventDefault();const {error}=await sb.from("profiles").update({full_name:$("#profile-name").value.trim(),phone:$("#profile-phone").value.trim()}).eq("id",session.user.id);if(!error)window.VillegramAccount?.identity({display_name:$("#profile-name").value.trim()},"account");$("#account-message").textContent=error?"Não foi possível atualizar seus dados agora. Tente novamente.":"Dados atualizados."});
 $("#logout").addEventListener("click",async()=>{await sb.auth.signOut();location.href="auth.html"});
 $("#delete-account").addEventListener("click",async()=>{const {error}=await sb.from("account_deletion_requests").insert({user_id:session.user.id});$("#account-message").textContent=error?"Não foi possível registrar a solicitação agora. Tente novamente.":"Solicitação de exclusão registrada para análise."});
 function openModification(reservationId,currentProperty,currentIn,currentOut){
