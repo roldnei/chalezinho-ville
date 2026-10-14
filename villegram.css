@@ -176,7 +176,7 @@
 
 /* Escapes keep one readable text flow directly over the real photo. */
 #villegram.vg-escape .vg-purchase{padding:18px 20px 12px;border-radius:0;background:transparent;text-shadow:0 1px 3px #000,0 3px 12px #000b;touch-action:pan-y;overscroll-behavior:contain;max-height:calc(100dvh - 350px)}
-#villegram.vg-escape .vg-purchase>:not(details){touch-action:pan-y}
+#villegram.vg-escape .vg-purchase>:not(details){touch-action:none}
 #villegram.vg-escape .vg-story{margin:0 0 12px}
 #villegram.vg-escape .vg-story h2{font-size:clamp(24px,3vw,30px);line-height:1.2;margin:4px 0}
 #villegram.vg-escape .vg-story small{letter-spacing:.03em;font-size:13px}
@@ -295,3 +295,6 @@
 #villegram .vg-dates input[type=date]::-webkit-date-and-time-value{text-align:left;min-height:1.4em}
 #villegram .vg-dates button{justify-self:stretch;margin:0;white-space:normal}
 #villegram .vg-price-before{display:block;font-size:16px;color:#f1dfbf;margin-bottom:4px;text-decoration-thickness:1px}
+
+/* Long text keeps native scrolling; compact text and prices use the Trip gesture. */
+#villegram .vg-purchase.vg-reading-scroll,#villegram .vg-purchase.vg-reading-scroll>:not(details){touch-action:pan-y}
