@@ -174,3 +174,21 @@ test('avatar accepts Safari JPEG and PNG output with matching storage type and o
  const result=await communityOperation({db,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'safari',display_name:'Teste Safari',is_public:true,avatar_data}},isAdmin:false});assert.equal(result.status,200);assert.ok(uploads[0].path.startsWith(owner+'/'));assert.ok(uploads[0].path.endsWith('.'+sample.name));assert.equal(uploads[0].options.contentType,sample.mime);
  }
 });
+
+test('profile saves marielen with mobile keyboard spacing and identifies the actual invalid field',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w,calls}=await communityPage('conta.html','',b=>{if(b.operation==='community_save_profile'){state.profile={id:owner,...b.profile};return {profile:state.profile}}return state});
+ const f=w.document.querySelector('#community-profile-form');
+ f.elements.display_name.value='Marielen Barreto';f.elements.bio.value='Sou Marielen, anfitriã do Chalezinho Ville. 🌿';f.elements.is_public.checked=true;
+ f.elements.handle.value=' @Marielen\u200b ';f.requestSubmit();await tick();await tick();
+ assert.equal(calls.find(c=>c.operation==='community_save_profile').profile.handle,'marielen');
+ const count=calls.filter(c=>c.operation==='community_save_profile').length;
+ f.elements.bio.value='a'.repeat(241);f.requestSubmit();await tick();
+ assert.match(w.document.querySelector('#community-profile-feedback').textContent,/Sobre você.*240/);
+ assert.equal(calls.filter(c=>c.operation==='community_save_profile').length,count);
+ assert.equal(f.elements.handle.value,'marielen');
+ f.elements.bio.value='Minha bio';f.elements.handle.value='1invalido';f.requestSubmit();await tick();
+ assert.match(w.document.querySelector('#community-profile-feedback').textContent,/@nome/);
+ assert.equal(calls.filter(c=>c.operation==='community_save_profile').length,count);
+ dom.window.close();
+});
