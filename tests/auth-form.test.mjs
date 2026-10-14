@@ -7,7 +7,7 @@ function setup({missing=false,storageError=false,login=async()=>({error:{name:'A
  w.fetch=async()=>({ok:true});w.CHALEZINHO_CONFIG={supabaseUrl:'https://example.supabase.co',supabaseKey:'test',bookingEngine:'https://example/engine'};
  w.VilleSession={remembered:()=>false,choose(){if(storageError)throw Object.assign(new Error(),{name:'SecurityError'})}};
  if(!missing)w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}}),signInWithPassword:login}})};
- w.eval(readFileSync('auth-bootstrap.js','utf8'));w.eval(readFileSync('auth.js','utf8'));return w;
+ w.eval(readFileSync('auth-bootstrap.js','utf8'));w.eval(readFileSync('auth.js','utf8'));w.document.querySelector('#login-email').value='qa@example.test';w.document.querySelector('#login-password').value='fixture-only';return w;
 }
 const submit=w=>{const e=new w.Event('submit',{bubbles:true,cancelable:true});w.document.querySelector('#pane-login').dispatchEvent(e);return e};
 const settle=()=>new Promise(r=>setTimeout(r,0));
