@@ -9,6 +9,7 @@ for(const entry of await readdir(root,{withFileTypes:true})){
  if(entry.isFile()&&['.html','.js','.css','.svg','.xml'].includes(extname(entry.name))||entry.name==='robots.txt')
   await copyFile(new URL(entry.name,root),new URL(entry.name,out));
 }
+await cp(new URL('faxinas/',root),new URL('faxinas/',out),{recursive:true});
 await cp(new URL('assets/',root),new URL('assets/',out),{recursive:true});
 console.log('Preview browser assets built in dist.');
 

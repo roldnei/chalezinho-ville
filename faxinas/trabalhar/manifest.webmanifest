@@ -1,0 +1,26 @@
+{
+  "id": "/faxinas/trabalhar/",
+  "name": "Ville Faxinas · Trabalhar",
+  "short_name": "Ville Trabalhar",
+  "description": "Seus serviços. Seu recebimento.",
+  "start_url": "/faxinas/trabalhar/",
+  "scope": "/faxinas/trabalhar/",
+  "display": "standalone",
+  "lang": "pt-BR",
+  "background_color": "#f7f7f2",
+  "theme_color": "#2456ae",
+  "icons": [
+    {
+      "src": "/faxinas/assets/trabalhar-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/faxinas/assets/trabalhar-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
