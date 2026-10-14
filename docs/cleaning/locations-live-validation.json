@@ -1,0 +1,25 @@
+{
+  "before": {
+    "jobs": 3,
+    "stays": 27,
+    "tasks": 58,
+    "cities": null,
+    "payments": 34,
+    "jobs_hash": "fdcf759599a00e98627bdcd19e938c8c",
+    "reservations": 30
+  },
+  "after": {
+    "jobs": 3,
+    "stays": 27,
+    "tasks": 58,
+    "cities": 5571,
+    "payments": 34,
+    "jobs_hash": "fdcf759599a00e98627bdcd19e938c8c",
+    "reservations": 30,
+    "neighborhoods": 19
+  },
+  "liveNegativeChecksPassed": true,
+  "rolledBack": true,
+  "source": "DEV Supabase",
+  "edgeVersion": 6
+}
