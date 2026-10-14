@@ -6,14 +6,16 @@
  try{await new Promise((resolve,reject)=>{const timer=setTimeout(()=>{video.onloadedmetadata=video.onerror=null;reject(Error('Não foi possível ler este vídeo. Tente um trecho menor.'))},15000);video.onloadedmetadata=()=>{clearTimeout(timer);resolve()};video.onerror=()=>{clearTimeout(timer);reject(Error('Este navegador não consegue ler a codificação do vídeo. Abra no Safari do iPhone ou exporte em MP4/H.264.'))};video.src=url;});if(!Number.isFinite(video.duration)||video.duration>120||video.duration<=0)throw Error('Use um vídeo de até 2 minutos.');return {video,url,...format};}catch(e){URL.revokeObjectURL(url);throw e;}}
  async function poster(video,seconds){
   const wait=(event,message,action)=>new Promise((resolve,reject)=>{let timer;const cleanup=()=>{clearTimeout(timer);video.removeEventListener(event,done);video.removeEventListener('error',failed)};const done=()=>{cleanup();resolve()},failed=()=>{cleanup();reject(Error(message))};video.addEventListener(event,done,{once:true});video.addEventListener('error',failed,{once:true});timer=setTimeout(failed,15000);try{action?.()}catch{failed()}});
-  if(video.readyState<2)await wait('loadeddata','Não foi possível criar a capa. Tente novamente.');
   const target=Math.min(seconds===undefined?Math.min(.5,video.duration/4):seconds,Math.max(0,video.duration-.1));
-  if(Math.abs(video.currentTime-target)>.01)await wait('seeked','Não foi possível escolher esta capa.',()=>{video.currentTime=target});
+  // Seek before waiting for loadeddata: iOS may not decode a detached,
+  // paused video until explicitly asked for a frame.
+  if(Math.abs(video.currentTime-target)>.01||video.readyState<2)await wait('seeked','Não foi possível criar a capa automática. Seu vídeo está selecionado; tente novamente ou escolha uma foto de capa.',()=>{video.currentTime=target});
+  if(video.readyState<2)await wait('loadeddata','Não foi possível criar a capa automática. Escolha uma foto de capa.');
   if(!video.videoWidth||!video.videoHeight)throw Error('O vídeo ainda não foi decodificado. Tente novamente.');
   const canvas=document.createElement('canvas'),scale=Math.min(1,1280/Math.max(video.videoWidth,video.videoHeight));canvas.width=Math.round(video.videoWidth*scale);canvas.height=Math.round(video.videoHeight*scale);canvas.getContext('2d').drawImage(video,0,0,canvas.width,canvas.height);
   const sample=document.createElement('canvas');sample.width=16;sample.height=16;const context=sample.getContext('2d',{willReadFrequently:true});context.drawImage(canvas,0,0,16,16);const pixels=context.getImageData(0,0,16,16).data;
   if(!pixels.some((value,i)=>i%4!==3&&value>2))throw Error('A capa ficou preta. Escolha outro instante; se continuar, use um vídeo MP4/H.264 sem HDR.');
-  return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Falha ao criar a capa.')),'image/webp',.88));
+  return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Falha ao criar a capa.')),'image/jpeg',.88));
  }
 
  // TUS's 6 MiB chunks resume after a failed PATCH. No file is overwritten.

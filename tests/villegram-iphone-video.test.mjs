@@ -15,3 +15,12 @@ test('iPhone MOV MIME and missing MIME keep the MOV extension and QuickTime uplo
  w.document.createElement=()=>({set src(v){queueMicrotask(()=>this.onerror())}});
  await assert.rejects(w.VillegramUpload.inspect({name:'IMG.MOV',type:'video/quicktime',size:1024}),/codificação/);assert.equal(revoked,1);dom.window.close();
 });
+test('iPhone metadata-only video is seeked before waiting for its first frame',async()=>{
+ const dom=new JSDOM('',{runScripts:'outside-only'}),w=dom.window;
+ w.eval(await readFile('villegram-upload.js','utf8'));
+ w.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){},getImageData:()=>({data:new Uint8Array([50,40,30,255])})});
+ w.HTMLCanvasElement.prototype.toBlob=function(cb,type){cb(new w.Blob(['cover'],{type}))};
+ const video=w.document.createElement('video');let ready=1,time=0;
+ Object.defineProperties(video,{duration:{value:8},readyState:{get:()=>ready},videoWidth:{value:1080},videoHeight:{value:1920},currentTime:{get:()=>time,set:v=>{time=v;ready=2;queueMicrotask(()=>video.dispatchEvent(new w.Event('seeked')))}}});
+ const cover=await w.VillegramUpload.poster(video);assert.equal(time,.5);assert.equal(cover.type,'image/jpeg');dom.window.close();
+});

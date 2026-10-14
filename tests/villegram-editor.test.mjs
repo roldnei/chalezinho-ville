@@ -238,3 +238,13 @@ test('guest can submit scene text without filling duplicate title and caption fi
  doc.querySelector('.vg-text-tools button').click();const text=doc.querySelector('[contenteditable=true]');text.textContent='Um mergulho 🌴';text.dispatchEvent(new w.Event('input'));doc.querySelector('[data-text-finish]').click();
  assert.equal(f.elements.title.value,'');assert.equal(f.elements.caption.value,'');assert.equal(f.elements.title.required,false);doc.querySelector('[data-step="2"]').click();f.querySelector('[name=published]').click();await tick();assert.equal(saved.length,1);assert.equal(saved[0].publication.media[0].text_layers[0].text,'Um mergulho 🌴');assert.equal(saved[0].publication.title,'Um mergulho 🌴');assert.equal(saved[0].operation,'guest_save');d.window.close();
 });
+test('failed automatic cover preserves MOV for retry or a selected cover photo',async()=>{
+ for(const manual of [false,true]){
+  const {d,w}=await editor();let inspections=0,attempts=0;const uploaded=[];
+  w.VillegramUpload={inspect:async()=>{inspections++;return {extension:'mov',url:'blob:mov',video:{duration:8}}},poster:async()=>{if(++attempts===1)throw Error('Capa indisponível');return new Blob(['cover'],{type:'image/jpeg'})},upload:async(_sb,file,path)=>uploaded.push({file,path})};
+  const input=w.document.querySelector('#vg-upload'),original=new w.File(['movie'],'IMG.MOV',{type:'video/quicktime'});Object.defineProperty(input,'files',{value:[original]});input.dispatchEvent(new w.Event('change'));await tick();
+  assert.equal(uploaded.length,0);assert.equal(w.document.querySelector('#vg-cover-photo-label').hidden,false);assert.equal(w.document.querySelector('#vg-upload-retry').hidden,false);
+  if(manual){const cover=w.document.querySelector('#vg-cover-photo');Object.defineProperty(cover,'files',{value:[new w.File(['cover'],'cover.jpg',{type:'image/jpeg'})]});cover.dispatchEvent(new w.Event('change'))}else w.document.querySelector('#vg-upload-retry').click();
+  await tick();assert.equal(inspections,1);assert.equal(uploaded.length,2);assert.equal(uploaded[0].file,original);assert.ok(uploaded[0].path.endsWith('.mov'));assert.equal(w.document.querySelector('#vg-cover-photo-label').hidden,true);assert.equal(w.document.querySelectorAll('#vg-composer-visual video').length,1);d.window.close();
+ }
+});
