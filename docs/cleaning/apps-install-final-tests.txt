@@ -1,0 +1,22 @@
+✔ public gateway links to distinct owner and worker apps without a blended dashboard (1901.947824ms)
+✔ dual-role account owner app shows its request and owner navigation, without offers or management navigation (51.953586ms)
+✔ owner profile update preserves the professional role, region, availability and existing approval in real local SQL (49.728285ms)
+✔ dual-role professional app explains its own pending request, hides owner tools and cannot accept its own job (33.787276ms)
+✔ another approved professional accepts from its dedicated app through the actual local SQL boundary (42.518635ms)
+✔ professional profile changes retain the existing owner role and properties (42.785919ms)
+✔ non-administrator entering the administration URL gets an explicit denial without recursion or management controls (20.702412ms)
+✔ admin service links point to the dedicated administration app and auth callback recognizes all app continuations (54.628627ms)
+✔ owner/worker manifests have separate install identities and narrow scopes with valid PNG icons (17.404681ms)
+✔ service worker never intercepts APIs, private media, payment POSTs or PMS navigation (2.070037ms)
+✔ offline navigation uses a generic fallback, does not cache a signed-in screen and preserves unrelated caches (3.365854ms)
+✔ install registration uses only the cleaning scope; unsupported install prompt exposes clear mobile instructions (7.056118ms)
+✔ morning fixtures do not weaken the actual rejection of work crossing midnight (10.435393ms)
+✔ an administrator without a marketplace member can view the account screen without creating invalid or unwanted roles (26.981687ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2695.051013
