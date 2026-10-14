@@ -205,3 +205,19 @@ test('profile preview leaves dragging to the page and full-screen Trips have an 
  d.querySelector('.community-watch-open').click();assert.equal(host.classList.contains('is-expanded'),true);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(host.classList.contains('is-expanded'),false);assert.equal(d.documentElement.style.overflow,'');
  dom.window.close();
 });
+
+test('public profile sharing goes to the composer instead of reopening saved profile fields',async()=>{
+ const state={profile:{id:owner,handle:'merielen',display_name:'Merielen',is_public:true},allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w}=await communityPage('conta.html','',()=>state);
+ assert.equal(w.document.querySelector('#community-profile-card .primary-action').getAttribute('href'),'villegram-admin.html?mode=guest');
+ assert.equal(w.document.querySelector('#community-profile-form').hidden,true);dom.window.close();
+});
+
+test('server-controlled posting permission admits a contributor without a reservation and remains protected on profile save',async()=>{
+ for(const granted of [false,true]){
+  const profile={id:owner,handle:'contributor',display_name:'Contribuidora',is_public:true,can_post:granted};let written;
+  const database={from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},single(){return this},upsert(value){written=value;return this},then(resolve){return Promise.resolve({data:table==='villegram_profiles'?(written||profile):[],error:null}).then(resolve)}}}};
+  const result=await communityOperation({db:database,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'contributor',display_name:'Nome alterado',is_public:true,can_post:true}},isAdmin:false});
+  assert.equal(result.status,200);assert.equal(written.can_post,granted);
+ }
+});
