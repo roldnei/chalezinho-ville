@@ -1,3 +1,4 @@
+import {teamInvitationSite,inviteNewTeamUser} from '../_shared/pms-team-invitations.ts';
 import {taskPhotos} from '../pms-operations/photos.ts';
 import {listingsAction} from '../pms-operations/listings.ts';
 // Partial production release: preserve existing PMS operations while adding the scoped listing editor.
@@ -286,10 +287,10 @@ async function teamAction(body:any,actor:{id:string,role?:string}){
     const {data:list}=await admin.auth.admin.listUsers({page:1,perPage:1000});
     let invitedUser=list.users.find((u:any)=>u.email?.toLowerCase()===email)||null;
     if(!invitedUser){
-      const site=(Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL")||"https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app").replace(/\/$/,"");
-      const {data,error}=await admin.auth.admin.inviteUserByEmail(email,{data:{full_name:fullName},redirectTo:`${site}/auth-callback.html?next=pms-operacao.html%3Fview%3Dteam`});
-      if(error||!data.user)return json({ok:false,error:"invite_send_failed"},502);
-      invitedUser=data.user;
+      const site=teamInvitationSite(url,Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL"));
+      const delivery=await inviteNewTeamUser(admin,{email,full_name:fullName,role,position,property_ids:propertyIds,permissions,invited_by:actor.id},site);
+      if(delivery.error||!delivery.user)return json({ok:false,error:delivery.error||"invite_send_failed"},502);
+      invitedUser=delivery.user;
     }
     const accessStatus=invitedUser.email_confirmed_at?"active":"invited",now=new Date().toISOString();
     const {error:profileError}=await admin.from("profiles").upsert({id:invitedUser.id,full_name:fullName,role,pms_position:position,pms_property_ids:propertyIds,pms_permissions:permissions,pms_access_status:accessStatus,updated_at:now},{onConflict:"id"});
@@ -311,8 +312,8 @@ async function teamAction(body:any,actor:{id:string,role?:string}){
     const invitationId=clip(body.invitation_id,80);
     const {data:invitation}=await admin.from("pms_team_invitations").select("*").eq("id",invitationId).in("status",["pending","expired"]).maybeSingle();
     if(!invitation)return json({ok:false,error:"invitation_not_found"},404);
-    const site=(Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL")||"https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app").replace(/\/$/,"");
-    const {error}=await admin.auth.resend({type:"signup",email:invitation.email,options:{emailRedirectTo:`${site}/auth-callback.html?next=pms-operacao.html%3Fview%3Dteam`}});
+    const site=teamInvitationSite(url,Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL"));
+    const {error}=await admin.auth.resend({type:"signup",email:invitation.email,options:{emailRedirectTo:`${site}/auth-callback.html?next=conferencias.html`}});
     if(error)return json({ok:false,error:"invite_resend_failed"},502);
     const now=new Date().toISOString();
     await admin.from("pms_team_invitations").update({status:"pending",expires_at:new Date(Date.now()+7*86400000).toISOString(),updated_at:now}).eq("id",invitationId);
