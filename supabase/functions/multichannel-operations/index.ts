@@ -83,6 +83,7 @@ Deno.serve(async req=>{
   if(body.action==='hub')return json(await hub(a));
   if(body.action==='sync'){if(a.role!=='admin')return json({ok:false,error:'admin_required'},403);return json(await sync());}
   if(body.action==='task')return await taskDetail(a,String(body.task_id||''));
+  if(body.action==='link_preparation'){if(a.role!=='admin')return json({ok:false,error:'admin_required'},403);return json({ok:true,result:checked(await admin.rpc('ops_link_preparation',{p_actor:a.id,p:body}))});}
   if(body.action==='complete_task')return json({ok:true,result:checked(await admin.rpc('ops_complete_task',{p_actor:a.id,p:body}))});
   if(body.action==='upload'){
    const base64=String(body.base64||'');if(!base64||base64.length>699052)return json({ok:false,error:'photo_too_large'},413);
@@ -108,7 +109,7 @@ Deno.serve(async req=>{
   return json({ok:false,error:'invalid_action'},400);
  }catch(e){
   const message=e instanceof Error?e.message:'operation_unavailable';
-  const known=['stay_changed_reload','linked_identity_locked','invalid_task_window','permission_denied','admin_required','task_not_found','invalid_assignee','invalid_status','task_locked','departure_not_due','checklist_and_photos_required','inspection_required','invalid_item','upload_key_conflict','photo_upload_failed_retry','existing_stay_link_required','use_reservation_flow','manual_dates_required','already_linked','link_dates_or_property_differ','attendance_not_allowed','invalid_checklist'];
+  const known=['link_target_unavailable','standalone_preparation_required','preparation_already_linked','preparation_not_submitted','link_property_mismatch','preparation_after_arrival','intervening_stay_requires_cleaning','preparation_evidence_pending','preparation_has_work','stay_changed_reload','linked_identity_locked','invalid_task_window','permission_denied','admin_required','task_not_found','invalid_assignee','invalid_status','task_locked','departure_not_due','checklist_and_photos_required','inspection_required','invalid_item','upload_key_conflict','photo_upload_failed_retry','existing_stay_link_required','use_reservation_flow','manual_dates_required','already_linked','link_dates_or_property_differ','attendance_not_allowed','invalid_checklist'];
   return json({ok:false,error:known.find(k=>message.includes(k))||'operation_unavailable'},known.some(k=>message.includes(k))?409:503);
  }
 });
