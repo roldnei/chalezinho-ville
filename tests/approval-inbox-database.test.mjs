@@ -34,6 +34,19 @@ before(async()=>{
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
 });
 after(()=>db.close());
+test('approval inbox supports direct DEV incidents and production incidents linked through guarantees',async()=>{
+ await db.exec('create table guarantees(id uuid,reservation_id uuid);alter table incidents add column guarantee_id uuid;');
+ await db.exec(await readFile(new URL('../supabase/migrations/20261015184011_approval_incident_schema_compatibility.sql',import.meta.url),'utf8'));
+ const id='60000000-0000-4000-8000-000000000001';
+ await db.query("insert into reservations values($1,1,'Guest');",[id]);
+ await db.query('insert into guarantees values($1,$1)',[id]);
+ await db.query("insert into incidents(id,reservation_id,category,status,decision,created_at) values($1,$1,'Avaria','open','pending',now())",[id]);
+ assert.equal((await call()).items.find(i=>i.key==='incident:'+id).property_name,'CH1');
+ await db.exec('delete from incidents;alter table incidents drop column reservation_id;');
+ await db.query("insert into incidents(id,guarantee_id,category,status,decision,created_at) values($1,$1,'Avaria','open','pending',now())",[id]);
+ assert.equal((await call()).items.find(i=>i.key==='incident:'+id).property_name,'CH1');
+ await db.exec('delete from incidents;delete from guarantees;delete from reservations;');
+});
 test('queue derives entry and departure once, retains after reads, removes only decided items and returns reopened items',async()=>{
  const a='20000000-0000-4000-8000-000000000001',b='20000000-0000-4000-8000-000000000002';
  await db.query("insert into ops_tasks(id,stage,title,property_id,executed_by,submitted_at,status) values($1,'departure','Saída',1,$3,now(),'inspection'),($2,'preparation','Entrada',1,$3,now(),'inspection')",[a,b,staff]);
