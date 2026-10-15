@@ -213,12 +213,12 @@ test('public profile sharing goes to the composer instead of reopening saved pro
  assert.equal(w.document.querySelector('#community-profile-form').hidden,true);dom.window.close();
 });
 
-test('server-controlled posting permission admits a contributor without a reservation and remains protected on profile save',async()=>{
+test('every registered account can activate a public contributor profile without a reservation or invite',async()=>{
  for(const granted of [false,true]){
   const profile={id:owner,handle:'contributor',display_name:'Contribuidora',is_public:true,can_post:granted};let written;
   const database={from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},single(){return this},upsert(value){written=value;return this},then(resolve){return Promise.resolve({data:table==='villegram_profiles'?(written||profile):[],error:null}).then(resolve)}}}};
   const result=await communityOperation({db:database,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'contributor',display_name:'Nome alterado',is_public:true,can_post:true}},isAdmin:false});
-  assert.equal(result.status,200);assert.equal(written.can_post,granted);
+  assert.equal(result.status,200);assert.equal(written.can_post,true);
  }
 });
 
@@ -234,4 +234,15 @@ test('mentions use dated publication cards with video covers and no author edit 
  assert.ok(host.classList.contains('community-grid'));assert.equal(host.querySelector('.community-tile img').src,'https://example.test/cover.jpg');assert.equal(host.querySelector('.community-tile>a').getAttribute('href'),'index.html?publication='+other);
  assert.match(host.querySelector('.community-month').textContent,/outubro de 2026/);assert.match(host.querySelector('.community-post-date').textContent,/14\/10\/2026/);assert.equal(host.querySelector('.community-edit'),null);assert.ok(host.querySelector('[data-tag="removed"]'));assert.equal(host.querySelector('[data-tag="accepted"]'),null);
  dom.window.close();
+});
+
+
+test('a new account without reservation or invite submits only for review and cannot moderate',async()=>{
+ const profile={id:owner,handle:'newperson',display_name:'Pessoa nova',is_public:true,can_post:false};let savedArgs;
+ const database={from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},in(){return this},then(resolve){return Promise.resolve({data:table==='villegram_profiles'?profile:[],error:null}).then(resolve)}}},storage:{from(){return {list:async()=>({data:[{name:other+'.webp'}],error:null})}}},rpc:async(name,args)=>{savedArgs={name,args};return {data:{id:other,...args.value},error:null}}};
+ const ctx={db:database,u:{id:owner},isAdmin:false,projectUrl:dev,catalog:async()=>({properties:[{id:1,active:true}]}),resolveMedia:async x=>x};
+ const submit=await communityOperation({...ctx,op:'guest_save',body:{publication:draft,mentions:[]}});
+ assert.equal(submit.status,200);assert.equal(savedArgs.name,'villegram_save_guest');assert.equal(savedArgs.args.value.status,'pending_review');
+ const denied=await communityOperation({...ctx,op:'community_review_queue',body:{}});assert.equal(denied.status,403);assert.equal(denied.body.error,'admin_required');
+ const anonymous=await communityOperation({...ctx,u:null,op:'guest_save',body:{publication:draft}});assert.equal(anonymous.status,401);
 });

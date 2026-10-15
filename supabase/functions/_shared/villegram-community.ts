@@ -50,7 +50,9 @@ export async function communityOperation(ctx:any){
  const mine=async()=>{const r=await db.from('villegram_profiles').select('*').eq('id',u.id).maybeSingle();if(r.error)throw Error('community_unavailable');return r.data;};
  const check=async(query:any)=>{const r=await query;if(r.error)throw Error('community_unavailable');return r.data;};
  const mediaExists=async(path:string)=>{if(!new RegExp('^'+u.id+'/[a-f0-9-]{36}\\.(webp|jpg|mp4|webm|mov)$','i').test(path))throw Error('invalid_media_owner');const [folder,name]=path.split('/'),r=await db.storage.from('villegram-media').list(folder,{search:name,limit:1});if(r.error||!r.data?.some((f:Row)=>f.name===name))throw Error('invalid_media_upload');};
- const eligible=async()=>{const r=await db.from('reservations').select('property_id').eq('user_id',u.id).eq('status','confirmed').limit(30);if(r.error)throw Error('community_unavailable');const invite=await db.from('villegram_invites').select('id').eq('accepted_by',u.id).limit(1);if(invite.error)throw Error('community_unavailable');const profile=await mine();return {allowed:profile?.can_post===true||!!r.data?.length||!!invite.data?.length||isAdmin,property_ids:[...new Set((r.data||[]).map((v:Row)=>v.property_id))]};};
+ // Any authenticated account may submit. Public-profile consent and mandatory
+ // moderation remain enforced below; reservations only suggest a property.
+ const eligible=async()=>{const r=await db.from('reservations').select('property_id').eq('user_id',u.id).eq('status','confirmed').limit(30);if(r.error)throw Error('community_unavailable');return {allowed:true,property_ids:[...new Set((r.data||[]).map((v:Row)=>v.property_id))]};};
  if(op==='community_profile'||op==='community_people'){
   const q=db.from('villegram_profiles').select(publicProfileColumns).eq('is_public',true);
   if(op==='community_people'){const term=String(body.search||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,24);const rows=await check(q.ilike('handle',term+'%').order('handle').limit(30));return ok({people:rows.map(({avatar_path,is_public,...p}:Row)=>p)});}
