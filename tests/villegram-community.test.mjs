@@ -9,7 +9,7 @@ const draft={title:'Meu momento',caption:'Café no chalé',status:'published',pr
 const db=new PGlite();
 before(async()=>{
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
- for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
  await db.exec(`insert into auth.users values('${owner}'),('${other}'),('${staff}');insert into properties values(1);insert into profiles values('${staff}','admin','active');insert into villegram_profiles(id,handle,display_name,is_public,can_post) values('${owner}','hospede','Nome público',true,true),('${other}','amiga','Amiga',true,true);`);
 });after(()=>db.close());
 test('guest sanitization cannot impersonate team, publish directly, store prices or use another owner media',()=>{
@@ -164,5 +164,74 @@ test('profile Trips group by month and day in Brazil, retain dates and edit dest
  assert.match(d.querySelector('.community-tile>a').href,/mode=guest&edit=draft/);
  assert.equal(d.querySelectorAll('.community-edit').length,4);
  assert.equal(posts[0].id,'old','input order remains intact');
+ dom.window.close();
+});
+
+test('avatar accepts Safari JPEG and PNG output with matching storage type and own path',async()=>{
+ const samples=[{name:'jpg',mime:'image/jpeg',bytes:new Uint8Array([255,216,255,224,...Array(20).fill(0)])},{name:'png',mime:'image/png',bytes:new Uint8Array([137,80,78,71,13,10,26,10,...Array(20).fill(0)])}];
+ for(const sample of samples){const uploads=[];const db={from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},upsert(value){this.value=value;return this},single(){return this},then(resolve){return Promise.resolve({data:this.value||(['reservations','villegram_invites'].includes(table)?[]:null),error:null}).then(resolve)}}},storage:{from(){return {upload:async(path,bytes,options)=>{uploads.push({path,bytes,options});return {error:null}}}}}};
+ const avatar_data=Buffer.from(sample.bytes).toString('base64');assert.equal(avatarBytes(avatar_data).length,sample.bytes.length);
+ const result=await communityOperation({db,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'safari',display_name:'Teste Safari',is_public:true,avatar_data}},isAdmin:false});assert.equal(result.status,200);assert.ok(uploads[0].path.startsWith(owner+'/'));assert.ok(uploads[0].path.endsWith('.'+sample.name));assert.equal(uploads[0].options.contentType,sample.mime);
+ }
+});
+
+test('profile saves marielen with mobile keyboard spacing and identifies the actual invalid field',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w,calls}=await communityPage('conta.html','',b=>{if(b.operation==='community_save_profile'){state.profile={id:owner,...b.profile};return {profile:state.profile}}return state});
+ const f=w.document.querySelector('#community-profile-form');
+ f.elements.display_name.value='Marielen Barreto';f.elements.bio.value='Sou Marielen, anfitriã do Chalezinho Ville. 🌿';f.elements.is_public.checked=true;
+ f.elements.handle.value=' @Marielen\u200b ';f.requestSubmit();await tick();await tick();
+ assert.equal(calls.find(c=>c.operation==='community_save_profile').profile.handle,'marielen');
+ const count=calls.filter(c=>c.operation==='community_save_profile').length;
+ f.elements.bio.value='a'.repeat(241);f.requestSubmit();await tick();
+ assert.match(w.document.querySelector('#community-profile-feedback').textContent,/Sobre você.*240/);
+ assert.equal(calls.filter(c=>c.operation==='community_save_profile').length,count);
+ assert.equal(f.elements.handle.value,'marielen');
+ f.elements.bio.value='Minha bio';f.elements.handle.value='1invalido';f.requestSubmit();await tick();
+ assert.match(w.document.querySelector('#community-profile-feedback').textContent,/@nome/);
+ assert.equal(calls.filter(c=>c.operation==='community_save_profile').length,count);
+ dom.window.close();
+});
+
+test('profile preview leaves dragging to the page and full-screen Trips have an explicit return',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w}=await communityPage('conta.html','',()=>state),d=w.document,host=d.querySelector('#community-watch-player'),frame=host.querySelector('iframe');
+ assert.equal(frame.tabIndex,-1);assert.equal(host.querySelector('.community-watch-enter').hidden,false);
+ const css=await readFile(new URL('../villegram-community.css',import.meta.url),'utf8');
+ assert.match(css,/#community-watch-player:not\(\.is-expanded\) iframe\{pointer-events:none\}/);
+ assert.match(css,/\.community-watch-enter\{[^}]*touch-action:pan-y/);
+ host.querySelector('.community-watch-enter').click();assert.equal(host.classList.contains('is-expanded'),true);assert.equal(host.getAttribute('aria-modal'),'true');assert.equal(frame.tabIndex,0);assert.equal(d.documentElement.style.overflow,'hidden');assert.equal(host.querySelector('.community-watch-back').hidden,false);
+ host.querySelector('.community-watch-back').click();assert.equal(host.classList.contains('is-expanded'),false);assert.equal(d.documentElement.style.overflow,'');assert.equal(frame.tabIndex,-1);assert.equal(host.querySelector('iframe'),frame);
+ d.querySelector('.community-watch-open').click();assert.equal(host.classList.contains('is-expanded'),true);d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Escape',bubbles:true}));assert.equal(host.classList.contains('is-expanded'),false);assert.equal(d.documentElement.style.overflow,'');
+ dom.window.close();
+});
+
+test('public profile sharing goes to the composer instead of reopening saved profile fields',async()=>{
+ const state={profile:{id:owner,handle:'merielen',display_name:'Merielen',is_public:true},allowed:false,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w}=await communityPage('conta.html','',()=>state);
+ assert.equal(w.document.querySelector('#community-profile-card .primary-action').getAttribute('href'),'villegram-admin.html?mode=guest');
+ assert.equal(w.document.querySelector('#community-profile-form').hidden,true);dom.window.close();
+});
+
+test('server-controlled posting permission admits a contributor without a reservation and remains protected on profile save',async()=>{
+ for(const granted of [false,true]){
+  const profile={id:owner,handle:'contributor',display_name:'Contribuidora',is_public:true,can_post:granted};let written;
+  const database={from(table){return {select(){return this},eq(){return this},limit(){return this},maybeSingle(){return this},single(){return this},upsert(value){written=value;return this},then(resolve){return Promise.resolve({data:table==='villegram_profiles'?(written||profile):[],error:null}).then(resolve)}}}};
+  const result=await communityOperation({db:database,u:{id:owner},op:'community_save_profile',body:{profile:{handle:'contributor',display_name:'Nome alterado',is_public:true,can_post:true}},isAdmin:false});
+  assert.equal(result.status,200);assert.equal(written.can_post,granted);
+ }
+});
+
+
+test('guest MOV stays a video and storage accepts only the authorized owner path',async()=>{
+ const p=guestInput({...draft,media:[{kind:'video',path:owner+'/'+other+'.mov',poster_path:owner+'/'+other+'.webp',duration:10,bytes:1024,fit:'contain',position:50}]},dev,owner);assert.equal(p.media[0].path,owner+'/'+other+'.mov');
+ await db.exec(`grant usage on schema auth,storage to authenticated;grant select on profiles to authenticated;grant select,insert on storage.objects to authenticated;alter table storage.objects enable row level security;set test.uid='${owner}';set role authenticated;`);
+ try{await db.query("insert into storage.objects(name,bucket_id) values($1,'villegram-media')",[owner+'/'+other+'.mov']);await assert.rejects(db.query("insert into storage.objects(name,bucket_id) values($1,'villegram-media')",[other+'/'+owner+'.mov']),/row-level security/);}finally{await db.exec('reset role')}
+});
+test('mentions use dated publication cards with video covers and no author edit action',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],invites:[],mentions:[{id:other,title:'Banho no Ville',author_name:'Merielen',mention_status:'accepted',status:'published',published_at:'2026-10-15T02:35:00Z',media:[{kind:'video',url:'https://example.test/video.mov',poster:'https://example.test/cover.jpg'}]}]};
+ const {dom,w}=await communityPage('conta.html','',()=>state),host=w.document.querySelector('#community-mentions');
+ assert.ok(host.classList.contains('community-grid'));assert.equal(host.querySelector('.community-tile img').src,'https://example.test/cover.jpg');assert.equal(host.querySelector('.community-tile>a').getAttribute('href'),'index.html?publication='+other);
+ assert.match(host.querySelector('.community-month').textContent,/outubro de 2026/);assert.match(host.querySelector('.community-post-date').textContent,/14\/10\/2026/);assert.equal(host.querySelector('.community-edit'),null);assert.ok(host.querySelector('[data-tag="removed"]'));assert.equal(host.querySelector('[data-tag="accepted"]'),null);
  dom.window.close();
 });
