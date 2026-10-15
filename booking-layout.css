@@ -29,3 +29,5 @@
 .booking-price .price-before{display:block;color:#746453;font-size:17px;margin:8px 0 4px;text-decoration-thickness:1px}
 .booking-search label,.booking-search input,.booking-search select{min-width:0;max-width:100%;box-sizing:border-box}
 .booking-search input[type=date]{appearance:none;-webkit-appearance:none;width:100%}
+
+.booking-field-error{display:block;color:#8f2525;font-size:14px;line-height:1.4;letter-spacing:normal;text-transform:none;margin-top:6px}.booking-fields [aria-invalid="true"]{outline:2px solid #b34539;outline-offset:2px}

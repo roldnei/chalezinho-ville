@@ -44,8 +44,9 @@ function validateForm(form){
  return true;
 }
 document.querySelectorAll('.auth-card form').forEach(form=>form.addEventListener('invalid',e=>{
- const input=e.target;msg(input.validity.valueMissing?"Preencha os campos obrigatórios.":input.type==='email'?"Informe um e-mail válido, como nome@exemplo.com.":input.type==='password'?"Use uma senha com pelo menos 8 caracteres.":"Confira o formato do campo indicado.");
+ const input=e.target;if(input.id==='confirmation-code'){by('confirmation-feedback').textContent='Digite os 6 dígitos do código recebido por e-mail.';input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby','confirmation-feedback');return}msg(input.validity.valueMissing?"Preencha os campos obrigatórios.":input.type==='email'?"Informe um e-mail válido, como nome@exemplo.com.":input.type==='password'?"Use uma senha com pelo menos 8 caracteres.":"Confira o formato do campo indicado.");
 },true));
+by('confirmation-code')?.addEventListener('input',()=>{by('confirmation-code').removeAttribute('aria-invalid');by('confirmation-feedback').textContent=''});
 const digits=v=>String(v||"").replace(/\D/g,"");
 function validCpf(v){if(!/^[\d.\s-]+$/.test(String(v||"")))return false;const s=digits(v);if(s.length!==11||/^(\d)\1{10}$/.test(s))return false;for(let n=9;n<11;n++){const sum=[...s.slice(0,n)].reduce((a,x,i)=>a+Number(x)*(n+1-i),0),check=(sum*10)%11;if(Number(s[n])!==(check===10?0:check))return false}return true}
 by("signup-document-type")?.addEventListener("change",()=>{const passport=by("signup-document-type").value==="passport";by("signup-country-label").hidden=!passport;by("signup-country").required=passport;by("signup-document-number").inputMode=passport?"text":"numeric";by("signup-document-number").placeholder=passport?"Número do passaporte":"000.000.000-00"});

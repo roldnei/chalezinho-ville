@@ -144,7 +144,13 @@ function setFlowError(t){$("#checkout-error").textContent=t}
 async function search({scroll=true}={}){
  const sequence=++searchSequence;state.search=null;state.quote=null;state.rate=null;state.rateConfirmed=false;if(PUBLIC)clearWhatsApp();
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
- if(!bi||!bo||bo<=bi)return error("Escolha datas válidas.");
+ for(const id of ['book-in','book-out']){document.getElementById(id).removeAttribute('aria-invalid');document.getElementById(id+'-error')?.remove();}
+ const invalidDate=(id,text)=>{const input=document.getElementById(id),note=document.createElement('small');note.id=id+'-error';note.className='booking-field-error';note.textContent=text;input.after(note);input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby',note.id);error(text);input.focus();};
+ if(!bi)return invalidDate('book-in','Escolha a data de entrada.');
+ if(!bo)return invalidDate('book-out','Escolha a data de saída.');
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+ if(bi<today)return invalidDate('book-in','Escolha uma entrada a partir de hoje.');
+ if(bo<=bi)return invalidDate('book-out','A saída deve ser depois da entrada.');
  error("Consultando disponibilidade e valores...");
  document.body.classList.add("booking-results-screen");$("#booking-results").classList.remove("booking-results-hidden");
  $("#booking-period").textContent=bi.split('-').reverse().join('/')+' → '+bo.split('-').reverse().join('/');$('#availability-count').textContent='Consultando disponibilidade…';$('#booking-list').innerHTML='<p role="status">Buscando estadias para suas datas…</p>';

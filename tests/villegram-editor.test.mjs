@@ -254,3 +254,7 @@ test('email review deep link opens the selected pending Trip and never approves 
  const {d,w,rows}=await editor({initialRows:[post],query:'?review=pending&trip='+uid});try{await tick();const panel=w.document.querySelector('.vg-review-dialog');assert.ok(panel?.open);assert.match(panel.textContent,/Trip do hóspede/);assert.equal(rows[0].status,'pending_review');assert.equal(panel.querySelector('[data-approve]').disabled,false)}finally{d.window.close()}
  const old=await editor({initialRows:[{...post,status:'published'}],query:'?review=pending&trip='+uid});try{await tick();assert.equal(old.w.document.querySelector('.vg-review-dialog'),null);assert.match(old.w.document.querySelector('#vg-library-message').textContent,/já foi analisado/)}finally{old.d.window.close()}
 });
+
+test('unsupported and unreadable photos explain recovery without decoder internals',async()=>{
+ for(const bad of ['unsupported','corrupt']){const {d,w}=await editor();try{if(bad==='corrupt')w.VillegramMedia.transform=async()=>{throw Error('The source image could not be decoded.')};const input=w.document.querySelector('#vg-upload');Object.defineProperty(input,'files',{value:[new w.File(['bad'],bad==='unsupported'?'bad.txt':'bad.jpg',{type:bad==='unsupported'?'text/plain':'image/jpeg'})]});input.dispatchEvent(new w.Event('change'));await tick();const text=w.document.querySelector('#vg-upload-status').textContent;assert.match(text,/JPG/);assert.doesNotMatch(text,/decoded|image_decode_failed/);assert.equal(input.disabled,false)}finally{d.window.close()}}
+});
