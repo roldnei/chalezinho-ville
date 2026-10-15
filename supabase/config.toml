@@ -8,3 +8,7 @@ verify_jwt = false
 # Custom auth: getUser + active operator scope, or Vault-backed scheduler secret.
 [functions.multichannel-operations]
 verify_jwt = false
+
+# Dedicated scheduler credential checked by a service-only claim RPC; never browser-callable.
+[functions.trip-review-mailer]
+verify_jwt = false
