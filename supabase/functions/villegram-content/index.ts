@@ -2,7 +2,7 @@ import {releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {communityOperation,communityPublic} from '../_shared/villegram-community.ts';
 import {resolvePublicationStay} from '../_shared/villegram-stay.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2';
-import {publicationInput,automationInput,eligiblePublication,generatePublications,signalInput,summarizePublications,recordVillegramBooking} from '../_shared/villegram-publications.ts';
+import {publicationInput,automationInput,eligiblePublication,guestPublicationVisible,generatePublications,signalInput,summarizePublications,recordVillegramBooking} from '../_shared/villegram-publications.ts';
 import {commentText,villegramService} from '../_shared/villegram.ts';
 const projectUrl=Deno.env.get('SUPABASE_URL')!,admin=createClient(projectUrl,Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,{auth:{persistSession:false}});
 const cors={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization,apikey,content-type,x-chalezinho-env','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
@@ -28,12 +28,12 @@ Deno.serve(async req=>{
  if(target==='production'&&!['public_feed','feed','signals','admin_list','save_settings','generate','save','preview','report','social','like','comment','remove_comment'].includes(op)&&!op.startsWith('community_')&&!op.startsWith('guest_'))return json({ok:false,error:'feature_not_released'},403);
  if(op==='feed'||op==='public_feed'||op==='generate_due'){
   if(op==='generate_due'){await generate();return json({ok:true})}if(op!=='public_feed')try{await generate()}catch{console.warn('villegram_generation_unavailable')}
-  const [c,s,posts]=await Promise.all([catalog(true),settings(),admin.from('villegram_publications').select('*').eq('status','published').order('featured',{ascending:false}).order('display_order').order('created_at').limit(200)]);if(posts.error)throw Error('feed_unavailable');
+  const [c,s,posts]=await Promise.all([catalog(true),settings(),admin.from('villegram_publications').select('*').eq('status','published').or('source.neq.guest_submission,expires_at.gt.'+new Date().toISOString()).order('featured',{ascending:false}).order('display_order').order('created_at').limit(200)]);if(posts.error)throw Error('feed_unavailable');
   let eligible=(posts.data||[]).filter(p=>target!=='production'||commercialItem(p)).filter(p=>eligiblePublication(p,c.properties,c.products,c.offers));eligible=await communityPublic(admin,eligible);if(body.feed==='following'){const viewer=await user(req);if(!viewer)return json({ok:false,error:'authentication_required'},401);const follows=await admin.from('villegram_follows').select('followed_id').eq('follower_id',viewer.id);if(follows.error)throw Error('feed_unavailable');const ids=new Set(follows.data.map(f=>f.followed_id));eligible=eligible.filter(p=>ids.has(p.author_id));}return json({ok:true,publications:await resolveMedia(await resolveStays(eligible)),...c,max_offers:s.max_offers,checked_at:new Date().toISOString()});
  }
  if(op==='signals'){
   if(!Array.isArray(body.events)||body.events.length<1||body.events.length>25)return json({ok:false,error:'invalid_signals'},400);
-  const events=body.events.map(signalInput),ids=[...new Set(events.map((e:any)=>e.publication_id))];const p=await admin.from('villegram_publications').select('id').eq('status','published').in('id',ids);if(p.error||p.data?.length!==ids.length)return json({ok:false,error:'publication_unavailable'},404);
+  const events=body.events.map(signalInput),ids=[...new Set(events.map((e:any)=>e.publication_id))];const p=await admin.from('villegram_publications').select('id,status,source,published_at,expires_at').eq('status','published').in('id',ids);if(p.error||p.data?.length!==ids.length||p.data?.some(row=>!guestPublicationVisible(row)))return json({ok:false,error:'publication_unavailable'},404);
   // Natural keys also deduplicate a retry with a different event ID.
   const r=await admin.from('villegram_signals').upsert(events,{onConflict:'view_id,kind,sequence',ignoreDuplicates:true});if(r.error)throw Error('signal_failed');return json({ok:true});
  }
@@ -51,8 +51,8 @@ Deno.serve(async req=>{
    if(offer.error||!offer.data||offer.data.status!=='active'||target==='production'&&!commercialItem(offer.data))return json({ok:false,error:'offer_unavailable'},404);
    return await villegramService({admin,currentUser:async()=>u,userIsAdmin:async()=>isAdmin,json})(req,{...body,operation:op==='social'?'list':op==='remove_comment'?'remove':op},true);
   }
-  const p=await admin.from('villegram_publications').select('id,status,source,author_id').eq('id',body.publication_id).maybeSingle();if(!p.data||p.data.status!=='published'&&!isAdmin)return json({ok:false,error:'publication_unavailable'},404);
-  if(p.data.source==='guest_submission'&&!isAdmin){const profile=await admin.from('villegram_profiles').select('is_public').eq('id',p.data.author_id).maybeSingle();if(!profile.data?.is_public)return json({ok:false,error:'publication_unavailable'},404);}
+  const p=await admin.from('villegram_publications').select('id,status,source,author_id,published_at,expires_at').eq('id',body.publication_id).maybeSingle();if(!p.data||p.data.status!=='published'&&!isAdmin)return json({ok:false,error:'publication_unavailable'},404);
+  if(p.data.source==='guest_submission'&&!isAdmin){if(!guestPublicationVisible(p.data))return json({ok:false,error:'publication_unavailable'},404);const profile=await admin.from('villegram_profiles').select('is_public').eq('id',p.data.author_id).maybeSingle();if(!profile.data?.is_public)return json({ok:false,error:'publication_unavailable'},404);}
   if(op!=='social'&&!u)return json({ok:false,error:'authentication_required'},401);
   if(op==='like'){if(typeof body.liked!=='boolean')return json({ok:false,error:'invalid_like'},400);const r=body.liked?await admin.from('villegram_post_likes').upsert({publication_id:p.data.id,user_id:u!.id},{onConflict:'publication_id,user_id',ignoreDuplicates:true}):await admin.from('villegram_post_likes').delete().eq('publication_id',p.data.id).eq('user_id',u!.id);if(r.error)throw Error('interaction_failed');}
   if(op==='comment'){const text=commentText(body.text);if(!/^[a-f0-9-]{36}$/i.test(body.request_id||''))return json({ok:false,error:'invalid_request'},400);const existing=await admin.from('villegram_post_comments').select('user_id,publication_id').eq('id',body.request_id).maybeSingle();if(existing.error)throw Error('interaction_failed');if(existing.data&&(existing.data.user_id!==u!.id||existing.data.publication_id!==p.data.id))return json({ok:false,error:'invalid_request'},409);

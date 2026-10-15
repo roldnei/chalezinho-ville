@@ -3,8 +3,8 @@ import {test} from 'node:test';import assert from 'node:assert/strict';import {r
 import * as publications from '../supabase/functions/_shared/villegram-publications.ts';
 import {commentText} from '../supabase/functions/_shared/villegram.ts';
 const id='4069a585-7cc6-48ad-9263-567358a45c0c',dev='https://pxfqmnhqodqyaaqeyjgr.supabase.co';
-async function handler({project=dev,logged=false,role='guest'}={}){
- let serve,writes=0;const db={auth:{getUser:async()=>({data:{user:logged?{id}:null},error:logged?null:Error('invalid token')})},from(table){const data=table==='profiles'?{role,pms_access_status:'active'}:table==='villegram_publications'?{id,status:'published'}:null;const query={select(){return this},eq(){return this},maybeSingle:async()=>({data,error:null}),insert(){writes++;return this},upsert(){writes++;return this},update(){writes++;return this}};return query;}};
+async function handler({project=dev,logged=false,role='guest',post={id,status:'published'}}={}){
+ let serve,writes=0;const db={auth:{getUser:async()=>({data:{user:logged?{id}:null},error:logged?null:Error('invalid token')})},from(table){const data=table==='profiles'?{role,pms_access_status:'active'}:table==='villegram_publications'?post:null;const query={select(){return this},eq(){return this},in(){return {data:[post],error:null}},maybeSingle:async()=>({data,error:null}),insert(){writes++;return this},upsert(){writes++;return this},update(){writes++;return this}};return query;}};
  const source=await readFile(new URL('../supabase/functions/villegram-content/index.ts',import.meta.url),'utf8'),compiled=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
  vm.runInNewContext(compiled,{exports:{},require(name){return name.startsWith('npm:')?{createClient:()=>db}:name.includes('release-policy')?release:name.includes('villegram-publications')?publications:{commentText}},Deno:{env:{get:k=>k==='SUPABASE_URL'?project:'test-key'},serve:fn=>serve=fn},Response,URL,console});
  return {request:body=>serve(new Request(dev+'/functions/v1/villegram-content',{method:'POST',headers:{'Content-Type':'application/json',...(logged?{authorization:'Bearer test'}:{})},body:JSON.stringify(body)})),writes:()=>writes};
@@ -18,11 +18,11 @@ test('production social remains authenticated and unknown operations stay closed
 // the real eligibility rules. Public DEV must permit review of approved moments.
 async function feedHandler(project){
  let serve;const rows=[
-  {id:'guest',source:'guest_submission',title:'Momento aprovado',status:'published',published_at:'2020-01-01',media:[]},
-  {id:'pending',source:'guest_submission',title:'Ainda em análise',status:'pending_review',published_at:'2020-01-01',media:[]},
-  {id:'team',source:'manual',title:'Conheça os chalés',status:'published',published_at:'2020-01-01',media:[]}
+  {id:'guest',source:'guest_submission',title:'Momento aprovado',status:'published',published_at:new Date().toISOString(),media:[]},
+  {id:'pending',source:'guest_submission',title:'Ainda em análise',status:'pending_review',published_at:new Date().toISOString(),media:[]},
+  {id:'team',source:'manual',title:'Conheça os chalés',status:'published',published_at:new Date().toISOString(),media:[]}
  ];
- const db={from(table){let data=table==='villegram_publications'?rows:table==='villegram_automation'?{max_offers:6}:[];return {select(){return this},eq(key,value){if(Array.isArray(data))data=data.filter(r=>r[key]===value);return this},order(){return this},limit(){return this},single(){return this},then(resolve){return Promise.resolve({data,error:null}).then(resolve)}}}};
+ const db={from(table){let data=table==='villegram_publications'?rows:table==='villegram_automation'?{max_offers:6}:[];return {select(){return this},eq(key,value){if(Array.isArray(data))data=data.filter(r=>r[key]===value);return this},or(){return this},order(){return this},limit(){return this},single(){return this},then(resolve){return Promise.resolve({data,error:null}).then(resolve)}}}};
  const source=await readFile(new URL('../supabase/functions/villegram-content/index.ts',import.meta.url),'utf8');
  vm.runInNewContext(ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,{exports:{},require(name){return name.startsWith('npm:')?{createClient:()=>db}:name.includes('release-policy')?release:name.includes('villegram-publications')?publications:name.includes('villegram-community')?{communityPublic:async(_,posts)=>posts}:name.includes('villegram-stay')?{resolvePublicationStay:async p=>p}:{commentText}},Deno:{env:{get:k=>k==='SUPABASE_URL'?project:'test-key'},serve:fn=>serve=fn},Response,URL,console});
  return serve(new Request(project+'/functions/v1/villegram-content?operation=public_feed'));
@@ -30,4 +30,10 @@ async function feedHandler(project){
 test('public feeds include approved guest moments in DEV and production',async()=>{
  const devResponse=await feedHandler(dev);assert.equal(devResponse.status,200);assert.deepEqual((await devResponse.json()).publications.map(p=>p.id),['guest','team']);
  const prodResponse=await feedHandler('https://irxsaladqhbzhkoaclxy.supabase.co');assert.equal(prodResponse.status,200);assert.deepEqual((await prodResponse.json()).publications.map(p=>p.id),['guest','team']);
+});
+
+test('expired guest Trips cannot be opened socially, liked, commented on or counted by public signals',async()=>{
+ const post={id,status:'published',source:'guest_submission',author_id:id,published_at:new Date(Date.now()-8*86400000).toISOString(),expires_at:new Date(Date.now()-86400000).toISOString()};
+ const s=await handler({logged:true,post});for(const operation of ['social','like','comment']){const r=await s.request({operation,publication_id:id,liked:true,text:'Test',request_id:id});assert.equal(r.status,404);assert.equal((await r.json()).error,'publication_unavailable')}
+ const r=await s.request({operation:'signals',events:[{event_id:id,publication_id:id,visitor_id:id,session_id:id,view_id:id,kind:'view'}]});assert.equal(r.status,404);assert.equal(s.writes(),0);
 });

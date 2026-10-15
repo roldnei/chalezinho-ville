@@ -1,6 +1,7 @@
 import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {guestPublicationVisible} from '../supabase/functions/_shared/villegram-publications.ts';
 import {PGlite} from '@electric-sql/pglite';
 import {JSDOM} from 'jsdom';
 import {profileInput,guestInput,mentionHandles,communityPublic,communityOperation,avatarBytes} from '../supabase/functions/_shared/villegram-community.ts';
@@ -9,7 +10,7 @@ const draft={title:'Meu momento',caption:'Café no chalé',status:'published',pr
 const db=new PGlite();
 before(async()=>{
  await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
- for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql','20261015200104_guest_trips_week_expiry.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
  await db.exec(`insert into auth.users values('${owner}'),('${other}'),('${staff}');insert into properties values(1);insert into profiles values('${staff}','admin','active');insert into villegram_profiles(id,handle,display_name,is_public,can_post) values('${owner}','hospede','Nome público',true,true),('${other}','amiga','Amiga',true,true);`);
 });after(()=>db.close());
 test('guest sanitization cannot impersonate team, publish directly, store prices or use another owner media',()=>{
@@ -37,12 +38,12 @@ test('guest save, moderation, notifications, mentions, edits and ownership execu
  assert.equal((await db.query('select count(*)::int as n from villegram_notifications')).rows[0].n,0);
  await assert.rejects(db.query('select villegram_moderate($1,$2,$3,$4,$5)',[other,saved.id,saved.updated_at,'published','']),/admin_required/);
  await db.query('select villegram_moderate($1,$2,$3,$4,$5)',[staff,saved.id,saved.updated_at,'published','']);
- let row=(await db.query('select * from villegram_publications where id=$1',[saved.id])).rows[0];assert.equal(row.status,'published');
+ let row=(await db.query('select * from villegram_publications where id=$1',[saved.id])).rows[0];assert.equal(row.status,'published');assert.equal(Date.parse(row.expires_at)-Date.parse(row.published_at),7*86400000);
  assert.deepEqual((await db.query('select kind from villegram_notifications order by kind')).rows.map(n=>n.kind),['mention','published']);
  await db.query("update villegram_mentions set status='accepted' where publication_id=$1",[saved.id]);
  await assert.rejects(db.query('select villegram_save_guest($1,$2,$3,$4,$5)',[other,row.id,row.updated_at,JSON.stringify(p),[]]),/edit_conflict/);
  const edited=(await db.query('select villegram_save_guest($1,$2,$3,$4,$5) as p',[owner,row.id,row.updated_at,JSON.stringify({...p,caption:'Legenda revisada'}),[other]])).rows[0].p;
- assert.equal(edited.status,'pending_review');assert.equal(edited.published_at,null);assert.equal((await db.query('select status from villegram_mentions where publication_id=$1',[row.id])).rows[0].status,'pending');
+ assert.equal(edited.status,'pending_review');assert.equal(edited.published_at,null);assert.equal(edited.expires_at,null);assert.equal((await db.query('select status from villegram_mentions where publication_id=$1',[row.id])).rows[0].status,'pending');
  await assert.rejects(db.query('select villegram_save_guest($1,$2,$3,$4,$5)',[owner,row.id,row.updated_at,JSON.stringify(p),[]]),/edit_conflict/);
  await db.query('select villegram_moderate($1,$2,$3,$4,$5)',[staff,edited.id,edited.updated_at,'archived','Solicitar autorização de imagem']);
  assert.equal((await db.query('select moderation_reason from villegram_publications where id=$1',[saved.id])).rows[0].moderation_reason,'Solicitar autorização de imagem');
@@ -70,7 +71,7 @@ test('anonymous callers cannot mutate community and non-admin cannot moderate',a
 test('public feed excludes disabled guest profiles and only projects accepted public mentions',async()=>{
  const data={villegram_profiles:[{id:owner,handle:'hospede',display_name:'Nome público',is_public:true}],villegram_mentions:[{publication_id:owner,user_id:owner,status:'accepted'}]};
  const mock={from(t){let rows=data[t]||[];return {select(){return this},in(k,v){rows=rows.filter(r=>v.includes(r[k]));return this},eq(k,v){rows=rows.filter(r=>r[k]===v);return this},then(fn){return Promise.resolve({data:rows}).then(fn)}}}};
- const result=await communityPublic(mock,[{id:owner,source:'guest_submission',author_id:owner},{id:other,source:'guest_submission',author_id:other},{id:staff,source:'automatic'}]);
+ const result=await communityPublic(mock,[{id:owner,source:'guest_submission',author_id:owner,status:'published',published_at:new Date().toISOString()},{id:other,source:'guest_submission',author_id:other,status:'published',published_at:new Date().toISOString()},{id:staff,source:'automatic'}]);
  assert.equal(result.length,2);assert.equal(result[0].author_name,'Nome público');assert.deepEqual(result[0].mentions,[{handle:'hospede',display_name:'Nome público'}]);
 });
 test('account defaults to community but charge links and reservations tab preserve private flow',async()=>{
@@ -245,4 +246,25 @@ test('a new account without reservation or invite submits only for review and ca
  assert.equal(submit.status,200);assert.equal(savedArgs.name,'villegram_save_guest');assert.equal(savedArgs.args.value.status,'pending_review');
  const denied=await communityOperation({...ctx,op:'community_review_queue',body:{}});assert.equal(denied.status,403);assert.equal(denied.body.error,'admin_required');
  const anonymous=await communityOperation({...ctx,u:null,op:'guest_save',body:{publication:draft}});assert.equal(anonymous.status,401);
+});
+
+// Exact half-open validity window: visible at approval, expired at 168 hours.
+test('guest lifetime expires exactly one week after approval; malformed dates fail closed and editorial remains eligible',()=>{
+ const start=Date.parse('2026-10-01T15:00:00Z'),p={source:'guest_submission',status:'published',published_at:new Date(start).toISOString()};
+ assert.equal(guestPublicationVisible(p,start),true);assert.equal(guestPublicationVisible(p,start+7*86400000-1),true);assert.equal(guestPublicationVisible(p,start+7*86400000),false);
+ assert.equal(guestPublicationVisible({...p,expires_at:'2099-01-01'},start+7*86400000),false);
+ for(const changes of [{published_at:null},{published_at:'invalid'},{status:'pending_review'},{expires_at:'invalid'}])assert.equal(guestPublicationVisible({...p,...changes},start),false);
+ assert.equal(guestPublicationVisible(p,start-1),false);assert.equal(guestPublicationVisible({...p,source:'manual'},start+99*86400000),true);
+});
+test('database assigns expiry from approval, keeps it on unrelated edits and retains expired records',async()=>{
+ const value=guestInput({...draft,status:'pending_review'},dev,owner);
+ const r=(await db.query('select villegram_save_guest($1,null,null,$2,$3) p',[owner,JSON.stringify(value),[]])).rows[0].p;
+ await db.query("update villegram_publications set created_at=now()-interval '30 days' where id=$1",[r.id]);
+ await db.query('select villegram_moderate($1,$2,$3,$4,$5)',[staff,r.id,r.updated_at,'published','']);
+ const row=(await db.query('select * from villegram_publications where id=$1',[r.id])).rows[0];assert.equal(Date.parse(row.expires_at)-Date.parse(row.published_at),7*86400000);assert.ok(Date.parse(row.published_at)>Date.parse(row.created_at)+29*86400000);
+ await db.query("update villegram_publications set expires_at=now()+interval '100 days',caption='Revised by administrator' where id=$1",[r.id]);
+ assert.equal((await db.query('select expires_at from villegram_publications where id=$1',[r.id])).rows[0].expires_at.toISOString(),row.expires_at.toISOString());
+ await db.query("update villegram_publications set published_at=now()-interval '8 days' where id=$1",[r.id]);
+ const expired=(await db.query('select * from villegram_publications where id=$1',[r.id])).rows[0];assert.equal(expired.status,'published');assert.equal(guestPublicationVisible(expired),false);assert.deepEqual(expired.media,row.media);
+ const team=(await db.query("insert into villegram_publications(source,type,title,caption,status,media,cta,published_at) values('manual','trust','Team','Team','published','[{\"kind\":\"photo\",\"url\":\"assets/photo.webp\"}]','dates',now()-interval '30 days') returning expires_at")).rows[0];assert.equal(team.expires_at,null);
 });

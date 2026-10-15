@@ -1,4 +1,4 @@
-import {publicationInput} from './villegram-publications.ts';
+import {publicationInput,guestPublicationVisible} from './villegram-publications.ts';
 type Row=Record<string,any>;
 export const publicProfileColumns='id,handle,display_name,bio,avatar_path,is_public';
 export function profileInput(raw:Row={}){
@@ -32,6 +32,7 @@ export function mentionHandles(raw:unknown){
  return handles;
 }
 export async function communityPublic(db:any,posts:Row[]){
+ posts=posts.filter(p=>guestPublicationVisible(p));
  const ids=[...new Set(posts.filter(p=>p.source==='guest_submission').map(p=>p.author_id))];
  if(!ids.length)return posts;
  const r=await db.from('villegram_profiles').select(publicProfileColumns).in('id',ids).eq('is_public',true);if(r.error)throw Error('community_unavailable');
@@ -57,7 +58,7 @@ export async function communityOperation(ctx:any){
   const q=db.from('villegram_profiles').select(publicProfileColumns).eq('is_public',true);
   if(op==='community_people'){const term=String(body.search||'').toLowerCase().replace(/[^a-z0-9_]/g,'').slice(0,24);const rows=await check(q.ilike('handle',term+'%').order('handle').limit(30));return ok({people:rows.map(({avatar_path,is_public,...p}:Row)=>p)});}
   const p=await check(q.eq('handle',String(body.handle||'').toLowerCase()).maybeSingle());if(!p)return fail('profile_unavailable',404);
-  const [posts,followers,following,self]=await Promise.all([db.from('villegram_publications').select('*').eq('author_id',p.id).eq('source','guest_submission').eq('status','published').order('published_at',{ascending:false}).limit(60),db.from('villegram_follows').select('*',{count:'exact',head:true}).eq('followed_id',p.id),db.from('villegram_follows').select('*',{count:'exact',head:true}).eq('follower_id',p.id),u?db.from('villegram_follows').select('followed_id').eq('follower_id',u.id).eq('followed_id',p.id).maybeSingle():Promise.resolve({data:null})]);
+  const [posts,followers,following,self]=await Promise.all([db.from('villegram_publications').select('*').eq('author_id',p.id).eq('source','guest_submission').eq('status','published').gt('expires_at',new Date().toISOString()).order('published_at',{ascending:false}).limit(60),db.from('villegram_follows').select('*',{count:'exact',head:true}).eq('followed_id',p.id),db.from('villegram_follows').select('*',{count:'exact',head:true}).eq('follower_id',p.id),u?db.from('villegram_follows').select('followed_id').eq('follower_id',u.id).eq('followed_id',p.id).maybeSingle():Promise.resolve({data:null})]);
   if(posts.error||followers.error||following.error||self.error)throw Error('community_unavailable');
   let avatar_url=null;if(p.avatar_path){const signed=await db.storage.from('villegram-media').createSignedUrl(p.avatar_path,1800);avatar_url=signed.data?.signedUrl||null;}
   return ok({profile:{id:p.id,handle:p.handle,display_name:p.display_name,bio:p.bio,avatar_url},followers:followers.count,following:following.count,is_following:!!self.data,is_self:u?.id===p.id,publications:await resolveMedia(await communityPublic(db,posts.data||[]))});
