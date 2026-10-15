@@ -2,7 +2,7 @@
 'use strict';
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),root=document.querySelector('#inspection-app');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const labels={preparation:'Conferência pós-limpeza',departure:'Conferência pós-hospedagem',pending:'Pendente',in_progress:'Em andamento',blocked:'Pendente',inspection:'Concluída · aguardando revisão',approved:'Concluída'};
+const labels={preparation:'Conferência pós-limpeza',departure:'Conferência pós-hospedagem',pending:'Não iniciada',in_progress:'Em andamento',blocked:'Pendente',inspection:'Enviada para aprovação',approved:'Finalizada'};
 const dt=x=>new Date(x).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'});
 const errors={access_unavailable:'Este acesso foi encerrado ou não está disponível. Peça um novo link à administração.',inspection_unavailable:'Não foi possível conectar. Suas respostas foram mantidas. Tente novamente.'};
 let token=new URLSearchParams(location.hash.slice(1)).get('acesso'),taskId=new URLSearchParams(location.search).get('tarefa'),scope='',current=null,dispose=null;

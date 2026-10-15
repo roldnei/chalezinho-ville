@@ -40,7 +40,7 @@ export function operationSummary(stays:any[],tasks:any[],today:string,now=new Da
  const pending=tasks.filter(t=>!['approved','cancelled','superseded'].includes(t.status));
  const operationalTasks=tasks.filter(t=>!['cancelled','superseded'].includes(t.status));
  const today_tasks=operationalTasks.filter(t=>day(t.scheduled_for)===today||day(t.submitted_at)===today);
- return {arrivals:active.filter(s=>s.check_in===today),departures:active.filter(s=>s.check_out===today),
+ return {arrivals:active.filter(s=>s.check_in===today&&!s.checked_in_at&&!ended(s)),departures:active.filter(s=>s.check_out===today&&!ended(s)),
   expected:active.filter(current),
   // An overdue stay from a previous day requires review, not presumed occupancy.
   // Today's checkout remains in house until an actual departure is recorded.

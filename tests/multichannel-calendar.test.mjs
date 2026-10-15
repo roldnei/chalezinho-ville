@@ -36,17 +36,17 @@ test('configured departure time and dated report prevent false presence; unknown
 });
 
 
-test('today calendar cards retain planned arrivals and departures while attendance reports actual stays',()=>{
+test('today forecasts exclude recorded arrivals and departures while attendance reports actual stays',()=>{
  const now=new Date('2026-10-15T19:00:00Z'),base={status:'confirmed',check_in:'2026-10-15',check_out:'2026-10-16'};
  const marcelly={...base,id:'marcelly',checked_in_at:'2026-10-15T18:54:00Z'};
  const future={...base,id:'future',check_in:'2026-10-16',check_out:'2026-10-18'};
  const stale={...base,id:'old',check_in:'2026-10-09',check_out:'2026-10-13',checked_in_at:'2026-10-09T18:00:00Z'};
  let result=operationSummary([marcelly,future,stale],[],'2026-10-15',now);
- assert.equal(result.arrivals.length,1);assert.deepEqual(result.present.map(s=>s.id),['marcelly']);assert.equal(result.departures.length,0);assert.deepEqual(result.attendance_review.map(s=>s.id),['old']);
+ assert.equal(result.arrivals.length,0);assert.deepEqual(result.present.map(s=>s.id),['marcelly']);assert.equal(result.departures.length,0);assert.deepEqual(result.attendance_review.map(s=>s.id),['old']);
  result=operationSummary([{...marcelly,checked_in_at:null}],[],'2026-10-15',now);assert.equal(result.arrivals.length,1);assert.equal(result.present.length,0);
  const departure={...marcelly,check_out:'2026-10-15'};
  result=operationSummary([departure],[],'2026-10-15',now);assert.equal(result.departures.length,1);assert.equal(result.present.length,1);
- for(const closed of [{checked_out_at:'2026-10-15T19:00:00Z'},{departure_reported_on:'2026-10-15'}]){result=operationSummary([{...departure,...closed}],[],'2026-10-15',now);assert.equal(result.arrivals.length,1);assert.equal(result.present.length,0);assert.equal(result.departures.length,1);}
+ for(const closed of [{checked_out_at:'2026-10-15T19:00:00Z'},{departure_reported_on:'2026-10-15'}]){result=operationSummary([{...departure,...closed}],[],'2026-10-15',now);assert.equal(result.arrivals.length,0);assert.equal(result.present.length,0);assert.equal(result.departures.length,0);}
 });
 test('daily cleaning agenda uses scheduled date and completion uses submitted date, never approval date',()=>{
  const task={stage:'preparation',status:'pending',scheduled_for:'2026-10-16T01:00:00Z',due_at:'2026-10-16T02:00:00Z'};

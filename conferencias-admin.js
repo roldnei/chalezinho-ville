@@ -4,7 +4,7 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const {data:{session}}=await sb.auth.getSession();if(!session){location.href='auth.html?mode=login&return='+encodeURIComponent('conferencias-admin.html'+location.search);return}
 async function api(action,p={}){const {data:{session}}=await sb.auth.getSession();const r=await fetch(C.supabaseUrl+'/functions/v1/team-inspections',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token,apikey:C.supabaseKey},body:JSON.stringify({action,task_id:id,...p})}),d=await r.json();if(!r.ok||!d.ok)throw Error(d.error);return d.data}
 let detail,people=[];
-const status=s=>({pending:'Pendente',in_progress:'Em andamento',inspection:'Concluída · aguardando revisão',approved:'Aprovada',blocked:'Impedida'}[s]||s);
+const status=s=>({pending:'Não iniciada',in_progress:'Em andamento',inspection:'Enviada para aprovação',approved:'Finalizada',blocked:'Impedida'}[s]||s);
 async function load(){try{people=(await api('people')).people;detail=await api('detail');render()}catch(e){root.textContent='Não foi possível abrir: '+e.message}}
 function note(text){root.querySelector('[data-message]').textContent=text}
 async function act(button,fn){if(button.disabled)return;button.disabled=true;try{await fn()}catch(e){note('Não foi possível salvar: '+e.message)}finally{button.disabled=false}}

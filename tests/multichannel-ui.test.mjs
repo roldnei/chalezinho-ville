@@ -98,8 +98,18 @@ test('today exposes the five daily operational cards and standalone cleaning ope
   stay.checked_in_at='2026-10-12T18:00:00Z';base.tasks=[cleaning];base.summary.arrivals=[stay];base.summary.present=[stay];base.summary.today_tasks=[cleaning];base.summary.cleanings=[cleaning];
   w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
   assert.deepEqual([...w.document.querySelectorAll('.ops-kpis span')].map(x=>x.textContent),['Entradas previstas','Estadias em andamento','Check-outs previstos','Limpezas previstas','Limpezas concluídas']);
-  assert.equal(w.document.querySelector('[data-today-filter="arrivals"] strong').textContent,'1');assert.equal(w.document.querySelector('[data-today-filter="present"] strong').textContent,'1');assert.match(w.document.querySelector('[data-today-filter="arrivals"]').textContent,/1 com entrada registrada · 0 a chegar/);
+  assert.equal(w.document.querySelector('[data-today-filter="arrivals"] strong').textContent,'0');assert.equal(w.document.querySelector('[data-today-filter="present"] strong').textContent,'1');assert.doesNotMatch(w.document.querySelector('[data-today-filter="arrivals"]').textContent,/com entrada registrada/);
   w.document.querySelector('[data-today-filter="cleanings"]').click();assert.deepEqual([...w.document.querySelectorAll('[data-task]')].map(x=>x.dataset.task),['standalone-cleaning']);assert.equal(w.document.querySelectorAll('[data-stay]').length,0);
   w.document.querySelector('[data-tab="next"]').click();assert.doesNotMatch(w.document.body.textContent,/Limpezas de hoje/);
+ }finally{f.close()}
+});
+
+test('task cards distinguish not started, ongoing, submitted and finalized without changing stored states',async()=>{
+ const f=await fixture();try{
+  const w=f.w,base=await (await w.fetch()).json();
+  const tasks=['pending','in_progress','inspection','approved'].map(status=>({id:'task-'+status,stage:'preparation',property_id:3,status,scheduled_for:'2026-10-12T14:00:00Z',due_at:'2026-10-12T20:00:00Z',submitted_at:status==='inspection'?'2026-10-12T18:00:00Z':null,completed_at:status==='approved'?'2026-10-12T19:00:00Z':null}));
+  base.tasks=tasks;base.summary.today_tasks=tasks;w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
+  assert.deepEqual([...w.document.querySelectorAll('[data-task-status]')].map(e=>e.textContent),['Não iniciada','Em andamento','Enviada para aprovação','Finalizada']);
+  assert.match(w.document.querySelector('[data-task="task-approved"]').textContent,/Conferência aprovada.*Tarefa encerrada/);assert.match(w.document.querySelector('[data-task="task-inspection"]').textContent,/Aguarda aprovação do administrador/);
  }finally{f.close()}
 });
