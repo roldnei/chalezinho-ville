@@ -145,7 +145,7 @@ async function search({scroll=true}={}){
  const sequence=++searchSequence;state.search=null;state.quote=null;state.rate=null;state.rateConfirmed=false;if(PUBLIC)clearWhatsApp();
  const bi=$("#book-in").value,bo=$("#book-out").value,guests=Number($("#book-guests").value);
  for(const id of ['book-in','book-out']){document.getElementById(id).removeAttribute('aria-invalid');document.getElementById(id).removeAttribute('aria-describedby');document.getElementById(id+'-error')?.remove();}
- const invalidDate=(id,text)=>{const input=document.getElementById(id),note=document.createElement('small');note.id=id+'-error';note.className='booking-field-error';note.textContent=text;input.after(note);input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby',note.id);error(text);input.focus();};
+ const invalidDate=(id,text)=>{const input=document.getElementById(id),note=document.createElement('small');note.id=id+'-error';note.className='booking-field-error';note.setAttribute('role','alert');note.textContent=text;input.after(note);input.setAttribute('aria-invalid','true');input.setAttribute('aria-describedby',note.id);error('');input.focus();};
  if(!bi)return invalidDate('book-in','Escolha a data de entrada.');
  if(!bo)return invalidDate('book-out','Escolha a data de saída.');
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
