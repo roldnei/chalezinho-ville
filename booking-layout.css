@@ -25,3 +25,7 @@
  .booking-page .booking-fields>label,.booking-page .booking-fields>button{grid-column:1/-1!important}
  .booking-page .booking-fields input,.booking-page .booking-fields select{font-size:16px;min-height:52px;letter-spacing:normal;text-transform:none}
 }
+
+.booking-price .price-before{display:block;color:#746453;font-size:17px;margin:8px 0 4px;text-decoration-thickness:1px}
+.booking-search label,.booking-search input,.booking-search select{min-width:0;max-width:100%;box-sizing:border-box}
+.booking-search input[type=date]{appearance:none;-webkit-appearance:none;width:100%}
