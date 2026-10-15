@@ -2,7 +2,7 @@
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENGINE=C.bookingEngine;
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const validViews=new Set(["menu","today","calendar","calendar_links","reservations","notifications","changes","finance","access","guests","properties","settings"]);
-const requestedView=new URLSearchParams(location.search).get("view")==="guarantees"?"reservations":new URLSearchParams(location.search).get("view");
+const approvalParams=new URLSearchParams(location.search);const requestedView=new URLSearchParams(location.search).get("view")==="guarantees"?"reservations":new URLSearchParams(location.search).get("view");
 let propertyGallery=[], propertyCover="";
 let session=null,state=null,currentView=validViews.has(requestedView)?requestedView:"today",calendarMonth=new Date().toISOString().slice(0,7),filters={search:"",status:"all",property:"all"};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -57,7 +57,7 @@ async function load(silent=false){
     ]);
     state={...hub,cancel_requests:cancelRequestsResult.value?.requests||[],guest_contacts:guestResult.value?.contacts||[],guest_links:guestResult.value?.links||[],guest_error:!!guestResult.error};
     applyGuestContacts();
-    updateCounts();showView(currentView);pollSameDayPriority();const requestId=new URLSearchParams(location.search).get("request");if(requestId&&!window.sameDayLinkOpened){window.sameDayLinkOpened=true;openSameDayReview(requestId)}
+    updateCounts();showView(currentView);pollSameDayPriority();const qp=approvalParams;if(qp.get("reservation")&&!window.approvalReservationOpened){window.approvalReservationOpened=true;openReservation(qp.get("reservation"));}if(qp.get("change")&&!window.approvalChangeOpened){window.approvalChangeOpened=true;openChangeDecision(qp.get("change"));}const requestId=approvalParams.get("request");if(requestId&&!window.sameDayLinkOpened){window.sameDayLinkOpened=true;openSameDayReview(requestId)}
     $("#admin-loading").hidden=true;$("#admin-content").hidden=false;$("#admin-app").setAttribute("aria-busy","false");
   }catch(e){$("#admin-loading").textContent="Não foi possível carregar a operação. Atualize a página ou tente novamente em instantes."}
 }

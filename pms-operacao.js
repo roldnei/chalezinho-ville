@@ -1,6 +1,6 @@
 (()=>{
 const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENDPOINT=C.supabaseUrl+"/functions/v1/pms-operations";
-const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const initialView=new URLSearchParams(location.search).get("view");let session,state,view=["today","agenda","reservations","blocks","tasks","legacy_tasks","maintenance","indicators","templates","team"].includes(initialView)?initialView:"today",filters={status:"all",property:"all",search:""};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];const initialTask=new URLSearchParams(location.search).get("task");const initialView=new URLSearchParams(location.search).get("view");let session,state,view=["today","agenda","reservations","blocks","tasks","legacy_tasks","maintenance","indicators","templates","team"].includes(initialView)?initialView:"today",filters={status:"all",property:"all",search:""};
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const saoDate=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"America/Sao_Paulo",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const brazilTimeZone="America/Sao_Paulo";
@@ -112,9 +112,9 @@ const previousTasks=renderTasks;
 renderToday=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
 renderReservations=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"stays"});
 renderAgenda=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"next"});
-renderTasks=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"tasks"});
+renderTasks=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"tasks",taskId:initialTask});
 renderTemplates=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"templates"});
 renderIndicators=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
-const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();return;}originalShow(next);if(["today","agenda","tasks","templates","reservations","indicators"].includes(next))$("#new-action").hidden=true;};
+const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();if(initialTask&&state.tasks.some(t=>t.id===initialTask))openTask(initialTask);return;}originalShow(next);if(["today","agenda","tasks","templates","reservations","indicators"].includes(next))$("#new-action").hidden=true;};
 boot();
 })();

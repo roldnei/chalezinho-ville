@@ -18,7 +18,7 @@ async function compress(file){
   const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(blob)});return {base64,content_type:blob.type};
  }finally{URL.revokeObjectURL(url)}
 }
-async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null}={}){
+async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null,taskId=null}={}){
  const C=window.CHALEZINHO_CONFIG,endpoint=C.supabaseUrl+'/functions/v1/multichannel-operations';let state,tab=initial,todayFilter=null,disposed=false;
  host.innerHTML='<section class="ville-ops"><p role="status">Consultando a operação multicanal…</p></section>';const root=host.firstElementChild;
  const alive=()=>root.isConnected&&!disposed;
@@ -105,11 +105,11 @@ async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null}=
    if(!entry&&staged.some(p=>p.item_index===-1)){pendingPhoto=staged.find(p=>p.item_index===-1);step='where'}
    function base(body){
     const stay=stayFor(t);
-    detail(entry?'Limpeza de entrada':'Conferência de saída',`<div class="ops-wizard">${isAdmin()?`<p><a class="ops-primary" href="conferencias-admin.html?tarefa=${id}">Responsável, link de acesso e conferência da equipe →</a></p>`:''}<p class="ops-task-context"><strong>${esc(pName(t.property_id))}</strong>${!inspection&&stay?.guest_name?' · '+esc(stay.guest_name):''}</p>${body}<p data-wizard-message role="status" aria-live="polite"></p>${!inspection?`<details class="ops-task-settings"><summary>Detalhes da tarefa</summary><p>${esc(label(t.status))} · prazo ${dt(t.due_at)}</p><p>Responsável: ${esc(person(t.assigned_to))}</p>${t.window_conflict?'<p class="ops-warning">Revisar prazo com a administração.</p>':''}<div class="ops-actions">${editable?'<button data-status="blocked">Sinalizar impedimento</button>':''}${isAdmin()&&t.status==='inspection'?'<button data-status="approved">Aprovar conferência</button>':''}${isAdmin()&&['inspection','approved','blocked'].includes(t.status)?'<a href="conferencias-admin.html?tarefa=${id}">Reabrir com justificativa</a>':''}</div><p>Executado por ${esc(person(t.executed_by))} · aprovado por ${esc(person(t.approved_by))}</p></details>`:''}${editable?'<button data-save-progress>Salvar progresso</button>':''}</div>`);
+    detail(entry?'Limpeza de entrada':'Conferência de saída',`<div class="ops-wizard">${isAdmin()?`<p><a class="ops-primary" href="conferencias-admin.html?tarefa=${id}">Responsável, link de acesso e conferência da equipe →</a></p>`:''}${isAdmin()&&t.status==='inspection'?'<div class="ops-actions"><button class="ops-primary" data-status="approved">Aprovar conferência</button><a href="conferencias-admin.html?tarefa='+id+'">Reabrir com justificativa</a></div>':''}<p class="ops-task-context"><strong>${esc(pName(t.property_id))}</strong>${!inspection&&stay?.guest_name?' · '+esc(stay.guest_name):''}</p>${body}<p data-wizard-message role="status" aria-live="polite"></p>${!inspection?`<details class="ops-task-settings"><summary>Detalhes da tarefa</summary><p>${esc(label(t.status))} · prazo ${dt(t.due_at)}</p><p>Responsável: ${esc(person(t.assigned_to))}</p>${t.window_conflict?'<p class="ops-warning">Revisar prazo com a administração.</p>':''}<div class="ops-actions">${editable?'<button data-status="blocked">Sinalizar impedimento</button>':''}${isAdmin()&&['inspection','approved','blocked'].includes(t.status)?'<a href="conferencias-admin.html?tarefa=${id}">Reabrir com justificativa</a>':''}</div><p>Executado por ${esc(person(t.executed_by))} · aprovado por ${esc(person(t.approved_by))}</p></details>`:''}${editable?'<button data-save-progress>Salvar progresso</button>':''}</div>`);
     root.querySelector('[data-save-progress]')?.addEventListener('click',async()=>{if(busy)return;captureEntry();freeze(true);try{await api('save_progress',{task_id:id,results:draft.results});const el=root.querySelector('[data-wizard-message]');if(el)el.textContent='Progresso salvo. Você pode sair e continuar depois.'}catch(e){fail(e)}finally{freeze(false)}});
     root.querySelector('.ops-wizard')?.scrollIntoView?.({block:'start'});
-    root.querySelector('[data-assignee]')?.addEventListener('change',e=>act('assign',{task_id:id,assigned_to:e.target.value},async()=>{state=await api('hub');await openTask(id)}));
-    root.querySelectorAll('[data-status]').forEach(b=>b.onclick=()=>act('status',{task_id:id,status:b.dataset.status},async()=>{state=await api('hub');await openTask(id)}));
+    root.querySelector('[data-assignee]')?.addEventListener('change',e=>act('assign',{task_id:id,assigned_to:e.target.value},async()=>{state=await api('hub');onSummary(state.summary);document.dispatchEvent(new CustomEvent('approval-changed'));await openTask(id)}));
+    root.querySelectorAll('[data-status]').forEach(b=>b.onclick=async()=>{if(b.disabled)return;b.disabled=true;try{await act('status',{task_id:id,status:b.dataset.status},async()=>{state=await api('hub');onSummary(state.summary);document.dispatchEvent(new CustomEvent('approval-changed'));await openTask(id)})}finally{b.disabled=false}});
    }
    function fail(e){const el=root.querySelector('[data-wizard-message]');if(el)el.textContent=errorText(e)}
    function freeze(value){busy=value;root.querySelectorAll('button,input,select,textarea').forEach(e=>e.disabled=value);const prev=root.querySelector('[data-prev]');if(prev&&!value)prev.disabled=step===0}
@@ -144,7 +144,7 @@ async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null}=
    draw();
   }catch(e){if(inspection)inspection.onError(e);else message(errorText(e))}
  }
- if(inspection){state=await inspection.api('hub');await openTask(inspection.taskId);}else await refresh();return ()=>{disposed=true};
+ if(inspection){state=await inspection.api('hub');await openTask(inspection.taskId);}else {await refresh();if(taskId&&alive())await openTask(taskId);}return ()=>{disposed=true};
 }
 window.VilleOperations={mount,compress,queue};
 })();
