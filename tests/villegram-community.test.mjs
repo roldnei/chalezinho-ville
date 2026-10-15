@@ -228,3 +228,10 @@ test('guest MOV stays a video and storage accepts only the authorized owner path
  await db.exec(`grant usage on schema auth,storage to authenticated;grant select on profiles to authenticated;grant select,insert on storage.objects to authenticated;alter table storage.objects enable row level security;set test.uid='${owner}';set role authenticated;`);
  try{await db.query("insert into storage.objects(name,bucket_id) values($1,'villegram-media')",[owner+'/'+other+'.mov']);await assert.rejects(db.query("insert into storage.objects(name,bucket_id) values($1,'villegram-media')",[other+'/'+owner+'.mov']),/row-level security/);}finally{await db.exec('reset role')}
 });
+test('mentions use dated publication cards with video covers and no author edit action',async()=>{
+ const state={profile:null,allowed:false,publications:[],notifications:[],invites:[],mentions:[{id:other,title:'Banho no Ville',author_name:'Merielen',mention_status:'accepted',status:'published',published_at:'2026-10-15T02:35:00Z',media:[{kind:'video',url:'https://example.test/video.mov',poster:'https://example.test/cover.jpg'}]}]};
+ const {dom,w}=await communityPage('conta.html','',()=>state),host=w.document.querySelector('#community-mentions');
+ assert.ok(host.classList.contains('community-grid'));assert.equal(host.querySelector('.community-tile img').src,'https://example.test/cover.jpg');assert.equal(host.querySelector('.community-tile>a').getAttribute('href'),'index.html?publication='+other);
+ assert.match(host.querySelector('.community-month').textContent,/outubro de 2026/);assert.match(host.querySelector('.community-post-date').textContent,/14\/10\/2026/);assert.equal(host.querySelector('.community-edit'),null);assert.ok(host.querySelector('[data-tag="removed"]'));assert.equal(host.querySelector('[data-tag="accepted"]'),null);
+ dom.window.close();
+});
