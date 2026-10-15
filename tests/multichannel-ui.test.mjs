@@ -4,6 +4,7 @@ import {readFileSync} from 'node:fs';
 import {JSDOM} from 'jsdom';
 const js=readFileSync('operations-workspace.js','utf8');
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+async function waitFor(check){const deadline=Date.now()+3000;while(!check()){assert.ok(Date.now()<deadline,'Expected UI state did not become ready');await new Promise(resolve=>setTimeout(resolve,10));}}
 
 test('today indicators filter stays and the corresponding task stage; clear restores all',async()=>{
  const f=await fixture();try{
@@ -65,20 +66,20 @@ async function taskFixture(stage,photos=[]){
  w.indexedDB={open(){const req={};setTimeout(()=>{req.result={close(){},transaction(){const tx={objectStore:()=>({getAll:()=>({result:[]})})};setTimeout(()=>tx.oncomplete?.(),0);return tx}};req.onsuccess()},0);return req}};
  const task={id:'guided-task',stay_id:'qa-stay',property_id:3,stage,title:'Conferir',status:'pending',template_version:1,checklist_snapshot:['Banheiro','Cozinha']};
  w.fetch=async(url,options)=>{const p=options?JSON.parse(options.body):{};calls.push(p);if(p.action==='task')return {ok:true,json:async()=>({ok:true,task,results:[],photos})};if(p.action==='complete_task'){task.status='inspection';return {ok:true,json:async()=>({ok:true})}}const response=await original();const data=await response.json();data.tasks=[task,...(stage==='departure'?[{id:'approved-preparation',stay_id:task.stay_id,stage:'preparation',status:'approved'}]:[])];data.summary.pending=[task];data.summary.today_tasks=[task];return {ok:true,json:async()=>data}};
- w.document.querySelector('[data-refresh]').click();await tick();w.document.querySelector('[data-task]').click();await new Promise(r=>setTimeout(r,20));return {...f,calls};
+ w.document.querySelector('[data-refresh]').click();await waitFor(()=>w.document.querySelector('[data-task]'));w.document.querySelector('[data-task]').click();await waitFor(()=>w.document.querySelector(stage==='departure'?'[data-no-damage]':'[data-next]'));return {...f,calls};
 }
 test('entry walks one item at a time and saves only once at the end',async()=>{
  const f=await taskFixture('preparation',[0,1].map(item_index=>({item_index,url:'photo.webp',stage:'preparation'})));try{const d=f.w.document;
  assert.match(d.querySelector('.ops-wizard h3').textContent,/Banheiro/);assert.equal(d.querySelectorAll('[data-item]').length,0);
  d.querySelector('[data-next]').click();assert.match(d.querySelector('.ops-wizard h3').textContent,/Cozinha/);
  assert.equal(f.calls.filter(x=>x.action==='result'||x.action==='complete_task').length,0);
- d.querySelector('[data-next]').click();d.querySelector('[data-finish]').click();await new Promise(r=>setTimeout(r,30));
+ d.querySelector('[data-next]').click();d.querySelector('[data-finish]').click();await waitFor(()=>f.calls.some(x=>x.action==='complete_task'));
  assert.equal(f.calls.filter(x=>x.action==='complete_task').length,1);assert.equal(f.calls.find(x=>x.action==='complete_task').results.length,2);
  }finally{f.close()}
 });
 test('entry cannot advance without photo; exit without damage needs no upload',async()=>{
  const a=await taskFixture('preparation');try{a.w.document.querySelector('[data-next]').click();assert.match(a.w.document.querySelector('[data-wizard-message]').textContent,/Tire uma foto/)}finally{a.close()}
- const b=await taskFixture('departure');try{const d=b.w.document;assert.equal(d.querySelector('[data-camera]'),null);d.querySelector('[data-no-damage]').click();d.querySelector('[data-finish]').click();await new Promise(r=>setTimeout(r,30));assert.equal(b.calls.find(x=>x.action==='complete_task').results.every(x=>x.result==='ok'),true);assert.equal(b.calls.some(x=>x.action==='upload'),false)}finally{b.close()}
+ const b=await taskFixture('departure');try{const d=b.w.document;assert.equal(d.querySelector('[data-camera]'),null);d.querySelector('[data-no-damage]').click();d.querySelector('[data-finish]').click();await waitFor(()=>b.calls.some(x=>x.action==='complete_task'));assert.equal(b.calls.find(x=>x.action==='complete_task').results.every(x=>x.result==='ok'),true);assert.equal(b.calls.some(x=>x.action==='upload'),false)}finally{b.close()}
 });
 
 
