@@ -76,3 +76,13 @@ Advisors de segurança: nenhum novo alerta WARN/ERROR da implementação. As tab
 DEV: prévia READY, banco migrado, Edge ativa. Usuários de teste foram suspensos e bloqueados no Auth, sessões revogadas e tarefas avulsas de teste canceladas após a validação. Evidências e histórico foram preservados. Não restam tarefas QA pendentes desta entrega.
 
 PROD `irxsaladqhbzhkoaclxy`: somente leitura na inspeção inicial. Nenhuma migração, função, hospedagem ou implantação de produção foi alterada. A publicação depende de aprovação explícita do proprietário. Os testes de câmera/galeria em aparelhos reais continuam como limitação declarada, não como testes aprovados.
+
+## Atualização de 15/10 — mesma execução do PMS e comodidades aquáticas
+
+A área por link passou a montar diretamente o executor `VilleOperations` usado no PMS, em modo restrito à tarefa. Não há uma segunda tela de checklist. Pós-limpeza apresenta um item por vez, câmera/galeria, avanço e revisão. Pós-hospedagem mantém a pergunta sobre avarias, foto e indicação do local. Login, link individual, cadastro inicial, salvamento, fila de fotos e revogação após concluir permanecem.
+
+A migração `20261015150002_inspection_property_water_amenities.sql` resolve exclusivamente piscina, spa e hidro pelo cadastro `properties.features.amenities`. No DEV inspecionado: CH1 → Spa + Piscina; CH2/CH3 → Hidromassagem. Deduplica sinônimos como piscina privativa/aquecida e spa/aquecido. A opção “Não se aplica” não é exibida para esses equipamentos; os ausentes ficam fora da execução. Itens não aquáticos continuam configuráveis.
+
+Os equipamentos são preservados no snapshot da tarefa. A atualização das tarefas ainda abertas mantém os índices das respostas e das fotos: um espaço antigo sem equipamento aplicável fica oculto e não obrigatório, sem apagar evidência; equipamentos adicionais são acrescentados ao final. Conferências fechadas não são alteradas. Os links vigentes não são reemitidos nem revogados por essa atualização. A tarefa de teste do proprietário foi mantida, incluindo três fotos já anexadas.
+
+Validação automatizada desta atualização: **740 testes, zero falhas**. Inclui tela compartilhada por link/login sem menus administrativos; preparação por etapas; saída por avarias; itens ocultos sem foto indevida; seleção spa/piscina/hidro/nenhum; ausência de N/A aquático; e snapshots preservados quando o cadastro de comodidades muda.
