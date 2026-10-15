@@ -1,0 +1,52 @@
+[
+  {
+    "name": "anonymous cannot open guest editor",
+    "status": 401,
+    "error": "authentication_required"
+  },
+  {
+    "name": "guest cannot moderate",
+    "status": 403,
+    "error": "admin_required"
+  },
+  {
+    "name": "guest cannot edit another author",
+    "status": 404,
+    "error": "publication_unavailable"
+  },
+  {
+    "name": "public account without reservation can open editor",
+    "status": 200,
+    "error": null
+  },
+  {
+    "name": "public account with reservation can open editor",
+    "status": 200,
+    "error": null
+  },
+  {
+    "name": "approved post visible to anonymous visitor",
+    "status": 200,
+    "error": null
+  },
+  {
+    "name": "test author can make profile private",
+    "status": 200,
+    "error": null
+  },
+  {
+    "name": "private profile is hidden from visitors",
+    "status": 404,
+    "error": "profile_unavailable"
+  },
+  {
+    "name": "private author receives specific posting prerequisite",
+    "status": 403,
+    "error": "public_profile_required"
+  },
+  {
+    "name": "restore test public profile",
+    "status": 200,
+    "error": null
+  }
+]
