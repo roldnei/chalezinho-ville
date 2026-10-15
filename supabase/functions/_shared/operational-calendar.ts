@@ -27,7 +27,7 @@ export function parseOperationalCalendar(raw:string,provider:string){
 
 export function operationSummary(stays:any[],tasks:any[],today:string,now=new Date(),properties:any[]=[]){
  const fixtureIds=new Set(stays.filter(s=>s.is_test).map(s=>s.id));
- tasks=tasks.filter(t=>!fixtureIds.has(t.stay_id));
+ tasks=tasks.filter(t=>!t.is_test&&!fixtureIds.has(t.stay_id));
  const active=stays.filter(s=>!s.is_test&&s.status==='confirmed');
  const ended=(s:any)=>!!(s.checked_out_at||s.departure_reported_on);
  const boundary=(s:any,stage:'check_in'|'check_out')=>{
@@ -36,11 +36,19 @@ export function operationSummary(stays:any[],tasks:any[],today:string,now=new Da
   return Date.parse(s[stage]+'T'+(time.length===5?time+':00':time)+'-03:00');
  };
  const current=(s:any)=>!ended(s)&&boundary(s,'check_in')<=now.getTime()&&boundary(s,'check_out')>now.getTime();
+ const day=(v:string)=>v&&Number.isFinite(Date.parse(v))?new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v)):null;
+ const pending=tasks.filter(t=>!['approved','cancelled','superseded'].includes(t.status));
+ const operationalTasks=tasks.filter(t=>!['cancelled','superseded'].includes(t.status));
+ const today_tasks=operationalTasks.filter(t=>day(t.scheduled_for)===today||day(t.submitted_at)===today);
  return {arrivals:active.filter(s=>s.check_in===today),departures:active.filter(s=>s.check_out===today),
   expected:active.filter(current),
-  present:active.filter(s=>s.checked_in_at&&current(s)),
+  // An overdue stay from a previous day requires review, not presumed occupancy.
+  // Today's checkout remains in house until an actual departure is recorded.
+  present:active.filter(s=>s.checked_in_at&&Date.parse(s.checked_in_at)<=now.getTime()&&!ended(s)&&s.check_out>=today),
+  cleanings:operationalTasks.filter(t=>t.stage==='preparation'&&day(t.scheduled_for)===today),
+  cleaning_completed:operationalTasks.filter(t=>t.stage==='preparation'&&['inspection','approved'].includes(t.status)&&day(t.submitted_at)===today),today_tasks,
   upcoming:active.filter(s=>!ended(s)&&boundary(s,'check_out')>now.getTime()),
   attendance_review:active.filter(s=>!ended(s)&&boundary(s,'check_out')<=now.getTime()),
-  pending:tasks.filter(t=>!['approved','cancelled','superseded'].includes(t.status)),
-  overdue:tasks.filter(t=>!['approved','cancelled','superseded'].includes(t.status)&&Date.parse(t.due_at)<now.getTime())};
+  pending,
+  overdue:pending.filter(t=>Date.parse(t.due_at)<now.getTime())};
 }

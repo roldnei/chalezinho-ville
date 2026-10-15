@@ -9,7 +9,7 @@ test('today indicators filter stays and the corresponding task stage; clear rest
  const f=await fixture();try{
   const w=f.w,base=await (await w.fetch()).json(),s=base.stays[0];
   const tasks=['preparation','departure'].map(stage=>({id:stage,stay_id:s.id,property_id:s.property_id,stage,status:'pending',scheduled_for:'2026-10-12T14:00:00Z',due_at:'2026-10-12T15:00:00Z'}));
-  base.tasks=tasks;base.summary.pending=tasks;base.summary.arrivals=[];
+  base.tasks=tasks;base.summary.pending=tasks;base.summary.today_tasks=tasks;base.summary.cleanings=[tasks[0]];base.summary.arrivals=[];
   w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
   w.document.querySelector('[data-today-filter="departures"]').click();
   assert.equal(w.document.querySelectorAll('[data-stay]').length,1);assert.deepEqual([...w.document.querySelectorAll('[data-task]')].map(x=>x.dataset.task),['departure']);
@@ -64,7 +64,7 @@ async function taskFixture(stage,photos=[]){
  const f=await fixture(),w=f.w,original=w.fetch,calls=[];
  w.indexedDB={open(){const req={};setTimeout(()=>{req.result={close(){},transaction(){const tx={objectStore:()=>({getAll:()=>({result:[]})})};setTimeout(()=>tx.oncomplete?.(),0);return tx}};req.onsuccess()},0);return req}};
  const task={id:'guided-task',stay_id:'qa-stay',property_id:3,stage,title:'Conferir',status:'pending',template_version:1,checklist_snapshot:['Banheiro','Cozinha']};
- w.fetch=async(url,options)=>{const p=options?JSON.parse(options.body):{};calls.push(p);if(p.action==='task')return {ok:true,json:async()=>({ok:true,task,results:[],photos})};if(p.action==='complete_task'){task.status='inspection';return {ok:true,json:async()=>({ok:true})}}const response=await original();const data=await response.json();data.tasks=[task];data.summary.pending=[task];return {ok:true,json:async()=>data}};
+ w.fetch=async(url,options)=>{const p=options?JSON.parse(options.body):{};calls.push(p);if(p.action==='task')return {ok:true,json:async()=>({ok:true,task,results:[],photos})};if(p.action==='complete_task'){task.status='inspection';return {ok:true,json:async()=>({ok:true})}}const response=await original();const data=await response.json();data.tasks=[task];data.summary.pending=[task];data.summary.today_tasks=[task];return {ok:true,json:async()=>data}};
  w.document.querySelector('[data-refresh]').click();await tick();w.document.querySelector('[data-task]').click();await new Promise(r=>setTimeout(r,20));return {...f,calls};
 }
 test('entry walks one item at a time and saves only once at the end',async()=>{
@@ -89,3 +89,17 @@ test('review shows every photo outside collapsed items with an explicit full-siz
  }finally{f.close()}
 });
 test('review explicitly says when no photos were sent instead of leaving an empty collapsed section',async()=>{const f=await taskFixture('departure');try{const d=f.w.document;d.querySelector('[data-no-damage]').click();assert.match(d.querySelector('.ops-review-gallery').textContent,/Nenhuma foto foi enviada nesta conferência/);assert.equal(d.querySelector('.ops-review-gallery a'),null)}finally{f.close()}});
+
+
+test('today exposes the five daily operational cards and standalone cleaning opens its task',async()=>{
+ const f=await fixture();try{
+  const w=f.w,base=await (await w.fetch()).json(),stay=base.stays[0];
+  const cleaning={id:'standalone-cleaning',property_id:3,stage:'preparation',title:'Limpeza avulsa de hoje',status:'pending',scheduled_for:'2026-10-12T16:00:00Z',due_at:'2026-10-12T17:00:00Z'};
+  stay.checked_in_at='2026-10-12T18:00:00Z';base.tasks=[cleaning];base.summary.arrivals=[stay];base.summary.present=[stay];base.summary.today_tasks=[cleaning];base.summary.cleanings=[cleaning];
+  w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
+  assert.deepEqual([...w.document.querySelectorAll('.ops-kpis span')].map(x=>x.textContent),['Entradas previstas','Estadias em andamento','Check-outs previstos','Limpezas previstas','Limpezas concluídas']);
+  assert.equal(w.document.querySelector('[data-today-filter="arrivals"] strong').textContent,'1');assert.equal(w.document.querySelector('[data-today-filter="present"] strong').textContent,'1');assert.match(w.document.querySelector('[data-today-filter="arrivals"]').textContent,/1 com entrada registrada · 0 a chegar/);
+  w.document.querySelector('[data-today-filter="cleanings"]').click();assert.deepEqual([...w.document.querySelectorAll('[data-task]')].map(x=>x.dataset.task),['standalone-cleaning']);assert.equal(w.document.querySelectorAll('[data-stay]').length,0);
+  w.document.querySelector('[data-tab="next"]').click();assert.doesNotMatch(w.document.body.textContent,/Limpezas de hoje/);
+ }finally{f.close()}
+});
