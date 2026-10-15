@@ -1,0 +1,29 @@
+{
+  "environment": "DEV only",
+  "at": "2026-10-13T19:05:41.626Z",
+  "evidence": [
+    {
+      "action": "bootstrap",
+      "status": 200,
+      "pass": true
+    },
+    {
+      "action": "hub",
+      "status": 401,
+      "error": "login_required",
+      "pass": true
+    },
+    {
+      "action": "config",
+      "status": 401,
+      "error": "login_required",
+      "pass": true
+    },
+    {
+      "action": "provider_webhook",
+      "status": 404,
+      "error": "unknown_payment",
+      "pass": true
+    }
+  ]
+}

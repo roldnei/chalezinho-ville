@@ -31,8 +31,8 @@ test('delayed live offers update the current reel counter without resetting play
  w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../villegram-content.js',import.meta.url),'utf8'));await new Promise(r=>setTimeout(r,20));
  const label=()=>w.document.querySelector('.vg-progress>span').textContent;assert.equal(label(),'Trip 1');const reel=w.document.querySelector('.vg-reel'),picture=w.document.querySelector('.vg-scene.is-visible'),purchase=w.document.querySelector('.vg-purchase');purchase.scrollTop=25;
  w.document.querySelector('[data-action=caption]').click();const panel=w.document.querySelector('.vg-sheet');assert.equal(active,false);
- w.VillegramContent.setOffers(quotes);assert.equal(label(),'1 de 9');assert.equal(w.document.querySelector('.vg-reel'),reel);assert.equal(w.document.querySelector('.vg-scene.is-visible'),picture);assert.equal(w.document.querySelector('.vg-sheet'),panel);assert.equal(panel.hidden,false);assert.equal(purchase.scrollTop,25);assert.equal(active,false);assert.equal(begins,1);
- w.document.querySelector('[data-sheet-close]').click();w.document.querySelector('[data-action=next]').click();assert.equal(label(),'2 de 9');w.Villegram.close();d.window.close();
+ w.VillegramContent.setOffers(quotes);assert.equal(label(),'1 de 7');assert.equal(w.document.querySelector('.vg-reel'),reel);assert.equal(w.document.querySelector('.vg-scene.is-visible'),picture);assert.equal(w.document.querySelector('.vg-sheet'),panel);assert.equal(panel.hidden,false);assert.equal(purchase.scrollTop,25);assert.equal(active,false);assert.equal(begins,1);
+ w.document.querySelector('[data-sheet-close]').click();w.document.querySelector('[data-action=next]').click();assert.equal(label(),'2 de 7');w.Villegram.close();d.window.close();
 });
 test('an updated feed immediately enables or disables the next control without rerendering the current post',async()=>{
  const d=await dom(),w=d.window;w.VillegramContent={request:async()=>({likes:0,comments:[]}),leave(){},rank:cards=>cards};w.eval(await readFile(new URL('../villegram.js',import.meta.url),'utf8'));

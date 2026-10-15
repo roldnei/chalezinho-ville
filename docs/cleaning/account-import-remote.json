@@ -1,0 +1,35 @@
+{
+  "environment": "DEV",
+  "tested_at": "2026-10-13T19:40:50.729Z",
+  "mode": "Read-only authenticated endpoint and public Auth settings; no emails or payments sent",
+  "evidence": [
+    {
+      "name": "Real Auth requires email confirmation",
+      "pass": true
+    },
+    {
+      "name": "Phone OTP not advertised as verified",
+      "pass": true
+    },
+    {
+      "name": "Existing confirmed QA account reuses password login",
+      "pass": true
+    },
+    {
+      "name": "Edge imports only under actual token actor",
+      "pass": true
+    },
+    {
+      "name": "Blocked QA guest gets no PMS links",
+      "pass": true
+    },
+    {
+      "name": "Repeated remote hub preserves IDs and count",
+      "pass": true
+    },
+    {
+      "name": "Browser cannot directly invoke privileged import",
+      "pass": true
+    }
+  ]
+}

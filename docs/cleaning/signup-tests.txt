@@ -1,0 +1,12 @@
+✔ short cleaning signup defers document without fabricating identity (1836.683353ms)
+✔ ordinary lodging signup retains mandatory document (3.159654ms)
+✔ cleaning marker does not bypass validation of a provided document (3.502322ms)
+✔ client cannot self-assert document verification through identity RPC (1.577814ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1993.308301

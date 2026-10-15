@@ -1,0 +1,26 @@
+{
+  "id": "/faxinas/contratar/",
+  "name": "Ville Faxinas · Contratar",
+  "short_name": "Ville Contratar",
+  "description": "Seus imóveis. Sua tranquilidade.",
+  "start_url": "/faxinas/contratar",
+  "scope": "/faxinas/contratar",
+  "display": "standalone",
+  "lang": "pt-BR",
+  "background_color": "#f7f7f2",
+  "theme_color": "#18584c",
+  "icons": [
+    {
+      "src": "/faxinas/assets/contratar-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/faxinas/assets/contratar-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

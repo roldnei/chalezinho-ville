@@ -1,0 +1,19 @@
+Evidência extraída da regressão completa apps-full-tests.txt.
+Auth e rede simulados; Postgres local real. Sem Pix ou operação real.
+
+✔ public gateway links to distinct owner and worker apps without a blended dashboard (2499.18965ms)
+✔ dual-role account owner app shows its request and owner navigation, without offers or management navigation (66.046008ms)
+✔ owner profile update preserves the professional role, region, availability and existing approval in real local SQL (53.95065ms)
+✔ dual-role professional app explains its own pending request, hides owner tools and cannot accept its own job (33.549129ms)
+✔ another approved professional accepts from its dedicated app through the actual local SQL boundary (57.498752ms)
+✔ professional profile changes retain the existing owner role and properties (54.719802ms)
+✔ non-administrator entering the administration URL gets an explicit denial without recursion or management controls (26.678186ms)
+✔ admin service links point to the dedicated administration app and auth callback recognizes all app continuations (71.567701ms)
+✔ owner/worker manifests have separate install identities and narrow scopes with valid PNG icons (3.098482ms)
+✔ service worker never intercepts APIs, private media, payment POSTs or PMS navigation (2.012842ms)
+✔ offline navigation uses a generic fallback, does not cache a signed-in screen and preserves unrelated caches (9.526376ms)
+✔ install registration uses only the cleaning scope; unsupported install prompt exposes clear mobile instructions (11.651127ms)
+✔ morning fixtures do not weaken the actual rejection of work crossing midnight (14.290335ms)
+✔ an administrator without a marketplace member can view the account screen without creating invalid or unwanted roles (35.658837ms)
+
+14/14 cenários específicos passaram.

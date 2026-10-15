@@ -1,0 +1,27 @@
+✔ 37 registrations paginate in 10/25/50 and never disappear from the last page (174.370947ms)
+✔ search finds accents, mixed case, multiple words and a formatted phone across every page (59.600388ms)
+✔ filters combine with search and reset clearly from a no-result state (41.11696ms)
+✔ editing then searching and paging retains the same form, values and submit handler (39.045725ms)
+✔ list state survives redraws, clamps after a removal and stays isolated by account and screen (113.607091ms)
+✔ untrusted names remain text and empty lists have no useless pager or reset (17.026229ms)
+✔ admin edits exactly the searched participant on page 4 and submits the original permission action (122.680121ms)
+✔ PMS property search retains independent integration controls and exact property id (108.236204ms)
+✔ manual Pix lists separate receivers and payments; a searched bank credit goes only to its payment (179.765136ms)
+✔ owner searches 37 authorized properties and edits the correct property without exposing another owner (163.619486ms)
+✔ home limits professional previews; full directory searches all 37 and favorites preserve the search (65.793341ms)
+✔ an administrator using the personal app sees only owned/assigned non-test jobs, while management retains all history (52.898434ms)
+✔ an administrator with no personal requests sees an honest empty list and a direct request button instead of QA fixtures (28.767495ms)
+✔ large text, explicit dual entry and public pilot message (1918.09103ms)
+✔ short owner profile persists through API and SQL with no identity requirements (45.192971ms)
+✔ two short property screens, no image requirement; one property autoselected (62.712252ms)
+✔ request shows exact composition and preserved scope before confirmation (64.143563ms)
+✔ network failure preserves input and produces plain correction message (26.764789ms)
+✔ exclusive administration rejects a normal member without importing admin UI (3.969818ms)
+ℹ tests 19
+ℹ suites 0
+ℹ pass 19
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2619.163487

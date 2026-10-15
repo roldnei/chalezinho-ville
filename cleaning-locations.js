@@ -1,0 +1,67 @@
+// Geography is selected from the server catalog, never created by typing.
+export const locationKey=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const escape=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Result actions stay inside the form; no native neighborhood popup or implicit save.
+export function renderNeighborhoodPicker(box,{neighborhoods,selected=[],multiple=false,onChange=()=>{}}){
+ const initial=selected.map(locationKey),chosen=new Set(neighborhoods.filter(n=>initial.includes(locationKey(n.name))).map(n=>n.id));let expanded=false,limit=5;
+ const suffix=n=>n.kind==='regiao'?' · região':'';
+ box.innerHTML=`<fieldset class="neighborhoods"><legend>${multiple?'Bairros onde atende':'Bairro do imóvel'}</legend><label>Pesquisar bairro<input name="bairro_search" type="search" autocomplete="off" enterkeyhint="search" placeholder="Digite o nome do bairro"></label>${multiple?'':'<input type="hidden" name="bairro">'}<p class="small" data-bairro-search-status role="status"></p><ul class="neighborhood-results" data-bairro-results aria-label="Resultados da busca de bairros"></ul><button type="button" data-bairro-more>Ver bairros da cidade</button><ul class="neighborhood-selected" data-bairro-selected></ul><p class="small" data-bairro-count role="status"></p></fieldset>`;
+ const search=box.querySelector('[name=bairro_search]'),results=box.querySelector('[data-bairro-results]'),status=box.querySelector('[data-bairro-search-status]'),more=box.querySelector('[data-bairro-more]');
+ const changed=()=>{drawSelected();drawResults();onChange();};
+ const drawSelected=()=>{
+  const list=box.querySelector('[data-bairro-selected]'),selectedRows=neighborhoods.filter(n=>chosen.has(n.id));
+  if(!multiple)box.querySelector('[name=bairro]').value=selectedRows[0]?.name||'';
+  list.innerHTML=selectedRows.map(n=>`<li>${multiple?`<input type="checkbox" name="bairros" value="${escape(n.name)}" checked hidden>`:''}<span>${multiple?'':'Bairro selecionado: '}${escape(n.name+suffix(n))}</span><button type="button" data-bairro-remove="${escape(n.id)}" aria-label="${multiple?'Remover':'Trocar'} ${escape(n.name)}">${multiple?'Remover':'Trocar'}</button></li>`).join('');
+  box.querySelector('[data-bairro-count]').textContent=multiple?(chosen.size?`${chosen.size} bairro(s) ou região(ões) incluído(s).`:'Nenhum bairro incluído ainda.'):'';
+  list.querySelectorAll('[data-bairro-remove]').forEach(button=>button.onclick=event=>{event.preventDefault();chosen.delete(button.dataset.bairroRemove);expanded=false;changed();});
+ };
+ const drawResults=()=>{
+  const query=locationKey(search.value),matches=n=>locationKey(n.name).includes(query),available=neighborhoods.filter(n=>!chosen.has(n.id)&&matches(n));
+  const visible=(query||expanded)?available.slice(0,limit):[];
+  results.innerHTML=visible.map(n=>`<li><span>${escape(n.name+suffix(n))}</span><button type="button" data-bairro-result="${escape(n.id)}" aria-label="${multiple?'Incluir':'Selecionar'} ${escape(n.name)}">${multiple?'Incluir':'Selecionar'}</button></li>`).join('');
+  status.textContent=!query&&!expanded?'Digite o nome ou toque em Ver bairros da cidade.':available.length?`${available.length} bairro(s) encontrado(s).`:neighborhoods.some(n=>chosen.has(n.id)&&matches(n))?'Esse bairro já está incluído abaixo.':'Nenhum bairro encontrado. Confira o nome ou peça a inclusão abaixo.';
+  more.hidden=!!(query||expanded)&&available.length<=limit;more.textContent=query||expanded?'Mostrar mais bairros':'Ver bairros da cidade';
+  results.querySelectorAll('[data-bairro-result]').forEach(button=>button.onclick=event=>{
+   event.preventDefault();const n=neighborhoods.find(n=>n.id===button.dataset.bairroResult);if(!n||chosen.has(n.id))return;
+   if(!multiple)chosen.clear();chosen.add(n.id);search.value='';expanded=false;limit=5;changed();
+  });
+ };
+ search.addEventListener('input',()=>{limit=5;drawResults();});
+ search.addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.isComposing){event.preventDefault();event.stopPropagation();drawResults();}});
+ more.onclick=event=>{event.preventDefault();if(expanded||search.value.trim())limit+=5;expanded=true;drawResults();};
+ drawSelected();drawResults();
+ return {selected:()=>neighborhoods.filter(n=>chosen.has(n.id)).map(n=>n.name)};
+}
+export function locationMarkup(initial={},multiple=false){return `<section data-location-fields><label>Pesquisar cidade<input name="city_search" type="search" value="${escape(initial.city||'')}" autocomplete="address-level2" placeholder="Digite o nome da cidade"></label><label>Cidade e estado<select name="city_choice" required><option value="">Escolha uma cidade da lista</option></select></label><input type="hidden" name="city" value=""><input type="hidden" name="city_ibge" value=""><div data-neighborhoods>${multiple?'<p>Selecione os bairros onde atende.</p>':'<label>Bairro ou região<select name="bairro" required disabled><option value="">Escolha a cidade primeiro</option></select></label>'}</div><p role="status" data-location-status>Carregando cidades…</p><button type="button" data-location-retry hidden>Tentar carregar novamente</button><details><summary>Não encontrei meu bairro</summary><p>Peça a inclusão. A administração confere antes de liberar; digitar um nome aqui não cria um bairro.</p><label>Nome do bairro<input name="missing_neighborhood" maxlength="100"></label><button type="button" data-location-interest>Pedir inclusão do bairro</button><p data-location-interest-status role="status"></p></details></section>`;}
+export function locationValid(form,multiple=false){return !!form.elements.city_ibge?.value&&(multiple?!!form.querySelector('[name=bairros]:checked'):!!form.elements.bairro?.value);}
+export async function mountLocations(form,{api,initial={},multiple=false,notice=()=>{}}){
+ const root=form.querySelector('[data-location-fields]');if(!root)return;
+ root._locationsDispose?.();
+ const stopImplicitSave=event=>{if(event.key==='Enter'&&!event.isComposing&&event.target.matches('input:not([type=hidden])')){event.preventDefault();event.stopPropagation();}};root.addEventListener('keydown',stopImplicitSave);
+ const search=form.elements.city_search,choice=form.elements.city_choice,status=root.querySelector('[data-location-status]'),retry=root.querySelector('[data-location-retry]'),box=root.querySelector('[data-neighborhoods]');let cities=[],version=0,timer,chosen=null;
+ const tell=v=>{status.textContent=v;};
+ const clear=()=>{chosen=null;form.elements.city.value='';form.elements.city_ibge.value='';box.innerHTML=multiple?'<p>Escolha uma cidade para ver os bairros.</p>':'<label>Bairro ou região<select name="bairro" required disabled><option value="">Escolha a cidade primeiro</option></select></label>';};
+ const choose=async(keep=false)=>{const v=++version,city=cities.find(c=>String(c.id)===choice.value);clear();if(!city)return;chosen=city;form.elements.city.value=city.name;form.elements.city_ibge.value=String(city.id);tell('Carregando bairros…');retry.hidden=true;try{const data=await api('locations',{city_id:city.id});if(v!==version||!root.isConnected)return;const selected=keep?(multiple?initial.bairros||[]:[initial.bairro]):[];renderNeighborhoodPicker(box,{neighborhoods:data.neighborhoods,selected,multiple,onChange:()=>form.dispatchEvent(new form.ownerDocument.defaultView.Event('input',{bubbles:true}))});if(box.hidden)box.querySelector('select')?.removeAttribute('required');tell(data.neighborhoods.length?(multiple?'Inclua os bairros onde você atende.':'Selecione seu bairro na lista.'):'Ainda não há bairros liberados nesta cidade. Peça a inclusão abaixo.');form.dispatchEvent(new form.ownerDocument.defaultView.Event('input',{bubbles:true}));}catch{if(v!==version||!root.isConnected)return;clear();tell('Não foi possível carregar os bairros. Seus outros dados continuam aqui.');retry.hidden=false;}};
+ const find=async(keep=false)=>{const v=++version,q=search.value.trim();clear();choice.innerHTML='<option value="">Escolha uma cidade da lista</option>';retry.hidden=true;if(q.length<2){tell('Digite pelo menos duas letras da cidade.');return;}tell('Buscando cidades…');try{const data=await api('locations',{query:q});if(v!==version||!root.isConnected)return;cities=data.cities;choice.innerHTML='<option value="">Escolha uma cidade da lista</option>'+cities.map(c=>`<option value="${c.id}">${escape(c.label)}</option>`).join('');tell(cities.length?'Escolha a cidade e o estado da lista.':'Cidade não encontrada. Confira o nome; não foi criado nenhum cadastro.');if(keep){const matches=cities.filter(c=>initial.city_ibge?c.id===Number(initial.city_ibge):locationKey(c.name)===locationKey(initial.city));if(matches.length===1){choice.value=String(matches[0].id);await choose(true);}}}catch{if(v!==version||!root.isConnected)return;tell('Não foi possível carregar as cidades. Seus outros dados continuam aqui.');retry.hidden=false;}};
+ const onSearch=()=>{version++;clear();choice.value='';clearTimeout(timer);timer=setTimeout(()=>find(),250);},onChoice=()=>choose();
+ search.addEventListener('input',onSearch);choice.addEventListener('change',onChoice);root._locationsDispose=()=>{root.removeEventListener('keydown',stopImplicitSave);version++;clearTimeout(timer);search.removeEventListener('input',onSearch);choice.removeEventListener('change',onChoice);};retry.onclick=()=>choice.value?choose():find(true);
+ const interestButton=root.querySelector('[data-location-interest]');if(interestButton)interestButton.onclick=async()=>{const out=root.querySelector('[data-location-interest-status]'),name=form.elements.missing_neighborhood.value.trim();if(!chosen||name.length<2){out.textContent='Escolha a cidade e informe o nome do bairro.';return;}const button=root.querySelector('[data-location-interest]');button.disabled=true;try{await api('location_interest',{city_id:chosen.id,name});out.textContent='Pedido de inclusão registrado. A administração vai conferir o bairro.';}catch{out.textContent='Não foi possível registrar. Tente de novo quando houver conexão.';}finally{button.disabled=false;}};
+ await find(true);
+}
+export async function renderLocationsAdmin(body,ctx){const {api,run,load,esc,input,options,notice}=ctx;body.innerHTML=`<section class="card"><h2>Bairros e regiões</h2><p>Cidades vêm do IBGE. Bairros e regiões só entram na lista após conferência administrativa. Variações de escrita devem apontar para o mesmo cadastro.</p><form id="location-review">${locationMarkup()}${input('Nome correto do bairro ou região','name','','text','required maxlength="100"')}<label>Tipo<select name="kind">${options([['bairro','Bairro'],['regiao','Região / loteamento']], 'bairro')}</select></label>${input('Link da fonte consultada','source','','url','required')}<label>Outras grafias para o mesmo lugar (opcional)<textarea name="aliases" placeholder="Uma por linha"></textarea></label><label class="check"><input name="checked" type="checkbox" required>Conferi o nome e o vínculo com esta cidade</label><input name="request_id" type="hidden"><button class="primary">Liberar bairro na lista</button></form></section><section class="card"><h2>Pedidos de inclusão</h2><div data-location-requests>Carregando pedidos…</div></section>`;
+ const f=body.querySelector('form');f.querySelector('[data-location-fields] details').remove();f.querySelector('[data-neighborhoods]').hidden=true;await mountLocations(f,{api});f.onsubmit=e=>{e.preventDefault();if(!f.elements.city_ibge.value){notice('Escolha uma cidade existente.',true);return;}const values=Object.fromEntries(new f.ownerDocument.defaultView.FormData(f));run('location_review',{...values,city_id:Number(values.city_ibge),checked:!!values.checked,aliases:values.aliases.split('\n').map(v=>v.trim()).filter(Boolean)},()=>load('admin'));};
+ try{
+  const d=await api('locations');if(!body.isConnected)return;
+  const target=body.querySelector('[data-location-requests]');
+  target.innerHTML=d.requests.map(r=>`<article class="own-request" data-region-request="${r.id}"><strong>${esc(r.name)}</strong><p>${esc(r.city_label)}</p><p>Nome informado por participante; ainda não validado.</p><button data-region-fill>Conferir este pedido</button><button data-region-reject>Recusar com explicação</button></article>`).join('')||'<p>Nenhum pedido aguardando conferência.</p>';
+  target.querySelectorAll('[data-region-request]').forEach(row=>{
+   const r=d.requests.find(r=>r.id===row.dataset.regionRequest);
+   row.querySelector('[data-region-fill]').onclick=async()=>{f.elements.request_id.value=r.id;f.elements.name.value=r.name;f.elements.city_search.value=r.city_label;await mountLocations(f,{api,initial:{city:r.city_label,city_ibge:r.city_id}});f.scrollIntoView({block:'start'});};
+   row.querySelector('[data-region-reject]').onclick=()=>{
+    if(row.querySelector('[data-reject]'))return;
+    row.insertAdjacentHTML('beforeend',`<form data-reject><label>Motivo<textarea name="resolution" minlength="5" required></textarea></label><button>Registrar decisão</button></form>`);
+    row.querySelector('[data-reject]').onsubmit=e=>{e.preventDefault();run('location_review',{request_id:r.id,decision:'reject',resolution:e.target.elements.resolution.value},()=>load('admin'));};
+   };
+  });
+ }catch{if(body.isConnected)body.querySelector('[data-location-requests]').textContent='Não foi possível carregar. Abra esta área novamente para tentar.';}
+}

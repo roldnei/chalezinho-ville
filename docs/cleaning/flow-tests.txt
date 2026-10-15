@@ -1,0 +1,18 @@
+✔ short cleaning signup defers document without fabricating identity (2734.711564ms)
+✔ ordinary lodging signup retains mandatory document (2.766511ms)
+✔ cleaning marker does not bypass validation of a provided document (3.41409ms)
+✔ client cannot self-assert document verification through identity RPC (1.91929ms)
+✔ large text, explicit dual entry and public pilot message (2777.142571ms)
+✔ short owner profile persists through API and SQL with no identity requirements (44.720264ms)
+✔ two short property screens, no image requirement; one property autoselected (54.638213ms)
+✔ request shows exact composition and preserved scope before confirmation (68.395038ms)
+✔ network failure preserves input and produces plain correction message (27.119384ms)
+✔ exclusive administration rejects a normal member without importing admin UI (3.76503ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3607.347741

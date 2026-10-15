@@ -1,0 +1,26 @@
+{
+  "before": {
+    "jobs": "fdcf759599a00e98627bdcd19e938c8c",
+    "stays": 27,
+    "tasks": 58,
+    "payments": 34,
+    "reservations": 30,
+    "other_city_regions": 0
+  },
+  "after": {
+    "jobs": "fdcf759599a00e98627bdcd19e938c8c",
+    "stays": 27,
+    "tasks": 58,
+    "payments": 34,
+    "unique_keys": 117,
+    "reservations": 30,
+    "guarapari_regions": 117,
+    "setiba_ville_kind": "regiao",
+    "other_city_regions": 0
+  },
+  "environment": "DEV",
+  "edgeVersion": 6,
+  "edgeChanged": false,
+  "fullTests": 700,
+  "affectedTests": 54
+}

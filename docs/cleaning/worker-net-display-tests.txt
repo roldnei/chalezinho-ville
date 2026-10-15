@@ -1,0 +1,44 @@
+✔ 37 registrations paginate in 10/25/50 and never disappear from the last page (184.461396ms)
+✔ search finds accents, mixed case, multiple words and a formatted phone across every page (54.455139ms)
+✔ filters combine with search and reset clearly from a no-result state (40.993812ms)
+✔ editing then searching and paging retains the same form, values and submit handler (43.201056ms)
+✔ list state survives redraws, clamps after a removal and stays isolated by account and screen (95.148366ms)
+✔ untrusted names remain text and empty lists have no useless pager or reset (10.665063ms)
+✔ admin edits exactly the searched participant on page 4 and submits the original permission action (149.552907ms)
+✔ PMS property search retains independent integration controls and exact property id (138.137983ms)
+✔ manual Pix lists separate receivers and payments; a searched bank credit goes only to its payment (156.465395ms)
+✔ owner searches 37 authorized properties and edits the correct property without exposing another owner (117.982267ms)
+✔ home limits professional previews; full directory searches all 37 and favorites preserve the search (81.656573ms)
+✔ an administrator using the personal app sees only owned/assigned non-test jobs, while management retains all history (101.960677ms)
+✔ an administrator with no personal requests sees an honest empty list and a direct request button instead of QA fixtures (27.949615ms)
+✔ public gateway links to distinct owner and worker apps without a blended dashboard (2161.459493ms)
+✔ dual-role account owner app shows its request and owner navigation, without offers or management navigation (54.344131ms)
+✔ owner profile update preserves the professional role, region, availability and existing approval in real local SQL (53.52268ms)
+✔ dual-role professional app explains its own pending request, hides owner tools and cannot accept its own job (41.885258ms)
+✔ another approved professional accepts from its dedicated app through the actual local SQL boundary (45.702184ms)
+✔ professional profile changes retain the existing owner role and properties (45.226005ms)
+✔ non-administrator entering the administration URL gets an explicit denial without recursion or management controls (19.67257ms)
+✔ admin service links point to the dedicated administration app and auth callback recognizes all app continuations (61.963102ms)
+✔ owner/worker manifests have separate install identities and narrow scopes with valid PNG icons (16.842364ms)
+✔ service worker never intercepts APIs, private media, payment POSTs or PMS navigation (1.825257ms)
+✔ offline navigation uses a generic fallback, does not cache a signed-in screen and preserves unrelated caches (3.754622ms)
+✔ install registration uses only the cleaning scope; unsupported install prompt exposes clear mobile instructions (6.339718ms)
+✔ morning fixtures do not weaken the actual rejection of work crossing midnight (10.277317ms)
+✔ an administrator without a marketplace member can view the account screen without creating invalid or unwanted roles (27.910776ms)
+✔ a pending owner payment is displayed as already accepted, without an own-service accept action (24.116344ms)
+✔ correcting a known city typo makes a request visible to another compatible professional without changing its accepted price (19.266036ms)
+✔ worker home, offers, list and details show only net receipt while owner retains total and itemization (97.852832ms)
+✔ large text, owner entry and public pilot message (2195.580626ms)
+✔ short owner profile persists through API and SQL with no identity requirements (43.210411ms)
+✔ two short property screens, no image requirement; one property autoselected (65.34499ms)
+✔ request shows exact composition and preserved scope before confirmation (64.513795ms)
+✔ network failure preserves input and produces plain correction message (26.333854ms)
+✔ exclusive administration rejects a normal member without importing admin UI (3.624536ms)
+ℹ tests 36
+ℹ suites 0
+ℹ pass 36
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3146.268097

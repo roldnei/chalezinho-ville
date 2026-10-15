@@ -1,0 +1,91 @@
+{
+  "environment": "DEV",
+  "at": "2026-10-13T18:00:34.910Z",
+  "financial_operations": "NONE. Execution used an explicitly simulated QA state.",
+  "evidence": [
+    {
+      "name": "owner signup defers identity and starts unapproved",
+      "pass": true
+    },
+    {
+      "name": "normal participant cannot configure",
+      "pass": true
+    },
+    {
+      "name": "dedicated administrator can open console",
+      "pass": true
+    },
+    {
+      "name": "unknown area is never invented",
+      "pass": true
+    },
+    {
+      "name": "remote category, mixed beds and independent fee",
+      "pass": true
+    },
+    {
+      "name": "pilot release required",
+      "pass": true
+    },
+    {
+      "name": "request replay is idempotent",
+      "pass": true
+    },
+    {
+      "name": "remote concurrent accept has one winner",
+      "pass": true
+    },
+    {
+      "name": "worker sees no address before real payment",
+      "pass": true
+    },
+    {
+      "name": "other worker cannot see private service",
+      "pass": true
+    },
+    {
+      "name": "Pix gate creates no pretend payment",
+      "pass": true
+    },
+    {
+      "name": "remote agenda conflict prevented",
+      "pass": true
+    },
+    {
+      "name": "simulated execution starts via authenticated endpoint",
+      "pass": true
+    },
+    {
+      "name": "missing evidence blocks completion",
+      "pass": true
+    },
+    {
+      "name": "private photos saved with idempotent replay",
+      "pass": true
+    },
+    {
+      "name": "authorized signed image actually available",
+      "pass": true
+    },
+    {
+      "name": "approval authorizes, never claims paid",
+      "pass": true
+    },
+    {
+      "name": "first rating remains unpublished to other side",
+      "pass": true
+    },
+    {
+      "name": "bilateral ratings publish together",
+      "pass": true
+    },
+    {
+      "name": "occurrence and right of response saved",
+      "pass": true
+    },
+    {
+      "name": "snapshot preserved after execution",
+      "pass": true
+    }
+  ]
+}

@@ -1,0 +1,200 @@
+# Ville Faxinas — validação de 13/10/2026
+
+Módulo independente implementado no repositório roldnei/chalezinho-ville. Base de inspeção: 2730681, branch feature/multichannel-operations-20261012; avanços até 6804f1d incorporados (Ville Moments, preferências e proporção de ofertas preservados): correção de campos de data no iPhone e conclusão guiada do PMS. Regras de preparação/saída do PMS mais recentes preservadas no adaptador. Produção, checkout e pagamentos de hospedagens não foram publicados ou substituídos por este trabalho.
+
+## Acesso e fluxos
+
+- `faxinas.html`: entrada pública, contratar ou trabalhar; os dois papéis na mesma conta.
+- `faxinas-admin.html`: administração exclusiva. O servidor revalida cada ação; esconder botões não é o controle de acesso.
+- Login: uma tela; criação de conta: uma tela com nome, celular, e-mail e senha compatível com o Auth existente. Novos usuários precisam confirmar o e-mail. Há tela de confirmação, reenvio, correção de acesso e recuperação do login quando o Auth informa e-mail não confirmado. Contas já confirmadas usam o mesmo acesso; telefone informado não é apresentado como verificado.
+- Perfil: uma tela curta. A parte profissional aparece somente quando escolhida.
+- Imóvel: duas telas; foto não é obrigatória. Metragem desconhecida exige análise ou preço administrativo explícito, sem metragem inventada.
+- Pedido: duas telas após cadastrar o imóvel: dia/janela e revisão do preço/escopo/termos. Um imóvel é selecionado automaticamente.
+- Profissional: uma tela de ofertas para decidir; uma tela do serviço para começar, conferir itens, enviar fotos e terminar. A foto tem prévia, confirmação e opção de refazer.
+- Conferência: uma tela; avaliação opcional em um formulário curto. Estrelas não condicionam o repasse.
+
+## Implementado
+
+Tabela inicial editável com os oito valores solicitados; menor categoria que comporta simultaneamente todos os limites. Franquia por quarto, tratamento de quarto misto e adicional de R$ 5 em configuração. Tipos de cama, escopo, adicionais, taxas, duração, deslocamento, prazos, distribuição e piloto editáveis.
+
+Valores em centavos e taxas percentuais em pontos-base. Taxas independentes dos dois lados e exceções por participante. Cópia de preços, escopos, adicionais, taxas, condições e versão dos termos na contratação. Aceite da profissional recalcula sua exceção de taxa e exige conferir o líquido mostrado.
+
+Cadastro público, interesse registrado, liberação individual e aprovação profissional. Favoritas e nova contratação. Uma pessoa pode ser proprietária e profissional. Administração e auditoria separadas do PMS; acesso às faxinas não dá acesso ao PMS.
+
+Atribuição transacional com bloqueio de agenda e intervalo de deslocamento. Pix tem ledger, idempotência, confirmação por consulta autenticada ao PagBank após webhook assinado, expiração conciliada, isolamento de pagamento tardio/duplicado, devolução e estados distintos de repasse. Nenhuma cobrança nasce apenas porque a tarefa foi gerada. Retorno de página não confirma pagamento.
+
+Fotos em bucket privado, vinculadas a imóvel/serviço/item/autor/data; objetos sem substituição. Endereço e acesso são ocultos antes da confirmação. Checklist salvo por item; fila IndexedDB por conta, envios pendentes e nova tentativa. O servidor impede finalizar sem evidências obrigatórias. Ocorrências dos dois lados com resposta, fotos privadas, prazo e resolução administrativa, sem descontos automáticos.
+
+Avaliações bilaterais com publicação conjunta ou por prazo; nota/comentário não podem ser editados pela moderação. Conteúdo abusivo pode ser ocultado ou reexibido com justificativa auditada; média e quantidade só consideram avaliações publicadas e não ocultadas.
+
+PMS: vínculo por imóvel e controles independentes de exibição/geração, com autorização no PMS para vincular. Uma rotina vinculada por estadia/finalidade. Futuras entradas usam a preparação operacional; hospedagens em andamento podem gerar limpeza após a saída. Conferência de saída e suas fotos continuam separadas. Horário/andamento/responsável/conclusão são projetados na tarefa; a tela do PMS consulta as fotos da plataforma com a autorização própria. Não há duplicação de arquivos de foto.
+
+Estadias encerradas, checkout registrado, registro de saída do proprietário, testes, cancelamentos ou hospedagem ainda pendente de confirmação não geram novas rotinas. Bloqueios/iCal ambíguos não são convertidos pela plataforma em reservas. Alterações de contratos aceitos ficam sinalizadas; não cancelam silenciosamente serviços. Novo horário exige consentimento dos dois lados e nova checagem de agenda, mantendo o preço aceito. Correções exigem iniciar outra etapa e enviar uma nova foto. O tempo de execução soma etapas ativas e exclui espera pela conferência. Desativar preserva histórico; reativar reconcilia somente elegíveis, sem duplicidade. A criação é sugestão, sem contratação ou pagamento automático.
+
+Dois jobs novos e independentes de manutenção/conciliação executam a cada cinco minutos no DEV, usando o mecanismo protegido já existente; os jobs anteriores não foram modificados. Função Edge nova `cleaning-platform`; as funções de hospedagem não foram substituídas.
+
+## Evidência e limites
+
+- Regressão completa final: 618/618, incluindo os avanços incorporados do PMS e as mudanças finais da plataforma; log `full-tests.txt`.
+- Suíte específica atual: 66/66, ver `local-tests.txt`; inclui preços/camas/taxas, concorrência, privacidade, configuração, evidências, ocorrências, avaliações, PMS, estados financeiros controlados e interface DOM com falha de conexão.
+- API publicada: `remote-smoke.json` (entrada pública e negação sem login).
+- API autenticada publicada: 21 verificações em `remote-authenticated-tests.json`, com Auth e Postgres reais, quatro contas QA e propriedades fictícias próprias. Cadastro, piloto, preços, disputa de aceite, conflito de agenda, isolamento e bloqueio de Pix foram reais chamadas do endpoint.
+- A execução/fotos/conferência/avaliações remotas usaram um serviço explicitamente marcado como teste, com **estado inicial de execução simulado no DEV**. Não houve Pix ou repasse. Fotos QA foram efetivamente salvas e lidas por URL assinada.
+- As contas QA foram bloqueadas para novos serviços e perderam aprovação/liberação/administração das faxinas. Histórico de evidências permanece privado e identificado como teste. Serviços de teste ficam fora de ofertas e não podem criar pagamentos.
+- Após instalação e testes: mesmos 26 registros operacionais de hospedagem, 56 tarefas do PMS, 30 reservas e 34 pagamentos de hospedagem. Zero pagamentos de faxina e nenhum vínculo dos imóveis QA ao PMS.
+- Revisão de segurança Supabase: sem privilégios de tabelas/RPCs das faxinas para anon/authenticated; RLS em todas as tabelas e bucket privado. Avisos informativos de RLS sem política são intencionais: o acesso passa exclusivamente pelo endpoint autenticado. Aviso anterior de proteção de senhas vazadas não foi modificado.
+- Verificação de interface por DOM/CSS, com fonte relativa e botões de 52 px. **Validação visual em navegador real/celular, câmera real, fonte ampliada e rede limitada ainda não realizada:** o navegador de QA indicado pelo ambiente não está disponível. Não há screenshots apresentados como prova de dispositivo real.
+
+## Bloqueios financeiros e configurações para operação real
+
+A versão continua publicada somente para validação. O modo **Pix manual** usa uma chave da administração e dispensa integração PagBank: exige cadastrar/liberar a chave, conferir identidade/titular/chave das profissionais, conferir créditos no banco e registrar repasses/devoluções já realizados. Dinheiro real deve usar o ambiente de operação real, que ainda não foi publicado por este trabalho. A lista abaixo se aplica **se o PagBank for escolhido**; suas pendências não bloqueiam o modo manual.
+
+1. Conta/aplicação PagBank habilitada especificamente para marketplace/split, Pix com custódia e autorização dos recebedores. A integração de hospedagem não comprova isso.
+2. Credenciais próprias do módulo no servidor: `CLEANING_PAGBANK_SANDBOX_TOKEN` ou `CLEANING_PAGBANK_PRODUCTION_TOKEN`, `CLEANING_PAGBANK_PLATFORM_ACCOUNT`. Não copiar credenciais de hospedagem para presumir habilitação.
+3. Homologar criação/consulta, assinatura real de webhook da API Order, expiração, pagamentos repetidos/tardios, estorno e liberação de custódia. A documentação usa um formato de assinatura diferente para algumas outras APIs; notificações sem assinatura confiável são recusadas.
+4. **Concluir e homologar a integração de liquidação/EDI**, com fonte de confirmação do recebimento efetivo e conciliação de taxas do intermediador. O ledger possui a observação privada de liquidação, mas não há conector EDI habilitado neste ambiente. `CLEANING_SETTLEMENT_INTEGRATION` permanece ausente; não configurar `verified` sem concluir essa integração e testar os valores líquidos. Liberação de custódia só move para processando.
+5. O PagBank pode liberar custódia automaticamente em seu prazo máximo. Definir uma janela que cubra serviço/conferência/ocorrência e não prometer retenção indefinida. A criação é bloqueada quando o serviço excede a janela configurada.
+6. Verificar identidade e recebimento dos participantes reais, cadastrar a referência de autorização e liberar individualmente. Nada foi enviado a profissionais/proprietários externos.
+7. Os imóveis ativos autorizados no PMS são carregados automaticamente na conta proprietária do mesmo ambiente ao entrar/salvar perfil. Completar endereço, cidade/bairro, quartos, banheiros, camas e dados de limpeza que não existem no PMS. Área continua desconhecida até informação ou orçamento assistido. Definir profissional/regra e habilitar a geração automática separadamente na administração.
+8. Revisar juridicamente termos, cancelamento, privacidade e tratamento de ocorrências. São propostas para revisão, não garantia de isenção ou seguro.
+9. Verificar URLs de retorno do Auth para o domínio definitivo de validação. A prévia mantém a proteção de acesso da Vercel existente.
+
+Referências oficiais consultadas: [Pix com split](https://developer.pagbank.com.br/reference/pedido-com-divisao-de-pagamento-com-pix), [custódia](https://developer.pagbank.com.br/reference/crie-e-pague-um-pedido-com-custodia), [liberação](https://developer.pagbank.com.br/reference/liberar-divisao-de-pagamento-com-custodia), [cancelamento](https://developer.pagbank.com.br/reference/cancelar-pagamento), [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Storage privado](https://supabase.com/docs/guides/storage/security/access-control).
+
+## Operação e retorno
+
+Publicação autorizada somente da prévia. Para interromper: desabilitar a geração por imóvel e pausar somente os dois jobs `cleaning-marketplace-*`; preservar tabelas/evidências/histórico. Retorno da interface é o deployment anterior. Nunca apagar o ledger ou copiar fixtures DEV para PROD. Produção exige revisão das migrações, dependências financeiras e validação visual antes de um novo pedido de publicação.
+
+## Ajuste de conta e importação do PMS — 13/10/2026
+
+- Importação idempotente no carregamento autenticado. Administrador ativo do PMS pode importar imóveis ativos; anfitrião importa apenas seus `pms_property_ids`. Participante da plataforma ou administrador exclusivo das faxinas não ganha acesso ao PMS. Conta bloqueada não importa. Identidade vem de `Auth.getUser()`, nunca de um ID enviado pelo navegador.
+- Importamos identificador, nome e tipo existentes, sem copiar taxa de limpeza da hospedagem nem presumir endereço, área, quartos, banheiros ou camas. Campos numéricos faltantes são nulos. Imóvel incompleto não pode receber preço nem pedido, mesmo com exceção administrativa. Depois de completar, os dados são preservados em novas entradas.
+- Vínculo existente pertence a um único imóvel/conta; importação não transfere propriedade nem sobrescreve dados preenchidos. Vincular ao PMS não ativa `Mostrar no PMS` ou geração automática.
+- Novos usuários precisam confirmar e-mail, com reenvio e espera visíveis. O backend também recusa usuário autenticado sem `email_confirmed_at`. O serviço Auth real no DEV está com `mailer_autoconfirm=false`; não foi alterada a autenticação das hospedagens. Celular continua sem OTP nessa etapa.
+- 78 testes do módulo passam, incluindo 12 novos testes de importação/isolamento/edição e confirmação/reenvio/negação no servidor. Evidência: `account-import-tests.txt`. A suíte completa atualizada está em `account-import-full-tests.txt`; um teste legado do Ville Moments foi atualizado para a nova regra existente de uma oferta por chalé, sem alterar seu comportamento.
+- Sete verificações remotas de leitura passam com Auth e Edge reais: `account-import-remote.json`. Importação positiva também validada no Postgres DEV em transação revertida: escopo de um imóvel, ausência de suposições, idempotência, orçamento pendente e ausência de privilégios de execução para o navegador. Nenhum vínculo QA foi mantido.
+- Após a transação revertida e chamadas HTTP: 26 estadias, 56 tarefas do PMS, 30 reservas, 34 pagamentos de hospedagem, zero pagamentos de faxina e zero vínculos QA ao PMS. Nenhuma alteração em produção.
+- As contas de produção e DEV permanecem separadas. Não copiamos usuários, senhas ou vínculos administrativos entre ambientes. A conta usada deve ser a do PMS correspondente ao ambiente da plataforma.
+- Entrega do e-mail na caixa real e retorno pelo domínio protegido da prévia ainda precisam de validação com um usuário convidado; os testes de interface/reenvio usam Auth simulado e não são prova de entrega SMTP. A exigência de confirmação e as chamadas remotas de Auth foram verificadas. URLs autorizadas de retorno devem incluir o domínio de validação.
+
+## Pix manual para o começo do piloto — 13/10/2026
+
+O pagamento inicial pode usar a chave Pix da administração. O cliente transfere no aplicativo do próprio banco. A plataforma informa a chave, o titular e o valor exato; não gera QR, não transfere dinheiro, não divide saldo e não oferece custódia de intermediador nesse modo. A configuração inicial do DEV foi alterada para `manual_pix`, mas permanece **desabilitada e sem chave real** até o administrador preencher os dados. A integração PagBank continua disponível para uso futuro.
+
+Fluxo do cliente: aceite da profissional → ver chave/nome/valor → copiar chave e transferir no banco → “Já fiz o Pix” → aguardar conferência administrativa. O aviso não marca pagamento como recebido. Somente administrador autorizado e autenticado pode registrar o crédito, informando ID da transação, valor, data/hora e confirmação de conferência do extrato. A profissional continua sem endereço completo até a confirmação.
+
+Após a limpeza e conferência, o repasse fica autorizado. A administração faz o Pix à profissional no banco e registra a transferência efetivada. A indicação “vou fazer o repasse” move apenas para processando; o registro do lançamento bancário com valor líquido exato move para pago. A tela identifica que o recebimento foi registrado pela administração e informa a data do Pix. O prazo de conferência após aviso (inicial: 120 minutos) e a previsão de repasse após aprovação (inicial: 24 horas) são editáveis e ficam nas condições aceitas, junto com preços e taxas. Não há desconto escondido ou promessa de saldo imediato.
+
+Chaves de recebimento das profissionais ficam privadas. Elas podem informá-las após aprovação, sem aumentar o cadastro inicial. A administração confere identidade/titular/chave antes de emitir instruções de pagamento ao cliente. Alterar a chave exige nova conferência; instruções já emitidas preservam destino e destinatária registrados. A chave da administração não aparece na configuração pública nem no orçamento/contrato. Somente cliente responsável e administradores autorizados consultam a instrução de pagamento.
+
+Regras de segurança financeira: um ID bancário não pode quitar dois pagamentos; repetição do mesmo registro é idempotente. Outra transferência é registrada separadamente para análise/devolução, sem contar como segunda contratação. Valor divergente fica em análise e não confirma serviço nem aplica desconto. Créditos tardios não ressuscitam atribuições expiradas. Devoluções exigem lançamento bancário efetivado e valor integral do crédito; o crédito válido de um serviço só pode ser devolvido após decisão administrativa. Ocorrência ou mudança aberta impede repasse. Evidências e destinos registrados não podem ser apagados/sobrescritos.
+
+Condições anteriores não mudam de forma de pagamento silenciosamente. Contratos que já aceitaram PagBank exigem revisão administrativa para um novo acordo, enquanto novas solicitações usam o modo escolhido na configuração.
+
+Validação final: **652/652 testes completos**, incluindo **98 testes do módulo** e 20 novos testes de Pix manual/contrato anterior/interface. Evidências: `manual-pix-full-tests.txt` e `manual-pix-tests.txt`. Interfaces testadas em DOM ligado ao Postgres local; Auth e lançamentos bancários desses testes são simulados, sem transferência real. O fluxo positivo também passou no Postgres DEV em transação integralmente revertida: instrução, aviso sem pagamento, crédito administrativo, idempotência e autorização/processamento/registro de repasse. A execução foi uma fixture explícita; não houve faxina ou banco real.
+
+API Edge versão 5 publicada no DEV. Sete verificações HTTP públicas/negação sem autenticação estão em `manual-pix-remote-public.json`; não são testes de banco nem de sessão autenticada nessa versão. As verificações autenticadas anteriores permanecem como evidência das versões precedentes. Depois do rollback: 26 estadias, 56 tarefas, 30 reservas, 34 pagamentos de hospedagem, zero pagamentos de faxina, zero instruções manuais, zero lançamentos bancários e zero chaves reais cadastradas. Produção e fluxos de hospedagem preservados.
+
+Para o piloto real: cadastrar chave/titular da administração e dados conferidos das profissionais; liberar os participantes; aplicar/publicar o módulo no ambiente real em etapa própria e configurar o ambiente de pagamentos correspondente; combinar quem confere o extrato e executa os repasses/devoluções. A conferência manual exige essa rotina operacional. PagBank, webhook e credenciais não são requisitos desse modo. Continua pendente a validação de e-mail em caixa real e a QA visual em dispositivo real, relatadas acima.
+
+Referência: [Banco Central — receber Pix por chave ou dados de conta](https://bcb.gov.br/estabilidadefinanceira/pix-sobre).
+
+## Listas com muitos cadastros — 13/10/2026
+
+Participantes, imóveis/PMS, serviços administrativos e recebimentos aparecem em linhas de resumo. O botão com texto abre os campos apenas quando necessário. Pagamentos manuais e chaves das profissionais têm listas separadas; chaves bancárias ficam dentro da edição, fora do resumo e do índice de pesquisa.
+
+Todas essas listas têm pesquisa sem distinção de acentos/maiúsculas, filtros por situação, opções de 10/25/50 itens e navegação anterior/próxima com contagem. A pesquisa considera todos os registros autorizados recebidos, não apenas a página visível. Participantes também podem ser encontrados pelo celular com ou sem pontuação. A lista de imóveis do proprietário continua filtrada pela conta, inclusive para administradores acessando a tela pública.
+
+Na área do participante, imóveis e suas faxinas também usam pesquisa e paginação; o botão Editar/Completar do imóvel abre diretamente o cadastro de duas etapas, sem expandir outro cartão. A tela inicial mostra até quatro profissionais, com acesso ao catálogo completo pesquisável e filtro de favoritas. Resumos, filtros, botões e edição têm disposição responsiva, foco visível e rótulos de texto. Não há ação dependente de gesto escondido.
+
+A troca de filtro ou página mantém os mesmos formulários e os valores digitados; uma marca avisa sobre alterações não salvas. Pesquisa/página/quantidade são lembradas durante esta aba, separadamente por conta e lista. Esses controles não salvam preços, permissões ou dados pessoais no armazenamento persistente e não alteram os endpoints existentes. Não há migração nem alteração de dados do PMS, pagamentos ou produção. A paginação é feita sobre o conjunto autorizado que a API já fornece; não é anunciada como paginação SQL para volume ilimitado.
+
+Evidências: `lists-tests.txt` contém 11 cenários com 37 registros, incluindo última página, 10/25/50, acentos/celular, filtros combinados, lista vazia, preservação de edição, isolamento de conta/tela, nomes com HTML, envio da liberação/integração/Pix para o registro correto, imóveis de outros proprietários ocultos e pesquisa/favoritas no catálogo. Os lançamentos bancários desses testes são locais e simulados; nenhum dinheiro é movimentado.
+
+A regressão completa passou em 663/663 testes (`lists-full-tests.txt`). Após o ajuste final para abrir a edição do imóvel direto no botão da linha, os 17 testes das listas/interface foram repetidos e passaram (`lists-ui-final-tests.txt`). O build mantém o ambiente DEV e publica o novo módulo de listas como asset. A verificação HTTP da prévia usa o conector autorizado da Vercel. O navegador remoto chegou à autenticação da Vercel, sem sessão; também não consegue acessar o servidor local. Por isso não há evidência nova de dispositivo real, zoom de fonte ou rede limitada, nem captura de tela apresentada como validação visual. A proteção da prévia permanece habilitada.
+
+Referências de organização: [Carbon — data tables](https://www.carbondesignsystem.com/building-blocks/core/components/data-table/guidelines) e [Atlassian — DynamicTable](https://developer.atlassian.com/platform/forge/ui-kit/components/dynamic-table/).
+
+## Correção de “Suas faxinas” para contas administrativas — 13/10/2026
+
+A captura enviada mostrava dois serviços QA de outro proprietário na aba pessoal. A leitura administrativa da API inclui o histórico geral por autorização, mas a interface reutilizava esse conjunto integral em “Suas faxinas” e no resumo inicial. Essas duas telas agora usam apenas serviços cujo proprietário ou responsável é a conta atual, excluindo os marcados `is_test`. Gestão mantém o conjunto completo e as evidências; não houve exclusão, migração nem mudança de permissões. A tela vazia informa que nenhum pedido foi enviado e tem botão direto para pedir faxina.
+
+O banco DEV e seu histórico foram consultados: a conta Roldnei Costa tem Signature, Essenza e Amore cadastrados, mas nenhuma solicitação registrada; os dois serviços da captura são QA, de outra conta. A ausência do pedido Signature é uma questão distinta; ainda depende de identificar o dia/horário e a resposta recebida ao enviar. Nenhuma contratação foi criada a partir dessa investigação.
+
+Validação afetada: 19/19 testes em `personal-jobs-tests.txt`. Inclui conta administrativa na interface pessoal, serviço próprio, serviço atribuído, serviço alheio, QA próprio/alheio, busca/contagem sem QA, lista vazia e preservação integral do histórico em Gestão. Os fluxos existentes de cadastro, imóvel, pedido com preço/condições aceitos e falha de conexão também passaram. O build continua DEV; produção e pagamentos não foram alterados.
+
+## Aplicativos separados por uso — 13/10/2026
+
+- `/faxinas/contratar/`: aplicativo do proprietário. Pedir faxina, acompanhar pedidos, pagar, conferir a limpeza, cadastrar imóveis e escolher favoritas. Cor verde e ícone de casa.
+- `/faxinas/trabalhar/`: aplicativo da profissional. Serviços disponíveis, aceitar ofertas de outros proprietários, acompanhar somente trabalhos atribuídos à conta, executar checklist/fotos e consultar recebimento. Cor azul e ícone de limpeza.
+- `/faxinas/administracao/`: central exclusiva. Participantes, regras, imóveis/PMS, todos os serviços, pagamentos e auditoria. Autorização continua sendo exigida no servidor. Conta sem permissão recebe aviso explícito.
+- `/faxinas.html`: entrada para escolher o aplicativo, mantendo as duas opções públicas. O acesso à administração aparece para a conta autorizada. Links antigos `/faxinas-admin.html`, `/faxinas-profissional.html` e `/faxinas-proprietario.html` redirecionam ao aplicativo correspondente, preservando parâmetros de serviço.
+
+A mesma conta pode usar os dois aplicativos de uso diário. Editar dados no aplicativo do proprietário preserva serviços, disponibilidade, região, aprovação e papel profissional; editar o perfil profissional preserva o papel de proprietário e os imóveis. Não foram duplicadas contas, imóveis, pedidos ou pagamentos. O retorno da confirmação por e-mail identifica o aplicativo de origem e mantém o mesmo Auth existente.
+
+O aplicativo profissional explica quando a conta tem um pedido próprio aguardando outra profissional. A regra de não aceitar o próprio pedido permanece: separar aplicativos não transforma uma única pessoa nas duas partes de uma contratação. Para validar o aceite é necessária outra conta profissional aprovada/liberada e compatível com região/horário. Não foi criado aceite automático nem modificado o pedido real do Amore.
+
+Os dois aplicativos têm manifests independentes, IDs/escopos próprios, ícones PNG de 192/512 e display standalone, além do botão de instalação e orientações para Android/iPhone. O service worker controla somente `/faxinas/`; o único conteúdo no Cache Storage é a página genérica de falta de conexão. Não armazena páginas autenticadas, API, Pix, fotos, dados de participantes ou instruções. Não controla PMS, site, checkout ou caches de outros produtos. Rascunhos/fotos pendentes já salvos continuam no mecanismo IndexedDB por conta existente. Sem conexão, não há envio automático de contratação nem operação financeira.
+
+Verificação: `apps-tests.txt` cobre os aplicativos com Auth/rede simulados e Postgres local real, incluindo aceite por outra conta, recusa do próprio pedido, isolamento de navegação/serviços, preservação dos dois papéis, negativa administrativa, retorno de e-mail, manifests/ícones, escopo do service worker e ausência de cache privado. A regressão completa passou em **679/679** (`apps-full-tests.txt`); os 14 cenários específicos foram extraídos em `apps-tests.txt`. Fixtures usam horários futuros de manhã para manter os cenários válidos independentemente da hora em que os testes são executados; a rejeição real de trabalho atravessando meia-noite tem teste específico. Nenhuma regra operacional foi alterada para acomodar os testes.
+
+O build entrega os arquivos dos três aplicativos e mantém a configuração DEV. Publicação somente de prévia. Instalação efetiva em dispositivo, confirmação em caixa de e-mail real e validação visual continuam pendentes; os testes de manifest/DOM/service worker não são apresentados como instalação verificada. A prévia mantém a proteção Vercel existente e o conector autorizado verifica os assets publicados.
+
+Referências: [PWAs distintas no mesmo domínio](https://web.dev/articles/building-multiple-pwas-on-the-same-domain), [identidade do manifest](https://developer.mozilla.org/en-US/docs/Web/Progressive_web_apps/Manifest/Reference/id) e [service workers](https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers).
+
+Os links dos manifests são absolutos e o escopo/início aceita a URL canônica sem barra final usada pelo servidor. Isso evita que a resolução relativa procure o manifest na pasta errada depois de um redirecionamento. Os 14 testes dos aplicativos foram repetidos após esse ajuste e passaram (`apps-install-final-tests.txt`). A configuração global de URLs da Vercel não foi alterada.
+
+## Pedido próprio visível para explicar a ausência de oferta — 13/10/2026
+
+O aplicativo profissional mostra até três pedidos próprios pendentes em uma seção identificada como pedidos de proprietário: imóvel, janela, situação, total do proprietário e link para abrir no aplicativo de contratar. Não oferece ação de aceite nem inclui esses pedidos nas ofertas disponíveis. Se outra profissional já aceitou, o aviso informa a pendência do Pix. QA e pedidos de outras pessoas ficam fora dessa seção. Isso evita interpretar uma lista vazia como perda do serviço, mantendo a regra de não aceitar o próprio pedido.
+
+A investigação também identificou um erro de digitação na cidade de um imóvel do usuário: Guarapaei em vez de Guarapari. A correção foi limitada à cidade daquele imóvel no DEV, com filtro de propriedade/titular/valor anterior e histórico auditado; o pedido existente, sua situação, preços e condições foram preservados. A conta do usuário continuava sendo a única profissional ativa aprovada/liberada, então ainda não poderia aceitar o próprio pedido. Não houve aprovação automática de participantes, alteração de produção ou pagamento.
+
+Validação: 35/35 testes afetados em `own-request-visibility-tests.txt`, incluindo identificação do pedido próprio, ausência de botão de aceite, total claramente identificado, aceite já realizado por outra conta, compatibilidade após corrigir uma cidade e preservação da cópia comercial. A verificação real confirmou a cidade corrigida no histórico e o pedido ainda aguardando outra profissional. O build permanece DEV.
+
+
+## Valor exibido no aplicativo profissional — 14/10/2026
+
+Ofertas, início, lista e detalhe do aplicativo profissional mostram somente o recebimento líquido combinado, identificado como “Você vai receber”. O aviso de pedidos próprios mantém imóvel, horário, situação e link para contratar, sem apresentar preço. Detalhes de adicionais continuam visíveis pelo escopo, sem mostrar valores brutos. O aplicativo de contratar mantém composição, taxas e total do proprietário; a gestão mantém a conferência financeira. Contratos, cálculo, pagamentos e condições aceitas não foram alterados.
+
+Validação: **36/36** cenários afetados passaram (`worker-net-display-tests.txt`). Um cenário usa a interface ligada ao Postgres local com rede/Auth simulados para confirmar que uma profissional com taxa fixa recebe R$ 90 e vê somente esse valor em oferta, início, lista e detalhe, enquanto o proprietário continua vendo R$ 110 e sua taxa de R$ 10. Os avisos de pedidos próprios não mostram moeda, antes ou depois do aceite. Build DEV e verificação sintática passaram. Sem transferências reais ou alterações no banco compartilhado nesta correção.
+
+
+## Endereço, municípios e bairros validados — 14/10/2026
+
+Imóveis e perfil profissional agora usam pesquisa de cidade com seleção explícita de município/UF do catálogo do IBGE (5.571 municípios, snapshot obtido em 14/10/2026). Identificador IBGE é salvo e usado no cruzamento de ofertas e aceite, impedindo confusão entre municípios homônimos. Alterar a pesquisa limpa a seleção anterior imediatamente. Bairros vêm de um catálogo por município; não há campo livre para criar bairros em imóveis ou disponibilidade. Maiúsculas, espaços e acentos convergem para o mesmo cadastro; erros de digitação são rejeitados, sem correção por aproximação. A validação também acontece na API/Postgres, com tabelas privadas protegidas por RLS e RPCs disponíveis apenas ao serviço.
+
+Catálogo inicial de Guarapari contém 18 bairros e a região operacional/loteamento Setiba Ville, identificada como região. Bairros foram conferidos nas fontes municipais abaixo. Não há alegação de catálogo nacional completo de bairros. Quem não encontra seu bairro pode registrar um pedido privado de inclusão; isso não o torna selecionável. Gestão → Cidades e bairros permite conferir o município, nome, tipo, fonte e variações de grafia, aprovar uma inclusão ou recusar com explicação. Mudanças e pedidos têm histórico; aliases não podem tomar o nome de outro bairro. Outros municípios podem receber bairros após conferência administrativa.
+
+Rua/endereço completo continua privado e aceita número ou referência; tamanho mínimo/máximo e caracteres de controle são validados. Não foi acrescentada consulta a CEP nem confirmação de existência da rua/número. As etapas do imóvel permanecem duas. Pesquisa/seleção e checkbox de bairros substituem a digitação livre; falha de rede mantém os outros dados e apresenta tentativa explícita. Imóveis importados do PMS continuam sem endereço/cidade inventados até o proprietário completar os dados. Associações anteriores a municípios foram feitas apenas por nomes exatos e inequívocos, com histórico; preços, condições, contratação e financeiro não foram modificados.
+
+Validação: **49/49** cenários afetados (`locations-tests.txt`) e **695/695** na regressão completa (`locations-full-tests.txt`). Inclui DOM → handler Edge com Auth/rede simulados → Postgres local, estado/municípios homônimos, cidades/bairros inexistentes, normalização, seleção e limpeza ao digitar, falha de conexão/retry, pedido privado/deduplicado, administração autorizada, aprovação/recusa, conflito de aliases, preservação de preço/aceite e PMS pendente. Um fixture antigo de vitrine tinha chegada em 13/10/2026 e expirou; passou a usar datas futuras calculadas, sem mudança no comportamento do site.
+
+Aplicado somente ao DEV: migração cleaning_verified_locations e Edge cleaning-platform v6. Consulta real retornou Guarapari / ES e 19 bairros/regiões; testes negativos reais de cidade/bairro executados em transação encerrada com rollback. A impressão dos três contratos permaneceu idêntica, assim como os totais de hospedagens (27), tarefas (58), reservas (30) e pagamentos de hospedagens (34). Evidência em locations-live-validation.json. O advisory de segurança das tabelas de limpeza é informativo pela ausência intencional de políticas públicas; tabelas/RPCs são privadas, conforme testes de permissões. Build DEV passou. Produção e dinheiro real não foram usados. QA visual no celular continua pendente da sessão autenticada de navegador; os testes DOM não são apresentados como visita real às telas.
+
+Fontes do catálogo: [IBGE — API de localidades](https://servicodados.ibge.gov.br/api/docs/localidades), [Prefeitura de Guarapari — bairros](https://www.guarapari.es.gov.br/noticia/ler/266/prefeitura-realiza-ordem-de-servico-para-obras-de-drenagem-e-pavimentacao-em-setiba-e-una) e [Câmara de Guarapari — Setiba Ville como loteamento/região](https://guarapari.camarasempapel.com.br/Arquivo/Documents/legislacao/html/L1424A1993.html).
+
+
+## Busca e inclusão de bairros na área de atendimento — 15/10/2026
+
+O perfil profissional substitui a lista vertical de todos os bairros por pesquisa local, menu de resultados e botão “Incluir”. Apenas os selecionados aparecem abaixo, com botão “Remover”. Não há duplicação ao incluir novamente, e os bairros já salvos são preservados. A busca aceita texto sem acentos e não cria bairros; nomes ausentes ainda usam o pedido privado de conferência. Alterar município limpa as seleções, evitando carregar bairros da cidade anterior. O imóvel também ganhou pesquisa para filtrar o menu de bairro, preservando o endereço válido enquanto a pessoa apenas pesquisa. São mantidas as duas etapas do cadastro do imóvel e uma tela de perfil profissional.
+
+O catálogo foi ampliado exclusivamente em Guarapari: **117 bairros/localidades** revisados, considerando o cadastro da API municipal, os territórios e bairros citados no Plano Municipal de Saúde 2022–2025 (páginas 41, 74 e 97–98) e a lista dos CRAS. A API municipal traz 53 registros brutos, incluindo duplicatas, grafias erradas, um agrupamento de comunidades e duas linhas “não há locais cadastrados”. Esses itens não foram importados cegamente. Fonte bruta, revisão, exclusões e aliases estão em guarapari-municipal-api-20261015.json e guarapari-neighborhood-catalog.json. Áreas rurais/loteamentos são distinguidos como regiões. Esse catálogo operacional não certifica limites legais nem afirma que Guarapari tem 117 bairros oficiais. Boa Vista e Santa Rosa isolados ficaram fora pela ambiguidade; não foram inferidos aliases para esses nomes.
+
+A migração cleaning_guarapari_neighborhoods usa apenas o código IBGE de Guarapari, preserva os identificadores e vínculos existentes e pode ser repetida sem duplicar entidades ou tomar uma chave já vinculada a outro bairro. Não altera profissionais, imóveis, tarefas, contratos ou financeiro e não requer nova versão da Edge Function. A lista da cidade é consultada do banco existente, com o mesmo controle de acesso e histórico.
+
+Verificação específica: **54/54** testes passaram (`neighborhood-picker-tests.txt`), incluindo catálogo e escopo municipal, idempotência, busca, inclusão, remoção, ausência de duplicatas, seleção persistida, bairros fora do catálogo, pedidos privados, autorização e troca de cidade. Build DEV e verificação sintática passaram. A prova usa DOM e backend local com rede/Auth simulados; validação visual em celular autenticado permanece pendente.
+
+Fontes: [documentação oficial da API de bairros](https://wstransparencia.guarapari.es.gov.br/Help/Api/GET-api-bairro), [cadastro municipal](https://wstransparencia.guarapari.es.gov.br/api/bairro), [Plano Municipal de Saúde](https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf) e [bairros atendidos pelos CRAS](https://www.guarapari.es.gov.br/noticia/ler/618/atendimentos-dos-cras-de-guarapari-passam-ser-exclusivamente-por-telefone).
+
+
+Regressão completa desta entrega: **700/700** testes (`neighborhood-picker-full-tests.txt`), além dos **54/54** afetados. Migração aplicada exclusivamente no DEV: catálogo de Guarapari confirmou 117 nomes distintos, Setiba Ville permaneceu região e nenhuma região foi criada em outra cidade. A impressão de todos os contratos permaneceu igual à anterior, assim como os totais de 27 hospedagens, 58 tarefas, 30 reservas e 34 pagamentos de hospedagens. Evidência em neighborhood-picker-live-validation.json. A Edge permanece na v6, pois a atualização só acrescenta dados ao catálogo e muda o seletor da interface. Produção e dinheiro real não foram usados.
+
+
+## Resultado de bairro permanece na tela — 15/10/2026
+
+O seletor nativo de bairro foi substituído por resultados na própria tela. Cada resultado tem um botão explícito “Incluir” no perfil ou “Selecionar” no imóvel, sempre type=button. A lista só aparece ao pesquisar ou tocar em “Ver bairros da cidade”, começa com cinco itens e tem “Mostrar mais bairros”. Incluir, remover, trocar e navegar pelos resultados não enviam o formulário. O Enter nos campos de busca e no pedido de bairro é tratado sem enviar o cadastro; composição de texto continua preservada. Escolhas já incluídas aparecem identificadas, sem sugerir sua criação novamente.
+
+Validação: **56/56** testes afetados em neighborhood-in-place-tests.txt. Inclui o perfil profissional real em DOM com Auth/rede simulados e Postgres local: pesquisar, Enter e clique em resultado mantêm a mesma instância do formulário e URL, preservam os campos e não fazem chamada de gravação; apenas o botão final envia uma alteração e abre a tela inicial após sucesso. Também cobre seleção no imóvel, remoção, paginação dos resultados, ausência de duplicatas, região desconhecida, permissões, catálogo e preservação dos dois papéis. Build DEV, sintaxe e diff passaram. A regressão completa de 700 testes é a da entrega anterior; nesta correção foram executados os 56 cenários afetados.
+
+Não houve migração, publicação de Edge, alteração de dados compartilhados, valores ou pagamentos. Publicação apenas da interface de prévia DEV. Validação no aparelho físico continua pendente; os testes DOM não equivalem a interação em Android real.

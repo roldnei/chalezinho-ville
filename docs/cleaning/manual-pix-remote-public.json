@@ -1,0 +1,36 @@
+{
+  "environment": "DEV",
+  "tested_at": "2026-10-13T20:27:34.482Z",
+  "edge_version": 5,
+  "mode": "Public HTTP and unauthenticated security probes; positive financial tests are separately marked simulated",
+  "evidence": [
+    {
+      "name": "Published v5 exposes manual payment method and waits for a real configured key",
+      "pass": true
+    },
+    {
+      "name": "Public bootstrap discloses no platform or professional bank key",
+      "pass": true
+    },
+    {
+      "name": "manual_claim requires authenticated identity",
+      "pass": true
+    },
+    {
+      "name": "manual_credit requires authenticated identity",
+      "pass": true
+    },
+    {
+      "name": "manual_payout requires authenticated identity",
+      "pass": true
+    },
+    {
+      "name": "manual_refund requires authenticated identity",
+      "pass": true
+    },
+    {
+      "name": "Anonymous browser cannot invoke manual bank command RPC",
+      "pass": true
+    }
+  ]
+}
