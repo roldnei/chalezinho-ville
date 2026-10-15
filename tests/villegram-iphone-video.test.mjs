@@ -24,3 +24,14 @@ test('iPhone metadata-only video is seeked before waiting for its first frame',a
  Object.defineProperties(video,{duration:{value:8},readyState:{get:()=>ready},videoWidth:{value:1080},videoHeight:{value:1920},currentTime:{get:()=>time,set:v=>{time=v;ready=2;queueMicrotask(()=>video.dispatchEvent(new w.Event('seeked')))}}});
  const cover=await w.VillegramUpload.poster(video);assert.equal(time,.5);assert.equal(cover.type,'image/jpeg');dom.window.close();
 });
+test('decoder starts mounted inline playback and captures without a seeked event',async()=>{
+ const dom=new JSDOM('',{runScripts:'outside-only'}),w=dom.window;
+ w.eval(await readFile('villegram-upload.js','utf8'));
+ w.HTMLCanvasElement.prototype.getContext=()=>({drawImage(){},getImageData:()=>({data:new Uint8Array([50,40,30,255])})});
+ w.HTMLCanvasElement.prototype.toBlob=function(cb,type){cb(new w.Blob(['cover'],{type}))};
+ const video=w.document.createElement('video');let ready=1,time=0,played=0,paused=0;
+ video.pause=()=>paused++;
+ video.play=()=>{assert.equal(video.isConnected,true);assert.equal(video.playsInline,true);assert.equal(video.muted,true);played++;ready=2;queueMicrotask(()=>video.dispatchEvent(new w.Event('playing')));return Promise.resolve()};
+ Object.defineProperties(video,{duration:{value:8},readyState:{get:()=>ready},videoWidth:{value:1080},videoHeight:{value:1920},currentTime:{get:()=>time,set:v=>{time=v}}});
+ const cover=await w.VillegramUpload.poster(video);assert.equal(cover.type,'image/jpeg');assert.equal(played,1);assert.equal(paused,1);assert.equal(video.isConnected,false);dom.window.close();
+});
