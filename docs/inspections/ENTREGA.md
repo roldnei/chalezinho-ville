@@ -92,3 +92,11 @@ Validação adicional na prévia DEV: abertura automática da tarefa pelo link; 
 Migração aquática registrada no DEV como `20261015150557` (`inspection_property_water_amenities`). Após a validação, somente os quatro fixtures QA desta atualização foram cancelados e o usuário sintético suspenso. A tarefa do proprietário segue pendente com suas três fotos. Ajuste visual final omite metadados de autor/data quando a resposta restrita do link não os fornece; 11 testes direcionados passaram após esse ajuste. `npm run check` e build passaram.
 
 PMS de validação com alias da branch: https://chalezinho-ville-git-feature-team-insp-9351ae-roldneicosta-4140.vercel.app/pms-operacao.html?view=tasks . Links gerados em prévias imutáveis anteriores continuam apontando para aquela versão da interface; gere o link nesta prévia atualizada para validar o novo executor. Produção permanece sem alterações.
+
+## Revisão de fotos — 15/10, após relato do proprietário
+
+A revisão do executor compartilhado agora mostra uma galeria de todos os anexos da tarefa, com contagem, nome do item e ação “Ampliar foto”. Fotos em índices históricos fora do checklist atual também aparecem, sem exclusão. A ampliação usa um diálogo na própria página, compatível com URLs assinadas e imagens dataURL do acesso por link; não depende de nova aba. Botão Fechar/Escape encerra a ampliação e restaura o foco. A consulta continua autorizada pelas APIs existentes.
+
+Tarefas sem anexos mostram explicitamente “Nenhuma foto foi enviada nesta conferência”. Na inspeção DEV feita nesta atualização, a saída do Essenza `5b1a5d55-191c-48b9-a8be-990d6d9c3a53` continua em vistoria e sem fotos; a preparação do Signature `5153cd72-e98f-4490-9223-18b16514a4eb` tem sete fotos e está aprovada. Nenhuma dessas tarefas, respostas ou mídias foi alterada para testar. A regra vigente de fotos de saída permanece.
+
+Validação: 16 testes direcionados passaram, cobrindo galeria visível, ampliação/fechamento, fotos históricas fora dos índices atuais, indicação de ausência e fluxo compartilhado por link/conta; build DEV passou. Não houve nova autenticação do proprietário no navegador nem teste em aparelho físico nesta atualização. Sem migração ou alteração de produção nesta revisão visual. A liberação de publicações do Ville Moments já aplicada em produção foi preservada.

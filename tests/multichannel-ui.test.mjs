@@ -80,3 +80,12 @@ test('entry cannot advance without photo; exit without damage needs no upload',a
  const a=await taskFixture('preparation');try{a.w.document.querySelector('[data-next]').click();assert.match(a.w.document.querySelector('[data-wizard-message]').textContent,/Tire uma foto/)}finally{a.close()}
  const b=await taskFixture('departure');try{const d=b.w.document;assert.equal(d.querySelector('[data-camera]'),null);d.querySelector('[data-no-damage]').click();d.querySelector('[data-finish]').click();await new Promise(r=>setTimeout(r,30));assert.equal(b.calls.find(x=>x.action==='complete_task').results.every(x=>x.result==='ok'),true);assert.equal(b.calls.some(x=>x.action==='upload'),false)}finally{b.close()}
 });
+
+
+test('review shows every photo outside collapsed items with an explicit full-size link and item caption',async()=>{
+ const photos=[{item_index:0,url:'https://media.invalid/bathroom.jpg',stage:'departure'},{item_index:9,url:'https://media.invalid/legacy.jpg',stage:'departure'}];
+ const f=await taskFixture('departure',photos);try{const d=f.w.document;d.querySelector('[data-no-damage]').click();
+ const gallery=d.querySelector('.ops-review-gallery');assert.match(gallery.textContent,/Fotos desta conferência · 2/);assert.equal(gallery.querySelectorAll('a').length,2);assert.equal(gallery.closest('details'),null);assert.equal(gallery.querySelector('a').href,photos[0].url);assert.equal(gallery.querySelector('a').target,'_blank');assert.match(gallery.textContent,/Ampliar foto/);assert.match(gallery.textContent,/Banheiro/);assert.match(gallery.textContent,/Foto da conferência/);gallery.querySelector('a').click();assert.equal(d.querySelector('.ops-photo-viewer img').src,photos[0].url);assert.equal(d.querySelector('.ops-photo-viewer').getAttribute('open'),'');d.querySelector('.ops-photo-viewer button').click();assert.equal(d.querySelector('.ops-photo-viewer'),null);
+ }finally{f.close()}
+});
+test('review explicitly says when no photos were sent instead of leaving an empty collapsed section',async()=>{const f=await taskFixture('departure');try{const d=f.w.document;d.querySelector('[data-no-damage]').click();assert.match(d.querySelector('.ops-review-gallery').textContent,/Nenhuma foto foi enviada nesta conferência/);assert.equal(d.querySelector('.ops-review-gallery a'),null)}finally{f.close()}});
