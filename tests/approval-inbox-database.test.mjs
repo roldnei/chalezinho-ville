@@ -13,7 +13,7 @@ before(async()=>{
  create table properties(id bigint,name text);insert into properties values(1,'CH1');
  create table ops_stays(id uuid,is_test boolean);
  create table ops_tasks(id uuid,stage text,title text,property_id bigint,executed_by uuid,submitted_at timestamptz,updated_at timestamptz,due_at timestamptz,priority text,status text,cleaning_job_id uuid,stay_id uuid);
- create table ops_task_results(task_id uuid,result text);
+ create table ops_task_results(task_id uuid,result text,item_index int default 0);create table ops_evidence(task_id uuid,status text);alter table ops_tasks add column checklist_snapshot jsonb default '["Item"]';alter table ops_tasks add column item_rules_snapshot jsonb default '[]';
  create table pms_tasks(id uuid,title text,property_id bigint,assigned_user_id uuid,assigned_name text,submitted_at timestamptz,updated_at timestamptz,due_at timestamptz,status text);
  create table reservations(id uuid,property_id bigint,guest_name text);
  create table modification_requests(id uuid,reservation_id uuid,status text,created_at timestamptz);
@@ -30,14 +30,14 @@ before(async()=>{
  create table cleaning_receivers(user_id uuid,verified boolean,updated_at timestamptz);create table cleaning_manual_entries(id uuid,payment_id uuid,state text,created_at timestamptz);
  create table cleaning_manual_invoices(payment_id uuid,reported_at timestamptz,review_until timestamptz);
  `);
- await db.exec(await readFile(new URL('../supabase/migrations/20261015153616_admin_approval_inbox.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261015153616_admin_approval_inbox.sql',import.meta.url),'utf8'));await db.exec(await readFile(new URL('../supabase/migrations/20261015165640_approval_execution_evidence.sql',import.meta.url),'utf8'));
  await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
 });
 after(()=>db.close());
 test('queue derives entry and departure once, retains after reads, removes only decided items and returns reopened items',async()=>{
  const a='20000000-0000-4000-8000-000000000001',b='20000000-0000-4000-8000-000000000002';
  await db.query("insert into ops_tasks(id,stage,title,property_id,executed_by,submitted_at,status) values($1,'departure','Saída',1,$3,now(),'inspection'),($2,'preparation','Entrada',1,$3,now(),'inspection')",[a,b,staff]);
- await db.query("insert into ops_task_results values($1,'issue')",[a]);
+ await db.query("insert into ops_task_results(task_id,result) values($1,'issue')",[a]);
  let data=await call();assert.equal(data.total,2);assert.equal(data.items.find(i=>i.key==='ops:'+a).issues,1);assert.deepEqual(new Set(data.items.map(i=>i.category)),new Set(['Entrada','Saída']));
  assert.equal((await call()).total,2);
  await db.query("update ops_tasks set status='approved' where id=$1",[a]);assert.equal((await call()).total,1);
@@ -53,7 +53,7 @@ test('actionable statuses across sources counted, expired and waiting-on-guest s
  await db.exec('delete from modification_requests;delete from reservation_cancel_requests;delete from same_day_requests;delete from villegram_publications;');
 });
 test('linked cleaning approval is not counted again as an operations approval; test stays are excluded',async()=>{
- const j='40000000-0000-4000-8000-000000000001';await db.query("insert into cleaning_properties values($1,'CH1')",[j]);await db.query("insert into cleaning_jobs(id,property_id,state,is_test) values($1,$1,'review',false)",[j]);await db.query("insert into ops_stays values($1,true)",[j]);
+ const j='40000000-0000-4000-8000-000000000001';await db.query("insert into cleaning_properties values($1,'CH1')",[j]);await db.query("insert into cleaning_jobs(id,property_id,state,is_test,submitted_at) values($1,$1,'review',false,now())",[j]);await db.query("insert into ops_stays values($1,true)",[j]);
  await db.query("insert into ops_tasks(id,stage,title,property_id,status,cleaning_job_id) values(gen_random_uuid(),'preparation','Linked',1,'inspection',$1)",[j]);await db.query("insert into ops_tasks(id,stage,title,property_id,status,stay_id) values(gen_random_uuid(),'preparation','Fixture',1,'inspection',$1)",[j]);
  assert.equal((await call()).total,1);assert.equal((await call()).items[0].category,'Faxinas');
  await db.exec('delete from ops_tasks;delete from cleaning_jobs;');
@@ -63,4 +63,13 @@ test('database denies non-admin, unauthenticated and suspended admin callers wit
  await db.query("select set_config('request.jwt.claim.sub','',false)");await assert.rejects(call,/admin_required/);
  await db.exec('reset role');await db.query("update profiles set pms_access_status='suspended' where id=$1",[admin]);await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);await db.exec('set role authenticated');await assert.rejects(call,/admin_required/);await assert.rejects(db.query('select * from ops_tasks'),/permission denied/);await db.exec('reset role');
  await db.query("update profiles set pms_access_status='active' where id=$1",[admin]);await db.exec('set role authenticated');assert.equal((await call()).total,0);await db.exec('reset role;set role anon');await assert.rejects(call,/permission denied/);await db.exec('reset role');
+});
+
+
+test('operational queue excludes execution not yet submitted and exposes submitted photo and answer counts',async()=>{
+ await db.query("select set_config('request.jwt.claim.sub',$1,false)",[admin]);
+ const id='50000000-0000-4000-8000-000000000001';await db.query("insert into ops_tasks(id,stage,title,property_id,status,executed_by) values($1,'departure','Em execução',1,'inspection',$2)",[id,staff]);assert.equal((await call()).total,0);
+ await db.query("update ops_tasks set submitted_at=now() where id=$1",[id]);await db.query("insert into ops_task_results(task_id,result) values($1,'ok')",[id]);await db.query("insert into ops_evidence values($1,'ready'),($1,'pending')",[id]);
+ const data=await call();assert.equal(data.total,1);assert.equal(data.items[0].completed_execution,true);assert.equal(data.items[0].photo_count,1);assert.equal(data.items[0].answered_count,1);assert.equal(data.items[0].item_count,1);
+ await db.exec('delete from ops_evidence;delete from ops_task_results;delete from ops_tasks');
 });

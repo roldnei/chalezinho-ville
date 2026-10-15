@@ -17,3 +17,13 @@ Validação: 747 testes passaram (740 anteriores + 4 SQL + 3 interface), zero fa
 A consulta real DEV retornou um item: `Conferir saída · Ville Essenza`, enviado em 15/10/2026 às 12:32 (Brasília), tarefa `5b1a5d55-191c-48b9-a8be-990d6d9c3a53`. Nenhuma aprovação nem resposta do proprietário foi alterada para testar. O proprietário continua responsável por essa decisão. Nenhum aparelho Android/iPhone físico foi utilizado nesta atualização.
 
 Advisors: nenhum novo WARN/ERROR. Permanece o aviso preexistente de proteção contra senhas vazadas desativada: https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection .
+
+## Lista de execuções para decisão — 15/10, 14h
+
+A caixa passou a usar uma lista: a linha inteira é clicável e abre diretamente as fotos e respostas da conferência, sem os menus do PMS. Mostra autor, data da execução, quantidade de itens conferidos e quantidade de fotos antes da abertura. “Conferido às” foi substituído por “Lista atualizada em”, e “Aguardando vistoria” por “Aguardando aprovação”. O modo de revisão não permite executar uma tarefa reaberta/retirada da fila. Fotos aparecem visíveis e podem ser ampliadas na própria página; a aprovação continua usando o endpoint autorizado e só reduz o contador após a decisão persistir.
+
+O banco exige `submitted_at` e `executed_by` para uma conferência operacional entrar na fila; tarefas legadas e faxinas em revisão também precisam ter envio registrado. As outras solicitações permanecem nas etapas que aguardam decisão humana de seus módulos. Não se confundem pendências da equipe com a aprovação do administrador.
+
+A migração `20261015165640_approval_execution_evidence.sql` substitui apenas a consulta privada, mantém autorização e grants e acrescenta contadores de evidências/respostas. Aplicada somente no DEV. A consulta real sob `authenticated` confirmou a saída do Essenza como executada em 15/10 às 12h32, 6/6 itens, zero fotos, aguardando aprovação. Nenhuma tarefa ou mídia real foi modificada.
+
+21 testes direcionados passaram, incluindo exclusão de execução não enviada, contagem de fotos já enviadas, abertura direta da galeria ao clicar na linha e ampliação dentro da aprovação, além das verificações de autorização e atualização do contador. Build DEV passou. Interface autenticada do proprietário e aparelhos físicos não foram usados como teste nesta atualização; a integração UI foi validada com APIs controladas e a consulta real no banco DEV foi verificada separadamente.
