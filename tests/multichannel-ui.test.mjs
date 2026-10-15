@@ -9,7 +9,7 @@ test('today indicators filter stays and the corresponding task stage; clear rest
  const f=await fixture();try{
   const w=f.w,base=await (await w.fetch()).json(),s=base.stays[0];
   const tasks=['preparation','departure'].map(stage=>({id:stage,stay_id:s.id,property_id:s.property_id,stage,status:'pending',scheduled_for:'2026-10-12T14:00:00Z',due_at:'2026-10-12T15:00:00Z'}));
-  base.tasks=tasks;base.summary.pending=tasks;base.summary.today_tasks=tasks;base.summary.cleanings=[tasks[0]];base.summary.arrivals=[];
+  base.tasks=[...tasks,{id:'approved-preparation',stay_id:s.id,property_id:s.property_id,stage:'preparation',status:'approved'}];base.summary.pending=tasks;base.summary.today_tasks=tasks;base.summary.cleanings=[tasks[0]];base.summary.arrivals=[];
   w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
   w.document.querySelector('[data-today-filter="departures"]').click();
   assert.equal(w.document.querySelectorAll('[data-stay]').length,1);assert.deepEqual([...w.document.querySelectorAll('[data-task]')].map(x=>x.dataset.task),['departure']);
@@ -64,7 +64,7 @@ async function taskFixture(stage,photos=[]){
  const f=await fixture(),w=f.w,original=w.fetch,calls=[];
  w.indexedDB={open(){const req={};setTimeout(()=>{req.result={close(){},transaction(){const tx={objectStore:()=>({getAll:()=>({result:[]})})};setTimeout(()=>tx.oncomplete?.(),0);return tx}};req.onsuccess()},0);return req}};
  const task={id:'guided-task',stay_id:'qa-stay',property_id:3,stage,title:'Conferir',status:'pending',template_version:1,checklist_snapshot:['Banheiro','Cozinha']};
- w.fetch=async(url,options)=>{const p=options?JSON.parse(options.body):{};calls.push(p);if(p.action==='task')return {ok:true,json:async()=>({ok:true,task,results:[],photos})};if(p.action==='complete_task'){task.status='inspection';return {ok:true,json:async()=>({ok:true})}}const response=await original();const data=await response.json();data.tasks=[task];data.summary.pending=[task];data.summary.today_tasks=[task];return {ok:true,json:async()=>data}};
+ w.fetch=async(url,options)=>{const p=options?JSON.parse(options.body):{};calls.push(p);if(p.action==='task')return {ok:true,json:async()=>({ok:true,task,results:[],photos})};if(p.action==='complete_task'){task.status='inspection';return {ok:true,json:async()=>({ok:true})}}const response=await original();const data=await response.json();data.tasks=[task,...(stage==='departure'?[{id:'approved-preparation',stay_id:task.stay_id,stage:'preparation',status:'approved'}]:[])];data.summary.pending=[task];data.summary.today_tasks=[task];return {ok:true,json:async()=>data}};
  w.document.querySelector('[data-refresh]').click();await tick();w.document.querySelector('[data-task]').click();await new Promise(r=>setTimeout(r,20));return {...f,calls};
 }
 test('entry walks one item at a time and saves only once at the end',async()=>{
@@ -111,5 +111,22 @@ test('task cards distinguish not started, ongoing, submitted and finalized witho
   base.tasks=tasks;base.summary.today_tasks=tasks;w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();
   assert.deepEqual([...w.document.querySelectorAll('[data-task-status]')].map(e=>e.textContent),['Não iniciada','Em andamento','Enviada para aprovação','Finalizada']);
   assert.match(w.document.querySelector('[data-task="task-approved"]').textContent,/Conferência aprovada.*Tarefa encerrada/);assert.match(w.document.querySelector('[data-task="task-inspection"]').textContent,/Aguarda aprovação do administrador/);
+ }finally{f.close()}
+});
+
+test('task groups partition dates and collapse future lists; search finds held departures and history',async()=>{
+ const f=await fixture();try{
+  const w=f.w,base=await (await w.fetch()).json(),stay=base.stays[0];
+  const task=(id,date,extra={})=>({id,property_id:3,stage:'preparation',title:id,status:'pending',scheduled_for:date+'T18:00:00Z',due_at:date+'T19:00:00Z',...extra});
+  base.tasks=[task('Hoje','2026-10-12'),task('Atrasada','2026-10-11'),task('Amanhã','2026-10-13'),task('Limite sete dias','2026-10-19'),task('Oito dias','2026-10-20'),task('Saída oculta','2026-10-13',{stage:'departure',stay_id:stay.id,stay_version:2}),task('Antiga finalizada','2026-10-01',{status:'approved'})];
+  w.fetch=async()=>({ok:true,json:async()=>base});w.document.querySelector('[data-refresh]').click();await tick();w.document.querySelector('[data-tab="tasks"]').click();
+  const groups=[...w.document.querySelectorAll('[data-task-group]')];assert.equal(groups.length,3);assert.deepEqual(groups.map(g=>g.querySelectorAll('[data-task]').length),[2,2,1]);assert.deepEqual(groups.map(g=>g.open),[true,false,false]);
+  groups[1].open=true;assert.equal(groups[1].open,true);
+  let search=w.document.querySelector('[data-task-search]');search.value='saida oculta';search.dispatchEvent(new w.Event('input'));assert.deepEqual([...w.document.querySelectorAll('[data-task]')].map(x=>x.dataset.task),['Saída oculta']);assert.equal(w.document.querySelector('[data-task-search]'),search);
+  search.value='antiga finalizada';search.dispatchEvent(new w.Event('input'));assert.equal(w.document.querySelector('[data-task]').dataset.task,'Antiga finalizada');
+  search.value='';search.dispatchEvent(new w.Event('input'));assert.equal(w.document.querySelector('[data-task="Saída oculta"]'),null);
+  base.tasks.push(task('Entrada aprovada','2026-10-11',{status:'approved',stay_id:stay.id,stay_version:2}));w.document.querySelector('[data-refresh]').click();await tick();assert.ok(w.document.querySelector('[data-task="Saída oculta"]'));
+  base.tasks.find(t=>t.id==='Entrada aprovada').stay_version=1;w.document.querySelector('[data-refresh]').click();await tick();assert.equal(w.document.querySelector('[data-task="Saída oculta"]'),null);
+  base.tasks=base.tasks.filter(t=>t.id!=='Entrada aprovada');base.tasks.find(t=>t.id==='Saída oculta').preparation_approved=true;w.document.querySelector('[data-refresh]').click();await tick();assert.ok(w.document.querySelector('[data-task="Saída oculta"]'));
  }finally{f.close()}
 });

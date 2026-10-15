@@ -48,7 +48,8 @@ async function hub(a:any){
   admin.from('ops_sync_runs').select('*').order('started_at',{ascending:false}).limit(60).then(checked)
  ]);
  const fixtureIds=new Set(stays.filter(s=>s.is_test).map(s=>s.id));
- const visibleTasks=tasks.filter(t=>!fixtureIds.has(t.stay_id)&&taskAccess(a,t));
+ const approvedPreparations=new Set(tasks.filter(t=>t.stage==='preparation'&&t.status==='approved').map(t=>JSON.stringify([t.stay_id,t.stay_version])));
+ const visibleTasks=tasks.filter(t=>!fixtureIds.has(t.stay_id)&&taskAccess(a,t)).map(t=>({...t,preparation_approved:t.stage==='departure'&&!!t.stay_id&&approvedPreparations.has(JSON.stringify([t.stay_id,t.stay_version]))}));
  const assignedStayIds=new Set(visibleTasks.map(t=>t.stay_id));
  const guestAccess=a.role==='admin'||a.pms_permissions?.reservations===true;
  let visibleStays=stays.filter(s=>!s.is_test&&propertyAccess(a,s.property_id)&&(guestAccess||assignedStayIds.has(s.id))).map(s=>guestAccess?s:{...s,guest_name:null,guest_phone:null,guests:null,notes:null,departure_report_note:null});
