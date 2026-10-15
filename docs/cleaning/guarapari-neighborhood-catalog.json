@@ -1,0 +1,760 @@
+{
+  "municipality": {
+    "id": 3202405,
+    "name": "Guarapari",
+    "uf": "ES"
+  },
+  "reviewed_on": "2026-10-15",
+  "api_records": 53,
+  "api_sha256": "9254e21cd3da196ef832aea0e74782eccae30a9b4af6fb316854e8d55c06916b",
+  "notes": [
+    "Cadastro operacional municipal, complementado por áreas de cobertura do Plano Municipal de Saúde; não equivale a certificação de limites legais.",
+    "Boas grafias foram conferidas em fontes municipais. Repetições convergem para uma única chave.",
+    "Boa Vista e Santa Rosa isolados ficaram fora por ambiguidade; nenhum alias foi inferido para eles.",
+    "Itens sem local foram excluídos. O registro agrupado de comunidades foi desdobrado usando os nomes no plano e no cadastro municipal.",
+    "Áreas rurais e loteamentos são identificados como região. Não houve inclusão em outra cidade."
+  ],
+  "excluded_api_values": [
+    "BOA VISTA",
+    "SANTA ROSA",
+    "não há locais cadastrados",
+    "não há locais cadastrados ",
+    "COMUNIDADES DE BOA ESPERANÇA, SAMAMBAIA,  LIMÃOZINHO E RETA GRANDE 1 E 2"
+  ],
+  "catalog": [
+    {
+      "name": "Acampamento Adventista",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Acapulco",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Adalberto Simão Nader",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "Adalbeto Simão Nader"
+      ]
+    },
+    {
+      "name": "Aeroporto",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Aldeia Velha",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Aldeia da Praia",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Alto Baía Nova",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Alto Iguape",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Alto Lameirão",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Alto São Miguel",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Alto Todos os Santos",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Amarelinho",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": [
+        "Amarelinhos"
+      ]
+    },
+    {
+      "name": "Amarelos",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Andana",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": [
+        "Andano"
+      ]
+    },
+    {
+      "name": "Arraial de Jaboti",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Balneário de Meaípe",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Banqueta",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Barra do Limão",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Barro Branco",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Baía Nova",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "BAIA NOVA"
+      ]
+    },
+    {
+      "name": "Bela Vista",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Belo Horizonte",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Boa Esperança",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Buenos Aires",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Cabeça Quebrada",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Cachoeirinha",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Camurugi",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Centro",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Concha D’Ostra",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Condados",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Coroado",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Elza Nader",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Enseada Azul",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Fazenda Roncetti",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Fazenda do Campo",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Fátima Cidade Jardim",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Goiaba",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Iguape",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Ilha do Sol",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Ilhas Verdes",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/noticia/ler/618/atendimentos-dos-cras-de-guarapari-passam-ser-exclusivamente-por-telefone",
+      "aliases": []
+    },
+    {
+      "name": "Independência",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "INDEPENDÊNCCIA"
+      ]
+    },
+    {
+      "name": "Ipiranga",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Itapebussu",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Itaúna",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Jabaraí",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Jaboti",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": [
+        "Jabuti"
+      ]
+    },
+    {
+      "name": "Jaboticaba",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "JOBOTICABA",
+        "Jabuticaba"
+      ]
+    },
+    {
+      "name": "Jacarandá",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Jacunen",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Jardim Boa Vista",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Jardim Europa",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Jardim Guarapari",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Jardim Santa Rosa",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Kubitschek",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "Kubitscheck",
+        "Kubistchek"
+      ]
+    },
+    {
+      "name": "Lagoa Dourada",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Lagoa Funda",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Lagoa Vermelha",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Laje das Pedras",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": [
+        "Lage das Pedras"
+      ]
+    },
+    {
+      "name": "Lameirão",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Limãozinho",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Maxinda",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Meaípe",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Morro Alto",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Mucambo",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "MUCAMBU"
+      ]
+    },
+    {
+      "name": "Muquiçaba",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Neves",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Nossa Senhora da Conceição",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "NOSSA SENHORA DA CANCEIÇÃO"
+      ]
+    },
+    {
+      "name": "Nova Guarapari",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Olaria",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Palmeiras",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Parque da Areia Preta",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": [
+        "Parque Areia Preta"
+      ]
+    },
+    {
+      "name": "Parque das Mansões",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Paturá",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Pau D’Óleo",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Pernambuco",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Perocão",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Pontal de Santa Mônica",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Portal Clube",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "Portal Club"
+      ]
+    },
+    {
+      "name": "Portal de Guarapari",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/noticia/ler/618/atendimentos-dos-cras-de-guarapari-passam-ser-exclusivamente-por-telefone",
+      "aliases": []
+    },
+    {
+      "name": "Porto Grande",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Praia de Santa Mônica",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/noticia/ler/618/atendimentos-dos-cras-de-guarapari-passam-ser-exclusivamente-por-telefone",
+      "aliases": []
+    },
+    {
+      "name": "Praia do Morro",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Praia do Riacho",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Praia do Sol",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/noticia/ler/618/atendimentos-dos-cras-de-guarapari-passam-ser-exclusivamente-por-telefone",
+      "aliases": []
+    },
+    {
+      "name": "Prainha de Olaria",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Recanto da Sereia",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Residencial Beira Mar",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Reta Grande",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Rio Calçado",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Rio Clarinho",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Rio Claro",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Rio Grande",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Rio da Prata",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Samambaia",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Santa Luzia",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Santa Margarida",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Santa Mônica",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Santa Rita",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Santana",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Setiba",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Setiba Ville",
+      "kind": "regiao",
+      "source": "https://guarapari.camarasempapel.com.br/Arquivo/Documents/legislacao/html/L1424A1993.html",
+      "aliases": []
+    },
+    {
+      "name": "Sol Nascente",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "São Félix",
+      "kind": "regiao",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": [
+        "SÃO FELIX"
+      ]
+    },
+    {
+      "name": "São Gabriel",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "São José",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "São João",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "São João do Jaboti",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": [
+        "São João de Jabuti"
+      ]
+    },
+    {
+      "name": "São Judas Tadeu",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "São Miguel",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Taquara do Reino",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Tartaruga",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Todos Os Santos",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Una",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Vargem Fria",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Vila Samarco",
+      "kind": "bairro",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    },
+    {
+      "name": "Village do Sol",
+      "kind": "bairro",
+      "source": "https://wstransparencia.guarapari.es.gov.br/api/bairro",
+      "aliases": []
+    },
+    {
+      "name": "Várzea Nova",
+      "kind": "regiao",
+      "source": "https://www.guarapari.es.gov.br/uploads/files/saude/plano-municipal-de-saude/PMS-2022-2025---Aprovado-pelo-CMS.pdf",
+      "aliases": []
+    }
+  ]
+}

@@ -12,6 +12,11 @@ const api=actor=>async(action,p={})=>action==='locations'?locations(p,actor):{re
 const until=async f=>{for(let i=0;i<120;i++){if(f())return;await new Promise(r=>setTimeout(r,10));}throw Error('UI not settled');};
 before(async()=>{db=await database({locations:true});c=client(db);await c.mutate('member',member());await c.mutate('member',member('Profissional',true),worker);await c.mutate('member',member('Outra pessoa'),other);await release(c,owner);await release(c,worker);});
 after(async()=>{doms.forEach(d=>d.window.close());await db.close();});
+test('Guarapari catalog contains reviewed missing neighborhoods, preserves Setiba Ville and does not fill other cities',async()=>{
+ const catalog=(await locations({city_id:3202405})).neighborhoods;assert.equal(catalog.length,117);const names=catalog.map(n=>n.name);for(const name of ['Aeroporto','Elza Nader','Paturá','Nova Guarapari','São Judas Tadeu','Enseada Azul','Praia do Riacho','Independência','Nossa Senhora da Conceição','Adalberto Simão Nader','Jaboticaba','Setiba Ville'])assert.ok(names.includes(name),name);assert.equal(new Set(names.map(n=>n.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase())).size,117);
+ assert.equal((await c.one('select count(*)::int n from cleaning_neighborhoods where city_id<>3202405')).n,0);assert.ok(!names.some(n=>/não há locais|INDEPENDÊNCCIA|CANCEIÇÃO|JOBOTICABA|Adalbeto/.test(n)));assert.equal(catalog.find(n=>n.name==='Setiba Ville').kind,'regiao');
+ const before=JSON.parse(JSON.stringify(catalog));await db.exec(await readFile(new URL('../supabase/migrations/20261015032030_cleaning_guarapari_neighborhoods.sql',import.meta.url),'utf8'));assert.deepEqual((await locations({city_id:3202405})).neighborhoods,before);
+});
 test('all 5571 official municipalities have UF; same city name needs a specific state',async()=>{
  assert.equal((await c.one('select count(*)::int n from cleaning_cities')).n,5571);const cities=(await locations({query:'Bom Jesus'})).cities;assert.ok(cities.some(x=>x.uf==='PI'));assert.ok(cities.some(x=>x.uf==='RS'));assert.ok(cities.every(x=>x.label.includes(x.uf)));
  await assert.rejects(()=>c.mutate('property',{...property(),city:'Bom Jesus'}),/city_selection_required/);
@@ -97,4 +102,22 @@ test('actual Edge handler authenticates location lookup and routes review/intere
  const rejected=await e.post({action:'property',...property(),city:'Guarapaei'});assert.equal(rejected.status,409);assert.equal((await rejected.json()).error,'invalid_city');
  const interested=await e.post({action:'location_interest',city_id:3202405,name:'Bairro QA edge'});assert.equal(interested.status,200);
  const unauthorized=await e.post({action:'location_review',city_id:3202405,name:'Bairro QA edge',kind:'bairro',checked:true,source:'https://qa.example.test/fonte'});assert.equal(unauthorized.status,403);assert.equal((await unauthorized.json()).error,'cleaning_admin_required');
+});
+
+
+test('professional searches, includes and removes canonical neighborhoods while keeping saved selections compact',async()=>{
+ const {w,f}=await ui({city:'Guarapari',bairros:['Setiba','Muquiçaba']},true);const search=f.elements.bairro_search,choice=f.elements.bairro_choice,add=f.querySelector('[data-bairro-add]');assert.equal(f.querySelectorAll('[data-bairro-selected] li').length,2);assert.equal(f.querySelectorAll('[name=bairros]').length,2);assert.ok(f.querySelectorAll('[name=bairros]')[0].hidden);
+ search.value='aerop';search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(choice.options.length,2);assert.equal(choice.selectedOptions[0].textContent,'Aeroporto');assert.equal(add.disabled,false);add.click();assert.equal(f.querySelectorAll('[name=bairros]:checked').length,3);assert.ok([...f.querySelectorAll('[name=bairros]:checked')].some(x=>x.value==='Aeroporto'));assert.equal(search.value,'');assert.equal(choice.value,'');add.click();assert.equal(f.querySelectorAll('[name=bairros]').length,3);
+ const item=[...f.querySelectorAll('[data-bairro-selected] li')].find(n=>n.textContent.includes('Aeroporto'));item.querySelector('button').click();assert.equal(f.querySelectorAll('[name=bairros]').length,2);assert.ok([...f.querySelectorAll('[name=bairros]')].some(n=>n.value==='Setiba'));assert.equal(locationValid(f,true),true);
+ search.value='muquicaba';search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(choice.options.length,1);assert.equal(add.disabled,true);assert.match(f.querySelector('[data-bairro-search-status]').textContent,/Nenhum bairro encontrado/);
+});
+test('unknown typed neighborhood is a search, cannot be included, and can only generate a pending review request',async()=>{
+ const {w,f}=await ui({city:'Guarapari'},true);const search=f.elements.bairro_search;search.value='Bairro inventado QA';search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(f.querySelector('[data-bairro-add]').disabled,true);f.querySelector('[data-bairro-add]').click();assert.equal(locationValid(f,true),false);assert.equal(f.querySelectorAll('[name=bairros]').length,0);
+ f.elements.missing_neighborhood.value='Bairro inventado QA';f.querySelector('[data-location-interest]').click();await until(()=>f.querySelector('[data-location-interest-status]').textContent.includes('registrado'));assert.equal((await locations({city_id:3202405})).neighborhoods.some(n=>n.name==='Bairro inventado QA'),false);assert.equal(locationValid(f,true),false);
+});
+test('changing municipality clears every selected neighborhood and cannot carry Guarapari selections elsewhere',async()=>{
+ const {w,f}=await ui({city:'Guarapari',bairros:['Setiba']},true);f.elements.city_search.value='Vitória';f.elements.city_search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(f.querySelectorAll('[name=bairros]').length,0);assert.equal(f.elements.city_ibge.value,'');assert.equal(locationValid(f,true),false);assert.equal(f.elements.name.value,'Progresso preservado');await until(()=>f.elements.city_choice.options.length>1);
+});
+test('property neighborhood menu filters accents without changing an already selected valid address',async()=>{
+ const {w,f}=await ui({city:'Guarapari',bairro:'Setiba'});f.elements.bairro_search.value='muquicaba';f.elements.bairro_search.dispatchEvent(new w.Event('input',{bubbles:true}));assert.equal(f.elements.bairro.value,'Setiba');assert.match(f.querySelector('[data-bairro-search-status]').textContent,/1 bairro/);assert.ok([...f.elements.bairro.options].some(o=>o.value==='Muquiçaba'));f.elements.bairro.value='Muquiçaba';f.elements.bairro.dispatchEvent(new w.Event('change',{bubbles:true}));assert.equal(locationValid(f),true);
 });
