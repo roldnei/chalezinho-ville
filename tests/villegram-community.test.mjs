@@ -268,3 +268,16 @@ test('database assigns expiry from approval, keeps it on unrelated edits and ret
  const expired=(await db.query('select * from villegram_publications where id=$1',[r.id])).rows[0];assert.equal(expired.status,'published');assert.equal(guestPublicationVisible(expired),false);assert.deepEqual(expired.media,row.media);
  const team=(await db.query("insert into villegram_publications(source,type,title,caption,status,media,cta,published_at) values('manual','trust','Team','Team','published','[{\"kind\":\"photo\",\"url\":\"assets/photo.webp\"}]','dates',now()-interval '30 days') returning expires_at")).rows[0];assert.equal(team.expires_at,null);
 });
+
+test('private and new profiles see a posting notice that opens explicit consent without checking or saving it',async()=>{
+ for(const profile of [null,{id:owner,handle:'cellyaa',display_name:'Pessoa',is_public:false}]){
+ const state={profile,allowed:true,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w,calls}=await communityPage('conta.html','',()=>state);try{const d=w.document,form=d.querySelector('#community-profile-form');assert.match(d.querySelector('.community-public-notice').textContent,/Quero um perfil público/);assert.match(d.querySelector('.community-public-notice').textContent,/reserva continuam privados/);
+ d.querySelector('#community-enable-public').click();assert.equal(form.hidden,false);assert.equal(d.activeElement,form.elements.is_public);assert.equal(form.elements.is_public.checked,false);assert.equal(calls.some(c=>c.operation==='community_save_profile'),false);
+ form.hidden=true;d.querySelector('#community-profile-card .primary-action').click();assert.equal(form.hidden,false);assert.equal(d.activeElement,form.elements.is_public);assert.equal(form.elements.is_public.checked,false);assert.match(d.querySelector('#community-profile-feedback').textContent,/Salvar perfil/);
+ }finally{dom.window.close()}}
+});
+test('already public profile has no consent reminder and can open the composer',async()=>{
+ const state={profile:{id:owner,handle:'publicperson',display_name:'Pessoa',is_public:true},allowed:true,publications:[],notifications:[],mentions:[],invites:[]};
+ const {dom,w}=await communityPage('conta.html','',()=>state);try{assert.equal(w.document.querySelector('.community-public-notice'),null);assert.equal(w.document.querySelector('#community-profile-card .primary-action').getAttribute('href'),'villegram-admin.html?mode=guest')}finally{dom.window.close()}
+});
