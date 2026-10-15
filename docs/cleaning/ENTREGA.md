@@ -189,3 +189,12 @@ Fontes: [documentação oficial da API de bairros](https://wstransparencia.guara
 
 
 Regressão completa desta entrega: **700/700** testes (`neighborhood-picker-full-tests.txt`), além dos **54/54** afetados. Migração aplicada exclusivamente no DEV: catálogo de Guarapari confirmou 117 nomes distintos, Setiba Ville permaneceu região e nenhuma região foi criada em outra cidade. A impressão de todos os contratos permaneceu igual à anterior, assim como os totais de 27 hospedagens, 58 tarefas, 30 reservas e 34 pagamentos de hospedagens. Evidência em neighborhood-picker-live-validation.json. A Edge permanece na v6, pois a atualização só acrescenta dados ao catálogo e muda o seletor da interface. Produção e dinheiro real não foram usados.
+
+
+## Resultado de bairro permanece na tela — 15/10/2026
+
+O seletor nativo de bairro foi substituído por resultados na própria tela. Cada resultado tem um botão explícito “Incluir” no perfil ou “Selecionar” no imóvel, sempre type=button. A lista só aparece ao pesquisar ou tocar em “Ver bairros da cidade”, começa com cinco itens e tem “Mostrar mais bairros”. Incluir, remover, trocar e navegar pelos resultados não enviam o formulário. O Enter nos campos de busca e no pedido de bairro é tratado sem enviar o cadastro; composição de texto continua preservada. Escolhas já incluídas aparecem identificadas, sem sugerir sua criação novamente.
+
+Validação: **56/56** testes afetados em neighborhood-in-place-tests.txt. Inclui o perfil profissional real em DOM com Auth/rede simulados e Postgres local: pesquisar, Enter e clique em resultado mantêm a mesma instância do formulário e URL, preservam os campos e não fazem chamada de gravação; apenas o botão final envia uma alteração e abre a tela inicial após sucesso. Também cobre seleção no imóvel, remoção, paginação dos resultados, ausência de duplicatas, região desconhecida, permissões, catálogo e preservação dos dois papéis. Build DEV, sintaxe e diff passaram. A regressão completa de 700 testes é a da entrega anterior; nesta correção foram executados os 56 cenários afetados.
+
+Não houve migração, publicação de Edge, alteração de dados compartilhados, valores ou pagamentos. Publicação apenas da interface de prévia DEV. Validação no aparelho físico continua pendente; os testes DOM não equivalem a interação em Android real.
