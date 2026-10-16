@@ -162,3 +162,11 @@ A migração `20261016220000_cost_review_neural_engine.sql`, aplicada somente em
 Ao salvar o custo com o comprovante ativo, o sistema registra automaticamente a leitura original, os dados finais e as regiões. A gravação ocorre depois de persistir o custo e o anexo; editar ou cancelar não gera exemplo. Somente o comprovante ativo recebe os dados finais, evitando atribuí-los aos outros anexos. A confirmação dos dados lidos continua necessária; foi removida somente a opção separada de guardar o exemplo. Custos sem comprovante ativo não geram exemplos. Isso não treina o modelo automaticamente.
 
 O botão único Anexar comprovante abre diretamente o seletor do aparelho, aceitando fotos e PDF. O botão exclusivo Fotografar e seu campo de câmera foram removidos.
+
+## Análise gráfica de custos
+
+O painel inclui evolução mensal (12 meses, inclusive zeros), comparação anual e comparação dos imóveis por mês ou ano. Mostra total do mês, total anual do imóvel/filtro e total geral anual de todos os imóveis, incluindo compartilhados. As barras permitem selecionar mês, ano ou imóvel, sincronizando filtros e lançamentos. Os valores mensais também estão disponíveis em tabela acessível.
+
+Usa os lançamentos carregados e exclui arquivados. Compartilhados não são rateados automaticamente; imóveis sem cadastro carregado mantêm identificação própria. O critério selecionado vale para os gráficos: competência, pagamento (sem despesas ainda não pagas) ou exclusão fiscal (somente valor de exclusões confirmadas, com título específico). Comparação por imóvel mostra todos os imóveis no período, enquanto evolução e totais no filtro respeitam o imóvel selecionado.
+
+Sem dependência gráfica externa nem mudança no banco. Validado com 21 testes direcionados e Chromium em 390px/1440px: somas exatas em centavos, filtros interativos, período vazio, total geral, compartilhados e ausência de rolagem horizontal na página. Dados do teste de navegador são fictícios e não são gravados no banco.

@@ -1,4 +1,4 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import vm from 'node:vm';import {JSDOM} from 'jsdom';import * as model from '../costs-model.js';import {reviewExample} from '../cost-receipt-regions.js';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import vm from 'node:vm';import {JSDOM} from 'jsdom';import * as model from '../costs-model.js';import {createCostAnalytics} from '../costs-analytics.js';import {reviewExample} from '../cost-receipt-regions.js';
 const pause=()=>new Promise(resolve=>setTimeout(resolve,15));
 async function setup({reader=async()=>({fields:{},warnings:[],text:''})}={}){
  const dom=new JSDOM(await readFile(new URL('../custos.html',import.meta.url),'utf8'),{url:'https://test.local/custos.html',runScripts:'outside-only'}),w=dom.window;
@@ -16,7 +16,7 @@ async function setup({reader=async()=>({fields:{},warnings:[],text:''})}={}){
   storage:{from:()=>({upload:async(path,file)=>{if(uploadFailure)return {error:{message:'Network'}};files.set(path,file);return {data:{path}}},download:async path=>({data:files.get(path)})})}
  })};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};w.confirm=()=>true;w.URL.createObjectURL=()=> 'blob:qa';w.URL.revokeObjectURL=()=>{};
- Object.assign(w,model,{readReceipt:reader,reviewExample,createReceiptViewer:()=>({setItem:()=>{},setResult:()=>{},setReading:()=>{},setNotice:()=>{},clear:()=>{},refresh:()=>{}})});const source=(await readFile(new URL('../custos.js',import.meta.url),'utf8')).replace(/^import .*?;\r?\n/gm,'');vm.runInContext(source,dom.getInternalVMContext());await pause();
+ Object.assign(w,model,{createCostAnalytics,readReceipt:reader,reviewExample,createReceiptViewer:()=>({setItem:()=>{},setResult:()=>{},setReading:()=>{},setNotice:()=>{},clear:()=>{},refresh:()=>{}})});const source=(await readFile(new URL('../custos.js',import.meta.url),'utf8')).replace(/^import .*?;\r?\n/gm,'');vm.runInContext(source,dom.getInternalVMContext());await pause();
  return {dom,w,data,files,failUploads:value=>{uploadFailure=value},$:s=>w.document.querySelector(s),field:n=>w.document.querySelector(`[name="${n}"]`)};
 }
 test('UI persists expense, photo, fiscal review and separate reporting months without auto deduction',async()=>{

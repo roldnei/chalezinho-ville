@@ -1,4 +1,5 @@
 import {createReceiptViewer} from './cost-receipt-viewer.js';
+import {createCostAnalytics} from './costs-analytics.js';
 import {reviewExample} from './cost-receipt-regions.js';
 import {CATEGORIES,TAX_SOURCE,cents,monthStart,selection,totals,reportCSV,safeName,zipBlob} from './costs-model.js';
 import {readReceipt} from './cost-receipt-ocr.js';
@@ -12,6 +13,7 @@ let receiptController=null,receiptRun=0,receiptBusy=false,receiptActive=null,rec
 const touchedFields=new Set(),receiptDefaults=new Map(),receiptAuto=new Map();
 const receiptFields=['supplier','supplier_document','document_date','competence','document_number','amount','category','description'];
 const form=$('#cost-form'),field=n=>form.elements.namedItem(n);
+const analytics=createCostAnalytics($('#cost-analysis'),{onMonth:month=>{$('#cost-month').value=month;render();},onProperty:property=>{$('#cost-property').value=property;render();}});
 const viewer=createReceiptViewer($('#cost-document-viewer'),{getValue:name=>field(name).value,onChange:correctReceiptField,onReviewChange:requireReceiptReview});
 function requireReceiptReview(){$('#cost-receipt-panel').hidden=false;receiptReview=true;field('receipt_reviewed').checked=false;field('receipt_reviewed').required=true;$('#cost-receipt-review').hidden=false;}
 function correctReceiptField(name,value){
@@ -78,6 +80,7 @@ async function allRows(table,build=q=>q){let rows=[];for(let offset=0;;offset+=1
 function visible(){return selection(entries,$('#cost-month').value,$('#cost-property').value,$('#cost-basis').value);}
 function propertyName(id){return properties.find(p=>String(p.id)===String(id))?.name||'Compartilhado / geral';}
 function render(){
+ analytics.render({entries,properties,month:$('#cost-month').value,property:$('#cost-property').value,basis:$('#cost-basis').value});
  const rows=visible(),t=totals(rows),missing=rows.filter(r=>!receipts.some(f=>f.expense_id===r.id)).length;
  $('#cost-totals').innerHTML=`<article><small>CUSTOS NO FILTRO</small><strong>${brl(t.cost)}</strong><small>${rows.length} lançamento(s) · pagos: ${brl(t.paid)}</small></article><article><small>EXCLUSÕES REVISADAS NO FILTRO</small><strong>${brl(t.exclusions)}</strong><small>Para apurar por mês fiscal, altere “Organizar por”.</small></article><article><small>PENDÊNCIAS</small><strong>${t.pending} para revisar</strong><small>${missing} lançamento(s) sem comprovante</small></article>`;
  $('#cost-period-title').textContent='Lançamentos · '+$('#cost-month').value.split('-').reverse().join('/');
