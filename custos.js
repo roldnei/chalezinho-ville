@@ -83,11 +83,11 @@ function classify(){
 function openEditor(row){
  cancelReceiptRead();receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
  edit=row?{...row}:null;draftId=row?.id||crypto.randomUUID();queue=[];form.reset();$('#cost-form-message').textContent='';$('#cost-dialog-title').textContent=row?'Editar custo':'Novo custo';$('#cost-archive').hidden=!row;
- field('category').innerHTML=Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
+ field('category').innerHTML='<option value="">Selecione a categoria</option>'+Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
  field('property_id').innerHTML='<option value="">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
  for(const key of ['description','supplier','supplier_document','document_number','document_date','paid_on','notes','fiscal_note'])field(key).value=row?.[key]||'';
  for(const name of ['amount','exclusion']){field(name).setCustomValidity('');field(name).removeAttribute('aria-invalid');$('#cost-'+name+'-error').hidden=true;}
- field('amount').value=row?brl(row.amount_cents):'';field('category').value=row?.category||'cleaning';field('property_id').value=row?.property_id||'';
+ field('amount').value=row?brl(row.amount_cents):'';field('category').value=row?.category||'';field('property_id').value=row?.property_id||'';
  field('competence').value=row?.competence.slice(0,7)||$('#cost-month').value;field('document_date').value=row?.document_date||today();field('paid_on').max=today();field('exclusion').value=row?.exclusion_cents?brl(row.exclusion_cents):'';field('fiscal_month').value=row?.fiscal_month?.slice(0,7)||row?.paid_on?.slice(0,7)||today().slice(0,7);
  field('owner_borne').checked=!!row?.owner_borne;field('confirm_fiscal').checked=row?.fiscal_status==='confirmed';$('#cost-existing-files').innerHTML=row?filesHTML(row.id):'';bindDownloads($('#cost-existing-files'));renderQueue();classify();for(const input of form.querySelectorAll('[name]'))receiptDefaults.set(input.name,input.value);$('#cost-dialog').showModal();
 }
@@ -103,6 +103,7 @@ function addFiles(input){
 }
 function payload(){
  if(receiptReview&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');
+ if(!CATEGORIES[field('category').value])throw Error('Selecione a categoria do custo.');
  const p={description:field('description').value.trim(),category:field('category').value,property_id:field('property_id').value?Number(field('property_id').value):null,amount_cents:cents(field('amount').value),competence:monthStart(field('competence').value),document_date:field('document_date').value,paid_on:field('paid_on').value||null,supplier:field('supplier').value.trim(),supplier_document:field('supplier_document').value.trim(),document_number:field('document_number').value.trim(),notes:field('notes').value.trim(),fiscal_note:field('fiscal_note').value.trim(),owner_borne:field('owner_borne').checked,fiscal_status:CATEGORIES[field('category').value][1]?'review':'operational',fiscal_month:null,exclusion_cents:0};
  if(p.paid_on&&p.paid_on>today())throw Error('A data do pagamento não pode estar no futuro.');
  if(field('confirm_fiscal').checked){if(!p.property_id)throw Error('Vincule a exclusão fiscal a um imóvel. Para custos compartilhados, registre o rateio documentado por imóvel.');if(!p.paid_on||!p.owner_borne||p.fiscal_note.length<5)throw Error('Informe pagamento, justificativa e confirme que o encargo foi do locador.');if(!queue.length&&!receipts.some(f=>f.expense_id===edit?.id))throw Error('Anexe o comprovante antes de revisar a exclusão.');

@@ -16,3 +16,10 @@ test('scanned PDF with no text layer renders locally and its image can be recogn
  worker=await createWorker('por',1,{langPath:new URL('../node_modules/@tesseract.js-data/por/4.0.0_best_int',import.meta.url).pathname,cacheMethod:'none'});const {data}=await worker.recognize(canvas.toBuffer('image/png'));const r=extractReceiptFields(data.text);assert.equal(r.fields.amount_cents,14000);assert.equal(r.fields.supplier_document,'11.222.333/0001-81');
  }finally{if(worker)await worker.terminate();await task.destroy();}
 });
+test('receipt on a textured background uses fiscal anchors for a second local reading',async()=>{
+ const {createCanvas,loadImage}=await import('@napi-rs/canvas'),{enhanceReceipt,combineReceiptReadings}=await import('../cost-receipt-image.js');
+ const image=await loadImage(new URL('./fixtures/receipts/synthetic-receipt.png',import.meta.url).pathname),photo=createCanvas(image.width+500,image.height+400),ctx=photo.getContext('2d');ctx.fillStyle='#777';ctx.fillRect(0,0,photo.width,photo.height);ctx.strokeStyle='#999';for(let n=0;n<photo.width;n+=29){ctx.beginPath();ctx.moveTo(n,0);ctx.lineTo(n+70,photo.height);ctx.stroke();}ctx.drawImage(image,250,200);
+ const worker=await createWorker('por',1,{langPath:new URL('../node_modules/@tesseract.js-data/por/4.0.0_best_int',import.meta.url).pathname,cacheMethod:'none'});
+ try{await worker.setParameters({tessedit_pageseg_mode:'6',preserve_interword_spaces:'1'});const {data}=await worker.recognize(photo.toBuffer('image/png'),{rotateAuto:true},{blocks:true});const focused=enhanceReceipt(photo,data.blocks,()=>createCanvas(1,1)),{data:reread}=await worker.recognize(focused.toBuffer('image/png'),{rotateAuto:true});const result=combineReceiptReadings(extractReceiptFields(data.text,{confidence:data.confidence}),extractReceiptFields(reread.text,{confidence:reread.confidence}));assert.equal(result.fields.supplier_document,'11.222.333/0001-81');assert.equal(result.fields.amount_cents,14000);assert.equal(result.fields.document_date,'2026-10-16');assert.ok(focused.width<photo.width*1.5);
+ }finally{await worker.terminate();}
+});

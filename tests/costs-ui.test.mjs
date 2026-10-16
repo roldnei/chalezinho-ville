@@ -34,14 +34,14 @@ test('UI persists expense, photo, fiscal review and separate reporting months wi
 });
 test('upload failure leaves a single pending expense and retry attaches once',async()=>{
  const s=await setup(),{$,field,w,data}=s;try{
- $('#cost-new').click();field('description').value='Faxina';field('amount').value='130,00';const file=new w.File(['photo'],'faxina.jpg',{type:'image/jpeg'});Object.defineProperty($('#cost-files'),'files',{value:[file],configurable:true});$('#cost-files').dispatchEvent(new w.Event('change'));await pause();s.failUploads(true);
+ $('#cost-new').click();field('description').value='Faxina';field('category').value='cleaning';field('amount').value='130,00';const file=new w.File(['photo'],'faxina.jpg',{type:'image/jpeg'});Object.defineProperty($('#cost-files'),'files',{value:[file],configurable:true});$('#cost-files').dispatchEvent(new w.Event('change'));await pause();s.failUploads(true);
  $('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();assert.equal(data.cost_entries.length,1);assert.equal(data.cost_receipts.length,0);assert.equal($('#cost-dialog').open,true);assert.ok($('#cost-form-message').textContent.includes('lançamento está salvo'));
  s.failUploads(false);$('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();assert.equal(data.cost_entries.length,1);assert.equal(data.cost_receipts.length,1);assert.equal(data.cost_entries[0].exclusion_cents,0);assert.equal($('#cost-dialog').open,false);
  }finally{s.dom.window.close();}
 });
 test('currency fields format BRL, validate two decimals and persist exact cents',async()=>{
  const s=await setup(),{$,field,w,data}=s;try{
- $('#cost-new').click();const input=field('amount');field('description').value='Produto piscina';input.value='130,5';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.Event('blur'));
+ $('#cost-new').click();const input=field('amount');field('description').value='Produto piscina';field('category').value='pool';input.value='130,5';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.Event('blur'));
  assert.match(input.value,/^R\$\s130,50$/);assert.equal(input.checkValidity(),true);
  input.dispatchEvent(new w.Event('focus'));assert.equal(input.value,'130,50');input.setSelectionRange(input.value.length,input.value.length);
  const third=new w.InputEvent('beforeinput',{inputType:'insertText',data:'7',cancelable:true});assert.equal(input.dispatchEvent(third),false);assert.equal(input.value,'130,50');
@@ -72,4 +72,7 @@ test('upload reads and fills fields automatically, preserves manual edits, and r
 test('OCR failure preserves attachment and manual entry; closing prevents stale reading from filling another cost',async()=>{
  const failed=await setup({reader:async()=>{throw Error('Não foi possível ler a nota.')}});try{failed.$('#cost-new').click();addReceipt(failed);await pause();assert.ok(failed.$('#cost-receipt-status').textContent.includes('Não foi possível'));assert.equal(failed.$('[data-read-file]').textContent,'Ler dados da nota');assert.equal(failed.$('#cost-save').disabled,false);}finally{failed.dom.window.close();}
  let resolve;const s=await setup({reader:()=>new Promise(done=>{resolve=done})});try{s.$('#cost-new').click();addReceipt(s);s.$('#cost-close').click();s.$('#cost-new').click();resolve(recognized);await pause();assert.equal(s.field('supplier').value,'');assert.equal(s.field('amount').value,'');assert.equal(s.$('#cost-receipt-panel').hidden,true);}finally{s.dom.window.close();}
+});
+test('an unidentified category remains pending instead of assuming cleaning',async()=>{
+ const s=await setup({reader:async()=>({fields:{description:'Nota de compra',amount_cents:4094},warnings:['Categoria não identificada; selecione antes de salvar.'],text:'TOTAL A PAGAR 40,94'})});try{s.$('#cost-new').click();assert.equal(s.field('category').value,'');addReceipt(s);await pause();assert.equal(s.field('category').value,'');s.field('receipt_reviewed').checked=true;s.$('#cost-form').dispatchEvent(new s.w.Event('submit',{cancelable:true}));await pause();assert.equal(s.data.cost_entries.length,0);assert.ok(s.$('#cost-form-message').textContent.includes('Selecione a categoria'));}finally{s.dom.window.close();}
 });

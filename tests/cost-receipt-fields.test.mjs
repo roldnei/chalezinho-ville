@@ -20,3 +20,19 @@ test('never guesses largest number; conflicting totals and absent or impossible 
 test('emission outranks other dates and total label can precede amount on next line',()=>{const r=extractReceiptFields('LOJA TESTE\nCNPJ 11222333000181\nVencimento 30/10/2026\nEmissão 15/10/2026\nTOTAL A PAGAR\nR$ 1.234,50');assert.equal(r.fields.amount_cents,123450);assert.equal(r.fields.document_date,'2026-10-15');});
 test('blank/low confidence readings stay reviewable and never infer payment or tax exclusion',()=>{assert.deepEqual(extractReceiptFields('').fields,{});const r=extractReceiptFields(receipt,{confidence:40});assert.ok(r.warnings.some(w=>w.includes('baixa nitidez')));assert.equal(r.fields.exclusion_cents,undefined);assert.equal(r.fields.paid_on,undefined);});
 test('PDF text positions retain row order and associate amount with its label',()=>{const text=pdfTextLines([{str:'140,00',transform:[1,0,0,1,200,100]},{str:'LOJA TESTE',transform:[1,0,0,1,10,200]},{str:'TOTAL A PAGAR',transform:[1,0,0,1,10,100]}]);assert.equal(text,'LOJA TESTE\nTOTAL A PAGAR 140,00');assert.equal(extractReceiptFields(text).fields.amount_cents,14000);});
+// Synthetic IDs and keys only. Customer receipts never become public fixtures.
+function accessKey(){const base='3226101122233300018165234000089628100089629';let sum=0,w=2;for(let i=42;i>=0;i--){sum+=Number(base[i])*w;w=w===9?2:w+1;}const r=sum%11;return base+(r<2?0:11-r);}
+test('reads supplier after CNPJ, joins a wrapped legal suffix and handles OCR punctuation',()=>{
+ const r=extractReceiptFields('oo A o RED RS RR RR\n11,222.333/0001-81 - MERCADO EXEMPLO DE ALIMENTO\nS LTDA\nDETERG YPE 500ML\nLAVA ROUPAS PO\nValor a Pagar R$: 40,94');
+ assert.equal(r.fields.supplier_document,'11.222.333/0001-81');assert.equal(r.fields.supplier,'MERCADO EXEMPLO DE ALIMENTOS LTDA');assert.equal(r.fields.category,'cleaning_products');assert.equal(r.fields.amount_cents,4094);
+});
+test('background fragments and low confidence unanchored names stay blank',()=>{
+ assert.equal(extractReceiptFields('oo A o RED RS RR RR\n1.E.: 123456789\nTOTAL A PAGAR 40,94').fields.supplier,undefined);
+ assert.equal(extractReceiptFields('NOME APARENTEMENTE LEGIVEL\nTOTAL A PAGAR 40,94',{confidence:40}).fields.supplier,undefined);
+ assert.equal(extractReceiptFields('LOJA EXEMPLO\nTOTAL A PAGAR 40,94').fields.category,undefined);
+});
+test('validated access key recovers issuer and invoice without guessing an erroneous digit',()=>{
+ const key=accessKey(),r=extractReceiptFields('11.222.333/0001-82 - MERCADO EXEMPLO\nNFC-e: 00069628\nChave de acesso\n'+key.match(/.{1,4}/g).join(' '));
+ assert.equal(r.fields.supplier_document,'11.222.333/0001-81');assert.equal(r.fields.document_number,'000089628');assert.match(r.evidence.document_number,/Chave de acesso validada/);assert.ok(r.warnings.some(w=>w.includes('divergiu')));
+ const invalid=extractReceiptFields(key.slice(0,-1)+(Number(key.at(-1))+1)%10);assert.equal(invalid.fields.supplier_document,undefined);assert.equal(invalid.fields.document_number,undefined);
+});
