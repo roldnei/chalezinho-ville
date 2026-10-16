@@ -21,12 +21,12 @@ function separatedMoney(line,{allowFused=false}={}){
  return null;
 }
 // Short fragments from background texture must never become a business name.
-function nameCandidate(value){
+export function nameCandidate(value){
  const s=value.trim().replace(/^[:\s-]+/,'');const words=plain(s).match(/[A-Z]+/g)||[],letters=words.join('');
  const meaningful=words.filter(w=>w.length>=3&&/[AEIOUY]/.test(w));
  return s.length>=3&&s.length<=160&&meaningful.length>0&&words.filter(w=>w.length<=2).length<=words.length/2&&
   (letters.match(/[AEIOUY]/g)||[]).length>=letters.length*.18&&
-  !/(?:R\$|\bVALOR\b|\bQTD(?:E)?\b|\bDESCR(?:ICAO)?\b|\bVL[. ]|\bITENS\b|\bUNITARIO\b|CNPJ|CPF|INSCRICAO|NOTA FISCAL|CUPOM|DANFE|DOC[UO]MENTO AUXILIAR|CONSUMIDOR|DESTINATARIO|TOMADOR|EMISSAO|ENDERECO|CEP|TELEFONE|TOTAL|AUTORIZACAO|HTTP|WWW\.|CHAVE DE ACESSO|RODOVIA|RUA\b|AVENIDA\b|BAIRRO\b|^AV\.|^I[. ]?E[.:]|^OPER:|^COD(?:IGO)?\b|^FORMA PAGAMENTO|^CARTAO|^REDE )/.test(plain(s))&&
+  !/(?:R\$|\bVALOR\b|\bQTD(?:E)?\b|\bDESCR(?:ICAO)?\b|\bVL[. ]|\bITENS\b|\bUNITARIO\b|CNPJ|CPF|INSCRICAO|NOTA FISCAL|CUPOM|DANFE|DOC[UO]MENTO AUXILIAR|CONSUMIDOR|DESTINATARIO|TOMADOR|EMISSAO|ENDERECO|CEP|TELEFONE|VENDEDOR|CLIENTE|COMPROVANTE|ORCAMENTO|PEDIDO|MODELO|PREENCHER|^DATA\b|TOTAL|AUTORIZACAO|HTTP|WWW\.|CHAVE DE ACESSO|RODOVIA|RUA\b|AVENIDA\b|BAIRRO\b|^AV\.|^I[. ]?E[.:]|^OPER:|^COD(?:IGO)?\b|^FORMA PAGAMENTO|^CARTAO|^REDE )/.test(plain(s))&&
   !/\d{2}\/\d{2}|\d+[.,]\d{2}|\d{4,}/.test(s)?s:null;
 }
 const cnpjPattern=/\b[A-Z\d]{2}[.,\s]+[A-Z\d]{3}[.,\s]+[A-Z\d]{3}\s*\/\s*[A-Z\d]{4}\s*-\s*\d{2}\b/g;
@@ -47,8 +47,8 @@ export function extractReceiptKey(value){
 export function extractReceiptFields(text,{confidence=null}={}){
  const lines=String(text||'').slice(0,200000).split(/\r?\n/).map(s=>s.trim()).filter(Boolean),normalized=lines.map(plain),fields={},warnings=[],evidence={};
  if(!lines.length)return {fields,warnings:['Não foi possível encontrar texto legível.'],evidence,confidence};
- const recipient=normalized.findIndex(s=>/^(?:DADOS\s+(?:DO|DA)\s+)?(?:CONSUMIDOR|DESTINATARIO|TOMADOR)\b/.test(s)),issuerLines=recipient<0?lines:lines.slice(0,recipient);
- const headerEnd=issuerLines.findIndex(s=>/DOCUMENTO\s+AUXILIAR|DANFE|CODIGO\s+DESCRICAO|^COD[. ]+DESCR/i.test(plain(s)));
+ const recipient=normalized.findIndex(s=>/^(?:DADOS\s+(?:DO|DA)\s+)?(?:CLIENTE|CONSUMIDOR|DESTINATARIO|TOMADOR)\b/.test(s)),issuerLines=recipient<0?lines:lines.slice(0,recipient);
+ const headerEnd=issuerLines.findIndex(s=>/DOCUMENTO\s+AUXILIAR|DANFE|NAO\s+E\s+DOCUMENTO\s+FISCAL|COMPROVANTE\s+DE\s+VENDA|ORCAMENTO|PEDIDO\s+DE\s+VENDA|CODIGO\s+DESCRICAO|^COD[. ]+DESCR/i.test(plain(s)));
  const headerLines=headerEnd<0?issuerLines.slice(0,12):issuerLines.slice(0,headerEnd);
  let issuerIndex=-1,invalidCNPJ=false;
  for(let i=0;i<issuerLines.length;i++){
@@ -75,7 +75,7 @@ export function extractReceiptFields(text,{confidence=null}={}){
   const prefix=headerLines[issuerIndex].split(/CNPJ/i)[0],same=nameCandidate(prefix);if(same)fields.supplier=same;
   for(let i=issuerIndex-1;!fields.supplier&&i>=Math.max(0,issuerIndex-4);i--){const name=nameCandidate(headerLines[i]);if(name){fields.supplier=name;evidence.supplier=headerLines[i];}}
  }
- if(!fields.supplier&&(confidence===null||confidence>=65)){const top=headerLines.slice(0,5).map(nameCandidate).find(Boolean);if(top){fields.supplier=top;evidence.supplier=top;}}
+ if(!fields.supplier&&(confidence===null||confidence>=65)){const candidates=headerLines.slice(0,8).map(nameCandidate).filter(s=>s&&(plain(s).match(/[A-Z]{3,}/g)||[]).length>=2),top=candidates.find(s=>/\b(?:LTDA|EIRELI|EPP|S[.\s/]*A)\b/.test(plain(s)))||((confidence===null||confidence>=80)?candidates[0]:null);if(top){fields.supplier=top;evidence.supplier=top;}}
  if(!fields.supplier)warnings.push('Nome do estabelecimento não identificado.');
  const dated=[];
  lines.forEach((line,i)=>{if(/VENC(?:IMENTO|ENDO)?|PARCELA|PAGAMENTO|ENTREGA|SAIDA|ENTRADA/.test(normalized[i])&&!/EMISSAO/.test(normalized[i]))return;for(const match of line.matchAll(/\b\d{2}[\/.-]\d{2}[\/.-]\d{4}\b/g)){const value=isoDate(match[0]);if(value)dated.push({value,score:/EMISSAO|EMITIDA|EMITIDO/.test(normalized[i])?3:1,line});}});

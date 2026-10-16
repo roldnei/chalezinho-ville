@@ -15,7 +15,7 @@ function wordEvidence(name,lines,target){
    const trusted=words.filter(w=>w.confidence>=75),numeric=trusted.filter(w=>/\d/.test(w.text));
    if(numeric.length&&normal(numeric.map(w=>w.text).join(' '))===normal(target))return box(trusted);
   }
-  if(name==='document_date'&&/NFC?E|EMISS|EMITID|AUTORIZA/.test(normal(line.text))&&!/VENC|PARCELA|PAGAMENTO|ENTREGA/.test(normal(line.text))){
+  if(name==='document_date'&&/NFC?E|EMISS|EMITID|AUTORIZA|^DATA/.test(normal(line.text))&&!/VENC|PARCELA|PAGAMENTO|ENTREGA/.test(normal(line.text))){
    const date=words.find(w=>w.confidence>=75&&normal(w.text)===normal(target));if(date)return box([date]);
   }
   if(name==='document_number'){

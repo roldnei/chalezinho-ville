@@ -73,3 +73,17 @@ test('missing decimal separator requires matching total and payment and enough O
 test('five OCR digits use the last two as cents only in a corroborated financial total',()=>{
  const text='VALOR TOTAL R$ 12345\nCartão de Crédito 12345';assert.equal(extractReceiptFields(text,{confidence:85}).fields.amount_cents,12345);assert.equal(extractReceiptFields(text).fields.amount_cents,undefined);assert.equal(extractReceiptFields('VALOR TOTAL R$ 12345',{confidence:85}).fields.amount_cents,undefined);assert.equal(extractReceiptFields('NFC-e: 12345\nCartão de Crédito 12345',{confidence:85}).fields.amount_cents,undefined);
 });
+
+test('sales receipt header identifies the issuer before nonfiscal title and never takes salesperson or customer as supplier',()=>{
+ const text='COMERCIO EXEMPLO LTDA\nNAO E DOCUMENTO FISCAL\nCOMPROVANTE DE VENDA - MODELO 02\nData: 22/07/2026 Codigo: 30123\nVendedor: JOANA\nDADOS DO CLIENTE\nCliente: CLIENTE EXEMPLO LTDA\nCNPJ: 11.222.333/0001-81\nTOTAL A PAGAR R$ 75,50';
+ const r=extractReceiptFields(text,{confidence:90});assert.equal(r.fields.supplier,'COMERCIO EXEMPLO LTDA');assert.equal(r.fields.document_date,'2026-07-22');assert.equal(r.fields.amount_cents,7550);assert.equal(r.fields.supplier_document,undefined);assert.equal(r.fields.document_number,undefined);
+ const missing=extractReceiptFields(text.slice(text.indexOf('NAO E')),{confidence:90});assert.equal(missing.fields.supplier,undefined);
+});
+
+test('a single unanchored header fragment cannot become the establishment',()=>{
+ const r=extractReceiptFields('MARE)\nCOMPROVANTE DE VENDA - MODELO 02\nData: 22/07/2026\nVendedor: JOANA\nDADOS DO CLIENTE\nCONSUMIDOR',{confidence:90});assert.equal(r.fields.supplier,undefined);assert.equal(r.fields.document_date,'2026-07-22');
+});
+
+test('moderate global confidence cannot promote an unanchored name fragment without corporate context',()=>{
+ const r=extractReceiptFields('Fragmento Aparente\nData: 22/07/2026',{confidence:66});assert.equal(r.fields.supplier,undefined);
+});
