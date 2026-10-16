@@ -66,3 +66,34 @@
 
 /* Date-width columns; stay hours are represented only by bar geometry. */
 .calendar-track>i{background-image:none}.calendar-days span{padding:6px 0}.admin-calendar-grid .calendar-event{height:28px!important;min-height:28px;padding:3px 5px}.admin-calendar-grid .calendar-event strong{font-size:11px;line-height:1.2}
+
+/* Properties stay side by side; time runs down the page. */
+.calendar-columns-panel{padding:16px!important}
+.calendar-columns-panel .calendar-columns-toolbar>div:first-child{display:grid;grid-template-columns:44px minmax(0,1fr) 44px;gap:8px;width:100%}
+.calendar-columns-panel .calendar-period input{width:100%;min-width:0}
+.calendar-columns-panel #calendar-span{grid-column:2;width:100%}
+.calendar-columns-panel #calendar-property{grid-column:3;width:100%}
+.calendar-columns-panel .calendar-columns-toolbar>div:first-child{grid-template-columns:44px minmax(0,1fr) 44px}
+.calendar-columns-panel [data-month-today]{grid-column:1}
+.calendar-columns-panel #calendar-property{grid-column:1/-1}
+.calendar-columns-panel #calendar-span{grid-column:2/4}
+.calendar-columns-toolbar{margin-bottom:8px}
+.calendar-columns-period{font:400 12px/1.4 'DM Sans',sans-serif;color:#bbaa99;margin:8px 0 12px}
+.calendar-columns-scroll{overflow-x:auto}
+.calendar-columns-grid{min-width:calc(42px + var(--properties) * 76px);border:1px solid #42382d;border-radius:10px;overflow:hidden}
+.calendar-columns-heading,.calendar-columns-body{display:grid;grid-template-columns:42px repeat(var(--properties),minmax(0,1fr))}
+.calendar-columns-heading{background:#211b15;border-bottom:1px solid #42382d;align-items:stretch}
+.calendar-columns-heading>span{font:400 11px/1.3 'DM Sans',sans-serif;color:#c4b5a4;align-self:center;text-align:center}
+.calendar-columns-panel .calendar-columns-heading>button{font:500 13px/1.3 'DM Sans',sans-serif;color:#eee5dc;background:transparent;border:0;border-left:1px solid #42382d;border-radius:0;padding:10px 3px;min-width:0;min-height:48px;overflow-wrap:anywhere;letter-spacing:0;text-transform:none;box-shadow:none}
+.calendar-columns-dates{display:grid;grid-template-rows:repeat(var(--days),68px)}
+.calendar-columns-dates>div{display:flex;flex-direction:column;align-items:center;justify-content:center;border-bottom:1px solid #342c24;font:500 15px/1.4 'DM Sans',sans-serif}
+.calendar-columns-dates small{font:400 11px/1.4 'DM Sans',sans-serif;color:#bbaa99}
+.calendar-columns-dates .today{background:#304b3d;color:#fff}
+.calendar-column-track{position:relative;min-width:0;border-left:1px solid #42382d;background:repeating-linear-gradient(to bottom,#100d09 0,#100d09 67px,#342c24 67px,#342c24 68px)}
+.calendar-columns-panel .calendar-column-event{position:absolute;display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:4px;overflow:hidden;padding:6px 5px;border:0;border-radius:6px;background:#784d35;color:#fff;text-align:left;font:400 12px/1.3 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;box-shadow:none;min-width:0;min-height:0}
+.calendar-column-event.airbnb{background:#893b48!important}.calendar-column-event.booking{background:#315c87!important}.calendar-column-event.ical{background:#665397!important}.calendar-column-event.operational{background:#60513f!important}.calendar-column-event.pending{background:#806127!important}
+.calendar-column-event strong{font:500 13px/1.3 'DM Sans',sans-serif;overflow-wrap:anywhere;width:100%;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.calendar-column-event small{font:400 11px/1.2 'DM Sans',sans-serif;color:#fff;opacity:.9}
+.calendar-columns-panel .calendar-legend{display:flex;gap:8px 12px;flex-wrap:wrap;margin:14px 0}
+.calendar-columns-panel .calendar-connections-link{font:400 12px/1.4 'DM Sans',sans-serif;color:#d6b48c;padding:10px 0;background:none;border:0;box-shadow:none;text-decoration:underline;min-height:44px}
+@media(min-width:761px){.calendar-columns-panel .calendar-columns-toolbar>div:first-child{display:flex;flex-wrap:wrap}.calendar-columns-panel #calendar-property{width:auto}.calendar-columns-panel #calendar-span{width:auto}.calendar-columns-panel .calendar-period{max-width:230px}}
