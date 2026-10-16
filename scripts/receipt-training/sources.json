@@ -1,0 +1,142 @@
+[
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/LICENSE",
+    "file": "source/LICENSE",
+    "sha256": "481d454e8ea02cb9083743d2604c8d170e61134da0f10541ae8e9d492dce775d",
+    "size": 1087
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/README.md",
+    "file": "source/README.md",
+    "sha256": "993f7db974d9675477173661eda071e9b1556d355cc11eb6856f7aeb11fd2774",
+    "size": 244
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.bematech.exp0.box",
+    "file": "source/ftc.bematech.exp0.box",
+    "sha256": "cc537022a59e9eb3ec8a6c26fff0680d0c64ecf0ff5257a80792596820a16e01",
+    "size": 15540
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.bematech.exp0.tif",
+    "file": "source/ftc.bematech.exp0.tif",
+    "sha256": "2be8f378c185f42beee5b73dbdeab77aaf2d47f60965ee7b59a2c088bdaa189d",
+    "size": 82640
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.bematech.exp1.box",
+    "file": "source/ftc.bematech.exp1.box",
+    "sha256": "ad16aa42fe9c19ed51cca2c641214a20442fc1b47ef2e300fb531a9840922b64",
+    "size": 29288
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.bematech.exp1.tif",
+    "file": "source/ftc.bematech.exp1.tif",
+    "sha256": "5eef24c82ab0c11cb5de4058700dbbcc571e5d07c88774947e6c6d56155ba509",
+    "size": 79476
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.epson.exp0.box",
+    "file": "source/ftc.epson.exp0.box",
+    "sha256": "de89e4d298c828a2b9cb9ee6599b3353b2892d5b55b4553898b332fcc481be39",
+    "size": 20328
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.epson.exp0.tif",
+    "file": "source/ftc.epson.exp0.tif",
+    "sha256": "22802b12a5a5814d8170f8d9be3e54134fc0a7c24ea431531073ff5b0ea7894c",
+    "size": 61906
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.ibm.exp0.box",
+    "file": "source/ftc.ibm.exp0.box",
+    "sha256": "f66c7a96265a8e3ba84edbccc99d41dc422078be3324ae366fdc5e2d02601714",
+    "size": 19195
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.ibm.exp0.tif",
+    "file": "source/ftc.ibm.exp0.tif",
+    "sha256": "339f1af4d9f3a7afd83a6db1373ff2b95f606fdededc740015a4e501793407f5",
+    "size": 3567656
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.ibm.exp1.box",
+    "file": "source/ftc.ibm.exp1.box",
+    "sha256": "b3396b3171085e7ede4c75f4edaafc5bb491ee3eeab6964f9331c415bae37406",
+    "size": 60575
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.ibm.exp1.tif",
+    "file": "source/ftc.ibm.exp1.tif",
+    "sha256": "0face9ea19dcbd7536371faf94c5513c20edfaf8bb181176d498ff662599de67",
+    "size": 165248
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.ncr-mac.exp0.box",
+    "file": "source/ftc.ncr-mac.exp0.box",
+    "sha256": "d0bf480cac7f72cb9cfc832671af87961fd688c5d001dfe81e9415817cd5bca3",
+    "size": 12430
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.ncr-mac.exp0.tif",
+    "file": "source/ftc.ncr-mac.exp0.tif",
+    "sha256": "3e318684b09ffbd4f476e7db069a367dca1b59045b8c21bdaff436c66991550a",
+    "size": 35056
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.sweda-120.exp0.box",
+    "file": "source/ftc.sweda-120.exp0.box",
+    "sha256": "2cc6db4b0de14aaf8f08fc162e2dd2535b1fabf1494dd7da74b07e02dcc9153b",
+    "size": 15615
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.sweda-120.exp0.tif",
+    "file": "source/ftc.sweda-120.exp0.tif",
+    "sha256": "0dc6e576a7d03125837de00940d5052601764c2c5cf61fb384a78c0d99801c19",
+    "size": 63922
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.sweda.exp0.box",
+    "file": "source/ftc.sweda.exp0.box",
+    "sha256": "fde3427802c9cb87fc6c7ca76a69f9416525726503175a8bad768e5ffd4ae42f",
+    "size": 12801
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.sweda.exp0.tif",
+    "file": "source/ftc.sweda.exp0.tif",
+    "sha256": "d14829ccbd2c7aae9a8f226cfdde21c98531615ab91de5cc4841884986c47e05",
+    "size": 1978722
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.zantus.exp0.box",
+    "file": "source/ftc.zantus.exp0.box",
+    "sha256": "cd904de740ca7f58bda10c1b56ff91dfcb23aea19945c010268bb543ff70a731",
+    "size": 31738
+  },
+  {
+    "url": "https://raw.githubusercontent.com/ggodas/tesseract-training-receipt/master/ftc.zantus.exp0.tif",
+    "file": "source/ftc.zantus.exp0.tif",
+    "sha256": "e32049bf66f00da758d6fda42ceeb896a0a981645213e5ea79e52803f513c8d7",
+    "size": 89322
+  },
+  {
+    "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/por.traineddata",
+    "file": "models/por.traineddata",
+    "sha256": "711de9dbb8052067bd42f16b9119967f30bada80d57e2ef24f65d09f531adb04",
+    "size": 8159939
+  },
+  {
+    "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/LICENSE",
+    "file": "models/LICENSE",
+    "sha256": "a6cba85bc92e0cff7a450b1d873c0eaa2e9fc96bf472df0247a26bec77bf3ff9",
+    "size": 10173
+  },
+  {
+    "url": "https://zenodo.org/api/records/13633335/files/Dataset.zip/content",
+    "file": "restaurant-dataset.zip",
+    "sha256": "9c7dd7115c300b651ceb1417c6a3c28c0a0982096f45206bacf576a906153eda",
+    "size": 19001549,
+    "license": "CC-BY-4.0",
+    "attribution": "Auad, Alves, Kakizaki, Reis, Silva. A Filtering and Image Preparation Approach to Enhance OCR for Fiscal Receipts. SIBGRAPI 2024. DOI:10.5281/zenodo.13633335"
+  }
+]

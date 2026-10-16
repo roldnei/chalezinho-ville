@@ -1,0 +1,76 @@
+{
+  "date": "2026-10-16",
+  "evaluation": "4 user receipts, 5 fields per receipt; exact matches after punctuation/case normalization; no user image used for training",
+  "fields": [
+    "supplier",
+    "supplier_document",
+    "document_number",
+    "amount",
+    "document_date"
+  ],
+  "pilot_1": {
+    "training_samples": 410,
+    "training_original_lines": 82,
+    "validation_lines": 17,
+    "test_lines": 14,
+    "validation_line_CER_before": 0.10816777041942605,
+    "validation_line_CER_after": 0.046357615894039736,
+    "test_line_CER_before": 0.0772626931567329,
+    "test_line_CER_after": 0.08388520971302428,
+    "decision": "rejected"
+  },
+  "browser": {
+    "current": {
+      "correct": 13,
+      "targets": 20,
+      "by_field": {
+        "supplier": 1,
+        "supplier_document": 4,
+        "document_number": 4,
+        "amount": 2,
+        "document_date": 2
+      },
+      "wrong_nonempty": 0
+    },
+    "pilot_1": {
+      "correct": 11,
+      "targets": 20,
+      "by_field": {
+        "supplier": 0,
+        "supplier_document": 4,
+        "document_number": 4,
+        "amount": 1,
+        "document_date": 2
+      },
+      "wrong_nonempty": 2
+    },
+    "pilot_2": {
+      "correct": 12,
+      "targets": 20,
+      "by_field": {
+        "supplier": 1,
+        "supplier_document": 4,
+        "document_number": 4,
+        "amount": 1,
+        "document_date": 2
+      },
+      "wrong_nonempty": 0
+    }
+  },
+  "pilot_2": {
+    "training_samples": 1924,
+    "training_documents": 145,
+    "validation_lines": 205,
+    "validation_documents": 17,
+    "test_lines": 186,
+    "test_documents": 19,
+    "validation_line_CER_before": 0.2872770511296076,
+    "validation_line_CER_after": 0.17812128418549347,
+    "test_line_CER_before": 0.24632046653707304,
+    "test_line_CER_after": 0.1596778672590947,
+    "decision": "rejected",
+    "selected_checkpoint": "receipt_23.037_1088_1500.checkpoint"
+  },
+  "decision": "Keep the existing app model. Both trained candidates worsened exact field accuracy on the 4-photo challenge.",
+  "sources_data_used_for_training": "Public licensed data only; no customer photo used for training"
+}
