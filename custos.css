@@ -12,3 +12,13 @@
 #cost-document-viewer.receipt-expanded{width:min(1300px,calc(100dvw - 16px));max-width:calc(100dvw - 16px);min-width:0;right:8px}
 /* Override the site's global full-width section rule in expanded mode. */
 #cost-document-viewer.receipt-expanded{width:min(1300px,calc(100dvw - 16px))!important;max-width:calc(100dvw - 16px)!important}
+
+/* Compact annotations: a short label and one editable value. */
+.receipt-field{display:flex;align-items:center;gap:4px;padding:3px 5px;border:1px solid #258448;border-radius:6px;background:#f4fff4f2;box-shadow:0 1px 5px #0002;line-height:1.2;color:#123d22}
+.receipt-field label{display:flex;align-items:center;gap:4px;min-width:0;flex:1;font-size:12px!important;font-weight:600;white-space:nowrap;letter-spacing:0}
+.receipt-field input{width:0;min-width:0;flex:1;font-size:16px!important;min-height:30px!important;height:30px;padding:2px 3px!important;border:0!important;border-radius:3px;background:transparent!important;color:#123d22!important;box-shadow:none}
+.receipt-field input[aria-invalid=true]{outline:2px solid #a32d22}.receipt-overlay .receipt-field{width:228px;min-width:0;max-width:calc(100% - 4px);touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;cursor:grab}.receipt-overlay .receipt-field[data-field=amount]{width:192px}.receipt-overlay .receipt-field[data-field=document_date]{width:218px}.receipt-overlay .receipt-field[data-field=document_number]{width:205px}
+.receipt-field .receipt-drag-handle{width:18px;min-width:18px;min-height:30px!important;height:30px;padding:0;margin:0;border:0;background:transparent;color:#258448;font-size:19px;cursor:grab;touch-action:none}.receipt-field.receipt-dragging{z-index:5;cursor:grabbing;box-shadow:0 5px 15px #0004;opacity:.94}.receipt-field.receipt-dragging *{cursor:grabbing}
+.receipt-region{background:#78e79c22;outline:1.5px solid #20944c}.receipt-region-label{position:absolute;left:0;bottom:100%;font:600 10px/1.2 Arial,sans-serif;color:#fff;background:#218447;padding:1px 3px;border-radius:3px 3px 0 0;white-space:nowrap;letter-spacing:0}.receipt-unplaced{grid-template-columns:1fr;gap:6px}.receipt-unplaced .receipt-field{min-width:0}.receipt-unplaced [data-locate]{width:auto;padding:3px 6px;min-height:30px!important;margin:0;font-size:11px}
+@media(prefers-color-scheme:dark){.receipt-field{background:#12331ff5;border-color:#5add89;color:#d8ffe4}.receipt-field input{color:#d8ffe4!important}.receipt-field .receipt-drag-handle{color:#7ee89f}}
+.receipt-overlay>.receipt-region{z-index:0}.receipt-overlay>.receipt-field{z-index:1}
