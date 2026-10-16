@@ -16,12 +16,12 @@ async function setup({reader=async()=>({fields:{},warnings:[],text:''})}={}){
   storage:{from:()=>({upload:async(path,file)=>{if(uploadFailure)return {error:{message:'Network'}};files.set(path,file);return {data:{path}}},download:async path=>({data:files.get(path)})})}
  })};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};w.confirm=()=>true;w.URL.createObjectURL=()=> 'blob:qa';w.URL.revokeObjectURL=()=>{};
- Object.assign(w,model,{readReceipt:reader,reviewExample,createReceiptViewer:()=>({setItem:()=>{},setResult:()=>{},clear:()=>{},refresh:()=>{}})});const source=(await readFile(new URL('../custos.js',import.meta.url),'utf8')).replace(/^import .*?;\r?\n/gm,'');vm.runInContext(source,dom.getInternalVMContext());await pause();
+ Object.assign(w,model,{readReceipt:reader,reviewExample,createReceiptViewer:()=>({setItem:()=>{},setResult:()=>{},setReading:()=>{},setNotice:()=>{},clear:()=>{},refresh:()=>{}})});const source=(await readFile(new URL('../custos.js',import.meta.url),'utf8')).replace(/^import .*?;\r?\n/gm,'');vm.runInContext(source,dom.getInternalVMContext());await pause();
  return {dom,w,data,files,failUploads:value=>{uploadFailure=value},$:s=>w.document.querySelector(s),field:n=>w.document.querySelector(`[name="${n}"]`)};
 }
 test('UI persists expense, photo, fiscal review and separate reporting months without auto deduction',async()=>{
  const s=await setup(),{$,field,w,data,files}=s;try{
- $('#cost-new').click();field('description').value='IPTU Signature';field('amount').value='123,45';field('category').value='property_tax';field('category').dispatchEvent(new w.Event('change'));field('property_id').value='1';field('competence').value='2026-09';field('paid_on').value='2026-10-01';
+ $('#cost-new').click();field('document_date').value='2026-09-15';field('document_date').dispatchEvent(new w.Event('input'));field('description').value='IPTU Signature';field('amount').value='123,45';field('category').value='property_tax';field('category').dispatchEvent(new w.Event('change'));field('property_id').value='1';field('competence').value='2026-09';field('competence').dispatchEvent(new w.Event('input'));field('paid_on').value='2026-10-01';
  assert.equal(field('confirm_fiscal').checked,false);assert.equal($('#cost-fiscal').hidden,true);
  const file=new w.File(['%PDF-1.4 QA'],'iptu.pdf',{type:'application/pdf'});Object.defineProperty($('#cost-files'),'files',{value:[file],configurable:true});$('#cost-files').dispatchEvent(new w.Event('change'));await pause();
  field('confirm_fiscal').checked=true;field('confirm_fiscal').dispatchEvent(new w.Event('change'));field('exclusion').value='100,00';field('fiscal_month').value='2026-10';field('owner_borne').checked=true;field('fiscal_note').value='Revisado com documento e vínculo ao imóvel';
@@ -34,7 +34,7 @@ test('UI persists expense, photo, fiscal review and separate reporting months wi
 });
 test('upload failure leaves a single pending expense and retry attaches once',async()=>{
  const s=await setup(),{$,field,w,data}=s;try{
- $('#cost-new').click();field('description').value='Faxina';field('category').value='cleaning';field('amount').value='130,00';const file=new w.File(['photo'],'faxina.jpg',{type:'image/jpeg'});Object.defineProperty($('#cost-files'),'files',{value:[file],configurable:true});$('#cost-files').dispatchEvent(new w.Event('change'));await pause();s.failUploads(true);
+ $('#cost-new').click();field('description').value='Faxina';field('category').value='cleaning';field('amount').value='130,00';const file=new w.File(['photo'],'faxina.jpg',{type:'image/jpeg'});Object.defineProperty($('#cost-files'),'files',{value:[file],configurable:true});$('#cost-files').dispatchEvent(new w.Event('change'));await pause();field('document_date').value='2026-10-16';field('document_date').dispatchEvent(new w.Event('input'));field('competence').value='2026-10';field('competence').dispatchEvent(new w.Event('input'));field('receipt_reviewed').checked=true;s.failUploads(true);
  $('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();assert.equal(data.cost_entries.length,1);assert.equal(data.cost_receipts.length,0);assert.equal($('#cost-dialog').open,true);assert.ok($('#cost-form-message').textContent.includes('lançamento está salvo'));
  s.failUploads(false);$('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();assert.equal(data.cost_entries.length,1);assert.equal(data.cost_receipts.length,1);assert.equal(data.cost_entries[0].exclusion_cents,0);assert.equal($('#cost-dialog').open,false);
  }finally{s.dom.window.close();}
@@ -119,5 +119,14 @@ test('selecting an already queued photo after another returns to its fields with
 test('confirmed private examples use the active receipt and final corrected fields only',async()=>{
  const s=await setup({reader:async()=>recognized});try{s.$('#cost-new').click();addReceipt(s,'primeira.jpg');await pause();addReceipt(s,'segunda.jpg');await pause();s.field('supplier').value='Fornecedor corrigido';s.field('supplier').dispatchEvent(new s.w.Event('input'));s.field('keep_receipt_example').checked=true;s.field('receipt_reviewed').checked=true;s.$('#cost-form').dispatchEvent(new s.w.Event('submit',{cancelable:true}));await pause();await pause();
  assert.equal(s.data.cost_receipt_reviews.length,1);const review=s.data.cost_receipt_reviews[0];assert.equal(review.receipt_id,s.data.cost_receipts[1].id);assert.equal(review.reviewed_fields.supplier,'Fornecedor corrigido');assert.equal(review.predicted_fields.supplier,recognized.fields.supplier);assert.ok(!('text' in review));
+ }finally{s.dom.window.close();}
+});
+
+test('an empty or failed reading never shows today as the receipt date',async()=>{
+ for(const reader of [async()=>({fields:{},warnings:[],text:''}),async()=>{throw Error('OCR failed')}]){const s=await setup({reader});try{s.$('#cost-new').click();assert.ok(s.field('document_date').value);addReceipt(s);assert.equal(s.field('document_date').value,'');await pause();assert.equal(s.field('document_date').value,'');}finally{s.dom.window.close();}}
+});
+test('validated partial fields remain available if OCR later fails, and late partials cannot cross documents',async()=>{
+ const calls=new Map(),s=await setup({reader:(file,options)=>new Promise((resolve,reject)=>calls.set(file.name,{...options,resolve,reject}))});try{s.$('#cost-new').click();addReceipt(s,'primeira.jpg');const first=calls.get('primeira.jpg');first.onPartialResult({fields:{supplier_document:recognized.fields.supplier_document,document_number:'123'},warnings:[],text:''});assert.equal(s.field('supplier_document').value,recognized.fields.supplier_document);assert.equal(s.field('document_date').value,'');first.reject(Error('Falha no OCR'));await pause();assert.equal(s.field('document_number').value,'123');assert.equal(s.$('#cost-save').disabled,false);
+ addReceipt(s,'segunda.jpg');assert.equal(s.field('supplier_document').value,'');first.onPartialResult(recognized);assert.equal(s.field('supplier_document').value,'');calls.get('segunda.jpg').resolve({fields:{},warnings:[],text:''});await pause();assert.equal(s.field('document_date').value,'');
  }finally{s.dom.window.close();}
 });

@@ -45,7 +45,7 @@ function bindMoneyInput(name){
  input.addEventListener('input',()=>validate());input.addEventListener('blur',()=>validate(true));
 }
 function message(text){$('#cost-status').textContent=text;}
-function cancelReceiptRead(){receiptRun++;receiptController?.abort();receiptController=null;receiptBusy=false;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}
+function cancelReceiptRead(){viewer.setReading(null);receiptRun++;receiptController?.abort();receiptController=null;receiptBusy=false;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}
 function clearPreviousReceipt(){
  // A different attachment supplies a new document, including fields it cannot
  // read. Corrections made to the preceding document must not leak into it.
@@ -56,7 +56,7 @@ function clearPreviousReceipt(){
 }
 function applyReceiptResult(result){
  const values={...result.fields};if(values.amount_cents)values.amount=brl(values.amount_cents);delete values.amount_cents;
- if(!edit&&!values.document_date&&Object.keys(values).length>0){for(const name of ['document_date','competence']){const input=field(name);if(!touchedFields.has(name)&&(input.value===receiptDefaults.get(name)||input.value===receiptAuto.get(name))){input.value='';receiptAuto.delete(name);input.classList.remove('cost-ocr-filled');}}}
+ if(!edit&&!values.document_date){for(const name of ['document_date','competence']){const input=field(name);if(!touchedFields.has(name)&&(input.value===receiptDefaults.get(name)||input.value===receiptAuto.get(name))){input.value='';receiptAuto.delete(name);input.classList.remove('cost-ocr-filled');}}}
  let filled=0;applyingReceipt=true;
  try{for(const name of receiptFields){
   const input=field(name),value=values[name];if(!value||touchedFields.has(name)||(input.value!==''&&!(receiptAuto.has(name)&&receiptAuto.get(name)===input.value)&&!(!edit&&receiptDefaults.get(name)===input.value)))continue;
@@ -68,11 +68,11 @@ function applyReceiptResult(result){
  $('#cost-receipt-text').textContent=String(result.text||'').slice(0,30000);
 }
 async function startReceiptRead(item){
- if(busy)return;cancelReceiptRead();if(receiptSource!==null&&receiptSource!==item.id)clearPreviousReceipt();receiptSource=item.id;void viewer.setItem(item);const run=receiptRun,controller=new AbortController();receiptController=controller;const deadline=setTimeout(()=>controller.abort(),90000);receiptBusy=true;receiptActive=item.id;
+ if(busy)return;cancelReceiptRead();if(receiptSource!==null&&receiptSource!==item.id)clearPreviousReceipt();receiptSource=item.id;if(!edit&&!touchedFields.has('document_date')&&field('document_date').value===receiptDefaults.get('document_date')){field('document_date').value='';receiptDefaults.set('document_date','');}void viewer.setItem(item);viewer.setReading('Lendo comprovante…');const run=receiptRun,controller=new AbortController();receiptController=controller;const deadline=setTimeout(()=>controller.abort(),90000);let readingNotice='';receiptBusy=true;receiptActive=item.id;
  $('#cost-receipt-panel').hidden=false;$('#cost-receipt-source').textContent=item.file.name;$('#cost-receipt-status').textContent='Lendo comprovante…';$('#cost-receipt-progress').hidden=false;$('#cost-receipt-cancel').hidden=false;$('#cost-receipt-warnings').replaceChildren();$('#cost-receipt-text').textContent='';$('#cost-save').disabled=true;$('#cost-archive').disabled=true;
- try{const result=item.readResult||await readReceipt(item.file,{signal:controller.signal,onProgress:text=>{if(run===receiptRun)$('#cost-receipt-status').textContent=text;}});if(run!==receiptRun||!$('#cost-dialog').open)return;item.readResult=result;applyReceiptResult(result);for(const [name,value] of Object.entries(item.corrections||{})){const input=field(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));}viewer.setResult(result);}
- catch(error){if(run!==receiptRun)return;$('#cost-receipt-status').textContent=error.name==='AbortError'?'Leitura cancelada. Você pode preencher os campos.':error.message||'Não foi possível ler a nota. Preencha os campos ou tente outra foto.';}
- finally{clearTimeout(deadline);if(run===receiptRun){receiptBusy=false;receiptController=null;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}}
+ try{const result=item.readResult||await readReceipt(item.file,{signal:controller.signal,onProgress:text=>{if(run===receiptRun){$('#cost-receipt-status').textContent=text;viewer.setReading(text);}},onPartialResult:result=>{if(run!==receiptRun||!$('#cost-dialog').open)return;item.partialResult=result;applyReceiptResult(result);viewer.setResult(result);}});if(run!==receiptRun||!$('#cost-dialog').open)return;item.readResult=result;if(!Object.keys(result.fields||{}).length)readingNotice='Preencha os dados não reconhecidos nas caixas.';applyReceiptResult(result);for(const [name,value] of Object.entries(item.corrections||{})){const input=field(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));}viewer.setResult(result);}
+ catch(error){if(run!==receiptRun)return;readingNotice='Leitura incompleta. Confira e preencha as caixas.';viewer.refresh();$('#cost-receipt-status').textContent=error.name==='AbortError'?'Leitura cancelada. Você pode preencher os campos.':error.message||'Não foi possível ler a nota. Preencha os campos ou tente outra foto.';}
+ finally{clearTimeout(deadline);if(run===receiptRun){viewer.setReading(null);viewer.setNotice(readingNotice);receiptBusy=false;receiptController=null;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}}
 }
 async function allRows(table,build=q=>q){let rows=[];for(let offset=0;;offset+=1000){const page=check(await build(sb.from(table).select('*')).range(offset,offset+999));rows.push(...page);if(page.length<1000)return rows;}}
 function visible(){return selection(entries,$('#cost-month').value,$('#cost-property').value,$('#cost-basis').value);}

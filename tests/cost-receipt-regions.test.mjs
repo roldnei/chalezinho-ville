@@ -13,3 +13,7 @@ test('normalized positions reject outside coordinates and snapshots whitelist pr
 test('total annotation follows its fiscal evidence instead of an item with the same price',()=>{
  const b=(y,text)=>({text,confidence:90,bbox:{x0:10,y0:y,x1:90,y1:y+4}}),r=receiptRegions({fields:{amount_cents:1000},evidence:{amount_cents:'TOTAL A PAGAR 10,00'}},[{page:1,width:100,height:100,lines:[b(10,'PRODUTO 10,00'),b(70,'TOTAL A PAGAR 10,00')]}]);assert.equal(r.amount.y,.7);
 });
+
+test('private review preserves validated partial prediction when OCR did not complete',()=>{
+ const r=reviewExample({id:'receipt',reviewId:'review',partialResult:{fields:{document_number:'123'},text:'not retained'}},{supplier:'Manual',supplier_document:'',document_date:'2026-05-25',document_number:'123',amount_cents:10840});assert.deepEqual(r.predicted_fields,{document_number:'123'});assert.equal(r.reviewed_fields.amount_cents,10840);assert.ok(!JSON.stringify(r).includes('not retained'));
+});

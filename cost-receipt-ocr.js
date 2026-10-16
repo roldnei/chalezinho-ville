@@ -27,7 +27,7 @@ export function pdfTextLines(items){
  const rows=[];for(const item of items){if(!('str' in item)||!item.str.trim())continue;const y=item.transform?.[5]||0;let row=rows.find(r=>Math.abs(r.y-y)<3);if(!row){row={y,items:[]};rows.push(row);}row.items.push({x:item.transform?.[4]||0,text:item.str});}
  return rows.sort((a,b)=>b.y-a.y).map(row=>row.items.sort((a,b)=>a.x-b.x).map(i=>i.text).join(' ')).join('\n');
 }
-export async function readReceipt(file,{signal,onProgress=()=>{}}={}){
+export async function readReceipt(file,{signal,onProgress=()=>{},onPartialResult=()=>{}}={}){
  if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)||file.size>10485760||!file.size)throw Error('Use uma foto ou PDF de até 10 MB.');
  checkAbort(signal);let worker=null,pdf=null,loadingPDF=null;
  const stop=()=>{if(worker)void worker.terminate().catch(()=>{});if(loadingPDF)void loadingPDF.destroy().catch(()=>{});};signal?.addEventListener('abort',stop,{once:true});
@@ -55,7 +55,7 @@ export async function readReceipt(file,{signal,onProgress=()=>{}}={}){
    }finally{page.cleanup();}}
    text=pages.join('\n');if(scores.length)confidence=Math.min(...scores);
   }else{const canvas=await photoCanvas(file,signal);try{
-   let qr=null;try{onProgress('Lendo QR code da nota…');const decode=await loadQRDecoder();checkAbort(signal);qr=await readReceiptQR(canvas,{decode,createCanvas:()=>document.createElement('canvas'),signal});}catch(error){checkAbort(signal);}
+   let qr=null;try{onProgress('Lendo QR code da nota…');const decode=await loadQRDecoder();checkAbort(signal);qr=await readReceiptQR(canvas,{decode,createCanvas:()=>document.createElement('canvas'),signal});if(qr){checkAbort(signal);onPartialResult({...qr,regions:{},text:''});}}catch(error){checkAbort(signal);}
    const data=await recognize(canvas,'Lendo nota…'),first=extractReceiptFields(data.text,{confidence:data.confidence});text=data.text;confidence=data.confidence;
    if(!first.evidence.document_number?.startsWith('Chave de acesso validada:')||!first.fields.supplier_document||!first.fields.amount_cents||data.confidence<75){
     onProgress('Melhorando a leitura do cupom…');const focused=enhanceReceipt(canvas,data.blocks,()=>document.createElement('canvas'));

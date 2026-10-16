@@ -20,7 +20,7 @@ export function validRegion(r){return r&&Number.isInteger(r.page)&&r.page>=1&&r.
 export function ocrPage(data,canvas,page=1){return {page,width:canvas.width,height:canvas.height,lines:(data.blocks||[]).flatMap(b=>(b.paragraphs||[]).flatMap(p=>p.lines||[]))};}
 export function reviewedFields(p){return {amount_cents:p.amount_cents,supplier:p.supplier,supplier_document:p.supplier_document,document_date:p.document_date,document_number:p.document_number};}
 export function reviewExample(item,p){
- const predicted={};for(const k of ['amount_cents','supplier','supplier_document','document_date','document_number'])if(item.readResult?.fields?.[k]!==undefined)predicted[k]=item.readResult.fields[k];
+ const prediction=item.readResult||item.partialResult;const predicted={};for(const k of ['amount_cents','supplier','supplier_document','document_date','document_number'])if(prediction?.fields?.[k]!==undefined)predicted[k]=prediction.fields[k];
  const regions={};for(const [k,r] of Object.entries(item.regions||{}))if(k in REVIEW_FIELDS&&validRegion(r))regions[k]={...r};
  return {id:item.reviewId,receipt_id:item.id,predicted_fields:predicted,reviewed_fields:reviewedFields(p),regions,engine:'tesseract-por-1+receipt-v2'};
 }
