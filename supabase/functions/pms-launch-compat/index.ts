@@ -1,4 +1,4 @@
-import {teamInvitationSite,inviteNewTeamUser} from '../_shared/pms-team-invitations.ts';
+import {teamInvitationSite,inviteNewTeamUser,sendTeamConfirmation} from '../_shared/pms-team-invitations.ts';
 import {taskPhotos} from '../pms-operations/photos.ts';
 import {listingsAction} from '../pms-operations/listings.ts';
 // Partial production release: preserve existing PMS operations while adding the scoped listing editor.
@@ -284,11 +284,12 @@ async function teamAction(body:any,actor:{id:string,role?:string}){
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||fullName.length<2||!validRoles.includes(role))return json({ok:false,error:"invalid_invitation"},400);
     const propertyIds=role==="admin"?available:cleanPropertyIds(body.property_ids,available),permissions=cleanPermissions(body.permissions,role);
     if(role!=="admin"&&!propertyIds.length)return json({ok:false,error:"property_required"},400);
-    const {data:list}=await admin.auth.admin.listUsers({page:1,perPage:1000});
+    const {data:list,error:listError}=await admin.auth.admin.listUsers({page:1,perPage:1000});
+    if(listError||!list?.users)return json({ok:false,error:"invite_send_failed"},502);
     let invitedUser=list.users.find((u:any)=>u.email?.toLowerCase()===email)||null;
-    if(!invitedUser){
+    if(!invitedUser?.email_confirmed_at){
       const site=teamInvitationSite(url,Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL"));
-      const delivery=await inviteNewTeamUser(admin,{email,full_name:fullName,role,position,property_ids:propertyIds,permissions,invited_by:actor.id},site);
+      const delivery=await inviteNewTeamUser(admin,{email,full_name:fullName,role,position,property_ids:propertyIds,permissions,invited_by:actor.id},site,invitedUser);
       if(delivery.error||!delivery.user)return json({ok:false,error:delivery.error||"invite_send_failed"},502);
       invitedUser=delivery.user;
     }
@@ -313,8 +314,8 @@ async function teamAction(body:any,actor:{id:string,role?:string}){
     const {data:invitation}=await admin.from("pms_team_invitations").select("*").eq("id",invitationId).in("status",["pending","expired"]).maybeSingle();
     if(!invitation)return json({ok:false,error:"invitation_not_found"},404);
     const site=teamInvitationSite(url,Deno.env.get("PMS_SITE_URL")||Deno.env.get("EMAIL_SITE_URL"));
-    const {error}=await admin.auth.resend({type:"signup",email:invitation.email,options:{emailRedirectTo:`${site}/auth-callback.html?next=conferencias.html`}});
-    if(error)return json({ok:false,error:"invite_resend_failed"},502);
+    const deliveryError=await sendTeamConfirmation(admin,invitation.email,site);
+    if(deliveryError)return json({ok:false,error:deliveryError},502);
     const now=new Date().toISOString();
     await admin.from("pms_team_invitations").update({status:"pending",expires_at:new Date(Date.now()+7*86400000).toISOString(),updated_at:now}).eq("id",invitationId);
     await admin.from("audit_events").insert({actor_user_id:actor.id,action:"pms_invitation_resent",entity_type:"pms_team_invitation",entity_id:invitationId});
