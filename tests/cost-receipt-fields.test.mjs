@@ -38,8 +38,9 @@ test('validated access key recovers issuer and invoice without guessing an erron
 });
 test('OCR dates require agreement across distinct lines when the emission day conflicts',()=>{
  const mixed='LOJA EXEMPLO\n16/10/2026 - Cupom: 123\nN.:192220 Serie:114 Emissão 15/10/2026 11:05\nTOTAL A PAGAR 48,90';
- const r=extractReceiptFields(mixed,{confidence:50});assert.equal(r.fields.document_date,undefined);assert.equal(r.fields.competence,undefined);assert.equal(r.fields.document_number,'192220');assert.ok(r.warnings.some(w=>w.includes('Datas com leituras diferentes')));
- const agreed=extractReceiptFields(mixed+'\nProtocolo de autorização 16/10/2026',{confidence:50});assert.equal(agreed.fields.document_date,'2026-10-16');
+ const r=extractReceiptFields(mixed,{confidence:80});assert.equal(r.fields.document_date,undefined);assert.equal(r.fields.competence,undefined);assert.equal(r.fields.document_number,'192220');assert.ok(r.warnings.some(w=>w.includes('Datas com leituras diferentes')));
+ const agreed=extractReceiptFields(mixed+'\nProtocolo de autorização 16/10/2026',{confidence:80});assert.equal(agreed.fields.document_date,'2026-10-16');
  assert.equal(extractReceiptFields(mixed).fields.document_date,'2026-10-15');
  assert.equal(extractReceiptFields('Cod Descr. Qtd. Unid. Preco Total\nTOTAL A PAGAR 48,90').fields.supplier,undefined);
 });
+test('explicit business labels do not throw and low quality dates stay pending even if repeated',()=>{const r=extractReceiptFields('Razão social: MERCADO EXEMPLO LTDA\nCNPJ 11222333000181\nEmissão 15/10/2026\nProtocolo 15/10/2026\nTOTAL A PAGAR 48,90',{confidence:50});assert.equal(r.fields.supplier,'MERCADO EXEMPLO LTDA');assert.equal(r.fields.document_date,undefined);assert.equal(r.fields.competence,undefined);assert.equal(r.fields.amount_cents,undefined);assert.ok(r.warnings.some(w=>w.includes('Valor sem nitidez')));assert.ok(r.warnings.some(w=>w.includes('Data sem nitidez')));assert.equal(extractReceiptFields('Nome fantasia: MERCADO EXEMPLO').fields.supplier,'MERCADO EXEMPLO');});

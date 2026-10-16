@@ -42,7 +42,7 @@ function clearPreviousReceipt(){
 }
 function applyReceiptResult(result){
  const values={...result.fields};if(values.amount_cents)values.amount=brl(values.amount_cents);delete values.amount_cents;
- if(!edit&&!values.document_date&&result.warnings.some(w=>/Datas com leituras diferentes|Mais de uma data possível/.test(w))){for(const name of ['document_date','competence']){const input=field(name);if(!touchedFields.has(name)&&(input.value===receiptDefaults.get(name)||input.value===receiptAuto.get(name))){input.value='';receiptAuto.delete(name);input.classList.remove('cost-ocr-filled');}}}
+ if(!edit&&!values.document_date&&Object.keys(values).length>0){for(const name of ['document_date','competence']){const input=field(name);if(!touchedFields.has(name)&&(input.value===receiptDefaults.get(name)||input.value===receiptAuto.get(name))){input.value='';receiptAuto.delete(name);input.classList.remove('cost-ocr-filled');}}}
  let filled=0;applyingReceipt=true;
  try{for(const name of receiptFields){
   const input=field(name),value=values[name];if(!value||touchedFields.has(name)||(input.value!==''&&!(receiptAuto.has(name)&&receiptAuto.get(name)===input.value)&&!(!edit&&receiptDefaults.get(name)===input.value)))continue;

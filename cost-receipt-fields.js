@@ -31,8 +31,8 @@ export function extractReceiptKey(value){
  let candidate=value.trim();
  if(!/^\d{44}$/.test(candidate)){try{const uri=new URL(candidate);if(!['https:','http:'].includes(uri.protocol)||!uri.hostname.endsWith('.gov.br'))return null;candidate=(uri.searchParams.get('p')||'').split('|')[0];}catch{return null;}}
  if(!/^\d{44}$/.test(candidate)||accessKeys([candidate]).length!==1)return null;
- const fields={supplier_document:formattedCNPJ(candidate.slice(6,20)),document_number:candidate.slice(25,34)},source='Chave de acesso validada: '+candidate;
- return {fields,evidence:{supplier_document:source,document_number:source},warnings:[],confidence:null};
+ const fields={supplier_document:formattedCNPJ(candidate.slice(6,20)),document_number:candidate.slice(25,34),description:(candidate.slice(20,22)==='65'?'NFC-e':'NF-e')+' · '+Number(candidate.slice(25,34))},source='Chave de acesso validada: '+candidate;
+ return {fields,evidence:{supplier_document:source,document_number:source,description:source},warnings:[],confidence:null};
 }
 export function extractReceiptFields(text,{confidence=null}={}){
  const lines=String(text||'').slice(0,200000).split(/\r?\n/).map(s=>s.trim()).filter(Boolean),normalized=lines.map(plain),fields={},warnings=[],evidence={};
@@ -48,8 +48,7 @@ export function extractReceiptFields(text,{confidence=null}={}){
  const keys=[...new Set(accessKeys(issuerLines))];
  if(!fields.supplier_document&&keys.length===1){fields.supplier_document=formattedCNPJ(keys[0].slice(6,20));evidence.supplier_document='Chave de acesso validada: '+keys[0];}
  if(!fields.supplier_document)warnings.push(invalidCNPJ?'CNPJ lido com dígito inválido; confira no comprovante.':'CNPJ do estabelecimento não identificado.');
- for(let i=0;i<issuerLines.length;i++){const match=issuerLines[i].match(/(?:raz[aã]o\s+social|nome\s+fantasia)\s*:\s*(.+)/i);if(match){const name=nameCandidate(match[1]);if(name){fields.supplier=name;if(continuation&&!/^(?:S\s+)?(?:LTDA|S[.\s/]*A|ME|EPP)\.?$/i.test(continuation)&&/^(?:S\s*)?L[A-Z. ]{0,8}$/i.test(continuation))warnings.push('O final do nome do estabelecimento não ficou legível; confira e complete.');
-   evidence.supplier=issuerLines[i];break;}}}
+ for(let i=0;i<issuerLines.length;i++){const match=issuerLines[i].match(/(?:raz[aã]o\s+social|nome\s+fantasia)\s*:\s*(.+)/i);if(match){const name=nameCandidate(match[1]);if(name){fields.supplier=name;evidence.supplier=issuerLines[i];break;}}}
  // A printed issuer ID can precede the company name on the same line.
  // Keep that contextual name even when a digit of the ID failed its checksum.
  if(!fields.supplier)for(let i=0;i<issuerLines.length;i++){
@@ -68,7 +67,8 @@ export function extractReceiptFields(text,{confidence=null}={}){
  if(!fields.supplier)warnings.push('Nome do estabelecimento não identificado.');
  const dated=[];
  lines.forEach((line,i)=>{if(/VENCIMENTO|PAGAMENTO|ENTREGA|SAIDA|ENTRADA/.test(normalized[i])&&!/EMISSAO/.test(normalized[i]))return;for(const match of line.matchAll(/\b\d{2}[\/.-]\d{2}[\/.-]\d{4}\b/g)){const value=isoDate(match[0]);if(value)dated.push({value,score:/EMISSAO|EMITIDA|EMITIDO/.test(normalized[i])?3:1,line});}});
- if(dated.length){
+ if(confidence!==null&&confidence<65){warnings.push('Data sem nitidez suficiente; informe a emissão no comprovante.');}
+ else if(dated.length){
   const values=[...new Set(dated.map(d=>d.value))];let best;
   if(confidence!==null&&values.length>1){
    // OCR can read the same printed day differently beside the emission label.
@@ -98,6 +98,7 @@ export function extractReceiptFields(text,{confidence=null}={}){
  if(keys.length===1){const number=keys[0].slice(25,34);if(fields.document_number&&Number(fields.document_number)!==Number(number))warnings.push('Número impresso divergiu da chave de acesso; confira o número recuperado da chave.');fields.document_number=number;evidence.document_number='Chave de acesso validada: '+keys[0];}
  const all=normalized.join(' '),rules=[['pool_service',/PISCINEIRO|SERVICO.{0,30}PISCINA/],['energy',/ENERGIA ELETRICA|\bEDP\b/],['water',/\bCESAN\b|ABASTECIMENTO DE AGUA/],['pool',/\bCLORO\b|ALGICIDA|BARRILHA|PRODUTOS.{0,25}PISCINA/],['cleaning_products',/\bDETERG(?:ENTE)?\b|LAVA\s+ROUPAS|SABAO\s+(?:EM\s+)?PO|PAPEL\s+HIG(?:IENICO)?\b|AGUA SANITARIA|DESINFETANTE|PRODUTOS DE LIMPEZA/],['laundry',/LAVANDERIA|LAVAGEM.{0,25}ENXOVAL/],['cleaning',/FAXINA|SERVICO.{0,20}LIMPEZA/],['maintenance',/MANUTENCAO|REPAROS?/]];
  const category=rules.find(([,rule])=>rule.test(all));if(category)fields.category=category[0];else warnings.push('Categoria não identificada; selecione antes de salvar.');
+ if(confidence!==null&&confidence<65&&fields.amount_cents!==undefined){delete fields.amount_cents;delete evidence.amount;warnings.push('Valor sem nitidez suficiente; informe o total do comprovante.');}
  if(fields.supplier)fields.description='Nota · '+fields.supplier;
  if(confidence!==null&&confidence<65)warnings.push('Leitura com baixa nitidez. Confira todos os dados.');
  return {fields,warnings:[...new Set(warnings)],evidence,confidence};
