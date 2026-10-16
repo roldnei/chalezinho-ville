@@ -17,3 +17,10 @@ test('total annotation follows its fiscal evidence instead of an item with the s
 test('private review preserves validated partial prediction when OCR did not complete',()=>{
  const r=reviewExample({id:'receipt',reviewId:'review',partialResult:{fields:{document_number:'123'},text:'not retained'}},{supplier:'Manual',supplier_document:'',document_date:'2026-05-25',document_number:'123',amount_cents:10840});assert.deepEqual(r.predicted_fields,{document_number:'123'});assert.equal(r.reviewed_fields.amount_cents,10840);assert.ok(!JSON.stringify(r).includes('not retained'));
 });
+
+test('confident issuer labels locate CNPJ and supplier despite weak full line OCR, without using recipient labels',()=>{
+ const w=(text,x,confidence=85)=>({text,confidence,bbox:{x0:x,y0:100,x1:x+50,y1:120}}),line={text:'CNPJ: 11.222.338/0001-81 MERCADO EXEMPLO',confidence:40,words:[w('CNPJ:',100),w('11.222.338/0001-81',160),w('MERCADO',260),w('EXEMPLO',320)]};
+ const result={fields:{supplier_document:'11.222.333/0001-81',supplier:'MERCADO EXEMPLO LTDA'},evidence:{supplier_document:'Chave de acesso validada: synthetic'}};
+ const r=receiptRegions(result,[{page:1,width:1000,height:1500,lines:[line]}]);assert.equal(r.supplier_document.x,.1);assert.equal(r.supplier.x,.26);assert.equal(r.supplier_document.source,'automatic');
+ assert.deepEqual(receiptRegions(result,[{page:1,width:1000,height:1500,lines:[{...line,text:'CONSUMIDOR CNPJ: 11.222.338/0001-81'}]}]),{});assert.deepEqual(receiptRegions(result,[{page:1,width:1000,height:1500,lines:[{...line,confidence:90,text:'CONSUMIDOR CNPJ: 11.222.333/0001-81'}]}]),{});
+});

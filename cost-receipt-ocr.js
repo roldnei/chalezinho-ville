@@ -1,7 +1,7 @@
 import {receiptRegions,ocrPage} from './cost-receipt-regions.js';
 import {extractReceiptFields} from './cost-receipt-fields.js';
 import {readReceiptQR} from './cost-receipt-qr.js';
-import {enhanceReceipt,combineReceiptReadings} from './cost-receipt-image.js';
+import {receiptBounds,enhanceReceipt,combineReceiptReadings,recoverPositionedTotal} from './cost-receipt-image.js';
 const root=new URL('./assets/receipt-ocr/',import.meta.url),url=path=>new URL(path,root).href;
 let loadingScript=null,loadingQR=null;
 async function loadEngine(){
@@ -37,11 +37,14 @@ export async function readReceipt(file,{signal,onProgress=()=>{},onPartialResult
   await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});
   const result=await worker.recognize(canvas,{rotateAuto:!positionOnly},{blocks:!focused});checkAbort(signal);return result.data;
  }
- async function positioned(result,data,canvas){
+ async function positioned(result,data,canvas,layoutCanvas=canvas,transform=null,originalData=null){
   // Deskewed OCR coordinates do not belong to the original photo. Locate text
   // once without deskew, preserving the existing extraction decisions.
-  const layout=Math.abs(data.rotateRadians||0)>=.005?await recognize(canvas,'Localizando campos…',{positionOnly:true}):data;
-  return {...result,regions:receiptRegions(result,[ocrPage(layout,canvas)])};
+  const layout=Math.abs(data.rotateRadians||0)>=.005?await recognize(layoutCanvas,'Localizando campos…',{positionOnly:true}):data;
+  result=recoverPositionedTotal(result,extractReceiptFields(layout.text,{confidence:layout.confidence}));
+  const page=ocrPage(layout,layoutCanvas);if(transform){const map=b=>({x0:transform.left+b.x0*transform.width/layoutCanvas.width,y0:transform.top+b.y0*transform.height/layoutCanvas.height,x1:transform.left+b.x1*transform.width/layoutCanvas.width,y1:transform.top+b.y1*transform.height/layoutCanvas.height});page.width=canvas.width;page.height=canvas.height;page.lines=page.lines.map(l=>({...l,bbox:map(l.bbox),words:(l.words||[]).map(w=>({...w,bbox:map(w.bbox)}))}));}
+  const pages=[page];if(originalData&&Math.abs(originalData.rotateRadians||0)<.005)pages.push(ocrPage(originalData,canvas));
+  return {...result,regions:receiptRegions(result,pages)};
  }
  try{
   let text='',confidence=null;const positions=[];
@@ -58,9 +61,9 @@ export async function readReceipt(file,{signal,onProgress=()=>{},onPartialResult
    let qr=null;try{onProgress('Lendo QR code da nota…');const decode=await loadQRDecoder();checkAbort(signal);qr=await readReceiptQR(canvas,{decode,createCanvas:()=>document.createElement('canvas'),signal});if(qr){checkAbort(signal);onPartialResult({...qr,regions:{},text:''});}}catch(error){checkAbort(signal);}
    const data=await recognize(canvas,'Lendo nota…'),first=extractReceiptFields(data.text,{confidence:data.confidence});text=data.text;confidence=data.confidence;
    if(!first.evidence.document_number?.startsWith('Chave de acesso validada:')||!first.fields.supplier_document||!first.fields.amount_cents||data.confidence<75){
-    onProgress('Melhorando a leitura do cupom…');const focused=enhanceReceipt(canvas,data.blocks,()=>document.createElement('canvas'));
-    try{checkAbort(signal);const reread=await recognize(focused,'Conferindo dados…',{focused:true}),second=extractReceiptFields(reread.text,{confidence:reread.confidence});
-     const result=combineReceiptReadings(first,second);return await positioned({... (qr?combineReceiptReadings(result,qr):result),text:data.text+'\n\n— Segunda leitura —\n'+reread.text},data,canvas);
+    onProgress('Melhorando a leitura do cupom…');const bounds=receiptBounds(data.blocks,canvas.width,canvas.height)||{left:0,top:0,width:canvas.width,height:canvas.height},focused=enhanceReceipt(canvas,data.blocks,()=>document.createElement('canvas'),bounds);
+    try{checkAbort(signal);const reread=await recognize(focused,'Conferindo dados…'),second=extractReceiptFields(reread.text,{confidence:reread.confidence});
+     const result=combineReceiptReadings(first,second);return await positioned({... (qr?combineReceiptReadings(result,qr):result),text:data.text+'\n\n— Segunda leitura —\n'+reread.text},reread,canvas,focused,bounds,data);
     }finally{focused.width=focused.height=0;}
    }
    return await positioned({... (qr?combineReceiptReadings(first,qr):first),text},data,canvas);

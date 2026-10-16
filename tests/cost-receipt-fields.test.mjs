@@ -60,3 +60,16 @@ test('instalment due dates and instalment amounts do not replace issue date and 
 test('sanitary fittings and electrical repair parts suggest maintenance',()=>{
  for(const item of ['ASSENTO SANIT.BCO ALMOF','PERFIL EMBUTIR ALUMINIO','FONTE DE ALIMENTACAO SLIM'])assert.equal(extractReceiptFields('LOJA EXEMPLO\nDocumento Auxiliar\n'+item).fields.category,'maintenance');
 });
+
+test('missing decimal separator requires matching total and payment and enough OCR confidence',()=>{
+ const text='VALOR TOTAL R$ 187 70\nCartão de Crédito 187 70';
+ assert.equal(extractReceiptFields(text,{confidence:70}).fields.amount_cents,18770);
+ assert.equal(extractReceiptFields('VALOR TOTAL R$ 187 70\nPIX R$ 187,70',{confidence:85}).fields.amount_cents,18770);
+ for(const t of ['VALOR TOTAL R$ 187 70','VALOR TOTAL R$ 187 70\nCartão de Crédito 200 00','VALOR TOTAL R$ 187 70\nParcela 187 70','VALOR TOTAL R$ 1 234 56\nCartão de Crédito 1 234 56'])assert.equal(extractReceiptFields(t,{confidence:90}).fields.amount_cents,undefined);
+ assert.equal(extractReceiptFields(text,{confidence:40}).fields.amount_cents,undefined);
+ assert.match(extractReceiptFields(text,{confidence:70}).evidence.amount_cents,/VALOR TOTAL/);
+});
+
+test('five OCR digits use the last two as cents only in a corroborated financial total',()=>{
+ const text='VALOR TOTAL R$ 12345\nCartão de Crédito 12345';assert.equal(extractReceiptFields(text,{confidence:85}).fields.amount_cents,12345);assert.equal(extractReceiptFields(text).fields.amount_cents,undefined);assert.equal(extractReceiptFields('VALOR TOTAL R$ 12345',{confidence:85}).fields.amount_cents,undefined);assert.equal(extractReceiptFields('NFC-e: 12345\nCartão de Crédito 12345',{confidence:85}).fields.amount_cents,undefined);
+});

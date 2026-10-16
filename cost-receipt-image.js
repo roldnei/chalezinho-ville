@@ -2,6 +2,17 @@
 // the table behind it. A margin accommodates the small deskew applied during recognition.
 export function receiptBounds(blocks,width,height){
  const lines=(blocks||[]).flatMap(b=>(b.paragraphs||[]).flatMap(p=>p.lines||[]));
+ // Background texture can lower an entire line's confidence and enlarge its
+ // box across the photo. Fiscal words still provide a reliable paper crop.
+ const fiscal=/^(?:CNPJ|TOTAL|VALOR|PAGAR|NFC[- ]?E|EMISS[AÃ]O|FORMA)[:.]?$/i;
+ const words=lines.flatMap(l=>l.words||[]).filter(w=>w.confidence>=65&&w.bbox&&fiscal.test(w.text));
+ if(words.length>=4&&words.some(w=>/CNPJ|NFC/i.test(w.text))&&words.some(w=>/TOTAL|PAGAR/i.test(w.text))){
+  const numbers=lines.filter(l=>(l.words||[]).some(w=>w.confidence>=65&&fiscal.test(w.text))).flatMap(l=>l.words||[]).filter(w=>w.bbox&&w.confidence>=65&&/^\d+(?:\.\d{3})*,\d{2}$/.test(w.text));
+  const extents=[...words,...numbers];
+  const left=Math.max(0,Math.min(...extents.map(w=>w.bbox.x0))-width*.03),right=Math.min(width,Math.max(...extents.map(w=>w.bbox.x1))+width*.10);
+  const top=Math.max(0,Math.min(...words.map(w=>w.bbox.y0))-height*.055),bottom=Math.min(height,Math.max(...words.map(w=>w.bbox.y1))+height*.04);
+  if(right-left>=width*.2&&bottom-top>=height*.15)return {left,top,width:right-left,height:bottom-top};
+ }
  const anchors=lines.filter(l=>l.confidence>=55&&/CNPJ|\d{2}[.,]\d{3}[.,]\d{3}|TOTAL|A PAGAR|NFC[- ]?E|EMISS|FORMA PAGAMENTO/i.test(l.text)&&l.bbox);
  if(anchors.length<2)return null;
  const pad=Math.max(16,Math.round(width*.021)),verticalPad=Math.max(16,Math.round(height*.013));
@@ -10,8 +21,7 @@ export function receiptBounds(blocks,width,height){
  if(right-left<width*.15||bottom-top<height*.1)return null;
  return {left,top,width:right-left,height:bottom-top};
 }
-export function enhanceReceipt(source,blocks,createCanvas){
- const bounds=receiptBounds(blocks,source.width,source.height)||{left:0,top:0,width:source.width,height:source.height};
+export function enhanceReceipt(source,blocks,createCanvas,bounds=receiptBounds(blocks,source.width,source.height)||{left:0,top:0,width:source.width,height:source.height}){
  const scale=Math.min(1.5,2400/bounds.width,6000/bounds.height),canvas=createCanvas();canvas.width=Math.round(bounds.width*scale);canvas.height=Math.round(bounds.height*scale);
  const ctx=canvas.getContext('2d');ctx.drawImage(source,bounds.left,bounds.top,bounds.width,bounds.height,0,0,canvas.width,canvas.height);
  const pixels=ctx.getImageData(0,0,canvas.width,canvas.height);
@@ -35,4 +45,10 @@ export function combineReceiptReadings(first,second){
  if(first.fields.supplier&&second.fields.supplier&&first.fields.supplier!==second.fields.supplier)warnings.push('O nome do estabelecimento teve leituras diferentes; confira e complete se necessário.');
  const missing={'CNPJ do estabelecimento não identificado.':'supplier_document','Nome do estabelecimento não identificado.':'supplier','Data de emissão não identificada.':'document_date','Total da nota não identificado; informe o valor.':'amount_cents','Categoria não identificada; selecione antes de salvar.':'category','CNPJ lido com dígito inválido; confira no comprovante.':'supplier_document'};
  return {fields,evidence,confidence:second.confidence,warnings:[...new Set(warnings)].filter(w=>!missing[w]||fields[missing[w]]===undefined)};
+}
+// A clean, unrotated crop may recover a total that the full photograph missed.
+// Explicit conflicts stay pending even if a later pass agrees with one side.
+export function recoverPositionedTotal(result,reading){
+ if(result.fields.amount_cents||!reading.fields.amount_cents||reading.confidence===null||reading.confidence<65||result.warnings.some(w=>/divergentes em valor|Mais de um total|Linha de total com mais/i.test(w)))return result;
+ return combineReceiptReadings(result,{fields:{amount_cents:reading.fields.amount_cents},evidence:{amount_cents:reading.evidence.amount_cents||reading.evidence.amount},confidence:reading.confidence,warnings:[...reading.warnings.filter(w=>/Separador decimal/.test(w)),'Total recuperado da leitura localizada. Confira o valor.']});
 }
