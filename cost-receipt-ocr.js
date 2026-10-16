@@ -1,11 +1,17 @@
 import {extractReceiptFields} from './cost-receipt-fields.js';
+import {readReceiptQR} from './cost-receipt-qr.js';
 import {enhanceReceipt,combineReceiptReadings} from './cost-receipt-image.js';
 const root=new URL('./assets/receipt-ocr/',import.meta.url),url=path=>new URL(path,root).href;
-let loadingScript=null;
+let loadingScript=null,loadingQR=null;
 async function loadEngine(){
  if(window.Tesseract)return window.Tesseract;
  if(!loadingScript)loadingScript=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=url('tesseract.min.js');script.onload=()=>resolve(window.Tesseract);script.onerror=()=>{loadingScript=null;script.remove();reject(Error('Não foi possível carregar o leitor. Tente novamente.'));};document.head.append(script);});
  return loadingScript;
+}
+async function loadQRDecoder(){
+ if(window.jsQR)return window.jsQR;
+ if(!loadingQR)loadingQR=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=url('jsQR.js');script.onload=()=>resolve(window.jsQR);script.onerror=()=>{loadingQR=null;script.remove();reject(Error('QR indisponível'));};document.head.append(script);});
+ return loadingQR;
 }
 function abortError(){return new DOMException('Leitura cancelada.','AbortError');}
 function checkAbort(signal){if(signal?.aborted)throw abortError();}
@@ -41,13 +47,15 @@ export async function readReceipt(file,{signal,onProgress=()=>{}}={}){
    }finally{page.cleanup();}}
    text=pages.join('\n');if(scores.length)confidence=Math.min(...scores);
   }else{const canvas=await photoCanvas(file,signal);try{
+   let qr=null;try{onProgress('Lendo QR code da nota…');const decode=await loadQRDecoder();checkAbort(signal);qr=await readReceiptQR(canvas,{decode,createCanvas:()=>document.createElement('canvas'),signal});}catch(error){checkAbort(signal);}
    const data=await recognize(canvas,'Lendo nota…'),first=extractReceiptFields(data.text,{confidence:data.confidence});text=data.text;confidence=data.confidence;
    if(!first.evidence.document_number?.startsWith('Chave de acesso validada:')||!first.fields.supplier_document||!first.fields.amount_cents||data.confidence<75){
     onProgress('Melhorando a leitura do cupom…');const focused=enhanceReceipt(canvas,data.blocks,()=>document.createElement('canvas'));
     try{checkAbort(signal);const reread=await recognize(focused,'Conferindo dados…',{focused:true}),second=extractReceiptFields(reread.text,{confidence:reread.confidence});
-     return {...combineReceiptReadings(first,second),text:data.text+'\n\n— Segunda leitura —\n'+reread.text};
+     const result=combineReceiptReadings(first,second);return {...(qr?combineReceiptReadings(result,qr):result),text:data.text+'\n\n— Segunda leitura —\n'+reread.text};
     }finally{focused.width=focused.height=0;}
    }
+   return {...(qr?combineReceiptReadings(first,qr):first),text};
   }finally{canvas.width=canvas.height=0;}}
   checkAbort(signal);return {...extractReceiptFields(text,{confidence}),text};
  }catch(error){if(signal?.aborted)throw abortError();if(error?.name==='PasswordException')throw Error('O PDF tem senha. Envie uma versão sem senha ou uma foto.');throw error;}

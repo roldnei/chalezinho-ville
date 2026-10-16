@@ -29,6 +29,7 @@
   "private": true,
   "dependencies": {
     "@tesseract.js-data/por": "1.0.0",
+    "jsqr": "1.4.0",
     "pdfjs-dist": "6.4.299",
     "tesseract.js": "7.0.0"
   }

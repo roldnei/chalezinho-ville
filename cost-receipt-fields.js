@@ -16,7 +16,7 @@ function nameCandidate(value){
  const meaningful=words.filter(w=>w.length>=3&&/[AEIOUY]/.test(w));
  return s.length>=3&&s.length<=160&&meaningful.length>0&&words.filter(w=>w.length<=2).length<=words.length/2&&
   (letters.match(/[AEIOUY]/g)||[]).length>=letters.length*.18&&
-  !/(?:CNPJ|CPF|INSCRICAO|NOTA FISCAL|CUPOM|DANFE|DOC[UO]MENTO AUXILIAR|CONSUMIDOR|DESTINATARIO|TOMADOR|EMISSAO|ENDERECO|CEP|TELEFONE|TOTAL|AUTORIZACAO|HTTP|WWW\.|CHAVE DE ACESSO|RODOVIA|RUA\b|AVENIDA\b|BAIRRO\b|^AV\.|^I[. ]?E[.:]|^OPER:|^CODIGO|^FORMA PAGAMENTO|^CARTAO|^REDE )/.test(plain(s))&&
+  !/(?:CNPJ|CPF|INSCRICAO|NOTA FISCAL|CUPOM|DANFE|DOC[UO]MENTO AUXILIAR|CONSUMIDOR|DESTINATARIO|TOMADOR|EMISSAO|ENDERECO|CEP|TELEFONE|TOTAL|AUTORIZACAO|HTTP|WWW\.|CHAVE DE ACESSO|RODOVIA|RUA\b|AVENIDA\b|BAIRRO\b|^AV\.|^I[. ]?E[.:]|^OPER:|^COD(?:IGO)?\b|^FORMA PAGAMENTO|^CARTAO|^REDE )/.test(plain(s))&&
   !/\d{2}\/\d{2}|\d{3}[.,]\d{2}|\d{4,}/.test(s)?s:null;
 }
 const cnpjPattern=/\b[A-Z\d]{2}\s*[.,]\s*[A-Z\d]{3}\s*[.,]\s*[A-Z\d]{3}\s*\/\s*[A-Z\d]{4}\s*-\s*\d{2}\b/g;
@@ -26,6 +26,14 @@ function accessKeys(lines){return lines.flatMap(line=>[...line.matchAll(/(?<!\d)
  if(!['55','65'].includes(k.slice(20,22))||!validCNPJ(k.slice(6,20)))return false;
  let sum=0,weight=2;for(let i=42;i>=0;i--){sum+=Number(k[i])*weight;weight=weight===9?2:weight+1;}const rest=sum%11,digit=rest<2?0:11-rest;return digit===Number(k[43]);
 });}
+export function extractReceiptKey(value){
+ if(typeof value!=='string'||value.length>4096)return null;
+ let candidate=value.trim();
+ if(!/^\d{44}$/.test(candidate)){try{const uri=new URL(candidate);if(!['https:','http:'].includes(uri.protocol)||!uri.hostname.endsWith('.gov.br'))return null;candidate=(uri.searchParams.get('p')||'').split('|')[0];}catch{return null;}}
+ if(!/^\d{44}$/.test(candidate)||accessKeys([candidate]).length!==1)return null;
+ const fields={supplier_document:formattedCNPJ(candidate.slice(6,20)),document_number:candidate.slice(25,34)},source='Chave de acesso validada: '+candidate;
+ return {fields,evidence:{supplier_document:source,document_number:source},warnings:[],confidence:null};
+}
 export function extractReceiptFields(text,{confidence=null}={}){
  const lines=String(text||'').slice(0,200000).split(/\r?\n/).map(s=>s.trim()).filter(Boolean),normalized=lines.map(plain),fields={},warnings=[],evidence={};
  if(!lines.length)return {fields,warnings:['Não foi possível encontrar texto legível.'],evidence,confidence};
@@ -60,7 +68,19 @@ export function extractReceiptFields(text,{confidence=null}={}){
  if(!fields.supplier)warnings.push('Nome do estabelecimento não identificado.');
  const dated=[];
  lines.forEach((line,i)=>{if(/VENCIMENTO|PAGAMENTO|ENTREGA|SAIDA|ENTRADA/.test(normalized[i])&&!/EMISSAO/.test(normalized[i]))return;for(const match of line.matchAll(/\b\d{2}[\/.-]\d{2}[\/.-]\d{4}\b/g)){const value=isoDate(match[0]);if(value)dated.push({value,score:/EMISSAO|EMITIDA|EMITIDO/.test(normalized[i])?3:1,line});}});
- if(dated.length){const score=Math.max(...dated.map(d=>d.score)),best=dated.filter(d=>d.score===score),values=[...new Set(best.map(d=>d.value))];if(values.length===1){fields.document_date=values[0];fields.competence=values[0].slice(0,7);evidence.document_date=best[0].line;}else warnings.push('Mais de uma data possível; confira a emissão.');}else warnings.push('Data de emissão não identificada.');
+ if(dated.length){
+  const values=[...new Set(dated.map(d=>d.value))];let best;
+  if(confidence!==null&&values.length>1){
+   // OCR can read the same printed day differently beside the emission label.
+   // Require agreement in separate lines instead of trusting that label alone.
+   const counts=values.map(value=>({value,count:new Set(dated.filter(d=>d.value===value).map(d=>d.line)).size})).sort((a,b)=>b.count-a.count);
+   if(counts[0].count>=2&&counts[0].count>counts[1].count)best=dated.filter(d=>d.value===counts[0].value);
+   warnings.push('Datas com leituras diferentes; confira a emissão no comprovante.');
+  }else{const score=Math.max(...dated.map(d=>d.score));best=dated.filter(d=>d.score===score);}
+  const selected=[...new Set((best||[]).map(d=>d.value))];
+  if(selected.length===1){fields.document_date=selected[0];fields.competence=selected[0].slice(0,7);evidence.document_date=best[0].line;}
+  else warnings.push('Mais de uma data possível; confira a emissão.');
+ }else warnings.push('Data de emissão não identificada.');
  const amounts=[];
  normalized.forEach((line,i)=>{
   if(/SUB\s*TOTAL|TROCO|TRIBUT|IMPOST|VALOR\s+PAGO|TOTAL\s+(?:DE\s+|DOS\s+)?(?:ITENS|PRODUTOS)|QTD|UNITARIO/.test(line))return;
@@ -73,7 +93,8 @@ export function extractReceiptFields(text,{confidence=null}={}){
   if(values.length===1)amounts.push({value:values[0],score,line:source});else if(values.length>1)warnings.push('Linha de total com mais de um valor; confira o total.');
  });
  if(amounts.length){const score=Math.max(...amounts.map(a=>a.score)),best=amounts.filter(a=>a.score===score),values=[...new Set(best.map(a=>a.value))];if(values.length===1){fields.amount_cents=values[0];evidence.amount=best[0].line;}else warnings.push('Mais de um total encontrado. Informe o valor correto.');}else warnings.push('Total da nota não identificado; informe o valor.');
- for(const line of lines){const match=line.match(/(?:NFC[- ]?E|NF[- ]?E|NOTA\s+FISCAL|CUPOM(?:\s+FISCAL)?|N[UÚ]MERO\s+DA\s+NOTA)\s*(?:N[º°o.]?\s*[:.]?\s*|N[UÚ]MERO\s*:?\s*|[:#]\s*)(\d{1,12})\b/i);if(match){fields.document_number=match[1];evidence.document_number=line;break;}}
+ for(const line of lines){const invoice=line.match(/\bN\s*[.º°o]*\s*:\s*(\d{1,9})\s+S[eé]rie\s*:/i);if(invoice){fields.document_number=invoice[1];evidence.document_number=line;break;}}
+ for(const line of lines){if(fields.document_number)break;const match=line.match(/(?:NFC[- ]?E|NF[- ]?E|NOTA\s+FISCAL|CUPOM(?:\s+FISCAL)?|N[UÚ]MERO\s+DA\s+NOTA)\s*(?:N[º°o.]?\s*[:.]?\s*|N[UÚ]MERO\s*:?\s*|[:#]\s*)(\d{1,12})\b/i);if(match){fields.document_number=match[1];evidence.document_number=line;break;}}
  if(keys.length===1){const number=keys[0].slice(25,34);if(fields.document_number&&Number(fields.document_number)!==Number(number))warnings.push('Número impresso divergiu da chave de acesso; confira o número recuperado da chave.');fields.document_number=number;evidence.document_number='Chave de acesso validada: '+keys[0];}
  const all=normalized.join(' '),rules=[['pool_service',/PISCINEIRO|SERVICO.{0,30}PISCINA/],['energy',/ENERGIA ELETRICA|\bEDP\b/],['water',/\bCESAN\b|ABASTECIMENTO DE AGUA/],['pool',/\bCLORO\b|ALGICIDA|BARRILHA|PRODUTOS.{0,25}PISCINA/],['cleaning_products',/\bDETERG(?:ENTE)?\b|LAVA\s+ROUPAS|SABAO\s+(?:EM\s+)?PO|PAPEL\s+HIG(?:IENICO)?\b|AGUA SANITARIA|DESINFETANTE|PRODUTOS DE LIMPEZA/],['laundry',/LAVANDERIA|LAVAGEM.{0,25}ENXOVAL/],['cleaning',/FAXINA|SERVICO.{0,20}LIMPEZA/],['maintenance',/MANUTENCAO|REPAROS?/]];
  const category=rules.find(([,rule])=>rule.test(all));if(category)fields.category=category[0];else warnings.push('Categoria não identificada; selecione antes de salvar.');

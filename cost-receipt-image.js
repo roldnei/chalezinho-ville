@@ -25,7 +25,7 @@ export function combineReceiptReadings(first,second){
  for(const [name,value] of Object.entries(second.fields)){
   if(fields[name]===undefined){fields[name]=value;evidence[name]=second.evidence[name];}
   else if(fields[name]!==value&&['supplier_document','amount_cents','document_date','competence','document_number'].includes(name)){
-   if(name==='document_number'&&second.evidence[name]?.startsWith('Chave de acesso validada:')&&!first.evidence[name]?.startsWith('Chave de acesso validada:')){fields[name]=value;evidence[name]=second.evidence[name];warnings.push('Número da nota recuperado da chave de acesso validada; confira antes de salvar.');continue;}
+   if(name==='document_number'&&second.evidence[name]?.startsWith('Chave de acesso validada:')&&!first.evidence[name]?.startsWith('Chave de acesso validada:')){fields[name]=value;evidence[name]=second.evidence[name];if(Number(first.fields[name])!==Number(value))warnings.push('Número da nota recuperado da chave de acesso validada; confira antes de salvar.');continue;}
    if(name==='document_number'&&first.evidence[name]?.startsWith('Chave de acesso validada:')&&!second.evidence[name]?.startsWith('Chave de acesso validada:')){warnings.push('Número impresso divergiu da chave de acesso; confira o número recuperado da chave.');continue;}
    // Different zero padding denotes the same invoice number.
    if(name==='document_number'&&Number(fields[name])===Number(value))continue;

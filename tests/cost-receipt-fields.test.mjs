@@ -36,3 +36,10 @@ test('validated access key recovers issuer and invoice without guessing an erron
  assert.equal(r.fields.supplier_document,'11.222.333/0001-81');assert.equal(r.fields.document_number,'000089628');assert.match(r.evidence.document_number,/Chave de acesso validada/);assert.ok(r.warnings.some(w=>w.includes('divergiu')));
  const invalid=extractReceiptFields(key.slice(0,-1)+(Number(key.at(-1))+1)%10);assert.equal(invalid.fields.supplier_document,undefined);assert.equal(invalid.fields.document_number,undefined);
 });
+test('OCR dates require agreement across distinct lines when the emission day conflicts',()=>{
+ const mixed='LOJA EXEMPLO\n16/10/2026 - Cupom: 123\nN.:192220 Serie:114 Emissão 15/10/2026 11:05\nTOTAL A PAGAR 48,90';
+ const r=extractReceiptFields(mixed,{confidence:50});assert.equal(r.fields.document_date,undefined);assert.equal(r.fields.competence,undefined);assert.equal(r.fields.document_number,'192220');assert.ok(r.warnings.some(w=>w.includes('Datas com leituras diferentes')));
+ const agreed=extractReceiptFields(mixed+'\nProtocolo de autorização 16/10/2026',{confidence:50});assert.equal(agreed.fields.document_date,'2026-10-16');
+ assert.equal(extractReceiptFields(mixed).fields.document_date,'2026-10-15');
+ assert.equal(extractReceiptFields('Cod Descr. Qtd. Unid. Preco Total\nTOTAL A PAGAR 48,90').fields.supplier,undefined);
+});
