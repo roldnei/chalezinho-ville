@@ -105,7 +105,7 @@ function classify(){
  if(!field('confirm_fiscal').checked){field('exclusion').setCustomValidity('');field('exclusion').removeAttribute('aria-invalid');$('#cost-exclusion-error').hidden=true;}
 }
 function openEditor(row){
- cancelReceiptRead();viewer.clear();$('#cost-upload-options').hidden=true;$('#cost-upload').setAttribute('aria-expanded','false');receiptSource=null;receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
+ cancelReceiptRead();viewer.clear();receiptSource=null;receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
  edit=row?{...row}:null;draftId=row?.id||crypto.randomUUID();queue=[];form.reset();$('#cost-form-message').textContent='';$('#cost-dialog-title').textContent=row?'Editar custo':'Novo custo';$('#cost-archive').hidden=!row;
  field('category').innerHTML='<option value="">Selecione a categoria</option>'+Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
  field('property_id').innerHTML='<option value="">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -131,8 +131,7 @@ function addFiles(input){
 }
 function payload(){
  const invalid=$('#cost-document-viewer').querySelector('input[aria-invalid="true"]');if(invalid)throw Error(invalid.validationMessage||'Corrija o campo destacado na nota antes de salvar.');
- if((receiptReview||field('keep_receipt_example').checked)&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');
- if(field('keep_receipt_example').checked&&!queue.some(q=>q.id===receiptSource))throw Error('Selecione o comprovante que corresponde aos dados conferidos.');
+ if(receiptReview&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');
  if(!CATEGORIES[field('category').value])throw Error('Selecione a categoria do custo.');
  const p={description:field('description').value.trim(),category:field('category').value,property_id:field('property_id').value?Number(field('property_id').value):null,amount_cents:cents(field('amount').value),competence:monthStart(field('competence').value),document_date:field('document_date').value,paid_on:field('paid_on').value||null,supplier:field('supplier').value.trim(),supplier_document:field('supplier_document').value.trim(),document_number:field('document_number').value.trim(),notes:field('notes').value.trim(),fiscal_note:field('fiscal_note').value.trim(),owner_borne:field('owner_borne').checked,fiscal_status:CATEGORIES[field('category').value][1]?'review':'operational',fiscal_month:null,exclusion_cents:0};
  if(p.paid_on&&p.paid_on>today())throw Error('A data do pagamento não pode estar no futuro.');
@@ -153,9 +152,9 @@ async function uploadQueue(){
  }
 }
 async function saveReceiptReview(p){
- if(!field('keep_receipt_example').checked)return;
- const item=queue.find(q=>q.id===receiptSource);if(!item?.attached)throw Error('Confira o comprovante selecionado antes de guardar o exemplo.');
- if(!field('receipt_reviewed').checked)throw Error('Confirme a conferência dos dados da nota.');
+ const item=queue.find(q=>q.id===receiptSource);if(!item)return;
+ if(!item.attached)throw Error('Confira o comprovante selecionado antes de guardar a conferência.');
+ if(receiptReview&&!field('receipt_reviewed').checked)throw Error('Confirme a conferência dos dados da nota.');
  const example=reviewExample(item,p),key=JSON.stringify(example);
  if(item.savedReview===key)return;
  // Append-only snapshots: stable id on network retry; a changed correction
@@ -193,13 +192,11 @@ async function boot(){try{
  bindMoneyInput('amount');bindMoneyInput('exclusion');
  for(const id of ['cost-month','cost-property','cost-basis'])$('#'+id).onchange=()=>{if($('#cost-month').validity.valid&&$('#cost-month').value)render();};
  $('#cost-new').onclick=()=>openEditor();$('#cost-refresh').onclick=load;$('#cost-csv').onclick=()=>exportMonth(false);$('#cost-zip').onclick=()=>exportMonth(true);$('#cost-close').onclick=()=>{cancelReceiptRead();viewer.clear();$('#cost-dialog').close();};$('#cost-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else{cancelReceiptRead();viewer.clear();}});field('category').onchange=classify;field('confirm_fiscal').onchange=classify;
- field('keep_receipt_example').onchange=()=>{if(field('keep_receipt_example').checked)requireReceiptReview();};
  $('#cost-receipt-cancel').onclick=()=>{cancelReceiptRead();$('#cost-receipt-status').textContent='Leitura cancelada. Você pode preencher os campos.';};
- $('#cost-upload').onclick=()=>{const options=$('#cost-upload-options');options.hidden=!options.hidden;$('#cost-upload').setAttribute('aria-expanded',String(!options.hidden));};
- for(const [button,input] of [['cost-take-photo','cost-camera'],['cost-attach-file','cost-files']])$('#'+button).onclick=()=>{$('#cost-upload-options').hidden=true;$('#cost-upload').setAttribute('aria-expanded','false');$('#'+input).click();};
+ $('#cost-upload').onclick=()=>$('#cost-files').click();
  for(const input of form.querySelectorAll('[name]'))for(const type of ['input','change'])input.addEventListener(type,()=>{if(!applyingReceipt){touchedFields.add(input.name);input.classList.remove('cost-ocr-filled');if(receiptFields.includes(input.name)&&receiptSource){const item=queue.find(q=>q.id===receiptSource);if(item){item.corrections||={};item.corrections[input.name]=input.value;}requireReceiptReview();viewer.refresh();}}});
  field('paid_on').onchange=()=>{if(!field('fiscal_month').value)field('fiscal_month').value=field('paid_on').value.slice(0,7);};
- $('#cost-camera').onchange=e=>addFiles(e.target);$('#cost-files').onchange=e=>addFiles(e.target);form.onsubmit=save;
+ $('#cost-files').onchange=e=>addFiles(e.target);form.onsubmit=save;
  $('#cost-archive').onclick=async()=>{if(busy||!edit||!confirm('Arquivar este custo? Ele sairá dos totais, e os comprovantes serão preservados.'))return;busy=true;setBusy(true);try{await writeEntry({archived_at:new Date().toISOString()});$('#cost-dialog').close();await load();message('Custo arquivado. Os documentos e o histórico foram preservados.');}catch{$('#cost-form-message').textContent='Não foi possível arquivar. Atualize e tente novamente.';}finally{busy=false;setBusy(false);}};
  await load();
  }catch{$('#cost-loading').textContent='Não foi possível abrir os custos. Recarregue a página.';}}

@@ -116,8 +116,8 @@ test('selecting an already queued photo after another returns to its fields with
  }finally{s.dom.window.close();}
 });
 
-test('confirmed private examples use the active receipt and final corrected fields only',async()=>{
- const s=await setup({reader:async()=>recognized});try{s.$('#cost-new').click();addReceipt(s,'primeira.jpg');await pause();addReceipt(s,'segunda.jpg');await pause();s.field('supplier').value='Fornecedor corrigido';s.field('supplier').dispatchEvent(new s.w.Event('input'));s.field('keep_receipt_example').checked=true;s.field('receipt_reviewed').checked=true;s.$('#cost-form').dispatchEvent(new s.w.Event('submit',{cancelable:true}));await pause();await pause();
+test('saving automatically records the active receipt and final corrected fields only',async()=>{
+ const s=await setup({reader:async()=>recognized});try{s.$('#cost-new').click();addReceipt(s,'primeira.jpg');await pause();addReceipt(s,'segunda.jpg');await pause();s.field('supplier').value='Fornecedor corrigido';s.field('supplier').dispatchEvent(new s.w.Event('input'));assert.equal(s.data.cost_receipt_reviews.length,0,'editing does not save training examples');assert.equal(s.field('keep_receipt_example'),null);s.field('receipt_reviewed').checked=true;s.$('#cost-form').dispatchEvent(new s.w.Event('submit',{cancelable:true}));await pause();await pause();
  assert.equal(s.data.cost_receipt_reviews.length,1);const review=s.data.cost_receipt_reviews[0];assert.equal(review.receipt_id,s.data.cost_receipts[1].id);assert.equal(review.reviewed_fields.supplier,'Fornecedor corrigido');assert.equal(review.predicted_fields.supplier,recognized.fields.supplier);assert.ok(!('text' in review));
  }finally{s.dom.window.close();}
 });

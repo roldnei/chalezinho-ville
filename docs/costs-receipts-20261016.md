@@ -156,3 +156,9 @@ Fotos agora passam por PP-OCRv6 small/PaddleOCR.js local, com polígonos, retifi
 Na regressão privada de quatro fotos originais: 14/20 para 18/20 campos exatos; quatro totais, quatro datas, quatro CNPJs e quatro números corretos. Dois nomes pendentes, nenhum preenchimento errado. Não é estimativa independente de precisão: os casos já eram conhecidos. Critérios dos próximos treinos, fontes oficiais e gate de comparação estão em `scripts/receipt-training/README.md`.
 
 A migração `20261016220000_cost_review_neural_engine.sql`, aplicada somente em DEV, permite registrar a versão real do leitor nos exemplos opcionais. Não altera políticas de acesso nem dados existentes. Correções continuam exemplos para revisão futura, sem retreino automático.
+
+## Conferências automáticas — revisão 10
+
+Ao salvar o custo com o comprovante ativo, o sistema registra automaticamente a leitura original, os dados finais e as regiões. A gravação ocorre depois de persistir o custo e o anexo; editar ou cancelar não gera exemplo. Somente o comprovante ativo recebe os dados finais, evitando atribuí-los aos outros anexos. A confirmação dos dados lidos continua necessária; foi removida somente a opção separada de guardar o exemplo. Custos sem comprovante ativo não geram exemplos. Isso não treina o modelo automaticamente.
+
+O botão único Anexar comprovante abre diretamente o seletor do aparelho, aceitando fotos e PDF. O botão exclusivo Fotografar e seu campo de câmera foram removidos.
