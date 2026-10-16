@@ -1,8 +1,8 @@
-import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import vm from 'node:vm';import {JSDOM} from 'jsdom';import * as model from '../costs-model.js';
+import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import vm from 'node:vm';import {JSDOM} from 'jsdom';import * as model from '../costs-model.js';import {reviewExample} from '../cost-receipt-regions.js';
 const pause=()=>new Promise(resolve=>setTimeout(resolve,15));
 async function setup({reader=async()=>({fields:{},warnings:[],text:''})}={}){
  const dom=new JSDOM(await readFile(new URL('../custos.html',import.meta.url),'utf8'),{url:'https://test.local/custos.html',runScripts:'outside-only'}),w=dom.window;
- const data={cost_entries:[],cost_receipts:[],properties:[{id:1,name:'Ville Signature'},{id:2,name:'Ville Essenza'}]},files=new Map();let tick=0,uploadFailure=false;
+ const data={cost_entries:[],cost_receipts:[],cost_receipt_reviews:[],properties:[{id:1,name:'Ville Signature'},{id:2,name:'Ville Essenza'}]},files=new Map();let tick=0,uploadFailure=false;
  class Query{constructor(table){this.table=table;this.filters=[];this.mode='read';}select(){return this;}eq(k,v){this.filters.push([k,v]);return this;}order(){return this;}range(){return this;}single(){this.singleRow=true;return this;}insert(p){this.mode='insert';this.p=p;return this;}upsert(p){this.mode='upsert';this.p=p;return this;}update(p){this.mode='update';this.p=p;return this;}
  then(resolve){if(this.table==='profiles')return Promise.resolve({data:{role:'admin',full_name:'QA',pms_access_status:'active'}}).then(resolve);
  let rows=data[this.table].filter(r=>this.filters.every(([k,v])=>r[k]===v));
@@ -16,7 +16,7 @@ async function setup({reader=async()=>({fields:{},warnings:[],text:''})}={}){
   storage:{from:()=>({upload:async(path,file)=>{if(uploadFailure)return {error:{message:'Network'}};files.set(path,file);return {data:{path}}},download:async path=>({data:files.get(path)})})}
  })};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};w.confirm=()=>true;w.URL.createObjectURL=()=> 'blob:qa';w.URL.revokeObjectURL=()=>{};
- Object.assign(w,model,{readReceipt:reader});const source=(await readFile(new URL('../custos.js',import.meta.url),'utf8')).replace(/^import .*?;\r?\n/gm,'');vm.runInContext(source,dom.getInternalVMContext());await pause();
+ Object.assign(w,model,{readReceipt:reader,reviewExample,createReceiptViewer:()=>({setItem:()=>{},setResult:()=>{},clear:()=>{},refresh:()=>{}})});const source=(await readFile(new URL('../custos.js',import.meta.url),'utf8')).replace(/^import .*?;\r?\n/gm,'');vm.runInContext(source,dom.getInternalVMContext());await pause();
  return {dom,w,data,files,failUploads:value=>{uploadFailure=value},$:s=>w.document.querySelector(s),field:n=>w.document.querySelector(`[name="${n}"]`)};
 }
 test('UI persists expense, photo, fiscal review and separate reporting months without auto deduction',async()=>{
@@ -113,5 +113,11 @@ test('selecting an already queued photo after another returns to its fields with
  select(a);await pause();select(b);await pause();assert.equal(s.field('document_number').value,'000456');s.field('receipt_reviewed').checked=true;
  select(a);await pause();assert.equal(s.field('document_number').value,'000123');assert.equal(s.field('description').value,recognized.fields.description);assert.match(s.field('amount').value,/140,00/);assert.equal(s.field('receipt_reviewed').checked,false);assert.equal(s.$('#cost-receipt-source').textContent,'primeira.jpg');assert.equal(s.w.document.querySelectorAll('[data-read-file]').length,2);assert.equal(calls,2);
  assert.equal(s.w.document.querySelectorAll('[name=document_date]').length,1);
+ }finally{s.dom.window.close();}
+});
+
+test('confirmed private examples use the active receipt and final corrected fields only',async()=>{
+ const s=await setup({reader:async()=>recognized});try{s.$('#cost-new').click();addReceipt(s,'primeira.jpg');await pause();addReceipt(s,'segunda.jpg');await pause();s.field('supplier').value='Fornecedor corrigido';s.field('supplier').dispatchEvent(new s.w.Event('input'));s.field('keep_receipt_example').checked=true;s.field('receipt_reviewed').checked=true;s.$('#cost-form').dispatchEvent(new s.w.Event('submit',{cancelable:true}));await pause();await pause();
+ assert.equal(s.data.cost_receipt_reviews.length,1);const review=s.data.cost_receipt_reviews[0];assert.equal(review.receipt_id,s.data.cost_receipts[1].id);assert.equal(review.reviewed_fields.supplier,'Fornecedor corrigido');assert.equal(review.predicted_fields.supplier,recognized.fields.supplier);assert.ok(!('text' in review));
  }finally{s.dom.window.close();}
 });

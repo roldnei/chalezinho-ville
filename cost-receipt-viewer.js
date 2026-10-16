@@ -1,0 +1,47 @@
+import {REVIEW_FIELDS,validRegion} from './cost-receipt-regions.js';
+const assets=new URL('./assets/receipt-ocr/pdf/',import.meta.url);
+export function createReceiptViewer(root,{getValue,onChange,onReviewChange}){
+ const doc=root.ownerDocument,win=doc.defaultView,$=s=>root.querySelector(s);let item=null,url=null,pdf=null,loading=null,renderTask=null,version=0,page=1,zoom=1,mark=null;
+ root.innerHTML=`<div class="receipt-viewer-bar"><strong data-filename></strong><button type="button" data-expand>Ampliar</button><button type="button" data-toggle>Ocultar caixas</button><button type="button" data-zoom-out aria-label="Diminuir zoom">−</button><output data-zoom>100%</output><button type="button" data-zoom-in aria-label="Aumentar zoom">+</button><button type="button" data-prev aria-label="Página anterior">←</button><output data-page></output><button type="button" data-next aria-label="Próxima página">→</button></div><p data-viewer-status role="status"></p><div class="receipt-viewport" tabindex="0" aria-label="Comprovante com campos editáveis"><div class="receipt-sheet"><div data-document></div><div class="receipt-overlay"></div></div></div><p class="receipt-help">Corrija nas caixas junto à nota. Para localizar um campo ausente, escolha “Marcar na nota” e toque onde ele aparece.</p><div class="receipt-unplaced"></div>`;
+ const sheet=$('.receipt-sheet'),overlay=$('.receipt-overlay'),viewport=$('.receipt-viewport');
+ function cleanup(){version++;renderTask?.cancel();renderTask=null;if(loading)void loading.destroy().catch(()=>{});loading=null;pdf=null;if(url)win.URL.revokeObjectURL(url);url=null;$('[data-document]').replaceChildren();overlay.replaceChildren();$('.receipt-unplaced').replaceChildren();root.classList.remove('receipt-expanded');$('[data-expand]').textContent='Ampliar';mark=null;sheet.classList.remove('receipt-marking');overlay.hidden=false;$('[data-toggle]').textContent='Ocultar caixas';}
+ function status(text){$('[data-viewer-status]').textContent=text;}
+ function refresh(){
+  if(!item)return;overlay.replaceChildren();$('.receipt-unplaced').replaceChildren();let lastBottom=-1;
+  for(const [name,label] of Object.entries(REVIEW_FIELDS).sort(([a],[b])=>(item.regions?.[a]?.y??2)-(item.regions?.[b]?.y??2))){
+   const region=item.regions?.[name],located=validRegion(region);if(located&&region.page!==page)continue;
+   const card=doc.createElement('div');card.className='receipt-field';card.dataset.field=name;
+   const title=doc.createElement('label');title.textContent=label;const input=doc.createElement('input');input.setAttribute('aria-label',label+' na nota');input.dataset.reviewField=name;input.type=name==='document_date'?'date':'text';if(name==='amount')input.inputMode='decimal';input.maxLength=name==='supplier'?160:name==='document_number'?100:32;input.value=getValue(name);title.append(input);card.append(title);
+   const locate=doc.createElement('button');locate.type='button';locate.textContent=located?'Mover caixa':'Marcar na nota';locate.onclick=()=>{mark=name;overlay.hidden=false;$('[data-toggle]').textContent='Ocultar caixas';sheet.classList.add('receipt-marking');status(`Toque na posição de “${label}” na página ${page}.`);viewport.scrollIntoView?.({block:'nearest'});};card.append(locate);
+   input.addEventListener('input',()=>{const error=onChange(name,input.value);input.setCustomValidity(error||'');input.setAttribute('aria-invalid',String(!!error));if(error)status(error);else{status('Correção aplicada ao formulário.');onReviewChange();}});
+   input.addEventListener('blur',()=>{if(!input.validationMessage)input.value=getValue(name);});
+   if(located){
+    const box=doc.createElement('span');box.className='receipt-region';box.style.cssText=`left:${region.x*100}%;top:${region.y*100}%;width:${region.width*100}%;height:${region.height*100}%;`;overlay.append(box);
+    const height=sheet.getBoundingClientRect().height||1000,top=Math.max(region.y*height,lastBottom+8);lastBottom=top+94;
+    const connector=doc.createElementNS('http://www.w3.org/2000/svg','svg');connector.classList.add('receipt-connector');connector.setAttribute('viewBox',`0 0 1000 ${height}`);connector.setAttribute('preserveAspectRatio','none');const line=doc.createElementNS('http://www.w3.org/2000/svg','line');line.setAttribute('x1',String((region.x+region.width/2)*1000));line.setAttribute('y1',String((region.y+region.height/2)*height));line.setAttribute('x2',String(Math.min(.46,Math.max(.02,region.x+region.width))*1000));line.setAttribute('y2',String(top+30));connector.append(line);overlay.append(connector);
+    card.style.left=`${Math.min(0.46,Math.max(.02,region.x+region.width))*100}%`;card.style.top=top+'px';overlay.append(card);
+   }else $('.receipt-unplaced').append(card);
+  }
+  $('[data-page]').textContent=pdf?`${page} / ${pdf.numPages}`:'Foto';$('[data-prev]').disabled=!pdf||page<=1;$('[data-next]').disabled=!pdf||page>=pdf.numPages;
+ }
+ async function renderPage(){
+  const token=++version;renderTask?.cancel();renderTask=null;overlay.replaceChildren();status('Abrindo página…');
+  try{const source=await pdf.getPage(page);if(token!==version)return;const original=source.getViewport({scale:1}),view=source.getViewport({scale:Math.min(2,1800/original.width,3500/original.height)}),canvas=doc.createElement('canvas');canvas.width=Math.ceil(view.width);canvas.height=Math.ceil(view.height);$('[data-document]').replaceChildren(canvas);renderTask=source.render({canvasContext:canvas.getContext('2d'),viewport:view});await renderTask.promise;if(token!==version)return;renderTask=null;source.cleanup();status('Confira os dados nas caixas editáveis.');refresh();}catch(e){if(token===version&&e.name!=='RenderingCancelledException')status('Não foi possível mostrar esta página. Você pode baixar o arquivo e conferir os campos abaixo.');}
+ }
+ async function setItem(next){
+  cleanup();item=next;root.hidden=!item;if(!item)return;page=1;zoom=1;sheet.style.width='100%';$('[data-zoom]').textContent='100%';$('[data-filename]').textContent=item.file.name;item.regions||={};const token=version;status('Abrindo comprovante…');refresh();
+  try{if(item.file.type==='application/pdf'){
+    const js=await import('./assets/receipt-ocr/pdf/pdf.mjs');if(token!==version)return;js.GlobalWorkerOptions.workerSrc=new URL('pdf.worker.mjs',assets).href;
+    const bytes=new Uint8Array(await next.file.arrayBuffer());if(token!==version)return;loading=js.getDocument({data:bytes,isEvalSupported:false,useSystemFonts:true,wasmUrl:new URL('wasm/',assets).href,standardFontDataUrl:new URL('standard_fonts/',assets).href,cMapUrl:new URL('cmaps/',assets).href,cMapPacked:true});const loaded=await loading.promise;if(token!==version){void loaded.destroy();return;}pdf=loaded;if(pdf.numPages>6)throw Error('A visualização aceita até 6 páginas. Baixe o PDF para conferir.');await renderPage();
+   }else{url=win.URL.createObjectURL(item.file);const image=doc.createElement('img');image.alt='Comprovante para conferência';image.src=url;image.onload=()=>{if(token===version){status('Confira os dados nas caixas editáveis.');refresh();}};image.onerror=()=>{if(token===version)status('Não foi possível abrir a imagem. Anexe outra foto.');};$('[data-document]').replaceChildren(image);}
+  }catch(e){if(token===version)status(e.name==='PasswordException'?'PDF protegido por senha. Envie uma versão sem senha.':e.message||'Não foi possível abrir o comprovante.');}
+ }
+ function changeZoom(delta){zoom=Math.max(1,Math.min(3,zoom+delta));sheet.style.width=`${zoom*100}%`;$('[data-zoom]').textContent=Math.round(zoom*100)+'%';refresh();}
+ $('[data-toggle]').onclick=()=>{overlay.hidden=!overlay.hidden;$('[data-toggle]').textContent=overlay.hidden?'Mostrar caixas':'Ocultar caixas';};
+ $('[data-zoom-in]').onclick=()=>changeZoom(.25);$('[data-zoom-out]').onclick=()=>changeZoom(-.25);
+ $('[data-expand]').onclick=()=>{const expanded=root.classList.toggle('receipt-expanded');$('[data-expand]').textContent=expanded?'Voltar':'Ampliar';win.requestAnimationFrame(refresh);};
+ $('[data-prev]').onclick=()=>{if(pdf&&page>1){page--;mark=null;sheet.classList.remove('receipt-marking');void renderPage();}};$('[data-next]').onclick=()=>{if(pdf&&page<pdf.numPages){page++;mark=null;sheet.classList.remove('receipt-marking');void renderPage();}};
+ sheet.addEventListener('click',e=>{if(!mark||e.target.closest('.receipt-field'))return;const bounds=sheet.getBoundingClientRect();if(!bounds.width||!bounds.height)return;const name=mark,x=Math.max(0,Math.min(.97,(e.clientX-bounds.left)/bounds.width)),y=Math.max(0,Math.min(.98,(e.clientY-bounds.top)/bounds.height));item.regions[name]={page,x,y,width:Math.min(.25,1-x),height:Math.min(.025,1-y),source:'manual'};mark=null;sheet.classList.remove('receipt-marking');onReviewChange();refresh();status('Posição marcada. Confira e corrija o valor da caixa.');overlay.querySelector(`[data-review-field="${name}"]`)?.focus({preventScroll:true});});
+ root.addEventListener('keydown',e=>{if(e.key==='Escape'&&(mark||root.classList.contains('receipt-expanded'))){e.preventDefault();e.stopPropagation();mark=null;sheet.classList.remove('receipt-marking');root.classList.remove('receipt-expanded');$('[data-expand]').textContent='Ampliar';refresh();}});
+ return {setItem,refresh,setResult(result){if(item){for(const [name,region] of Object.entries(result.regions||{}))if(item.regions[name]?.source!=='manual'&&validRegion(region))item.regions[name]=region;refresh();}},clear(){cleanup();item=null;root.hidden=true;}};
+}

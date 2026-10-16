@@ -1,3 +1,5 @@
+import {createReceiptViewer} from './cost-receipt-viewer.js';
+import {reviewExample} from './cost-receipt-regions.js';
 import {CATEGORIES,TAX_SOURCE,cents,monthStart,selection,totals,reportCSV,safeName,zipBlob} from './costs-model.js';
 import {readReceipt} from './cost-receipt-ocr.js';
 const $=s=>document.querySelector(s),C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);
@@ -10,6 +12,18 @@ let receiptController=null,receiptRun=0,receiptBusy=false,receiptActive=null,rec
 const touchedFields=new Set(),receiptDefaults=new Map(),receiptAuto=new Map();
 const receiptFields=['supplier','supplier_document','document_date','competence','document_number','amount','category','description'];
 const form=$('#cost-form'),field=n=>form.elements.namedItem(n);
+const viewer=createReceiptViewer($('#cost-document-viewer'),{getValue:name=>field(name).value,onChange:correctReceiptField,onReviewChange:requireReceiptReview});
+function requireReceiptReview(){$('#cost-receipt-panel').hidden=false;receiptReview=true;field('receipt_reviewed').checked=false;field('receipt_reviewed').required=true;$('#cost-receipt-review').hidden=false;}
+function correctReceiptField(name,value){
+ if(busy||receiptBusy)return 'Aguarde a leitura terminar antes de corrigir.';
+ if(name==='amount'){try{cents(value);}catch(e){return e.message;}}
+ if(name==='document_date'&&(!/^\d{4}-\d{2}-\d{2}$/.test(value)||Number.isNaN(Date.parse(value+'T12:00:00Z'))))return 'Informe a data de emissão.';
+ const input=field(name),old=input.value;input.value=name==='amount'?brl(cents(value)):value;applyingReceipt=true;input.dispatchEvent(new Event('input',{bubbles:true}));applyingReceipt=false;touchedFields.add(name);input.classList.remove('cost-ocr-filled');
+ if(name==='document_date'&&!touchedFields.has('competence')){field('competence').value=value.slice(0,7);receiptAuto.set('competence',value.slice(0,7));}
+ if(name==='supplier'&&(!field('description').value||field('description').value==='Nota · '+old||field('description').value===receiptAuto.get('description'))){field('description').value='Nota · '+value;receiptAuto.set('description',field('description').value);}
+ const item=queue.find(q=>q.id===receiptSource);if(item){item.corrections||={};item.corrections[name]=input.value;if(name==='document_date')item.corrections.competence=field('competence').value;if(name==='supplier')item.corrections.description=field('description').value;}
+ return input.validationMessage||'';
+}
 const check=result=>{if(result.error)throw result.error;return result.data};
 function bindMoneyInput(name){
  const input=field(name),error=$('#cost-'+name+'-error');
@@ -54,9 +68,9 @@ function applyReceiptResult(result){
  $('#cost-receipt-text').textContent=String(result.text||'').slice(0,30000);
 }
 async function startReceiptRead(item){
- if(busy)return;cancelReceiptRead();if(receiptSource!==null&&receiptSource!==item.id)clearPreviousReceipt();receiptSource=item.id;const run=receiptRun,controller=new AbortController();receiptController=controller;const deadline=setTimeout(()=>controller.abort(),90000);receiptBusy=true;receiptActive=item.id;
+ if(busy)return;cancelReceiptRead();if(receiptSource!==null&&receiptSource!==item.id)clearPreviousReceipt();receiptSource=item.id;void viewer.setItem(item);const run=receiptRun,controller=new AbortController();receiptController=controller;const deadline=setTimeout(()=>controller.abort(),90000);receiptBusy=true;receiptActive=item.id;
  $('#cost-receipt-panel').hidden=false;$('#cost-receipt-source').textContent=item.file.name;$('#cost-receipt-status').textContent='Lendo comprovante…';$('#cost-receipt-progress').hidden=false;$('#cost-receipt-cancel').hidden=false;$('#cost-receipt-warnings').replaceChildren();$('#cost-receipt-text').textContent='';$('#cost-save').disabled=true;$('#cost-archive').disabled=true;
- try{const result=item.readResult||await readReceipt(item.file,{signal:controller.signal,onProgress:text=>{if(run===receiptRun)$('#cost-receipt-status').textContent=text;}});if(run!==receiptRun||!$('#cost-dialog').open)return;item.readResult=result;applyReceiptResult(result);}
+ try{const result=item.readResult||await readReceipt(item.file,{signal:controller.signal,onProgress:text=>{if(run===receiptRun)$('#cost-receipt-status').textContent=text;}});if(run!==receiptRun||!$('#cost-dialog').open)return;item.readResult=result;applyReceiptResult(result);for(const [name,value] of Object.entries(item.corrections||{})){const input=field(name);input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));}viewer.setResult(result);}
  catch(error){if(run!==receiptRun)return;$('#cost-receipt-status').textContent=error.name==='AbortError'?'Leitura cancelada. Você pode preencher os campos.':error.message||'Não foi possível ler a nota. Preencha os campos ou tente outra foto.';}
  finally{clearTimeout(deadline);if(run===receiptRun){receiptBusy=false;receiptController=null;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}}
 }
@@ -91,7 +105,7 @@ function classify(){
  if(!field('confirm_fiscal').checked){field('exclusion').setCustomValidity('');field('exclusion').removeAttribute('aria-invalid');$('#cost-exclusion-error').hidden=true;}
 }
 function openEditor(row){
- cancelReceiptRead();receiptSource=null;receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
+ cancelReceiptRead();viewer.clear();$('#cost-upload-options').hidden=true;$('#cost-upload').setAttribute('aria-expanded','false');receiptSource=null;receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
  edit=row?{...row}:null;draftId=row?.id||crypto.randomUUID();queue=[];form.reset();$('#cost-form-message').textContent='';$('#cost-dialog-title').textContent=row?'Editar custo':'Novo custo';$('#cost-archive').hidden=!row;
  field('category').innerHTML='<option value="">Selecione a categoria</option>'+Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
  field('property_id').innerHTML='<option value="">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
@@ -102,7 +116,7 @@ function openEditor(row){
  field('owner_borne').checked=!!row?.owner_borne;field('confirm_fiscal').checked=row?.fiscal_status==='confirmed';$('#cost-existing-files').innerHTML=row?filesHTML(row.id):'';bindDownloads($('#cost-existing-files'));renderQueue();classify();for(const input of form.querySelectorAll('[name]'))receiptDefaults.set(input.name,input.value);$('#cost-dialog').showModal();
 }
 function renderQueue(){
- $('#cost-file-queue').innerHTML=queue.map((item,i)=>`<div class="cost-queued-receipt"><span>${esc(item.file.name)}</span><button type="button" data-read-file="${i}">Ler dados da nota</button><button type="button" data-remove-file="${i}" aria-label="Remover ${esc(item.file.name)}">Remover</button></div>`).join('');$('#cost-file-queue').querySelectorAll('[data-read-file]').forEach(b=>b.onclick=()=>startReceiptRead(queue[Number(b.dataset.readFile)]));$('#cost-file-queue').querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{if(busy)return;const index=Number(b.dataset.removeFile);if(queue[index]?.id===receiptActive){cancelReceiptRead();$('#cost-receipt-status').textContent='Leitura cancelada. Comprovante removido.';}queue.splice(index,1);renderQueue();});
+ $('#cost-file-queue').innerHTML=queue.map((item,i)=>`<div class="cost-queued-receipt"><span>${esc(item.file.name)}</span><button type="button" data-read-file="${i}">Ler dados da nota</button><button type="button" data-remove-file="${i}" aria-label="Remover ${esc(item.file.name)}">Remover</button></div>`).join('');$('#cost-file-queue').querySelectorAll('[data-read-file]').forEach(b=>b.onclick=()=>startReceiptRead(queue[Number(b.dataset.readFile)]));$('#cost-file-queue').querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{if(busy)return;const index=Number(b.dataset.removeFile);if(queue[index]?.id===receiptSource){viewer.clear();clearPreviousReceipt();receiptSource=null;}if(queue[index]?.id===receiptActive){cancelReceiptRead();$('#cost-receipt-status').textContent='Leitura cancelada. Comprovante removido.';}queue.splice(index,1);renderQueue();});
 }
 function addFiles(input){
  const selected=[];
@@ -112,11 +126,13 @@ function addFiles(input){
  const existing=queue.find(q=>q.file.name===file.name&&q.file.size===file.size&&q.file.lastModified===file.lastModified);
  if(existing){selected.push(existing);continue;}
  if(queue.length+receipts.filter(f=>f.expense_id===edit?.id).length>=30){$('#cost-form-message').textContent='Limite de 30 anexos por lançamento.';break;}
- const item={id:crypto.randomUUID(),file,uploaded:false,attached:false};queue.push(item);selected.push(item);}
+ const item={id:crypto.randomUUID(),reviewId:crypto.randomUUID(),file,uploaded:false,attached:false};queue.push(item);selected.push(item);}
  input.value='';renderQueue();if(selected.length)void startReceiptRead(selected[0]);
 }
 function payload(){
- if(receiptReview&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');
+ const invalid=$('#cost-document-viewer').querySelector('input[aria-invalid="true"]');if(invalid)throw Error(invalid.validationMessage||'Corrija o campo destacado na nota antes de salvar.');
+ if((receiptReview||field('keep_receipt_example').checked)&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');
+ if(field('keep_receipt_example').checked&&!queue.some(q=>q.id===receiptSource))throw Error('Selecione o comprovante que corresponde aos dados conferidos.');
  if(!CATEGORIES[field('category').value])throw Error('Selecione a categoria do custo.');
  const p={description:field('description').value.trim(),category:field('category').value,property_id:field('property_id').value?Number(field('property_id').value):null,amount_cents:cents(field('amount').value),competence:monthStart(field('competence').value),document_date:field('document_date').value,paid_on:field('paid_on').value||null,supplier:field('supplier').value.trim(),supplier_document:field('supplier_document').value.trim(),document_number:field('document_number').value.trim(),notes:field('notes').value.trim(),fiscal_note:field('fiscal_note').value.trim(),owner_borne:field('owner_borne').checked,fiscal_status:CATEGORIES[field('category').value][1]?'review':'operational',fiscal_month:null,exclusion_cents:0};
  if(p.paid_on&&p.paid_on>today())throw Error('A data do pagamento não pode estar no futuro.');
@@ -136,11 +152,22 @@ async function uploadQueue(){
  item.attached=true;if(!receipts.some(r=>r.id===receipt.id))receipts.push(receipt);
  }
 }
+async function saveReceiptReview(p){
+ if(!field('keep_receipt_example').checked)return;
+ const item=queue.find(q=>q.id===receiptSource);if(!item?.attached)throw Error('Confira o comprovante selecionado antes de guardar o exemplo.');
+ if(!field('receipt_reviewed').checked)throw Error('Confirme a conferência dos dados da nota.');
+ const example=reviewExample(item,p),key=JSON.stringify(example);
+ if(item.savedReview===key)return;
+ // Append-only snapshots: stable id on network retry; a changed correction
+ // after a successful save receives a fresh id rather than overwriting history.
+ if(item.savedReview)item.reviewId=crypto.randomUUID();
+ check(await sb.from('cost_receipt_reviews').upsert({...example,id:item.reviewId},{onConflict:'id',ignoreDuplicates:true}).select());item.savedReview=JSON.stringify({...example,id:item.reviewId});
+}
 async function save(event){event.preventDefault();if(busy||receiptBusy)return;let p;try{p=payload();}catch(e){$('#cost-form-message').textContent=e.message;return;}busy=true;setBusy(true);$('#cost-form-message').textContent='Salvando lançamento e comprovantes…';
  try{const finalFiscal={fiscal_status:p.fiscal_status,fiscal_month:p.fiscal_month,exclusion_cents:p.exclusion_cents};
  // Always keep the entry pending until every selected receipt has been stored.
- await writeEntry({...p,fiscal_status:CATEGORIES[p.category][1]?'review':'operational',fiscal_month:null,exclusion_cents:0});await uploadQueue();if(finalFiscal.fiscal_status==='confirmed')await writeEntry(finalFiscal);
- $('#cost-dialog').close();await load();message('Custo salvo com os comprovantes.');
+ await writeEntry({...p,fiscal_status:CATEGORIES[p.category][1]?'review':'operational',fiscal_month:null,exclusion_cents:0});await uploadQueue();await saveReceiptReview(p);if(finalFiscal.fiscal_status==='confirmed')await writeEntry(finalFiscal);
+ viewer.clear();$('#cost-dialog').close();await load();message('Custo salvo com os comprovantes.');
  }catch(e){$('#cost-form-message').textContent=(edit?'O lançamento está salvo; confira os anexos e tente salvar novamente. ':'Não foi possível salvar. ')+(e.message?.includes('alterado em outra')?e.message:'Verifique a conexão e os campos informados.');}
  finally{busy=false;setBusy(false);}
 }
@@ -165,9 +192,12 @@ async function boot(){try{
  $('#cost-user').textContent=profile.full_name||session.user.email;$('#cost-month').value=today().slice(0,7);$('#cost-tax-source').href=TAX_SOURCE;
  bindMoneyInput('amount');bindMoneyInput('exclusion');
  for(const id of ['cost-month','cost-property','cost-basis'])$('#'+id).onchange=()=>{if($('#cost-month').validity.valid&&$('#cost-month').value)render();};
- $('#cost-new').onclick=()=>openEditor();$('#cost-refresh').onclick=load;$('#cost-csv').onclick=()=>exportMonth(false);$('#cost-zip').onclick=()=>exportMonth(true);$('#cost-close').onclick=()=>{cancelReceiptRead();$('#cost-dialog').close();};$('#cost-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else cancelReceiptRead();});field('category').onchange=classify;field('confirm_fiscal').onchange=classify;
+ $('#cost-new').onclick=()=>openEditor();$('#cost-refresh').onclick=load;$('#cost-csv').onclick=()=>exportMonth(false);$('#cost-zip').onclick=()=>exportMonth(true);$('#cost-close').onclick=()=>{cancelReceiptRead();viewer.clear();$('#cost-dialog').close();};$('#cost-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else{cancelReceiptRead();viewer.clear();}});field('category').onchange=classify;field('confirm_fiscal').onchange=classify;
+ field('keep_receipt_example').onchange=()=>{if(field('keep_receipt_example').checked)requireReceiptReview();};
  $('#cost-receipt-cancel').onclick=()=>{cancelReceiptRead();$('#cost-receipt-status').textContent='Leitura cancelada. Você pode preencher os campos.';};
- for(const input of form.querySelectorAll('[name]'))for(const type of ['input','change'])input.addEventListener(type,()=>{if(!applyingReceipt){touchedFields.add(input.name);input.classList.remove('cost-ocr-filled');}});
+ $('#cost-upload').onclick=()=>{const options=$('#cost-upload-options');options.hidden=!options.hidden;$('#cost-upload').setAttribute('aria-expanded',String(!options.hidden));};
+ for(const [button,input] of [['cost-take-photo','cost-camera'],['cost-attach-file','cost-files']])$('#'+button).onclick=()=>{$('#cost-upload-options').hidden=true;$('#cost-upload').setAttribute('aria-expanded','false');$('#'+input).click();};
+ for(const input of form.querySelectorAll('[name]'))for(const type of ['input','change'])input.addEventListener(type,()=>{if(!applyingReceipt){touchedFields.add(input.name);input.classList.remove('cost-ocr-filled');if(receiptFields.includes(input.name)&&receiptSource){const item=queue.find(q=>q.id===receiptSource);if(item){item.corrections||={};item.corrections[input.name]=input.value;}requireReceiptReview();viewer.refresh();}}});
  field('paid_on').onchange=()=>{if(!field('fiscal_month').value)field('fiscal_month').value=field('paid_on').value.slice(0,7);};
  $('#cost-camera').onchange=e=>addFiles(e.target);$('#cost-files').onchange=e=>addFiles(e.target);form.onsubmit=save;
  $('#cost-archive').onclick=async()=>{if(busy||!edit||!confirm('Arquivar este custo? Ele sairá dos totais, e os comprovantes serão preservados.'))return;busy=true;setBusy(true);try{await writeEntry({archived_at:new Date().toISOString()});$('#cost-dialog').close();await load();message('Custo arquivado. Os documentos e o histórico foram preservados.');}catch{$('#cost-form-message').textContent='Não foi possível arquivar. Atualize e tente novamente.';}finally{busy=false;setBusy(false);}};

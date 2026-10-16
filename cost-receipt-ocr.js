@@ -1,3 +1,4 @@
+import {receiptRegions,ocrPage} from './cost-receipt-regions.js';
 import {extractReceiptFields} from './cost-receipt-fields.js';
 import {readReceiptQR} from './cost-receipt-qr.js';
 import {enhanceReceipt,combineReceiptReadings} from './cost-receipt-image.js';
@@ -30,20 +31,27 @@ export async function readReceipt(file,{signal,onProgress=()=>{}}={}){
  if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)||file.size>10485760||!file.size)throw Error('Use uma foto ou PDF de até 10 MB.');
  checkAbort(signal);let worker=null,pdf=null,loadingPDF=null;
  const stop=()=>{if(worker)void worker.terminate().catch(()=>{});if(loadingPDF)void loadingPDF.destroy().catch(()=>{});};signal?.addEventListener('abort',stop,{once:true});
- async function recognize(canvas,label,{focused=false}={}){
+ async function recognize(canvas,label,{focused=false,positionOnly=false}={}){
   checkAbort(signal);
   if(!worker){onProgress('Preparando leitor…');const engine=await loadEngine();checkAbort(signal);worker=await engine.createWorker('por',1,{workerPath:url('worker.min.js'),corePath:url('core/'),langPath:url('lang/'),workerBlobURL:false,gzip:true,logger:message=>{if(message.status==='recognizing text')onProgress(`${label} ${Math.round(message.progress*100)}%`);}});checkAbort(signal);}
   await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});
-  const result=await worker.recognize(canvas,{rotateAuto:true},{blocks:!focused});checkAbort(signal);return result.data;
+  const result=await worker.recognize(canvas,{rotateAuto:!positionOnly},{blocks:!focused});checkAbort(signal);return result.data;
+ }
+ async function positioned(result,data,canvas){
+  // Deskewed OCR coordinates do not belong to the original photo. Locate text
+  // once without deskew, preserving the existing extraction decisions.
+  const layout=Math.abs(data.rotateRadians||0)>=.005?await recognize(canvas,'Localizando campos…',{positionOnly:true}):data;
+  return {...result,regions:receiptRegions(result,[ocrPage(layout,canvas)])};
  }
  try{
-  let text='',confidence=null;
+  let text='',confidence=null;const positions=[];
   if(file.type==='application/pdf'){
    onProgress('Abrindo PDF…');const pdfjs=await import('./assets/receipt-ocr/pdf/pdf.mjs');pdfjs.GlobalWorkerOptions.workerSrc=url('pdf/pdf.worker.mjs');checkAbort(signal);
    loadingPDF=pdfjs.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false,useSystemFonts:true,wasmUrl:url('pdf/wasm/'),standardFontDataUrl:url('pdf/standard_fonts/'),cMapUrl:url('pdf/cmaps/'),cMapPacked:true});pdf=await loadingPDF.promise;checkAbort(signal);
    if(pdf.numPages>6)throw Error('A leitura automática aceita PDFs de até 6 páginas. Você pode manter o anexo e preencher os campos.');
-   const pages=[],scores=[];for(let n=1;n<=pdf.numPages;n++){checkAbort(signal);onProgress(`Lendo página ${n} de ${pdf.numPages}…`);const page=await pdf.getPage(n);try{const content=await page.getTextContent(),native=pdfTextLines(content.items);if(native.replace(/\s/g,'').length>=40){pages.push(native);continue;}
-    const original=page.getViewport({scale:1}),scale=Math.min(2.5,2000/original.width,3000/original.height),viewport=page.getViewport({scale}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);try{await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;const data=await recognize(canvas,`Página ${n} de ${pdf.numPages} ·`);pages.push(data.text);scores.push(data.confidence);}finally{canvas.width=canvas.height=0;}
+   const pages=[],scores=[];for(let n=1;n<=pdf.numPages;n++){checkAbort(signal);onProgress(`Lendo página ${n} de ${pdf.numPages}…`);const page=await pdf.getPage(n);try{const content=await page.getTextContent(),native=pdfTextLines(content.items);if(native.replace(/\s/g,'').length>=40){pages.push(native);
+    const v=page.getViewport({scale:1});positions.push({page:n,width:v.width,height:v.height,lines:content.items.filter(i=>i.str?.trim()).map(i=>{const p=v.convertToViewportPoint(i.transform[4],i.transform[5]),h=Math.abs(i.height)||Math.hypot(i.transform[2],i.transform[3])||10;return {text:i.str,confidence:100,bbox:{x0:p[0],y0:Math.max(0,p[1]-h),x1:Math.min(v.width,p[0]+i.width),y1:Math.min(v.height,p[1])}};})});continue;}
+    const original=page.getViewport({scale:1}),scale=Math.min(2.5,2000/original.width,3000/original.height),viewport=page.getViewport({scale}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);try{await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;const data=await recognize(canvas,`Página ${n} de ${pdf.numPages} ·`);pages.push(data.text);scores.push(data.confidence);const layout=Math.abs(data.rotateRadians||0)>=.005?await recognize(canvas,'Localizando campos…',{positionOnly:true}):data;positions.push(ocrPage(layout,canvas,n));}finally{canvas.width=canvas.height=0;}
    }finally{page.cleanup();}}
    text=pages.join('\n');if(scores.length)confidence=Math.min(...scores);
   }else{const canvas=await photoCanvas(file,signal);try{
@@ -52,12 +60,12 @@ export async function readReceipt(file,{signal,onProgress=()=>{}}={}){
    if(!first.evidence.document_number?.startsWith('Chave de acesso validada:')||!first.fields.supplier_document||!first.fields.amount_cents||data.confidence<75){
     onProgress('Melhorando a leitura do cupom…');const focused=enhanceReceipt(canvas,data.blocks,()=>document.createElement('canvas'));
     try{checkAbort(signal);const reread=await recognize(focused,'Conferindo dados…',{focused:true}),second=extractReceiptFields(reread.text,{confidence:reread.confidence});
-     const result=combineReceiptReadings(first,second);return {...(qr?combineReceiptReadings(result,qr):result),text:data.text+'\n\n— Segunda leitura —\n'+reread.text};
+     const result=combineReceiptReadings(first,second);return await positioned({... (qr?combineReceiptReadings(result,qr):result),text:data.text+'\n\n— Segunda leitura —\n'+reread.text},data,canvas);
     }finally{focused.width=focused.height=0;}
    }
-   return {...(qr?combineReceiptReadings(first,qr):first),text};
+   return await positioned({... (qr?combineReceiptReadings(first,qr):first),text},data,canvas);
   }finally{canvas.width=canvas.height=0;}}
-  checkAbort(signal);return {...extractReceiptFields(text,{confidence}),text};
+  checkAbort(signal);const result=extractReceiptFields(text,{confidence});return {...result,text,regions:receiptRegions(result,positions)};
  }catch(error){if(signal?.aborted)throw abortError();if(error?.name==='PasswordException')throw Error('O PDF tem senha. Envie uma versão sem senha ou uma foto.');throw error;}
  finally{signal?.removeEventListener('abort',stop);if(worker)await worker.terminate().catch(()=>{});if(loadingPDF)await loadingPDF.destroy().catch(()=>{});}
 }
