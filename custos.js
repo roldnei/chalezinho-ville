@@ -105,11 +105,15 @@ function renderQueue(){
  $('#cost-file-queue').innerHTML=queue.map((item,i)=>`<div class="cost-queued-receipt"><span>${esc(item.file.name)}</span><button type="button" data-read-file="${i}">Ler dados da nota</button><button type="button" data-remove-file="${i}" aria-label="Remover ${esc(item.file.name)}">Remover</button></div>`).join('');$('#cost-file-queue').querySelectorAll('[data-read-file]').forEach(b=>b.onclick=()=>startReceiptRead(queue[Number(b.dataset.readFile)]));$('#cost-file-queue').querySelectorAll('[data-remove-file]').forEach(b=>b.onclick=()=>{if(busy)return;const index=Number(b.dataset.removeFile);if(queue[index]?.id===receiptActive){cancelReceiptRead();$('#cost-receipt-status').textContent='Leitura cancelada. Comprovante removido.';}queue.splice(index,1);renderQueue();});
 }
 function addFiles(input){
- const added=[];
+ const selected=[];
  for(const file of input.files){if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)||file.size>10485760||file.size===0){$('#cost-form-message').textContent='Use fotos JPG, PNG, WebP ou PDF com até 10 MB por arquivo. '+file.name+' não foi adicionado.';continue;}
+ // Selecting a queued photo still changes the document being read. Ignoring
+ // that selection would leave the fields of the preceding photo on screen.
+ const existing=queue.find(q=>q.file.name===file.name&&q.file.size===file.size&&q.file.lastModified===file.lastModified);
+ if(existing){selected.push(existing);continue;}
  if(queue.length+receipts.filter(f=>f.expense_id===edit?.id).length>=30){$('#cost-form-message').textContent='Limite de 30 anexos por lançamento.';break;}
- if(!queue.some(q=>q.file.name===file.name&&q.file.size===file.size&&q.file.lastModified===file.lastModified)){const item={id:crypto.randomUUID(),file,uploaded:false,attached:false};queue.push(item);added.push(item);}}
- input.value='';renderQueue();if(added.length)void startReceiptRead(added[0]);
+ const item={id:crypto.randomUUID(),file,uploaded:false,attached:false};queue.push(item);selected.push(item);}
+ input.value='';renderQueue();if(selected.length)void startReceiptRead(selected[0]);
 }
 function payload(){
  if(receiptReview&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');

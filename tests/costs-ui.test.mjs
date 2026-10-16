@@ -106,3 +106,12 @@ test('cancelling the new reading keeps old document values cleared',async()=>{
 test('ambiguous OCR dates clear untouched date defaults but preserve a date chosen manually',async()=>{
  const result={fields:{amount_cents:4890,category:'cleaning_products'},warnings:['Datas com leituras diferentes; confira a emissão no comprovante.'],text:'Datas divergentes'};const s=await setup({reader:async()=>result});try{s.$('#cost-new').click();assert.ok(s.field('document_date').value);addReceipt(s);await pause();assert.equal(s.field('document_date').value,'');assert.equal(s.field('competence').value,'');s.$('#cost-close').click();s.$('#cost-new').click();s.field('document_date').value='2026-10-16';s.field('document_date').dispatchEvent(new s.w.Event('input'));addReceipt(s,'manual.jpg');await pause();assert.equal(s.field('document_date').value,'2026-10-16');}finally{s.dom.window.close();}
 });
+test('selecting an already queued photo after another returns to its fields without duplicating the attachment',async()=>{
+ let calls=0;const s=await setup({reader:async file=>{calls++;return file.name==='primeira.jpg'?recognized:{fields:{description:'Outra nota',document_number:'000456',amount_cents:6000},warnings:[],text:'Outra nota'};}});
+ try{s.$('#cost-new').click();const a=new s.w.File(['receipt A'],'primeira.jpg',{type:'image/jpeg',lastModified:1234}),b=new s.w.File(['receipt B'],'segunda.jpg',{type:'image/jpeg',lastModified:5678});
+ const select=file=>{Object.defineProperty(s.$('#cost-files'),'files',{value:[file],configurable:true});s.$('#cost-files').dispatchEvent(new s.w.Event('change'));};
+ select(a);await pause();select(b);await pause();assert.equal(s.field('document_number').value,'000456');s.field('receipt_reviewed').checked=true;
+ select(a);await pause();assert.equal(s.field('document_number').value,'000123');assert.equal(s.field('description').value,recognized.fields.description);assert.match(s.field('amount').value,/140,00/);assert.equal(s.field('receipt_reviewed').checked,false);assert.equal(s.$('#cost-receipt-source').textContent,'primeira.jpg');assert.equal(s.w.document.querySelectorAll('[data-read-file]').length,2);assert.equal(calls,2);
+ assert.equal(s.w.document.querySelectorAll('[name=document_date]').length,1);
+ }finally{s.dom.window.close();}
+});
