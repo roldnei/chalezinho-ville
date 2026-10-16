@@ -1,4 +1,5 @@
 import {recoverReceiptDetails} from './cost-receipt-local-fields.js';
+import {readNeuralReceipt} from './cost-receipt-neural.js';
 import {receiptRegions,ocrPage} from './cost-receipt-regions.js';
 import {extractReceiptFields} from './cost-receipt-fields.js';
 import {readReceiptQR} from './cost-receipt-qr.js';
@@ -32,10 +33,10 @@ export async function readReceipt(file,{signal,onProgress=()=>{},onPartialResult
  if(!['image/jpeg','image/png','image/webp','application/pdf'].includes(file.type)||file.size>10485760||!file.size)throw Error('Use uma foto ou PDF de até 10 MB.');
  checkAbort(signal);let worker=null,pdf=null,loadingPDF=null;
  const stop=()=>{if(worker)void worker.terminate().catch(()=>{});if(loadingPDF)void loadingPDF.destroy().catch(()=>{});};signal?.addEventListener('abort',stop,{once:true});
- async function recognize(canvas,label,{focused=false,positionOnly=false}={}){
+ async function recognize(canvas,label,{focused=false,positionOnly=false,psm='6'}={}){
   checkAbort(signal);
   if(!worker){onProgress('Preparando leitor…');const engine=await loadEngine();checkAbort(signal);worker=await engine.createWorker('por',1,{workerPath:url('worker.min.js'),corePath:url('core/'),langPath:url('lang/'),workerBlobURL:false,gzip:true,logger:message=>{if(message.status==='recognizing text')onProgress(`${label} ${Math.round(message.progress*100)}%`);}});checkAbort(signal);}
-  await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:'6'});
+  await worker.setParameters({preserve_interword_spaces:'1',tessedit_pageseg_mode:psm});
   const result=await worker.recognize(canvas,{rotateAuto:!positionOnly},{blocks:!focused});checkAbort(signal);return result.data;
  }
  async function positioned(result,data,canvas,layoutCanvas=canvas,transform=null,originalData=null){
@@ -61,6 +62,10 @@ export async function readReceipt(file,{signal,onProgress=()=>{},onPartialResult
    text=pages.join('\n');if(scores.length)confidence=Math.min(...scores);
   }else{const canvas=await photoCanvas(file,signal);try{
    let qr=null;try{onProgress('Lendo QR code da nota…');const decode=await loadQRDecoder();checkAbort(signal);qr=await readReceiptQR(canvas,{decode,createCanvas:()=>document.createElement('canvas'),signal});if(qr){checkAbort(signal);onPartialResult({...qr,regions:{},text:''});}}catch(error){checkAbort(signal);}
+   // The detector rectifies each line before recognition. Keep the established
+   // reader as an offline-capability fallback if WASM/model loading fails.
+   try{return await readNeuralReceipt(file,{canvas,signal,onProgress,qr,verifyLine:crop=>recognize(crop,'Conferindo estabelecimento…',{positionOnly:true,psm:'13'})});
+   }catch(error){checkAbort(signal);onProgress('Usando o leitor alternativo neste aparelho…');}
    const data=await recognize(canvas,'Lendo nota…'),first=extractReceiptFields(data.text,{confidence:data.confidence});text=data.text;confidence=data.confidence;
    if(!first.evidence.document_number?.startsWith('Chave de acesso validada:')||!first.fields.supplier_document||!first.fields.amount_cents||data.confidence<75){
     onProgress('Melhorando a leitura do cupom…');const bounds=receiptBounds(data.blocks,canvas.width,canvas.height)||{left:0,top:0,width:canvas.width,height:canvas.height},focused=enhanceReceipt(canvas,data.blocks,()=>document.createElement('canvas'),bounds);

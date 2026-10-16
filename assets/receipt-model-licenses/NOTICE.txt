@@ -1,0 +1,4 @@
+Local receipt OCR: PaddleOCR.js 0.4.2 and official PP-OCRv6_small_det / PP-OCRv6_small_rec models (PaddlePaddle authors, Apache-2.0).
+https://github.com/PaddlePaddle/PaddleOCR
+ONNX Runtime Web 1.24.3 (Microsoft, MIT). OpenCV.js (Apache-2.0). js-yaml (MIT). Clipper JavaScript 6.4.2 by Timo (Boost Software License 1.0; notice embedded in the bundled source).
+Model URLs, lengths and SHA-256 hashes are pinned in scripts/build-receipt-neural.mjs. The application hosts all runtime files and model archives itself.

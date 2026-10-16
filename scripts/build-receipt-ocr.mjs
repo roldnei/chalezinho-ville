@@ -13,4 +13,5 @@ export async function buildReceiptOCR(output){
  for(const file of ['pdf.mjs','pdf.worker.mjs'])await copyFile(join(pdf,'build',file),new URL('pdf/'+file,directory));
  for(const folder of ['wasm','standard_fonts','cmaps'])await cp(join(pdf,folder),new URL('pdf/'+folder+'/',directory),{recursive:true});
  for(const [name,source] of [['TESSERACT-LICENSE',join(tesseract,'LICENSE.md')],['CORE-LICENSE',join(core,'LICENSE')],['LANGUAGE-README.md',join(language,'README.md')],['PDFJS-LICENSE',join(pdf,'LICENSE')]])await copyFile(source,new URL(name,directory));
+ const {buildReceiptNeural}=await import('./build-receipt-neural.mjs');await buildReceiptNeural(new URL('neural/',directory));
 }

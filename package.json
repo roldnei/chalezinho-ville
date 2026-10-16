@@ -22,14 +22,17 @@
     "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "1.62.1",
     "@types/node": "24.10.1",
+    "esbuild": "0.28.2",
     "jsdom": "27.2.0",
     "supabase": "2.82.0",
     "typescript": "5.9.3"
   },
   "private": true,
   "dependencies": {
+    "@paddleocr/paddleocr-js": "0.4.2",
     "@tesseract.js-data/por": "1.0.0",
     "jsqr": "1.4.0",
+    "onnxruntime-web": "1.24.3",
     "pdfjs-dist": "6.4.299",
     "tesseract.js": "7.0.0"
   }

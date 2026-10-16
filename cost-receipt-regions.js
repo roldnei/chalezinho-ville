@@ -47,5 +47,5 @@ export function reviewedFields(p){return {amount_cents:p.amount_cents,supplier:p
 export function reviewExample(item,p){
  const prediction=item.readResult||item.partialResult;const predicted={};for(const k of ['amount_cents','supplier','supplier_document','document_date','document_number'])if(prediction?.fields?.[k]!==undefined)predicted[k]=prediction.fields[k];
  const regions={};for(const [k,r] of Object.entries(item.regions||{}))if(k in REVIEW_FIELDS&&validRegion(r))regions[k]={...r};
- return {id:item.reviewId,receipt_id:item.id,predicted_fields:predicted,reviewed_fields:reviewedFields(p),regions,engine:'tesseract-por-1+receipt-v2'};
+ return {id:item.reviewId,receipt_id:item.id,predicted_fields:predicted,reviewed_fields:reviewedFields(p),regions,engine:prediction?.engine==='paddle-v6-small+tesseract-por'?prediction.engine:'tesseract-por-1+receipt-v2'};
 }

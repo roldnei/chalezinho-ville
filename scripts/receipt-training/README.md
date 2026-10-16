@@ -65,3 +65,29 @@ CHROMIUM_EXECUTABLE_PATH=/caminho/chromium node scripts/receipt-training/browser
 ```
 
 O JSON de casos é uma lista de pares `[caminho_da_foto, campos_esperados]`, com `supplier`, `supplier_document`, `document_number`, `amount` (ex.: `140,00`) e `document_date` (`AAAA-MM-DD`). O modelo é opcional. O servidor local pode fornecer os bytes experimentais sem sobrescrever assets do build. Não publique manifestos ou saídas privados.
+
+## Revisão do pipeline em 16/10/2026
+
+Os pilotos acima continuam reprovados. A nova versão usa PP-OCRv6 **small** pré-treinado, via PaddleOCR.js 0.4.2 e ONNX Runtime Web 1.24.3, no aparelho. O detector encontra polígonos e o reconhecedor lê linhas retificadas. Uma reconstrução de linhas considera a inclinação do papel ao associar rótulo e preço; ponto decimal vira vírgula somente em linhas monetárias rotuladas com exatamente dois centavos. QR/chave continuam validados. O leitor Tesseract anterior permanece como alternativa quando o novo motor não está disponível. PDFs mantêm o pipeline anterior.
+
+Nomes exigem um cabeçalho empresarial com confiança alta ou concordância com uma leitura Tesseract independente da região retificada. Discordâncias ficam pendentes. As coordenadas dos polígonos geram marcações sobre a foto original. Não há chamada para API de OCR paga, envio de foto a terceiros nem treinamento automático. O primeiro carregamento baixa os modelos da própria aplicação e pode demorar em celular. A qualidade em Android físico ainda precisa ser verificada.
+
+Na comparação privada das mesmas quatro fotografias originais, a versão anterior desta revisão acertou 14/20 campos (dois nomes preenchidos errados); a nova acertou 18/20, com dois nomes pendentes e nenhum preenchimento errado. Valor, emissão, CNPJ e número: 4/4 cada. O modelo tiny também foi experimentado, mas não foi incorporado: os erros de letras e valores tornavam insuficiente trocar somente o motor. São casos de regressão já conhecidos, não uma promessa de 90% de acurácia em novas notas.
+
+Para repetir a comparação sem divulgar fotos ou resultados detalhados:
+
+```bash
+node scripts/receipt-training/compare.mjs /tmp/baseline.json /tmp/candidate.json
+```
+
+O gate exige os mesmos arquivos e rótulos, mais acertos, nenhum campo com menos acertos e nenhum campo com mais preenchimentos errados. Ele também conta campos pendentes. O avaliador do navegador registra duração por foto. O gate não substitui medição de tempo/memória em celulares, revisão de privacidade ou teste em documentos inéditos.
+
+### Próximos treinos: critérios de dados
+
+1. Conferir transcrições humanas das linhas e seus recortes; os campos corrigidos no formulário são exemplos de extração, não transcrições completas para treinar reconhecimento de caracteres.
+2. Separar por estabelecimento, modelo de cupom e documento **antes** de qualquer aumento de dados. Versões da mesma foto jamais atravessam treino, validação e teste.
+3. Reservar documentos brasileiros inéditos, com autorização de uso, como teste final; não escolher pesos, limiares ou regras usando esse conjunto. As quatro fotos já vistas ficam somente na regressão.
+4. Selecionar com métricas de detecção/linha na validação, mas liberar apenas após comparar os cinco campos na foto inteira, falsos preenchimentos, pendências e tempo no aparelho. CER menor isoladamente não aprova um modelo.
+5. Guardar versões de rótulos, licença/origem, sementes, hashes e resultados agregados; permitir retorno ao modelo anterior. Correções privadas não entram no Git nem em treino sem uma etapa explícita de preparação e revisão.
+
+Referências primárias consultadas: https://tesseract-ocr.github.io/tessdoc/ImproveQuality.html ; https://github.com/tesseract-ocr/tesstrain ; https://www.paddleocr.ai/latest/en/version3.x/inference_deployment/cross_platform/browser.html ; https://github.com/PaddlePaddle/PaddleOCR/tree/main/paddleocr-js . O primeiro recomenda corrigir segmentação/qualidade antes de retreinar. O segundo especifica pares de imagem de linha e transcrição. O último documenta o SDK local e seus modelos. Versões, hashes dos modelos e licenças estão fixados no build.

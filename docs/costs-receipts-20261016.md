@@ -148,3 +148,11 @@ A identificação do estabelecimento considera o cabeçalho anterior a “não �
 Uma data simples explicitamente rotulada como “Data:” antes dos dados do cliente pode ser recuperada com alta confiança tanto do rótulo quanto da data, sem exigir rótulo NFC-e. Datas fracas, inválidas ou conflitantes ficam pendentes. As marcações também reconhecem esse rótulo simples.
 
 Validação: 68 testes específicos passaram, incluindo OCR real de comprovante sintético com caixas, nome, data simples, total, vendedor e CNPJ do cliente. No recorte privado da nova captura, a data foi preenchida corretamente e recebeu marcação; o fornecedor permanece pendente por falta de texto confiável nessa captura com caixas sobrepostas e o total está fora do recorte. A foto original completa não foi disponibilizada nesta mensagem. Não foram publicados imagem ou dados privados. Build DEV verificado, sem alteração de produção.
+
+## Leitura gratuita por regiões — revisão 9
+
+Fotos agora passam por PP-OCRv6 small/PaddleOCR.js local, com polígonos, retificação de linhas e associação de rótulos/preços pela inclinação. Assets e modelos fixados por versão/SHA-256 são servidos pela aplicação. Tesseract verifica nomes duvidosos e continua disponível como alternativa; PDFs mantêm o leitor existente. Não há API de OCR paga nem envio a terceiros. O download inicial e o processamento podem demorar em celulares.
+
+Na regressão privada de quatro fotos originais: 14/20 para 18/20 campos exatos; quatro totais, quatro datas, quatro CNPJs e quatro números corretos. Dois nomes pendentes, nenhum preenchimento errado. Não é estimativa independente de precisão: os casos já eram conhecidos. Critérios dos próximos treinos, fontes oficiais e gate de comparação estão em `scripts/receipt-training/README.md`.
+
+A migração `20261016220000_cost_review_neural_engine.sql`, aplicada somente em DEV, permite registrar a versão real do leitor nos exemplos opcionais. Não altera políticas de acesso nem dados existentes. Correções continuam exemplos para revisão futura, sem retreino automático.
