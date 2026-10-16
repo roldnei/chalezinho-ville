@@ -44,3 +44,19 @@ test('OCR dates require agreement across distinct lines when the emission day co
  assert.equal(extractReceiptFields('Cod Descr. Qtd. Unid. Preco Total\nTOTAL A PAGAR 48,90').fields.supplier,undefined);
 });
 test('explicit business labels do not throw and low quality dates stay pending even if repeated',()=>{const r=extractReceiptFields('Razão social: MERCADO EXEMPLO LTDA\nCNPJ 11222333000181\nEmissão 15/10/2026\nProtocolo 15/10/2026\nTOTAL A PAGAR 48,90',{confidence:50});assert.equal(r.fields.supplier,'MERCADO EXEMPLO LTDA');assert.equal(r.fields.document_date,undefined);assert.equal(r.fields.competence,undefined);assert.equal(r.fields.amount_cents,undefined);assert.ok(r.warnings.some(w=>w.includes('Valor sem nitidez')));assert.ok(r.warnings.some(w=>w.includes('Data sem nitidez')));assert.equal(extractReceiptFields('Nome fantasia: MERCADO EXEMPLO').fields.supplier,'MERCADO EXEMPLO');});
+test('missing receipt header never turns a product or a value row into the supplier',()=>{
+ for(const text of ['Documento Auxiliar da Nota Fiscal de Consumidor Eletronica\nCODIGO DESCRICAO\n123 ASSENTO SANIT.BCO\nValor Produtos R$ 85,60\nValor a Pagar R$ 85,60','Valor Produtos R$ 85,60\nTOTAL A PAGAR 85,60']){
+  const r=extractReceiptFields(text,{confidence:90});assert.equal(r.fields.supplier,undefined);assert.equal(r.fields.description,undefined);assert.equal(r.fields.amount_cents,8560);
+ }
+ const r=extractReceiptFields('Documento Auxiliar\nCNPJ 11.222.333/0001-81');assert.equal(r.fields.supplier_document,'11.222.333/0001-81');assert.equal(r.fields.supplier,undefined);
+});
+test('spaced issuer CNPJ anchors the business name before the fiscal heading',()=>{
+ const r=extractReceiptFields('CNPJ 11 222 333/0001-81 LOJA EXEMPLO LTDA ME\nRua Exemplo 10\nDocumento Auxiliar\nValor Produtos R$ 85,60\nValor a Pagar R$ 85,60');assert.equal(r.fields.supplier_document,'11.222.333/0001-81');assert.equal(r.fields.supplier,'LOJA EXEMPLO LTDA ME');
+});
+test('instalment due dates and instalment amounts do not replace issue date and full total',()=>{
+ const r=extractReceiptFields('LOJA EXEMPLO\nDocumento Auxiliar\nNFC-e nº 54321 Série 001 10/08/2026\nValor total R$ 120,00\nParcela 01/02 Vencendo em 10/09/2026 Cartao 60,00\nParcela 02/02 Vencendo em 10/10/2026 Cartao 60,00',{confidence:90});assert.equal(r.fields.document_date,'2026-08-10');assert.equal(r.fields.competence,'2026-08');assert.equal(r.fields.amount_cents,12000);
+ const pending=extractReceiptFields('Parcela 01/02 Venc. 10/09/2026 60,00');assert.equal(pending.fields.document_date,undefined);assert.equal(pending.fields.amount_cents,undefined);
+});
+test('sanitary fittings and electrical repair parts suggest maintenance',()=>{
+ for(const item of ['ASSENTO SANIT.BCO ALMOF','PERFIL EMBUTIR ALUMINIO','FONTE DE ALIMENTACAO SLIM'])assert.equal(extractReceiptFields('LOJA EXEMPLO\nDocumento Auxiliar\n'+item).fields.category,'maintenance');
+});
