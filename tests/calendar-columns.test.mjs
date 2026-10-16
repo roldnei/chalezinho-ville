@@ -13,6 +13,7 @@ const render=events=>new JSDOM(scope.calendarColumn(property,bounds,[],events)).
 test('vertical stay preserves check-in/out hours and its original detail target',()=>{
  const button=render([event]).querySelector('button');
  assert.equal(button.dataset.reservation,'stay-a');
+ assert.equal(button.querySelector('.calendar-column-range').textContent,'16/10 → 18/10');
  assert.equal(parseFloat(button.style.top),68*15/24);
  assert.ok(Math.abs(parseFloat(button.style.height)-68*(2-4/24))<1e-8);
  assert.match(button.getAttribute('aria-label'),/15:00.*11:00/);
@@ -27,6 +28,7 @@ test('vertical calendar clips dates, omits other properties, and escapes guest l
  const doc=render([{...event,start:'2026-10-15',guest_name:'<img src=x>'},{...event,id:'other',property_id:2}]);
  assert.equal(doc.querySelectorAll('button').length,1);
  assert.equal(parseFloat(doc.querySelector('button').style.top),0);
+ assert.equal(doc.querySelector('.calendar-column-range').textContent,'15/10 → 18/10');
  assert.equal(doc.querySelectorAll('img').length,0);
  assert.equal(doc.querySelector('strong').textContent,'<img src=x>');
 });

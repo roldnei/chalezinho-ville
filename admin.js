@@ -218,7 +218,8 @@ function calendarColumn(p,b,direct,external){
  return `<div class="calendar-column-track" style="--lanes:${lanes}">${placed.map(({e,timing,lane})=>{
   const top=(Math.max(origin,timing.start)-origin)/86400000*68,height=(Math.min(limit,timing.end)-Math.max(origin,timing.start))/86400000*68;
   const label=e.guest_name||e.calendar_label||sourceLabel(e.source),source=sourceLabel(e.source),pending=['pending_payment','hold'].includes(e.status);
-  return `<button type="button" class="calendar-column-event ${esc(e.source)} ${pending?'pending':''}" style="top:${top}px;height:${height}px;left:calc(${lane} * 100% / ${lanes} + 3px);width:calc(100% / ${lanes} - 6px)" ${stayButton(e)} aria-label="${esc(label)} · ${esc(p.name)} · ${esc(source)} · ${date(timing.startDate)} ${timing.startTime} a ${date(timing.endDate)} ${timing.endTime}"><strong>${esc(label)}</strong><small>${esc(e.source==='operational'?'Bloqueio':source)}</small></button>`;
+  const compactDate=day=>day.slice(8,10)+'/'+day.slice(5,7),range=compactDate(timing.startDate)+' → '+compactDate(timing.endDate);
+  return `<button type="button" class="calendar-column-event ${height<80?'compact':''} ${esc(e.source)} ${pending?'pending':''}" style="top:${top}px;height:${height}px;left:calc(${lane} * 100% / ${lanes} + 3px);width:calc(100% / ${lanes} - 6px)" ${stayButton(e)} aria-label="${esc(label)} · ${esc(p.name)} · ${esc(source)} · ${date(timing.startDate)} ${timing.startTime} a ${date(timing.endDate)} ${timing.endTime}"><strong>${esc(label)}</strong><small class="calendar-column-range">${esc(range)}</small><small class="calendar-column-channel">${esc(e.source==='operational'?'Bloqueio':source)}</small></button>`;
  }).join('')}</div>`;
 }
 function calendarRow(p,b,direct,external){
