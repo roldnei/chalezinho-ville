@@ -1,7 +1,7 @@
 // Positions only describe text actually present in the original, unrotated page.
 const normal=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 export const REVIEW_FIELDS={amount:'Valor (R$)',supplier_document:'CPF / CNPJ',supplier:'Estabelecimento',document_date:'Data de emissão',document_number:'Número da nota'};
-function wordEvidence(name,lines){
+function wordEvidence(name,lines,target){
  const box=words=>words.length?{x0:Math.min(...words.map(w=>w.bbox.x0)),y0:Math.min(...words.map(w=>w.bbox.y0)),x1:Math.max(...words.map(w=>w.bbox.x1)),y1:Math.max(...words.map(w=>w.bbox.y1))}:null;
  for(const line of lines){
   if(/CONSUMIDOR|DESTINATARIO|TOMADOR/.test(normal(line.text)))continue;
@@ -10,6 +10,13 @@ function wordEvidence(name,lines){
    let end=label+1;while(end<words.length&&/[\d/]/.test(words[end].text))end++;
    if(name==='supplier_document'&&end>label+1)return box(words.slice(label,end));
    if(name==='supplier'){const company=words.slice(end).filter(w=>w.confidence>=40&&/[a-zA-Z]/.test(w.text));if(company.length>=2)return box(company);}
+  }
+  if(name==='amount'&&/VALORTOTAL|(?:VALOR|TOTAL)APAGAR/.test(normal(line.text))&&!/ITENS|PRODUTOS|SUBTOTAL|UNITARIO|TRIBUT|TROCO/.test(normal(line.text))){
+   const trusted=words.filter(w=>w.confidence>=75),numeric=trusted.filter(w=>/\d/.test(w.text));
+   if(numeric.length&&normal(numeric.map(w=>w.text).join(' '))===normal(target))return box(trusted);
+  }
+  if(name==='document_date'&&/NFC?E|EMISS|EMITID|AUTORIZA/.test(normal(line.text))&&!/VENC|PARCELA|PAGAMENTO|ENTREGA/.test(normal(line.text))){
+   const date=words.find(w=>w.confidence>=75&&normal(w.text)===normal(target));if(date)return box([date]);
   }
   if(name==='document_number'){
    const index=words.findIndex(w=>w.confidence>=75&&/^NF(?:C)?[- ]?E[:.]?$/i.test(w.text));
@@ -27,7 +34,7 @@ export function receiptRegions(result,pages){
   for(const page of pages){
    const lines=page.lines.filter(l=>!(['supplier_document','supplier'].includes(name)&&/CONSUMIDOR|DESTINATARIO|TOMADOR/.test(normal(l.text))));
    const line=lines.find(l=>l.confidence>=55&&evidence&&!evidence.startsWith('Chave de acesso')&&normal(l.text)===normal(evidence))||lines.find(l=>l.confidence>=55&&(name!=='document_number'||/NFC?E|NOTAFISCAL|NUMERO/.test(normal(l.text)))&&(name!=='supplier_document'||/CNPJ|CPF|[A-Z\d]{2}[.,\s]+[A-Z\d]{3}[.,\s]+[A-Z\d]{3}\s*\//i.test(l.text))&&normal(l.text).includes(needle));
-   const b=line?.bbox||wordEvidence(name,lines);if(!b)continue;
+   const b=line?.bbox||wordEvidence(name,lines,target);if(!b)continue;
    const region={page:page.page,x:b.x0/page.width,y:b.y0/page.height,width:(b.x1-b.x0)/page.width,height:(b.y1-b.y0)/page.height,source:'automatic'};
    if(validRegion(region)){output[name]=region;break;}
   }

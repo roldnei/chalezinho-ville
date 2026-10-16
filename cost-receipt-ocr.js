@@ -1,3 +1,4 @@
+import {recoverReceiptDetails} from './cost-receipt-local-fields.js';
 import {receiptRegions,ocrPage} from './cost-receipt-regions.js';
 import {extractReceiptFields} from './cost-receipt-fields.js';
 import {readReceiptQR} from './cost-receipt-qr.js';
@@ -42,6 +43,7 @@ export async function readReceipt(file,{signal,onProgress=()=>{},onPartialResult
   // once without deskew, preserving the existing extraction decisions.
   const layout=Math.abs(data.rotateRadians||0)>=.005?await recognize(layoutCanvas,'Localizando campos…',{positionOnly:true}):data;
   result=recoverPositionedTotal(result,extractReceiptFields(layout.text,{confidence:layout.confidence}));
+  result=recoverReceiptDetails(result,[...new Set([originalData,data,layout].filter(Boolean))]);
   const page=ocrPage(layout,layoutCanvas);if(transform){const map=b=>({x0:transform.left+b.x0*transform.width/layoutCanvas.width,y0:transform.top+b.y0*transform.height/layoutCanvas.height,x1:transform.left+b.x1*transform.width/layoutCanvas.width,y1:transform.top+b.y1*transform.height/layoutCanvas.height});page.width=canvas.width;page.height=canvas.height;page.lines=page.lines.map(l=>({...l,bbox:map(l.bbox),words:(l.words||[]).map(w=>({...w,bbox:map(w.bbox)}))}));}
   const pages=[page];if(originalData&&Math.abs(originalData.rotateRadians||0)<.005)pages.push(ocrPage(originalData,canvas));
   return {...result,regions:receiptRegions(result,pages)};

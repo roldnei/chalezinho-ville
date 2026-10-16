@@ -24,3 +24,9 @@ test('confident issuer labels locate CNPJ and supplier despite weak full line OC
  const r=receiptRegions(result,[{page:1,width:1000,height:1500,lines:[line]}]);assert.equal(r.supplier_document.x,.1);assert.equal(r.supplier.x,.26);assert.equal(r.supplier_document.source,'automatic');
  assert.deepEqual(receiptRegions(result,[{page:1,width:1000,height:1500,lines:[{...line,text:'CONSUMIDOR CNPJ: 11.222.338/0001-81'}]}]),{});assert.deepEqual(receiptRegions(result,[{page:1,width:1000,height:1500,lines:[{...line,confidence:90,text:'CONSUMIDOR CNPJ: 11.222.333/0001-81'}]}]),{});
 });
+
+test('locally confident split total and issuance words receive source rectangles even with noisy line scores',()=>{
+ const w=(text,x,confidence=95)=>({text,confidence,bbox:{x0:x,y0:300,x1:x+40,y1:320}}),line={text:'ruido Valor total R$ 123 45',confidence:30,words:[w('ruido',0,5),w('Valor',100),w('total',150),w('R$',200),w('123',500),w('45',550)]};
+ const date={text:'NFC-e nº 321 Série 001 22/07/2026',confidence:40,words:[w('NFC-e',100),w('22/07/2026',600,80)]};
+ const r=receiptRegions({fields:{amount_cents:12345,document_date:'2026-07-22'},evidence:{}},[{page:1,width:1000,height:1500,lines:[line,date]}]);assert.equal(r.amount.x,.1);assert.equal(r.amount.width,.49);assert.equal(r.document_date.x,.6);assert.equal(r.document_date.width,.04);
+});
