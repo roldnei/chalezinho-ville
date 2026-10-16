@@ -10,6 +10,21 @@ vm.runInContext(source.slice(source.indexOf('function calendarInterval('),source
 const property={id:1,name:'Ville Signature',check_in_time:'15:00',check_out_time:'11:00'},bounds={start:'2026-10-16',days:7};
 const event={id:'stay-a',property_id:1,source:'airbnb',guest_name:'Ana',start:'2026-10-16',end:'2026-10-18'};
 const render=events=>new JSDOM(scope.calendarColumn(property,bounds,[],events)).window.document;
+test('monthly calendar starts today, can reveal previous days, and preserves other months',()=>{
+ const ctx={calendarSpan:'month',calendarMonth:'2026-10',calendarShowPreviousDays:false,today:()=> '2026-10-15'};
+ vm.createContext(ctx);
+ vm.runInContext(source.slice(source.indexOf('function monthBounds('),source.indexOf('function renderCalendar(){')),ctx);
+ assert.equal(ctx.calendarVisibleBounds().start,'2026-10-15');
+ assert.equal(ctx.calendarVisibleBounds().days,17);
+ ctx.calendarShowPreviousDays=true;
+ assert.equal(ctx.calendarVisibleBounds().start,'2026-10-01');
+ assert.equal(ctx.calendarVisibleBounds().days,31);
+ ctx.calendarShowPreviousDays=false;ctx.calendarMonth='2026-09';
+ assert.equal(ctx.calendarVisibleBounds().start,'2026-09-01');
+ assert.equal(ctx.calendarVisibleBounds().days,30);
+ ctx.calendarMonth='2026-11';
+ assert.equal(ctx.calendarVisibleBounds().start,'2026-11-01');
+});
 test('vertical stay preserves check-in/out hours and its original detail target',()=>{
  const button=render([event]).querySelector('button');
  assert.equal(button.dataset.reservation,'stay-a');

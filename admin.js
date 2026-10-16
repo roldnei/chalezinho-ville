@@ -188,19 +188,26 @@ function openCalendarEvent(id){
 }
 function importedRows(){return (state.channel_periods||[]).filter(x=>x.status!=='integration_error').map(x=>({...x,check_in:x.start,check_out:x.end,status:'imported'}))}
 function monthBounds(value){const [y,m]=value.split("-").map(Number),start=`${y}-${String(m).padStart(2,"0")}-01`,endDate=new Date(Date.UTC(y,m,1)),end=endDate.toISOString().slice(0,10);return {y,m,start,end,days:new Date(Date.UTC(y,m,0)).getUTCDate()}}
+function calendarVisibleBounds(){
+ if(calendarSpan==='week')return {start:calendarWeekStart,end:new Date(Date.parse(calendarWeekStart)+7*86400000).toISOString().slice(0,10),days:7};
+ const bounds=monthBounds(calendarMonth),reference=today();
+ if(!calendarShowPreviousDays&&calendarMonth===reference.slice(0,7))return {...bounds,start:reference,days:Math.round((Date.parse(bounds.end)-Date.parse(reference))/86400000)};
+ return bounds;
+}
 function renderCalendar(){
-  const b=calendarSpan==='week'?{start:calendarWeekStart,end:new Date(Date.parse(calendarWeekStart)+7*86400000).toISOString().slice(0,10),days:7}:monthBounds(calendarMonth),direct=state.reservations.filter(r=>["confirmed","pending_payment","hold"].includes(r.status)&&r.check_in<b.end&&r.check_out>=b.start),manual=(state.calendar_blocks||[]).filter(x=>x.status==="active"&&x.start_date<b.end&&x.end_date>b.start).map(x=>({...x,id:`block:${x.id}`,source:"operational",start:x.start_date,end:x.end_date,guest_name:x.reason,status:"blocked"})),external=[...state.channel_periods.filter(x=>x.start<b.end&&x.end>=b.start),...manual];
+  const b=calendarVisibleBounds(),direct=state.reservations.filter(r=>["confirmed","pending_payment","hold"].includes(r.status)&&r.check_in<b.end&&r.check_out>=b.start),manual=(state.calendar_blocks||[]).filter(x=>x.status==="active"&&x.start_date<b.end&&x.end_date>b.start).map(x=>({...x,id:`block:${x.id}`,source:"operational",start:x.start_date,end:x.end_date,guest_name:x.reason,status:"blocked"})),external=[...state.channel_periods.filter(x=>x.start<b.end&&x.end>=b.start),...manual];
   const properties=state.properties.filter(p=>p.active&&(calendarProperty==='all'||String(p.id)===calendarProperty));
   $("#admin-content").innerHTML=`<section class="admin-panel calendar-panel calendar-columns-panel"><div class="admin-calendar-toolbar calendar-columns-toolbar"><div><button data-month-prev aria-label="Período anterior">‹</button><label class="calendar-period"><input aria-label="Escolher mês" id="calendar-month" type="month" value="${calendarMonth}"></label><button data-month-next aria-label="Próximo período">›</button><button data-month-today>Hoje</button><select aria-label="Visão do calendário" id="calendar-span"><option value="week" ${calendarSpan==='week'?'selected':''}>Semana</option><option value="month" ${calendarSpan==='month'?'selected':''}>Mês</option></select><select aria-label="Filtrar imóvel" id="calendar-property"><option value="all">Todos os chalés</option>${state.properties.map(p=>`<option value="${p.id}" ${String(p.id)===calendarProperty?'selected':''}>${esc(p.name)}</option>`).join('')}</select></div></div>
-    <div class="calendar-columns-period">${date(b.start)} – ${date(new Date(Date.parse(b.end)-86400000).toISOString().slice(0,10))}</div>
+    <div class="calendar-columns-period">${date(b.start)} – ${date(new Date(Date.parse(b.end)-86400000).toISOString().slice(0,10))}${calendarSpan==='month'&&calendarMonth===today().slice(0,7)&&today().slice(8,10)!=='01'?`<button type="button" id="calendar-previous-days" aria-expanded="${calendarShowPreviousDays}">${calendarShowPreviousDays?'Ocultar dias anteriores':'Mostrar dias anteriores'}</button>`:''}</div>
     ${properties.length?`<div class="calendar-columns-scroll"><div class="calendar-columns-grid" style="--properties:${properties.length};--days:${b.days}"><div class="calendar-columns-heading"><span>Dia</span>${properties.map(p=>`<button type="button" data-calendar-availability="${p.id}" aria-label="Disponibilidade de ${esc(p.name)}">${esc(p.name.replace(/^Ville\s+/i,''))}</button>`).join('')}</div><div class="calendar-columns-body" style="height:${b.days*68}px"><div class="calendar-columns-dates">${Array.from({length:b.days},(_,i)=>{const d=new Date(Date.parse(b.start)+i*86400000),day=d.toISOString().slice(0,10);return `<div class="${day===today()?'today':''}"><strong>${d.getUTCDate()}</strong><small>${d.toLocaleDateString('pt-BR',{weekday:'short',timeZone:'UTC'}).replace('.','')}</small></div>`}).join('')}</div>${properties.map(p=>calendarColumn(p,b,direct,external)).join('')}</div></div></div>`:empty('Nenhum chalé neste filtro.')}
     <div class="calendar-legend"><span class="direct">Site</span><span class="airbnb">Airbnb</span><span class="booking">Booking</span><span class="ical">Outros</span><span class="operational">Bloqueio</span><span class="pending">Pagamento</span></div><button id="manage-calendar-links" class="calendar-connections-link">Calendários conectados</button></section>`;
-  $('#calendar-property').onchange=e=>{calendarProperty=e.target.value;renderCalendar()};$('#calendar-span').onchange=e=>{calendarSpan=e.target.value;renderCalendar()};
+  $('#calendar-property').onchange=e=>{calendarProperty=e.target.value;renderCalendar()};$('#calendar-span').onchange=e=>{calendarSpan=e.target.value;calendarMonth=today().slice(0,7);calendarWeekStart=today();calendarShowPreviousDays=false;renderCalendar()};
+  const previousDays=$('#calendar-previous-days');if(previousDays)previousDays.onclick=()=>{calendarShowPreviousDays=!calendarShowPreviousDays;renderCalendar()};
   $("#manage-calendar-links").onclick=()=>showView("calendar_links");$$('[data-calendar-availability]').forEach(b=>b.onclick=()=>openAvailability(Number(b.dataset.calendarAvailability)));
-  $("#calendar-month").onchange=e=>{calendarMonth=e.target.value;calendarWeekStart=calendarMonth+'-01';renderCalendar()};
-  $("[data-month-prev]").onclick=()=>changeMonth(-1);$("[data-month-next]").onclick=()=>changeMonth(1);$("[data-month-today]").onclick=()=>{calendarMonth=today().slice(0,7);calendarWeekStart=today();renderCalendar()};bindCards();
+  $("#calendar-month").onchange=e=>{if(!e.target.value)return;calendarMonth=e.target.value;calendarWeekStart=calendarMonth===today().slice(0,7)?today():calendarMonth+'-01';calendarShowPreviousDays=false;renderCalendar()};
+  $("[data-month-prev]").onclick=()=>changeMonth(-1);$("[data-month-next]").onclick=()=>changeMonth(1);$("[data-month-today]").onclick=()=>{calendarMonth=today().slice(0,7);calendarWeekStart=today();calendarShowPreviousDays=false;renderCalendar()};bindCards();
 }
-function changeMonth(delta){if(calendarSpan==='week'){calendarWeekStart=new Date(Date.parse(calendarWeekStart)+delta*7*86400000).toISOString().slice(0,10);calendarMonth=calendarWeekStart.slice(0,7);renderCalendar();return}const [y,m]=calendarMonth.split("-").map(Number),d=new Date(Date.UTC(y,m-1+delta,1));calendarMonth=d.toISOString().slice(0,7);renderCalendar()}
+function changeMonth(delta){calendarShowPreviousDays=false;if(calendarSpan==='week'){calendarWeekStart=new Date(Date.parse(calendarWeekStart)+delta*7*86400000).toISOString().slice(0,10);calendarMonth=calendarWeekStart.slice(0,7);renderCalendar();return}const [y,m]=calendarMonth.split("-").map(Number),d=new Date(Date.UTC(y,m-1+delta,1));calendarMonth=d.toISOString().slice(0,7);renderCalendar()}
 function calendarInterval(e,p){
  const operational=e.source==='operational',wholeDay=operational,startTime=wholeDay?'00:00':String(p.check_in_time||'15:00').slice(0,5),endTime=wholeDay?'00:00':String(p.check_out_time||'11:00').slice(0,5);
  const point=(day,time)=>Date.parse(day.slice(0,10)+'T00:00:00Z')+(Number(time.slice(0,2))*60+Number(time.slice(3,5)))*60000;
@@ -732,7 +739,8 @@ function openReservationIncident(reservationId){
 // Task-oriented workspace. Existing financial flows remain in their original handlers.
 const legacyProperty=openProperty,legacyToday=renderToday,legacyCalendar=renderCalendar,legacyView=showView;
 let todayTab='today';
-let calendarProperty='all',calendarSpan='week',calendarWeekStart=today();
+let calendarProperty='all',calendarSpan='week',calendarWeekStart=today(),calendarShowPreviousDays=false;
+calendarMonth=today().slice(0,7);
 async function listingApi(body){const fresh=await sb.auth.getSession();session=fresh.data.session;if(!session)throw Error("session_expired");const r=await fetch(C.supabaseUrl+'/functions/v1/pms-operations',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+session.access_token},body:JSON.stringify(body)});const d=await r.json();if(!r.ok||!d.ok)throw Error(d.error||'failed');return d}
 const workspaceCard=(key,title,summary)=>`<button type="button" data-workspace="${key}"><strong>${esc(title)}</strong><span>${esc(summary)}</span><span aria-hidden="true">Abrir →</span></button>`;
 
@@ -751,6 +759,7 @@ function setupWorkspace(){
  const nav=document.createElement('nav');nav.className='admin-bottom-nav';nav.setAttribute('aria-label','Navegação principal');nav.innerHTML=Object.entries({today:'Hoje',calendar:'Multicalendário',reservations:'Reservas',properties:'Imóveis',menu:'Mais'}).map(([v,l])=>`<button data-main-view="${v}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="${paths[v]}"/></svg><span>${l}</span></button>`).join('');$('#admin-app').append(nav);nav.onclick=e=>{const b=e.target.closest('[data-main-view]');if(b&&state)showView(b.dataset.mainView)};
 }
 showView=function(view){
+ if(view==='calendar'&&currentView!=='calendar'){calendarMonth=today().slice(0,7);calendarWeekStart=today();calendarShowPreviousDays=false}
  if(view==='menu'){currentView='menu';history.replaceState(null,'','admin.html?view=menu');$('#admin-context').textContent='SUA OPERAÇÃO';$('#admin-title').textContent='Menu';renderWorkspaceMenu()}else legacyView(view);
  $$('[data-main-view]').forEach(b=>{const active=b.dataset.mainView===view;b.classList.toggle('active',active);b.setAttribute('aria-current',active?'page':'false')});
 };
