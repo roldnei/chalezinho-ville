@@ -26,5 +26,10 @@
     "supabase": "2.82.0",
     "typescript": "5.9.3"
   },
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@tesseract.js-data/por": "1.0.0",
+    "pdfjs-dist": "6.4.299",
+    "tesseract.js": "7.0.0"
+  }
 }

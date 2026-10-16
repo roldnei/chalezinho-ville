@@ -11,6 +11,8 @@ for(const entry of await readdir(root,{withFileTypes:true})){
 }
 await cp(new URL('faxinas/',root),new URL('faxinas/',out),{recursive:true});
 await cp(new URL('assets/',root),new URL('assets/',out),{recursive:true});
+const {buildReceiptOCR}=await import('./build-receipt-ocr.mjs');
+await buildReceiptOCR(new URL('assets/receipt-ocr/',out));
 console.log('Preview browser assets built in dist.');
 
 import {releaseProfile,releaseFeatures} from './release-profile.mjs';

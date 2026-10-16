@@ -2,3 +2,5 @@
 #cost-confirm-label[hidden]{display:none!important}
 
 .cost-form input[aria-invalid="true"]{border-color:#a32d22}.cost-money-error{color:#a32d22;line-height:1.4}
+
+#cost-receipt-panel[hidden],#cost-receipt-review[hidden]{display:none!important}.cost-queued-receipt{display:flex;align-items:center;flex-wrap:wrap;gap:8px;width:100%}.cost-queued-receipt span{flex:1;overflow-wrap:anywhere}.cost-ocr-filled{border-color:#468a68!important;background:#f4fbf6!important}#cost-receipt-panel pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.8rem;max-height:180px;overflow:auto}#cost-receipt-panel progress{width:100%;margin:10px 0}#cost-receipt-review{margin-top:16px}#cost-receipt-warnings{padding-left:20px;font-size:.85rem}
