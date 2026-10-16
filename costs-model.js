@@ -3,7 +3,10 @@ export const CATEGORIES = {
 };
 export const TAX_SOURCE='https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/perguntas-e-respostas/dirpf/p-r-irpf-2026-v1-00-2026-04-23.pdf';
 export function cents(value){
- const text=String(value).trim();
+ let text=String(value).trim().replace(/^R\$\s*/, '');
+ // Decimal keyboards can emit a dot even with pt-BR selected. A single dot
+ // followed by one or two digits is a decimal separator, never a thousands mark.
+ if(/^\d+\.\d{1,2}$/.test(text))text=text.replace('.',',');
  if(!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(text))throw Error('Informe o valor em reais, por exemplo 120,50.');
  const [whole,decimal='']=text.replaceAll('.','').split(',');
  const n=Number(whole)*100+Number(decimal.padEnd(2,'0'));

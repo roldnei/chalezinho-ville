@@ -39,3 +39,23 @@ test('upload failure leaves a single pending expense and retry attaches once',as
  s.failUploads(false);$('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();assert.equal(data.cost_entries.length,1);assert.equal(data.cost_receipts.length,1);assert.equal(data.cost_entries[0].exclusion_cents,0);assert.equal($('#cost-dialog').open,false);
  }finally{s.dom.window.close();}
 });
+test('currency fields format BRL, validate two decimals and persist exact cents',async()=>{
+ const s=await setup(),{$,field,w,data}=s;try{
+ $('#cost-new').click();const input=field('amount');field('description').value='Produto piscina';input.value='130,5';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.Event('blur'));
+ assert.match(input.value,/^R\$\s130,50$/);assert.equal(input.checkValidity(),true);
+ input.dispatchEvent(new w.Event('focus'));assert.equal(input.value,'130,50');input.setSelectionRange(input.value.length,input.value.length);
+ const third=new w.InputEvent('beforeinput',{inputType:'insertText',data:'7',cancelable:true});assert.equal(input.dispatchEvent(third),false);assert.equal(input.value,'130,50');
+ input.value='130.50';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.Event('blur'));assert.match(input.value,/^R\$\s130,50$/);
+ $('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();assert.equal(data.cost_entries[0].amount_cents,13050);
+ $('[data-edit]').click();assert.match(field('amount').value,/^R\$\s130,50$/);
+ }finally{s.dom.window.close();}
+});
+test('pasted invalid money cannot save and hidden fiscal values do not block operational costs',async()=>{
+ const s=await setup(),{$,field,w,data}=s;try{
+ $('#cost-new').click();field('description').value='Faxina';const input=field('amount');
+ for(const bad of ['1,234','abc','-1,00','0,00']){input.value=bad;input.dispatchEvent(new w.Event('input'));assert.equal(input.checkValidity(),false);assert.equal($('#cost-amount-error').hidden,false);$('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();assert.equal(data.cost_entries.length,0);}
+ input.value='150,00';input.dispatchEvent(new w.Event('input'));assert.equal(input.checkValidity(),true);assert.equal($('#cost-amount-error').hidden,true);
+ field('category').value='property_tax';field('category').dispatchEvent(new w.Event('change'));field('confirm_fiscal').checked=true;field('confirm_fiscal').dispatchEvent(new w.Event('change'));field('exclusion').value='2,345';field('exclusion').dispatchEvent(new w.Event('input'));assert.equal(field('exclusion').checkValidity(),false);
+ field('category').value='cleaning';field('category').dispatchEvent(new w.Event('change'));assert.equal(field('exclusion').checkValidity(),true);assert.equal(field('exclusion').required,false);
+ }finally{s.dom.window.close();}
+});

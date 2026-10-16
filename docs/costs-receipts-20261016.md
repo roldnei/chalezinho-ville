@@ -24,3 +24,7 @@ Migração `20261016125659_costs_receipts.sql`: tabelas `cost_entries`, `cost_re
 Os testes de interface usam JSDOM com cliente de armazenamento simulado. O banco remoto foi testado com rollback, incluindo políticas reais e registro de metadados no Storage; isso não substitui uma captura de câmera nem upload físico pelo navegador. A instalação do Chromium neste executor falhou por download incompleto; não foi declarada homologação visual completa ou upload/download de um arquivo real em dispositivo físico.
 
 Para disponibilização PROD: aplicar a mesma migração aditiva no projeto `irxsaladqhbzhkoaclxy` e publicar este commit no projeto Vercel `chalezinho-ville`, mantendo o perfil WhatsApp e a configuração PROD existentes. Retorno de frontend: deployment anterior; preservar tabelas e comprovantes, sem rollback destrutivo dos dados.
+
+## Valores em reais
+
+Os campos de custo e exclusão fiscal validam números positivos com até duas casas decimais. Ao sair do campo, exibem BRL com agrupamento brasileiro (ex.: R$ 1.234,50); ao editar, removem o prefixo e os separadores de milhar. Ponto decimal do teclado e valores brasileiros colados com prefixo R$ são aceitos. Letras, negativos, excesso de casas e valores fora do limite não podem ser salvos. A terceira casa é bloqueada na digitação; conteúdo inválido colado mantém erro visível sem truncar ou arredondar silenciosamente. Nove testes específicos da aba passaram, incluindo formato, precisão, gravação em centavos e exclusão fiscal desativada.

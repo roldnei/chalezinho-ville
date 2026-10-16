@@ -7,6 +7,25 @@ const date=d=>d?d.split('-').reverse().join('/'):'Não pago';
 let entries=[],receipts=[],properties=[],edit=null,queue=[],busy=false,loadVersion=0,draftId=null;
 const form=$('#cost-form'),field=n=>form.elements.namedItem(n);
 const check=result=>{if(result.error)throw result.error;return result.data};
+function bindMoneyInput(name){
+ const input=field(name),error=$('#cost-'+name+'-error');
+ function validate(format=false){
+  input.setCustomValidity('');input.removeAttribute('aria-invalid');error.hidden=true;error.textContent='';
+  if(name==='exclusion'&&!field('confirm_fiscal').checked)return;
+  if(!input.value.trim()&&!input.required)return;
+  try{let value=input.value.trim();if(format&&/^\d+,$/.test(value))value+='00';const amount=cents(value);if(format)input.value=brl(amount);}
+  catch(e){input.setCustomValidity(e.message);input.setAttribute('aria-invalid','true');error.textContent=e.message;error.hidden=false;}
+ }
+ input.addEventListener('focus',()=>{if(/^R\$/.test(input.value))input.value=input.value.replace(/^R\$\s*/,'').replaceAll('.','');});
+ input.addEventListener('beforeinput',event=>{
+  if(!event.cancelable||!event.inputType?.startsWith('insert')||event.isComposing||event.data?.length!==1)return;
+  const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+  const char=event.data==='.'?',':event.data,next=input.value.slice(0,start)+char+input.value.slice(end);
+  if(!/^\d*(?:,\d{0,2})?$/.test(next)){event.preventDefault();return;}
+  if(event.data==='.'){event.preventDefault();input.setRangeText(',',start,end,'end');input.dispatchEvent(new Event('input',{bubbles:true}));}
+ });
+ input.addEventListener('input',()=>validate());input.addEventListener('blur',()=>validate(true));
+}
 function message(text){$('#cost-status').textContent=text;}
 async function allRows(table,build=q=>q){let rows=[];for(let offset=0;;offset+=1000){const page=check(await build(sb.from(table).select('*')).range(offset,offset+999));rows.push(...page);if(page.length<1000)return rows;}}
 function visible(){return selection(entries,$('#cost-month').value,$('#cost-property').value,$('#cost-basis').value);}
@@ -35,14 +54,17 @@ function classify(){
  $('#cost-confirm-label').hidden=!eligible;
  if(!eligible)field('confirm_fiscal').checked=false;
  $('#cost-fiscal').hidden=!field('confirm_fiscal').checked;
+ field('exclusion').required=field('confirm_fiscal').checked;
+ if(!field('confirm_fiscal').checked){field('exclusion').setCustomValidity('');field('exclusion').removeAttribute('aria-invalid');$('#cost-exclusion-error').hidden=true;}
 }
 function openEditor(row){
  edit=row?{...row}:null;draftId=row?.id||crypto.randomUUID();queue=[];form.reset();$('#cost-form-message').textContent='';$('#cost-dialog-title').textContent=row?'Editar custo':'Novo custo';$('#cost-archive').hidden=!row;
  field('category').innerHTML=Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
  field('property_id').innerHTML='<option value="">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
  for(const key of ['description','supplier','supplier_document','document_number','document_date','paid_on','notes','fiscal_note'])field(key).value=row?.[key]||'';
- field('amount').value=row?(row.amount_cents/100).toFixed(2).replace('.',','):'';field('category').value=row?.category||'cleaning';field('property_id').value=row?.property_id||'';
- field('competence').value=row?.competence.slice(0,7)||$('#cost-month').value;field('document_date').value=row?.document_date||today();field('paid_on').max=today();field('exclusion').value=row?.exclusion_cents?(row.exclusion_cents/100).toFixed(2).replace('.',','):'';field('fiscal_month').value=row?.fiscal_month?.slice(0,7)||row?.paid_on?.slice(0,7)||today().slice(0,7);
+ for(const name of ['amount','exclusion']){field(name).setCustomValidity('');field(name).removeAttribute('aria-invalid');$('#cost-'+name+'-error').hidden=true;}
+ field('amount').value=row?brl(row.amount_cents):'';field('category').value=row?.category||'cleaning';field('property_id').value=row?.property_id||'';
+ field('competence').value=row?.competence.slice(0,7)||$('#cost-month').value;field('document_date').value=row?.document_date||today();field('paid_on').max=today();field('exclusion').value=row?.exclusion_cents?brl(row.exclusion_cents):'';field('fiscal_month').value=row?.fiscal_month?.slice(0,7)||row?.paid_on?.slice(0,7)||today().slice(0,7);
  field('owner_borne').checked=!!row?.owner_borne;field('confirm_fiscal').checked=row?.fiscal_status==='confirmed';$('#cost-existing-files').innerHTML=row?filesHTML(row.id):'';bindDownloads($('#cost-existing-files'));renderQueue();classify();$('#cost-dialog').showModal();
 }
 function renderQueue(){
@@ -100,6 +122,7 @@ async function boot(){try{
  const {data:{session}}=await sb.auth.getSession();if(!session){location.href='auth.html?mode=login&return='+encodeURIComponent('custos.html');return;}
  const profile=check(await sb.from('profiles').select('role,full_name,pms_access_status').eq('id',session.user.id).single());if(profile.role!=='admin'||profile.pms_access_status!=='active'){$('#cost-loading').textContent='Custos e comprovantes são restritos à administração.';return;}
  $('#cost-user').textContent=profile.full_name||session.user.email;$('#cost-month').value=today().slice(0,7);$('#cost-tax-source').href=TAX_SOURCE;
+ bindMoneyInput('amount');bindMoneyInput('exclusion');
  for(const id of ['cost-month','cost-property','cost-basis'])$('#'+id).onchange=()=>{if($('#cost-month').validity.valid&&$('#cost-month').value)render();};
  $('#cost-new').onclick=()=>openEditor();$('#cost-refresh').onclick=load;$('#cost-csv').onclick=()=>exportMonth(false);$('#cost-zip').onclick=()=>exportMonth(true);$('#cost-close').onclick=()=>$('#cost-dialog').close();$('#cost-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();});field('category').onchange=classify;field('confirm_fiscal').onchange=classify;
  field('paid_on').onchange=()=>{if(!field('fiscal_month').value)field('fiscal_month').value=field('paid_on').value.slice(0,7);};

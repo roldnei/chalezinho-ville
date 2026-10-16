@@ -6,7 +6,8 @@ import {cents,selection,totals,reportCSV,zipBlob} from '../costs-model.js';
 
 test('BRL parsing uses cents and rejects ambiguous, negative or excess values',()=>{
  assert.equal(cents('1.234,56'),123456);assert.equal(cents('0,01'),1);assert.equal(cents('130'),13000);
- for(const value of ['-10','0','1.23','1,234','NaN','10000001'])assert.throws(()=>cents(value));
+ assert.equal(cents('R$ 1.234,56'),123456);assert.equal(cents('130.50'),13050);assert.equal(cents('130,5'),13050);
+ for(const value of ['-10','0','1,234','130.5678','NaN','12a','10000001'])assert.throws(()=>cents(value));
 });
 test('competence, payment and fiscal months remain independent and archived costs never count',()=>{
  const rows=[{id:'a',property_id:1,amount_cents:10000,competence:'2026-09-01',paid_on:'2026-10-02',fiscal_month:null,fiscal_status:'operational',exclusion_cents:0},{id:'b',property_id:2,amount_cents:20000,competence:'2026-10-01',paid_on:'2026-11-02',fiscal_month:'2026-11-01',fiscal_status:'confirmed',exclusion_cents:15000},{id:'c',property_id:null,amount_cents:30000,competence:'2026-10-01',fiscal_status:'review',exclusion_cents:0},{id:'d',amount_cents:999999,competence:'2026-10-01',archived_at:'2026-10-01'}];
