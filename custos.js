@@ -6,8 +6,9 @@ const brl=n=>(Number(n)/100).toLocaleString('pt-BR',{style:'currency',currency:'
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const date=d=>d?d.split('-').reverse().join('/'):'Não pago';
 let entries=[],receipts=[],properties=[],edit=null,queue=[],busy=false,loadVersion=0,draftId=null;
-let receiptController=null,receiptRun=0,receiptBusy=false,receiptActive=null,receiptReview=false,applyingReceipt=false;
+let receiptController=null,receiptRun=0,receiptBusy=false,receiptActive=null,receiptSource=null,receiptReview=false,applyingReceipt=false;
 const touchedFields=new Set(),receiptDefaults=new Map(),receiptAuto=new Map();
+const receiptFields=['supplier','supplier_document','document_date','competence','document_number','amount','category','description'];
 const form=$('#cost-form'),field=n=>form.elements.namedItem(n);
 const check=result=>{if(result.error)throw result.error;return result.data};
 function bindMoneyInput(name){
@@ -31,20 +32,28 @@ function bindMoneyInput(name){
 }
 function message(text){$('#cost-status').textContent=text;}
 function cancelReceiptRead(){receiptRun++;receiptController?.abort();receiptController=null;receiptBusy=false;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}
+function clearPreviousReceipt(){
+ // A different attachment supplies a new document, including fields it cannot
+ // read. Corrections made to the preceding document must not leak into it.
+ const names=edit?[...receiptAuto.keys()]:receiptFields;
+ for(const name of names){const input=field(name);input.value='';input.classList.remove('cost-ocr-filled');touchedFields.delete(name);receiptDefaults.set(name,'');}
+ receiptAuto.clear();receiptReview=false;field('receipt_reviewed').checked=false;field('receipt_reviewed').required=false;$('#cost-receipt-review').hidden=true;
+ field('amount').setCustomValidity('');field('amount').removeAttribute('aria-invalid');$('#cost-amount-error').hidden=true;$('#cost-form-message').textContent='';classify();
+}
 function applyReceiptResult(result){
  const values={...result.fields};if(values.amount_cents)values.amount=brl(values.amount_cents);delete values.amount_cents;
  let filled=0;applyingReceipt=true;
- try{for(const name of ['supplier','supplier_document','document_date','competence','document_number','amount','category','description']){
+ try{for(const name of receiptFields){
   const input=field(name),value=values[name];if(!value||touchedFields.has(name)||(input.value!==''&&!(receiptAuto.has(name)&&receiptAuto.get(name)===input.value)&&!(!edit&&receiptDefaults.get(name)===input.value)))continue;
   input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));if(name==='category')input.dispatchEvent(new Event('change',{bubbles:true}));receiptAuto.set(name,input.value);input.classList.add('cost-ocr-filled');filled++;
  }}finally{applyingReceipt=false;}
  if(filled){receiptReview=true;field('receipt_reviewed').checked=false;field('receipt_reviewed').required=true;$('#cost-receipt-review').hidden=false;}
- $('#cost-receipt-status').textContent=filled?`${filled} campo(s) preenchido(s). Confira antes de salvar.`:'Leitura concluída. Os campos já preenchidos foram mantidos.';
+ $('#cost-receipt-status').textContent=filled?`${filled} campo(s) preenchido(s). Confira antes de salvar.`:'Leitura concluída. Confira os campos e complete os dados pendentes.';
  $('#cost-receipt-warnings').replaceChildren(...result.warnings.map(text=>{const li=document.createElement('li');li.textContent=text;return li;}));
  $('#cost-receipt-text').textContent=String(result.text||'').slice(0,30000);
 }
 async function startReceiptRead(item){
- if(busy)return;cancelReceiptRead();const run=receiptRun,controller=new AbortController();receiptController=controller;const deadline=setTimeout(()=>controller.abort(),90000);receiptBusy=true;receiptActive=item.id;
+ if(busy)return;cancelReceiptRead();if(receiptSource!==null&&receiptSource!==item.id)clearPreviousReceipt();receiptSource=item.id;const run=receiptRun,controller=new AbortController();receiptController=controller;const deadline=setTimeout(()=>controller.abort(),90000);receiptBusy=true;receiptActive=item.id;
  $('#cost-receipt-panel').hidden=false;$('#cost-receipt-source').textContent=item.file.name;$('#cost-receipt-status').textContent='Lendo comprovante…';$('#cost-receipt-progress').hidden=false;$('#cost-receipt-cancel').hidden=false;$('#cost-receipt-warnings').replaceChildren();$('#cost-receipt-text').textContent='';$('#cost-save').disabled=true;$('#cost-archive').disabled=true;
  try{const result=item.readResult||await readReceipt(item.file,{signal:controller.signal,onProgress:text=>{if(run===receiptRun)$('#cost-receipt-status').textContent=text;}});if(run!==receiptRun||!$('#cost-dialog').open)return;item.readResult=result;applyReceiptResult(result);}
  catch(error){if(run!==receiptRun)return;$('#cost-receipt-status').textContent=error.name==='AbortError'?'Leitura cancelada. Você pode preencher os campos.':error.message||'Não foi possível ler a nota. Preencha os campos ou tente outra foto.';}
@@ -81,7 +90,7 @@ function classify(){
  if(!field('confirm_fiscal').checked){field('exclusion').setCustomValidity('');field('exclusion').removeAttribute('aria-invalid');$('#cost-exclusion-error').hidden=true;}
 }
 function openEditor(row){
- cancelReceiptRead();receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
+ cancelReceiptRead();receiptSource=null;receiptReview=false;touchedFields.clear();receiptDefaults.clear();receiptAuto.clear();field('receipt_reviewed').required=false;$('#cost-receipt-panel').hidden=true;$('#cost-receipt-review').hidden=true;form.querySelectorAll('.cost-ocr-filled').forEach(input=>input.classList.remove('cost-ocr-filled'));
  edit=row?{...row}:null;draftId=row?.id||crypto.randomUUID();queue=[];form.reset();$('#cost-form-message').textContent='';$('#cost-dialog-title').textContent=row?'Editar custo':'Novo custo';$('#cost-archive').hidden=!row;
  field('category').innerHTML='<option value="">Selecione a categoria</option>'+Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
  field('property_id').innerHTML='<option value="">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
