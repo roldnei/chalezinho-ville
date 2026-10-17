@@ -1,4 +1,4 @@
-import {validCalendarDate} from './calendars.ts';
+import {validCalendarDate,calendarEventKind} from './calendars.ts';
 
 // Occupancy and an operational stay are different assertions. Never infer a
 // booking from a closed date, a name, or STATUS:CONFIRMED on a generic feed.
@@ -19,8 +19,7 @@ export function parseOperationalCalendar(raw:string,provider:string){
   // Timestamp/TZID feeds require human review of their intended lodging dates.
   const dates=!!start&&!!end&&validCalendarDate(start)&&validCalendarDate(end)&&end>start;
   const summary=read('SUMMARY').slice(0,500),cancelled=read('STATUS')==='CANCELLED';
-  const reserved=['airbnb','booking'].includes(provider)&&/^(reserved|reservation|reservado)$/i.test(summary);
-  const closed=/^(airbnb \(not available\)|closed - not available|not available|blocked|unavailable)$/i.test(summary);
+  const classification=calendarEventKind(summary,provider),reserved=classification==='stay',closed=classification==='block';
   return [{uid,start:dates?start:null,end:dates?end:null,summary,kind:dates&&reserved?'stay':closed?'block':'ambiguous',cancelled,sequence:Number(read('SEQUENCE'))||0,reason:!dates?'dates_need_review':reserved?'provider_reserved':closed?'unavailability_only':'insufficient_booking_evidence'}];
  });
 }

@@ -1,12 +1,25 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {parseOperationalCalendar,operationSummary} from '../supabase/functions/_shared/operational-calendar.ts';
+import {parseCalendar,resolveCalendarPeriod} from '../supabase/functions/_shared/calendars.ts';
 const ical=(lines)=>'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:qa-calendar\r\nDTSTART;VALUE=DATE:20261009\r\nDTEND;VALUE=DATE:20261012\r\n'+lines+'\r\nEND:VEVENT\r\nEND:VCALENDAR';
 test('provider evidence, not occupancy, classifies Airbnb/Booking stays',()=>{
  for(const provider of ['airbnb','booking'])assert.equal(parseOperationalCalendar(ical('SUMMARY:Reserved'),provider)[0].kind,'stay');
  assert.equal(parseOperationalCalendar(ical('SUMMARY:Reserved'),'ical')[0].kind,'ambiguous');
  assert.equal(parseOperationalCalendar(ical('SUMMARY:Closed - Not Available'),'booking')[0].kind,'block');
  assert.equal(parseOperationalCalendar(ical('SUMMARY:Someone\r\nSTATUS:CONFIRMED'),'booking')[0].kind,'ambiguous');
+});
+test('all current and future connection types share the same block and review rules',()=>{
+ for(const provider of ['airbnb','booking','ical','future-provider']){
+  for(const summary of ['Blocked','CLOSED - Not available','Airbnb (Not available)']){
+   const feed=ical('SUMMARY:'+summary+'\r\nSTATUS:CONFIRMED');
+   assert.equal(parseCalendar(feed,provider)[0].event_kind,'block');assert.equal(parseOperationalCalendar(feed,provider)[0].kind,'block');
+  }
+  const unknown=ical('SUMMARY:Calendar event\r\nSTATUS:CONFIRMED');assert.equal(parseCalendar(unknown,provider)[0].event_kind,'ambiguous');assert.equal(parseOperationalCalendar(unknown,provider)[0].kind,'ambiguous');
+  const period={source:provider,calendar_id:'source',event_uid:'uid',property_id:1,start:'2099-10-01',end:'2099-10-03',event_kind:'block'};
+  const evidence={source_id:'source',uid:'uid',start_date:period.start,end_date:period.end,kind:'stay',stay_id:'confirmed',classification_at:'2026-10-17T22:00:00Z'};
+  assert.equal(resolveCalendarPeriod(period,[evidence],[{id:'confirmed',status:'confirmed',property_id:1,check_in:period.start,check_out:period.end}]).event_kind,'stay');
+ }
 });
 test('timestamp, invalid dates, malformed and recurring feeds never invent stays',()=>{
  assert.equal(parseOperationalCalendar(ical('SUMMARY:Reserved').replace('20261009','20261009T150000Z'),'airbnb')[0].kind,'ambiguous');
