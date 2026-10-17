@@ -44,11 +44,13 @@ test('configuration reads all sources beyond the API cap',async()=>{
  assert.equal((await calendarService(db,'https://example.test').configuration()).sources.length,1201);
 });
 
-test('Booking midnight blocks reject previous-night stays but allow checkout before and arrival after block',()=>{
- const block={start:'2026-10-12',end:'2026-10-13'};
- assert.equal(bookingStayOverlap('2026-10-11','2026-10-12',block),true);
- assert.equal(bookingStayOverlap('2026-10-10','2026-10-11',block),false);
- assert.equal(bookingStayOverlap('2026-10-13','2026-10-14',block),false);
- assert.equal(bookingStayOverlap('2026-10-12','2026-10-13',block),true);
- assert.equal(bookingStayOverlap('2026-10-11','2026-10-12',block,{check_out_time:'00:00'}),false);
+test('Booking 18-20 October allows adjacent stays and rejects occupied nights',()=>{
+ const block={source:'booking',start:'2026-10-18',end:'2026-10-20'};
+ assert.equal(bookingStayOverlap('2026-10-17','2026-10-18',block),false);
+ assert.equal(bookingStayOverlap('2026-10-20','2026-10-21',block),false);
+ for(const [start,end] of [['2026-10-18','2026-10-19'],['2026-10-19','2026-10-20'],['2026-10-17','2026-10-19'],['2026-10-19','2026-10-21']])assert.equal(bookingStayOverlap(start,end,block),true);
+ assert.equal(bookingStayOverlap('2026-10-17','2026-10-18',block,{},1),true);
+ assert.equal(bookingStayOverlap('2026-10-20','2026-10-21',block,{},1),true);
+ assert.equal(bookingStayOverlap('2026-10-17','2026-10-18',block,{check_in_time:'10:00',check_out_time:'11:00'}),true);
+ assert.equal(bookingStayOverlap('2026-10-17','2026-10-18',{...block,source:'ical'}),true);
 });

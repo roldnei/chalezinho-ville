@@ -212,7 +212,7 @@ function calendarInterval(e,p){
  const operational=e.source==='operational',wholeDay=operational,startTime=wholeDay?'00:00':String(p.check_in_time||'15:00').slice(0,5),endTime=wholeDay?'00:00':String(p.check_out_time||'11:00').slice(0,5);
  const point=(day,time)=>Date.parse(day.slice(0,10)+'T00:00:00Z')+(Number(time.slice(0,2))*60+Number(time.slice(3,5)))*60000;
  const rawStart=(e.start||e.check_in).slice(0,10),endDate=(e.end||e.check_out).slice(0,10);
- const startDate=e.source==='booking'?new Date(Date.parse(rawStart+'T00:00:00Z')-86400000).toISOString().slice(0,10):rawStart;
+ const startDate=rawStart;
  return {start:point(startDate,startTime),end:point(endDate,endTime),startDate,endDate,startTime,endTime,external:!['direct','manual','operational'].includes(e.source||'direct'),operational};
 }
 function calendarColumn(p,b,direct,external){

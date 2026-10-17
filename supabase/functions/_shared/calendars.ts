@@ -1,6 +1,6 @@
 import {lookup} from 'node:dns/promises';
 import {isIP} from 'node:net';
-export type CalendarPeriod={start:string;end:string};
+export type CalendarPeriod={start:string;end:string;source?:string};
 export function publicCalendarIp(ip:string){
  if(isIP(ip)===4){const [a,b,c]=ip.split('.').map(Number);return !(a===0||a===10||a===127||a>=224||a===100&&b>=64&&b<=127||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&(b===168||b===0||b===2)||a===198&&(b===18||b===19||b===51&&c===100)||a===203&&b===0&&c===113)}
  if(isIP(ip)===6){const parts=ip.toLowerCase().split(':'),first=parseInt(parts[0],16),second=parseInt(parts[1]||'0',16);return first>=0x2000&&first<=0x3fff&&!(first===0x2001&&(second<0x200||second===0xdb8))&&first!==0x2002}
@@ -155,10 +155,14 @@ export function calendarService(admin:any,projectUrl:string){
  return {channels,configuration,exportFeed};
 }
 
-// Booking iCal blocks are midnight-to-midnight; compare actual stay hours.
+// Booking dates are arrival/departure dates; apply the property's stay hours.
+// Generic iCal sources remain whole-day unavailability, not assumed reservations.
 export function bookingStayOverlap(start:string,end:string,block:CalendarPeriod,property:any={},preparationDays=0){
  const point=(day:string,time:string)=>Date.parse(day+'T00:00:00Z')+(Number(time.slice(0,2))*60+Number(time.slice(3,5)))*60000;
  const arrival=point(start,property.check_in_time||'15:00'),departure=point(end,property.check_out_time||'11:00');
  const padding=Math.max(0,Number(preparationDays)||0)*86400000;
- return arrival<Date.parse(block.end+'T00:00:00Z')+padding&&departure>Date.parse(block.start+'T00:00:00Z')-padding;
+ const wholeDay=block.source&&block.source!=='booking';
+ const occupiedStart=wholeDay?Date.parse(block.start+'T00:00:00Z'):point(block.start,property.check_in_time||'15:00');
+ const occupiedEnd=wholeDay?Date.parse(block.end+'T00:00:00Z'):point(block.end,property.check_out_time||'11:00');
+ return arrival<occupiedEnd+padding&&departure>occupiedStart-padding;
 }

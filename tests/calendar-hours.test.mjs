@@ -28,4 +28,4 @@ test('operational blocks remain whole days and actual overlaps use separate lane
  const html=scope.calendarRow(p,bounds,[],[event,{...event,source:'airbnb'}]);assert.match(html,/top:52px/);
 });
 
-test('Booking display covers the protected previous night and keeps source dates intact',()=>{const t=scope.calendarInterval({source:'booking',start:'2026-10-12',end:'2026-10-13'},p);assert.equal(t.startTime,'15:00');assert.equal(t.endTime,'11:00');assert.equal(t.startDate,'2026-10-11');assert.equal(t.endDate,'2026-10-13');assert.equal((t.end-t.start)/3600000,44);});
+test('Booking display preserves arrival date and property check-in/out hours',()=>{const t=scope.calendarInterval({source:'booking',start:'2026-10-18',end:'2026-10-20'},p);assert.equal(t.startTime,'15:00');assert.equal(t.endTime,'11:00');assert.equal(t.startDate,'2026-10-18');assert.equal(t.endDate,'2026-10-20');assert.equal((t.end-t.start)/3600000,44);});

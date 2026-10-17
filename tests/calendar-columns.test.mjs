@@ -39,6 +39,14 @@ test('overlapping stays occupy separate lanes; same-day turnover shares a lane',
  buttons=render([event,{...event,id:'b',start:'2026-10-18',end:'2026-10-19'}]).querySelectorAll('button');
  assert.equal(buttons[0].style.left,buttons[1].style.left);
 });
+test('Booking arrival on 18 October follows Airbnb departure with no phantom overlap',()=>{
+ const doc=render([event,{...event,id:'booking',source:'booking',start:'2026-10-18',end:'2026-10-20'}]);
+ const [airbnb,booking]=doc.querySelectorAll('button');
+ assert.equal(booking.querySelector('.calendar-column-range').textContent,'18/10 → 20/10');
+ assert.equal(parseFloat(booking.style.top),68*(2+15/24));
+ assert.equal(booking.style.left,airbnb.style.left);
+ assert.match(booking.getAttribute('aria-label'),/2026-10-18 15:00.*2026-10-20 11:00/);
+});
 test('vertical calendar clips dates, omits other properties, and escapes guest labels',()=>{
  const doc=render([{...event,start:'2026-10-15',guest_name:'<img src=x>'},{...event,id:'other',property_id:2}]);
  assert.equal(doc.querySelectorAll('button').length,1);
