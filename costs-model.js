@@ -38,3 +38,10 @@ export async function zipBlob(files){
  }
  const size=directory.reduce((n,b)=>n+b.length,0),end=new Uint8Array(22),v=new DataView(end.buffer);v.setUint32(0,0x06054b50,true);v.setUint16(8,files.length,true);v.setUint16(10,files.length,true);v.setUint32(12,size,true);v.setUint32(16,offset,true);return new Blob([...parts,...directory,end],{type:'application/zip'});
 }
+
+// Match the database invoice identity; formatting and leading zeros are irrelevant.
+export function invoiceKey(entry){
+ const clean=v=>String(v??'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+ const number=clean(entry.document_number);return number?clean(entry.supplier_document)+':'+(number.replace(/^0+/,'')||'0'):null;
+}
+export const DUPLICATE_INVOICE_MESSAGE='Esta nota já está cadastrada para este CPF/CNPJ, inclusive se estiver arquivada. Confira o lançamento existente e o número da nota.';

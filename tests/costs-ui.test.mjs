@@ -130,3 +130,16 @@ test('validated partial fields remain available if OCR later fails, and late par
  addReceipt(s,'segunda.jpg');assert.equal(s.field('supplier_document').value,'');first.onPartialResult(recognized);assert.equal(s.field('supplier_document').value,'');calls.get('segunda.jpg').resolve({fields:{},warnings:[],text:''});await pause();assert.equal(s.field('document_date').value,'');
  }finally{s.dom.window.close();}
 });
+test('duplicate invoice blocks before attachment upload across months and allows editing the original',async()=>{
+ const s=await setup({reader:async()=>recognized}),{$,field,w,data,files}=s;
+ const submit=async()=>{$('#cost-form').dispatchEvent(new w.Event('submit',{cancelable:true}));await pause();await pause();};
+ try{
+ $('#cost-new').click();addReceipt(s);await pause();field('receipt_reviewed').checked=true;await submit();
+ assert.equal(data.cost_entries.length,1);assert.equal(files.size,1);
+ $('#cost-month').value='2026-09';$('#cost-month').dispatchEvent(new w.Event('change'));
+ $('[data-edit]').click();field('description').value='Nota conferida';await submit();assert.equal(data.cost_entries[0].description,'Nota conferida');
+ $('#cost-new').click();addReceipt(s,'duplicada.jpg');await pause();field('receipt_reviewed').checked=true;field('document_number').value='123';field('supplier_document').value='11222333000181';field('competence').value='2026-10';field('property_id').value='2';await submit();
+ assert.equal(data.cost_entries.length,1);assert.equal(files.size,1);assert.equal($('#cost-dialog').open,true);assert.match($('#cost-form-message').textContent,/já está cadastrada/);
+ field('supplier_document').value='27.612.818/0001-11';await submit();assert.equal(data.cost_entries.length,2);assert.equal(files.size,2);
+ }finally{s.dom.window.close();}
+});

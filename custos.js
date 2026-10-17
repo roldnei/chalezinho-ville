@@ -1,7 +1,7 @@
 import {createReceiptViewer} from './cost-receipt-viewer.js';
 import {createCostAnalytics} from './costs-analytics.js';
 import {reviewExample} from './cost-receipt-regions.js';
-import {CATEGORIES,TAX_SOURCE,cents,monthStart,selection,totals,reportCSV,safeName,zipBlob} from './costs-model.js';
+import {invoiceKey,DUPLICATE_INVOICE_MESSAGE,CATEGORIES,TAX_SOURCE,cents,monthStart,selection,totals,reportCSV,safeName,zipBlob} from './costs-model.js';
 import {readReceipt} from './cost-receipt-ocr.js';
 const $=s=>document.querySelector(s),C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -143,6 +143,8 @@ function payload(){
  return p;
 }
 async function writeEntry(p){
+ const key=invoiceKey(p);
+ if(key&&key!==invoiceKey(edit||{})&&entries.some(e=>e.id!==edit?.id&&invoiceKey(e)===key))throw Error('cost_invoice_duplicate');
  if(edit){const rows=check(await sb.from('cost_entries').update(p).eq('id',edit.id).eq('updated_at',edit.updated_at).select());if(rows.length!==1)throw Error('Este custo foi alterado em outra tela. Feche e atualize antes de editar.');edit=rows[0];}
  else{const saved=check(await sb.from('cost_entries').upsert({...p,id:draftId},{onConflict:'id',ignoreDuplicates:true}).select());edit=saved?.[0]||check(await sb.from('cost_entries').select('*').eq('id',draftId).single());if(!saved?.length)await writeEntry(p);}
 }
@@ -170,7 +172,7 @@ async function save(event){event.preventDefault();if(busy||receiptBusy)return;le
  // Always keep the entry pending until every selected receipt has been stored.
  await writeEntry({...p,fiscal_status:CATEGORIES[p.category][1]?'review':'operational',fiscal_month:null,exclusion_cents:0});await uploadQueue();await saveReceiptReview(p);if(finalFiscal.fiscal_status==='confirmed')await writeEntry(finalFiscal);
  viewer.clear();$('#cost-dialog').close();await load();message('Custo salvo com os comprovantes.');
- }catch(e){$('#cost-form-message').textContent=(edit?'O lançamento está salvo; confira os anexos e tente salvar novamente. ':'Não foi possível salvar. ')+(e.message?.includes('alterado em outra')?e.message:'Verifique a conexão e os campos informados.');}
+ }catch(e){if(e.message?.includes('cost_invoice_duplicate')){$('#cost-form-message').textContent=DUPLICATE_INVOICE_MESSAGE;field('document_number').focus();}else $('#cost-form-message').textContent=(edit?'O lançamento está salvo; confira os anexos e tente salvar novamente. ':'Não foi possível salvar. ')+(e.message?.includes('alterado em outra')?e.message:'Verifique a conexão e os campos informados.');}
  finally{busy=false;setBusy(false);}
 }
 function setBusy(value){form.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=value);$('#cost-close').disabled=value;}
