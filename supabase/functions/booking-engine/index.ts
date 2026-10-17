@@ -1275,7 +1275,7 @@ async function adminHubData(req:Request,body:any){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:calendarPeriodKey("airbnb",p.id,period),property_id:p.id,source:"airbnb",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:calendarPeriodKey("airbnb",p.id,period),property_id:p.id,source:"airbnb",event_kind:period.event_kind,calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
   for(const listing of booking?.listings||[]){
     const p=propertyByName.get(String(listing.name));

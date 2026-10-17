@@ -102,5 +102,8 @@
 .calendar-columns-panel .calendar-column-event.compact{gap:2px}
 .calendar-column-event.compact strong{-webkit-line-clamp:1;flex-shrink:0}
 .calendar-column-event.compact .calendar-column-channel{display:none}
+.calendar-columns-panel .calendar-column-event.availability-block{background:repeating-linear-gradient(135deg,#39332d,#39332d 8px,#463e35 8px,#463e35 10px)!important;border:1px dashed #a28d75;color:#e4d8c8}
+.calendar-columns-panel .calendar-column-event.availability-block strong{font-size:11px;-webkit-line-clamp:2}
+.calendar-legend .availability-block:before{background:#756650}
 
 .calendar-columns-panel #calendar-previous-days{display:block;background:none;border:0;box-shadow:none;color:#d6b48c;font:400 12px/1.4 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;text-decoration:underline;padding:10px 0;min-height:44px}

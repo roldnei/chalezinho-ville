@@ -47,6 +47,19 @@ test('Booking arrival on 18 October follows Airbnb departure with no phantom ove
  assert.equal(booking.style.left,airbnb.style.left);
  assert.match(booking.getAttribute('aria-label'),/2026-10-18 15:00.*2026-10-20 11:00/);
 });
+test('Airbnb availability block occupies only its date and never displays arrival or checkout',()=>{
+ const doc=render([{...event,start:'2026-10-17',end:'2026-10-18',event_kind:'block',guest_name:'Stale contact'}]);
+ const button=doc.querySelector('button');
+ assert.equal(parseFloat(button.style.top),68);assert.equal(parseFloat(button.style.height),68);
+ assert.ok(button.classList.contains('availability-block'));
+ assert.equal(button.querySelector('strong').textContent,'Bloqueio Airbnb');
+ assert.equal(button.querySelector('.calendar-column-range').textContent,'17/10');
+ assert.match(button.getAttribute('aria-label'),/Sem hospedagem/);
+ assert.doesNotMatch(button.getAttribute('aria-label'),/15:00|11:00|18\/10|Stale contact/);
+ const stay=render([{...event,event_kind:'stay'}]).querySelector('button');
+ assert.equal(stay.classList.contains('availability-block'),false);
+ assert.match(stay.getAttribute('aria-label'),/15:00.*11:00/);
+});
 test('vertical calendar clips dates, omits other properties, and escapes guest labels',()=>{
  const doc=render([{...event,start:'2026-10-15',guest_name:'<img src=x>'},{...event,id:'other',property_id:2}]);
  assert.equal(doc.querySelectorAll('button').length,1);

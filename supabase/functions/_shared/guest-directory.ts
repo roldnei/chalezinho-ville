@@ -33,7 +33,7 @@ export async function guestDirectory(db:any,body:any,actor:string,getExternal:()
    const r=checked(await db.from('reservations').select('id,property_id,source,check_in,check_out').eq('id',body.reservation_id).maybeSingle());
    if(!r)throw Error('stay_not_found');stay={stay_key:'reservation:'+r.id,reservation_id:r.id,property_id:r.property_id,source:r.source,check_in:r.check_in,check_out:r.check_out};
   }else{
-   const matches=(await getExternal()).filter(e=>e.id===body.stay_key&&e.status!=='integration_error');
+   const matches=(await getExternal()).filter(e=>e.id===body.stay_key&&e.status!=='integration_error'&&!(e.source==='airbnb'&&e.event_kind==='block'));
    if(matches.length!==1)throw Error('stay_not_found');
    const e=matches[0];stay={stay_key:e.id,reservation_id:null,property_id:e.property_id,source:e.source,check_in:e.start,check_out:e.end};
   }

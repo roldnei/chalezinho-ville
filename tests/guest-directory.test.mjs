@@ -34,18 +34,23 @@ test('does not trust invented, duplicate, failed external periods or steal anoth
  db.data.guest_stay_links.push({stay_key:ext[0].id,guest_id:rid});
  await assert.rejects(()=>guestDirectory(db,{operation:'link',guest_id:gid,stay_key:ext[0].id},gid,async()=>ext),/stay_already_linked/);
 });
+test('Airbnb availability blocks cannot become guest stays through the API',async()=>{
+ const db=memoryDB();db.data.guest_contacts.push({id:gid,name:'QA'});
+ await assert.rejects(()=>guestDirectory(db,{operation:'link',guest_id:gid,stay_key:ext[0].id},gid,async()=>[{...ext[0],event_kind:'block'}]),/stay_not_found/);
+ assert.equal(db.data.guest_stay_links.length,0);
+});
 test('reads all pages beyond default API row cap and fails loudly on DB error',async()=>{
  const db=memoryDB();db.data.guest_contacts=Array.from({length:1100},(_,i)=>({id:String(i),name:'QA'}));
  assert.equal((await guestDirectory(db,{},gid,async()=>[])).contacts.length,1100);
  const broken={from(){return {select(){return this},order(){return this},range:async()=>({error:{code:'permission_denied'}})}}};
  await assert.rejects(()=>guestDirectory(broken,{},gid,async()=>[]),/unavailable/);
 });
-async function setup({fail=false}={}){
+async function setup({fail=false,external=ext}={}){
  const dom=new JSDOM(readFileSync(new URL('../admin.html',import.meta.url),'utf8'),{url:'https://preview.example/admin.html?view=guests',runScripts:'outside-only'}),w=dom.window,db=memoryDB();
  w.CHALEZINHO_CONFIG={bookingEngine:'https://dev.example/engine'};
  w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'fixture',user:{id:gid}}}})},from:()=>({select(){return this},eq(){return this},single:async()=>({data:{role:'admin',full_name:'QA'}})})})};
- const hub={ok:true,reservations:db.data.reservations,notifications:[],properties:[{id:1,name:'QA1',active:true},{id:3,name:'QA3',active:true}],channel_periods:ext,experience_orders:[],payments:[],guarantees:[],modifications:[],charges:[],notes:[]};
- w.fetch=async(_,o)=>{const b=JSON.parse(o.body);let d={ok:true};try{if(b.action==='admin_hub')d=structuredClone(hub);if(b.action==='admin_guests'){if(fail)throw Error('unavailable');d=await guestDirectory(db,b,gid,async()=>ext);}}catch(e){d={ok:false,error:e.message}}return {ok:d.ok,json:async()=>d}};
+ const hub={ok:true,reservations:db.data.reservations,notifications:[],properties:[{id:1,name:'QA1',active:true},{id:3,name:'QA3',active:true}],channel_periods:external,experience_orders:[],payments:[],guarantees:[],modifications:[],charges:[],notes:[]};
+ w.fetch=async(_,o)=>{const b=JSON.parse(o.body);let d={ok:true};try{if(b.action==='admin_hub')d=structuredClone(hub);if(b.action==='admin_guests'){if(fail)throw Error('unavailable');d=await guestDirectory(db,b,gid,async()=>external);}}catch(e){d={ok:false,error:e.message}}return {ok:d.ok,json:async()=>d}};
  w.eval(readFileSync(new URL('../admin.js',import.meta.url),'utf8'));
  const wait=async predicate=>{for(let i=0;i<100;i++){if(predicate())return;await new Promise(r=>setTimeout(r,3))}assert.fail('UI did not settle')};
  await wait(()=>w.document.querySelector('#new-guest'));return {w,db,dom,wait};
@@ -59,8 +64,18 @@ test('UI creates contact, links two stays, edits phone, unlinks, and escapes nam
  f=$('#guest-form');f.elements.phone.value='27999994321';submit(f);await wait(()=>$('#guest-form')!==f);
  assert.equal(db.data.guest_contacts.length,1);assert.equal(db.data.guest_stay_links.length,2);
  $('[data-close-modal]').click();$('[data-view="calendar"]').click();$('#calendar-month').value='2099-10';$('#calendar-month').dispatchEvent(new w.Event('change'));
- assert.equal(w.document.querySelectorAll('[data-guest-stay]').length,2);assert.match($('#admin-content').textContent,/5527999994321/);
-  $('[data-guest-stay]').click();assert.ok($('#event-contact'));$('#event-contact').click();const old=$('#guest-form');$('[data-unlink-stay]').click();await wait(()=>$('#guest-form')!==old);assert.equal(db.data.guest_stay_links.length,1);
+ assert.equal(w.document.querySelectorAll('[data-guest-stay]').length,1);
+  $('[data-guest-stay]').click();assert.match($('#admin-modal-content').textContent,/5527999994321/);assert.ok($('#event-contact'));$('#event-contact').click();const old=$('#guest-form');$('[data-unlink-stay]').click();await wait(()=>$('#guest-form')!==old);assert.equal(db.data.guest_stay_links.length,1);
  }finally{w.close()}
 });
 test('UI shows unavailable contact service without hiding the admin shell',async()=>{const {w}=await setup({fail:true});try{assert.match(w.document.body.textContent,/Não foi possível consultar os hóspedes/);assert.equal(w.document.querySelector('#new-guest').disabled,true)}finally{w.close()}});
+test('Airbnb block has a non-stay detail and is excluded from reservation and guest options',async()=>{
+ const {w}=await setup({external:[{...ext[0],event_kind:'block'}]});const $=s=>w.document.querySelector(s);
+ try{
+ $('[data-view="calendar"]').click();$('#calendar-month').value='2099-10';$('#calendar-month').dispatchEvent(new w.Event('change'));
+ const blocked=$('.availability-block[data-guest-stay]');assert.ok(blocked);blocked.click();
+ assert.match($('#admin-modal-content').textContent,/Sem hospedagem, check-in, checkout ou faxina/);assert.equal($('#event-contact'),null);
+ $('[data-close-modal]').click();$('[data-view="reservations"]').click();assert.equal($('[data-guest-stay]'),null);
+ $('[data-view="guests"]').click();$('#new-guest').click();assert.doesNotMatch($('#admin-modal-content').textContent,/2099-10-04/);
+ }finally{w.close()}
+});

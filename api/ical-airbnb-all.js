@@ -10,7 +10,9 @@ async function readFeed(url){
   return raw.split('BEGIN:VEVENT').slice(1).map(x=>x.split('END:VEVENT')[0]).map(e=>{
     const s=e.match(/DTSTART(?:;[^:]*)?:(\d{8})/);
     const d=e.match(/DTEND(?:;[^:]*)?:(\d{8})/);
-    return s&&d?{start:parseDate(s[1]),end:parseDate(d[1])}:null;
+    const summary=e.match(/^SUMMARY(?:;[^:]*)?:(.*)$/mi)?.[1]?.trim()||'';
+    const event_kind=/^(reserved|reservation|reservado)$/i.test(summary)?'stay':/^(airbnb \(not available\)|closed - not available|not available|blocked|unavailable)$/i.test(summary)?'block':'ambiguous';
+    return s&&d?{start:parseDate(s[1]),end:parseDate(d[1]),event_kind}:null;
   }).filter(Boolean);
 }
 async function previewFallback(){

@@ -2,6 +2,7 @@ import {test,before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {PGlite} from '@electric-sql/pglite';
 import {readFile} from 'node:fs/promises';
+import {parseOperationalCalendar} from '../supabase/functions/_shared/operational-calendar.ts';
 const db=new PGlite(),admin='10000000-0000-4000-8000-000000000001',staff='10000000-0000-4000-8000-000000000002',other='10000000-0000-4000-8000-000000000003';
 const one=async(q,p=[])=>(await db.query(q,p)).rows[0];
 const mutate=async(action,p,actor=admin)=>(await one('select ops_mutate($1,$2,$3) result',[actor,action,p])).result;
@@ -36,6 +37,15 @@ test('sync repeats idempotently, fenced claim rejects concurrency',async()=>{
 });
 test('blocks and ambiguous periods do not generate stays/tasks',async()=>{
  await sync([event('amore'),event('blocked','2027-01-01','2027-01-03','block'),event('ambiguous','2027-02-01','2027-02-03','ambiguous')]);assert.equal((await one('select count(*)::int n from ops_stays')).n,1);
+});
+test('Airbnb cutoff unavailability never creates arrival/departure cleaning after repeated sync',async()=>{
+ const raw='BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:airbnb-cutoff\r\nDTSTART;VALUE=DATE:20991017\r\nDTEND;VALUE=DATE:20991018\r\nSUMMARY:Airbnb (Not available)\r\nEND:VEVENT\r\nEND:VCALENDAR';
+ const parsed=parseOperationalCalendar(raw,'airbnb');assert.equal(parsed[0].kind,'block');
+ const before=await one('select count(*)::int n from ops_tasks');
+ await sync([event('amore'),...parsed]);await sync([event('amore'),...parsed]);
+ assert.equal((await one("select stay_id from ops_calendar_events where uid='airbnb-cutoff'")).stay_id,null);
+ assert.equal((await one("select count(*)::int n from ops_stays where external_id='airbnb-cutoff'")).n,0);
+ assert.equal((await one('select count(*)::int n from ops_tasks')).n,before.n);
 });
 test('missing event and calendar failure retain stay and tasks with divergence',async()=>{
  await sync([]);await sync([], 'calendar_unreachable');assert.equal((await one("select status from ops_stays where external_id='amore'")).status,'confirmed');assert.equal((await one("select missing_count from ops_calendar_events where uid='amore'")).missing_count,1);assert.equal((await one('select last_error from ops_sync_state')).last_error,'calendar_unreachable');

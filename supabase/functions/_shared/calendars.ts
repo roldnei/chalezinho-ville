@@ -1,6 +1,6 @@
 import {lookup} from 'node:dns/promises';
 import {isIP} from 'node:net';
-export type CalendarPeriod={start:string;end:string;source?:string};
+export type CalendarPeriod={start:string;end:string;source?:string;event_kind?:string};
 export function publicCalendarIp(ip:string){
  if(isIP(ip)===4){const [a,b,c]=ip.split('.').map(Number);return !(a===0||a===10||a===127||a>=224||a===100&&b>=64&&b<=127||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&(b===168||b===0||b===2)||a===198&&(b===18||b===19||b===51&&c===100)||a===203&&b===0&&c===113)}
  if(isIP(ip)===6){const parts=ip.toLowerCase().split(':'),first=parseInt(parts[0],16),second=parseInt(parts[1]||'0',16);return first>=0x2000&&first<=0x3fff&&!(first===0x2001&&(second<0x200||second===0xdb8))&&first!==0x2002}
@@ -61,7 +61,12 @@ export function calendarHttpResponse(raw:Uint8Array):{body:string;redirect?:stri
  if(body.length>2097152)throw Error('calendar_too_large');
  return {body:new TextDecoder().decode(body)};
 }
-export function parseCalendar(raw:string):CalendarPeriod[]{
+export function airbnbEventKind(summary:string){
+ if(/^(reserved|reservation|reservado)$/i.test(summary.trim()))return 'stay';
+ if(/^(airbnb \(not available\)|closed - not available|not available|blocked|unavailable)$/i.test(summary.trim()))return 'block';
+ return 'ambiguous';
+}
+export function parseCalendar(raw:string,provider?:string):CalendarPeriod[]{
  raw=raw.replace(/\r?\n[ \t]/g,'');
  if(!/^BEGIN:VCALENDAR\s*$/m.test(raw)||!/^END:VCALENDAR\s*$/m.test(raw))throw new Error('invalid_calendar');
  const chunks=raw.split('BEGIN:VEVENT').slice(1);
@@ -74,7 +79,8 @@ export function parseCalendar(raw:string):CalendarPeriod[]{
   const read=(key:string)=>{const m=event.match(new RegExp('^'+key+'(?:;[^:]*)?:(\\d{4})(\\d{2})(\\d{2})(?:T\\d{6}Z?)?\\s*$','m'));return m?m[1]+'-'+m[2]+'-'+m[3]:''};
   const start=read('DTSTART'),end=read('DTEND');
   if(!validCalendarDate(start)||!validCalendarDate(end)||end<=start)throw new Error('invalid_calendar_event');
-  return [{start,end}];
+  const summary=event.match(/^SUMMARY(?:;[^:]*)?:(.*)$/mi)?.[1]?.trim()||'';
+  return [{start,end,...(provider==='airbnb'?{event_kind:airbnbEventKind(summary)}:{})}];
  });
 }
 // Temporary, owner-authorized DEV fixture. Expires at midnight in Guarapari.
@@ -97,7 +103,7 @@ export async function fetchCalendarRaw(url:string,provider:string){
  return raw;
 }
 export async function fetchCalendar(url:string,provider:string,projectUrl='',sourceId=''){
- return parseCalendar(developmentApprovalCalendar(await fetchCalendarRaw(url,provider),projectUrl,sourceId));
+ return parseCalendar(developmentApprovalCalendar(await fetchCalendarRaw(url,provider),projectUrl,sourceId),provider);
 }
 export function calendarText(events:Array<CalendarPeriod&{uid:string;updated?:string}>,now=new Date()){
  const stamp=(v:string)=>new Date(v).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}Z$/,'Z');

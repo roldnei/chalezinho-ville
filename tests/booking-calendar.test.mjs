@@ -4,6 +4,13 @@ const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,c
 const wrap=body=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'+body+'END:VCALENDAR\r\n';
 const event='BEGIN:VEVENT\r\nUID:external\r\nDTSTART;VALUE=DATE:20270310\r\nDTEND;VALUE=DATE:20270312\r\nEND:VEVENT\r\n';
 test('valid empty calendar and exclusive checkout parse correctly',()=>{assert.deepEqual(parseCalendar(wrap('')),[]);assert.deepEqual(parseCalendar(wrap(event)),[{start:'2027-03-10',end:'2027-03-12'}]);});
+test('Airbnb unavailability retains blocked dates but is distinguished from a reserved stay',()=>{
+ const feed=summary=>wrap(event.replace('UID:external','UID:external\r\nSUMMARY:'+summary));
+ assert.deepEqual(parseCalendar(feed('Airbnb (Not available)'),'airbnb'),[{start:'2027-03-10',end:'2027-03-12',event_kind:'block'}]);
+ assert.equal(parseCalendar(feed('Reserved'),'airbnb')[0].event_kind,'stay');
+ assert.equal(parseCalendar(feed('Unknown'),'airbnb')[0].event_kind,'ambiguous');
+ assert.equal(parseCalendar(feed('Airbnb (Not available)'),'booking')[0].event_kind,undefined);
+});
 test('invalid pages, missing dates, impossible dates and recurrence fail closed',()=>{for(const raw of ['<html>error</html>',wrap('BEGIN:VEVENT\r\nEND:VEVENT\r\n'),wrap(event.replace('20270310','20270230')),wrap(event.replace('UID:external','RRULE:FREQ=DAILY'))])assert.throws(()=>parseCalendar(raw),/calendar/);});
 test('cancelled events and own exported events are not reimported',()=>{assert.deepEqual(parseCalendar(wrap(event.replace('UID:external','UID:reservation-123@chalezinho-site'))),[]);assert.deepEqual(parseCalendar(wrap(event.replace('UID:external','STATUS:CANCELLED'))),[]);});
 test('private network, unexpected hosts, redirects targets and credentials cannot become import URLs',()=>{for(const url of ['http://ical.booking.com/v1/export','https://127.0.0.1/v1/export','https://ical.booking.com.evil.test/v1/export','https://user:pass@ical.booking.com/v1/export','https://ical.booking.com:444/v1/export','https://ical.booking.com/v1/export#x'])assert.throws(()=>calendarUrl(url,'booking'));assert.ok(calendarUrl('https://ical.booking.com/v1/export?t=test','booking'));assert.ok(calendarUrl('https://www.airbnb.com/calendar/ical/example.ics?s=test','airbnb'));});
