@@ -14,7 +14,7 @@ import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-reques
 import {brazilClock,availabilityDefaults,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
-import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey,bookingStayOverlap} from "../_shared/calendars.ts";
+import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey,bookingStayOverlap,resolveCalendarPeriod} from "../_shared/calendars.ts";
 import {experiencePaymentEntries} from "../_shared/finance/experience-payment-entries.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
@@ -1237,7 +1237,7 @@ async function adminHubData(req:Request,body:any){
   const end=validDate(String(body?.end||""))?String(body.end):localDate(185);
   if(end<=start) return json({ok:false,error:"invalid_dates"},400);
 
-  const [propertiesQ,reservationsQ,notificationsQ,integrationsQ,settingsQ,blocksQ,airbnb,booking] = await Promise.all([
+  const [propertiesQ,reservationsQ,notificationsQ,integrationsQ,settingsQ,blocksQ,airbnb,booking,calendarEventsQ,operationalStaysQ] = await Promise.all([
     admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,active,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone,created_at,updated_at").order("id"),
     admin.from("reservations").select("id,property_id,user_id,check_in,check_out,status,source,guests,guest_name,guest_email,guest_phone,stay_amount,experience_amount,total_amount,rate_plan_code,confirmation_code,hold_expires_at,created_at,updated_at,confirmed_at,cancelled_at,not_confirmed_at,not_confirmed_reason,cancellation_actor,cancellation_reason,no_show_at,operational_status,checked_in_at,checked_out_at").lte("check_in",end).gte("check_out",start).order("created_at",{ascending:false}).limit(750),
     admin.from("admin_notifications").select("id,notification_type,severity,title,message,reservation_id,entity_type,entity_id,payload,read_at,created_at").order("created_at",{ascending:false}).limit(150),
@@ -1245,9 +1245,11 @@ async function adminHubData(req:Request,body:any){
     admin.from("payment_settings").select("*").eq("id",1).single(),
     admin.from("pms_calendar_blocks").select("*").gte("end_date",start).lte("start_date",end).order("start_date"),
     airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
-    bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]}))
+    bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]})),
+    admin.from("ops_calendar_events").select("source_id,uid,kind,stay_id,classification_at,cancelled,start_date,end_date").lte("start_date",end).gte("end_date",start),
+    admin.from("ops_stays").select("id,property_id,status,is_test,check_in,check_out,guest_name,guest_phone").lte("check_in",end).gte("check_out",start)
   ]);
-  if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error)
+  if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error||calendarEventsQ.error||operationalStaysQ.error)
     return json({ok:false,error:"admin_hub_unavailable"},500);
   let cancellationPolicies:any[];
   try { cancellationPolicies=await developmentPolicies(); }
@@ -1275,13 +1277,13 @@ async function adminHubData(req:Request,body:any){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:calendarPeriodKey("airbnb",p.id,period),property_id:p.id,source:"airbnb",event_kind:period.event_kind,calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:calendarPeriodKey("airbnb",p.id,period),property_id:p.id,source:"airbnb",event_kind:period.event_kind,event_uid:period.event_uid,calendar_id:period.calendar_id,calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
   for(const listing of booking?.listings||[]){
     const p=propertyByName.get(String(listing.name));
     if(!p) continue;
     for(const period of listing.periods||[]) if(period.start<end&&period.end>start)
-      channelPeriods.push({id:calendarPeriodKey("booking",p.id,period),property_id:p.id,source:period.source||"booking",calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
+      channelPeriods.push({id:calendarPeriodKey("booking",p.id,period),property_id:p.id,source:period.source||"booking",event_kind:period.event_kind,event_uid:period.event_uid,calendar_id:period.calendar_id,calendar_label:period.calendar_label,start:period.start,end:period.end,status:listing.ok?"blocked":"integration_error"});
   }
 
   return json({
@@ -1291,7 +1293,7 @@ async function adminHubData(req:Request,body:any){
     notifications:notificationsQ.data||[],integrations:integrationsQ.data||[],settings:settingsQ.data||{},
     cancellation_policies:cancellationPolicies,
     calendar_blocks:blocksQ.data||[],
-    channel_periods:channelPeriods,
+    channel_periods:channelPeriods.map(period=>resolveCalendarPeriod(period,calendarEventsQ.data||[],operationalStaysQ.data||[])),
     channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
   });
 }

@@ -1,6 +1,6 @@
 import {lookup} from 'node:dns/promises';
 import {isIP} from 'node:net';
-export type CalendarPeriod={start:string;end:string;source?:string;event_kind?:string};
+export type CalendarPeriod={start:string;end:string;source?:string;event_kind?:string;event_uid?:string};
 export function publicCalendarIp(ip:string){
  if(isIP(ip)===4){const [a,b,c]=ip.split('.').map(Number);return !(a===0||a===10||a===127||a>=224||a===100&&b>=64&&b<=127||a===169&&b===254||a===172&&b>=16&&b<=31||a===192&&(b===168||b===0||b===2)||a===198&&(b===18||b===19||b===51&&c===100)||a===203&&b===0&&c===113)}
  if(isIP(ip)===6){const parts=ip.toLowerCase().split(':'),first=parseInt(parts[0],16),second=parseInt(parts[1]||'0',16);return first>=0x2000&&first<=0x3fff&&!(first===0x2001&&(second<0x200||second===0xdb8))&&first!==0x2002}
@@ -61,8 +61,8 @@ export function calendarHttpResponse(raw:Uint8Array):{body:string;redirect?:stri
  if(body.length>2097152)throw Error('calendar_too_large');
  return {body:new TextDecoder().decode(body)};
 }
-export function airbnbEventKind(summary:string){
- if(/^(reserved|reservation|reservado)$/i.test(summary.trim()))return 'stay';
+export function calendarEventKind(summary:string,provider:string){
+ if(['airbnb','booking'].includes(provider)&&/^(reserved|reservation|reservado)$/i.test(summary.trim()))return 'stay';
  if(/^(airbnb \(not available\)|closed - not available|not available|blocked|unavailable)$/i.test(summary.trim()))return 'block';
  return 'ambiguous';
 }
@@ -80,8 +80,20 @@ export function parseCalendar(raw:string,provider?:string):CalendarPeriod[]{
   const start=read('DTSTART'),end=read('DTEND');
   if(!validCalendarDate(start)||!validCalendarDate(end)||end<=start)throw new Error('invalid_calendar_event');
   const summary=event.match(/^SUMMARY(?:;[^:]*)?:(.*)$/mi)?.[1]?.trim()||'';
-  return [{start,end,...(provider==='airbnb'?{event_kind:airbnbEventKind(summary)}:{})}];
+  return [{start,end,...(provider?{event_kind:calendarEventKind(summary,provider),event_uid:event.match(/^UID(?:;[^:]*)?:(.*)$/mi)?.[1]?.trim()||''}:{})}];
  });
+}
+// A provider's CLOSED period only becomes a stay with independently confirmed
+// operational evidence for the same source, UID, property and unchanged dates.
+export function resolveCalendarPeriod(period:any,events:any[],stays:any[]){
+ const review=events.find(e=>e.source_id===period.calendar_id&&e.uid===period.event_uid&&!e.cancelled&&e.start_date===period.start&&e.end_date===period.end);
+ if(review?.stay_id){
+  const stay=stays.find(s=>s.id===review.stay_id&&s.status==='confirmed'&&!s.is_test&&Number(s.property_id)===Number(period.property_id)&&s.check_in===period.start&&s.check_out===period.end);
+  if(review.kind==='stay'&&stay)return {...period,event_kind:'stay',operational_stay_id:stay.id,guest_name:stay.guest_name||period.guest_name,guest_phone:stay.guest_phone||period.guest_phone};
+  return {...period,event_kind:'ambiguous'};
+ }
+ if(review?.classification_at&&['block','maintenance'].includes(review.kind))return {...period,event_kind:'block'};
+ return {...period,event_kind:period.event_kind||'ambiguous'};
 }
 // Temporary, owner-authorized DEV fixture. Expires at midnight in Guarapari.
 export function developmentApprovalCalendar(raw:string,projectUrl:string,sourceId:string,now=new Date()){

@@ -8,7 +8,7 @@ function memoryDB(){
  const data={guest_contacts:[],guest_stay_links:[],reservations:[{id:rid,property_id:1,source:'direct',check_in:'2099-10-01',check_out:'2099-10-03'}]};
  return {data,from(table){let filters=[],mode='select',fields,range=null;const q={select(){return q},order(){return q},eq(k,v){filters.push(r=>r[k]===v);return q},range(a,b){range=[a,b];return q},insert(v){mode='insert';fields=v;return q},update(v){mode='update';fields=v;return q},delete(){mode='delete';return q},single(){q.one=true;return q},maybeSingle(){q.one=true;return q},then(resolve){let rows=data[table].filter(r=>filters.every(f=>f(r)));if(mode==='insert'){data[table].push(fields);rows=[fields]}if(mode==='update')rows.forEach(r=>Object.assign(r,fields));if(mode==='delete')data[table]=data[table].filter(r=>!rows.includes(r));if(range)rows=rows.slice(range[0],range[1]+1);return Promise.resolve({data:q.one?rows[0]||null:structuredClone(rows)}).then(resolve)}};return q}};
 }
-const ext=[{id:'airbnb:3:2099-10-04:2099-10-06',property_id:3,source:'airbnb',status:'blocked',start:'2099-10-04',end:'2099-10-06'}];
+const ext=[{id:'airbnb:3:2099-10-04:2099-10-06',property_id:3,source:'airbnb',event_kind:'stay',status:'blocked',start:'2099-10-04',end:'2099-10-06'}];
 test('normalizes Brazilian and international phones and rejects invalid input',()=>{
  assert.equal(contactInput({name:' Ana ',phone:'(27) 99999-1234'}).phone,'+5527999991234');
  assert.equal(contactInput({name:'Ana',phone:'+1 202-555-0123'}).phone,'+12025550123');
@@ -37,6 +37,11 @@ test('does not trust invented, duplicate, failed external periods or steal anoth
 test('Airbnb availability blocks cannot become guest stays through the API',async()=>{
  const db=memoryDB();db.data.guest_contacts.push({id:gid,name:'QA'});
  await assert.rejects(()=>guestDirectory(db,{operation:'link',guest_id:gid,stay_key:ext[0].id},gid,async()=>[{...ext[0],event_kind:'block'}]),/stay_not_found/);
+ assert.equal(db.data.guest_stay_links.length,0);
+});
+test('Booking closed, ambiguous and unclassified periods cannot be linked to guests',async()=>{
+ const db=memoryDB();db.data.guest_contacts.push({id:gid,name:'QA'});
+ for(const event_kind of ['block','ambiguous',undefined])await assert.rejects(()=>guestDirectory(db,{operation:'link',guest_id:gid,stay_key:ext[0].id},gid,async()=>[{...ext[0],source:'booking',event_kind}]),/stay_not_found/);
  assert.equal(db.data.guest_stay_links.length,0);
 });
 test('reads all pages beyond default API row cap and fails loudly on DB error',async()=>{
@@ -77,5 +82,16 @@ test('Airbnb block has a non-stay detail and is excluded from reservation and gu
  assert.match($('#admin-modal-content').textContent,/Sem hospedagem, check-in, checkout ou faxina/);assert.equal($('#event-contact'),null);
  $('[data-close-modal]').click();$('[data-view="reservations"]').click();assert.equal($('[data-guest-stay]'),null);
  $('[data-view="guests"]').click();$('#new-guest').click();assert.doesNotMatch($('#admin-modal-content').textContent,/2099-10-04/);
+ }finally{w.close()}
+});
+test('five March Booking closures are absent from reservations and remain calendar blocks',async()=>{
+ const closed=[['07','08'],['10','12'],['13','18'],['19','28'],['30','31']].map(([a,b],i)=>({id:'booking:1:block-'+i,property_id:1,source:'booking',event_kind:'block',status:'blocked',start:'2027-03-'+a,end:'2027-03-'+b}));
+ const real={id:'booking:1:real',property_id:1,source:'booking',event_kind:'stay',status:'blocked',start:'2026-10-18',end:'2026-10-20',guest_name:'Verified guest'};
+ const {w}=await setup({external:[...closed,real]});const $=s=>w.document.querySelector(s);
+ try{
+ $('[data-view="reservations"]').click();assert.equal(w.document.querySelectorAll('[data-guest-stay]').length,1);assert.match($('#admin-content').textContent,/Verified guest/);assert.doesNotMatch($('#admin-content').textContent,/07\/03\/2027/);
+ $('[data-view="calendar"]').click();$('#calendar-span').value='month';$('#calendar-span').dispatchEvent(new w.Event('change'));$('#calendar-month').value='2027-03';$('#calendar-month').dispatchEvent(new w.Event('change'));
+ assert.equal(w.document.querySelectorAll('.calendar-column-event.availability-block').length,5);
+ $('.calendar-column-event').click();assert.match($('#admin-modal-content').textContent,/Bloqueio Booking/);assert.equal($('#event-contact'),null);
  }finally{w.close()}
 });

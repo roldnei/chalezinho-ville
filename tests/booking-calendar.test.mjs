@@ -1,15 +1,27 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import ts from 'typescript';
 const code=ts.transpileModule(await readFile(new URL('../supabase/functions/_shared/calendars.ts',import.meta.url),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.ES2022}}).outputText;
-const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,calendarHttpResponse,calendarPeriodKey,bookingStayOverlap}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const {parseCalendar,calendarUrl,calendarText,calendarService,publicCalendarIp,calendarHttpResponse,calendarPeriodKey,bookingStayOverlap,resolveCalendarPeriod}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
 const wrap=body=>'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'+body+'END:VCALENDAR\r\n';
 const event='BEGIN:VEVENT\r\nUID:external\r\nDTSTART;VALUE=DATE:20270310\r\nDTEND;VALUE=DATE:20270312\r\nEND:VEVENT\r\n';
 test('valid empty calendar and exclusive checkout parse correctly',()=>{assert.deepEqual(parseCalendar(wrap('')),[]);assert.deepEqual(parseCalendar(wrap(event)),[{start:'2027-03-10',end:'2027-03-12'}]);});
 test('Airbnb unavailability retains blocked dates but is distinguished from a reserved stay',()=>{
  const feed=summary=>wrap(event.replace('UID:external','UID:external\r\nSUMMARY:'+summary));
- assert.deepEqual(parseCalendar(feed('Airbnb (Not available)'),'airbnb'),[{start:'2027-03-10',end:'2027-03-12',event_kind:'block'}]);
+ assert.deepEqual(parseCalendar(feed('Airbnb (Not available)'),'airbnb'),[{start:'2027-03-10',end:'2027-03-12',event_kind:'block',event_uid:'external'}]);
  assert.equal(parseCalendar(feed('Reserved'),'airbnb')[0].event_kind,'stay');
  assert.equal(parseCalendar(feed('Unknown'),'airbnb')[0].event_kind,'ambiguous');
- assert.equal(parseCalendar(feed('Airbnb (Not available)'),'booking')[0].event_kind,undefined);
+ assert.equal(parseCalendar(feed('CLOSED - Not available'),'booking')[0].event_kind,'block');
+ assert.equal(parseCalendar(feed('Reserved'),'booking')[0].event_kind,'stay');
+ assert.equal(parseCalendar(feed('Reserved'),'ical')[0].event_kind,'ambiguous');
+});
+test('Booking CLOSED periods need matching independently confirmed evidence to become stays',()=>{
+ const period={property_id:1,calendar_id:'source',event_uid:'uid',source:'booking',start:'2026-10-18',end:'2026-10-20',event_kind:'block'};
+ const reviewed={source_id:'source',uid:'uid',start_date:period.start,end_date:period.end,kind:'stay',stay_id:'real',classification_at:'2026-10-17T22:00:00Z'};
+ const stay={id:'real',property_id:1,status:'confirmed',check_in:period.start,check_out:period.end,guest_name:'Verified guest'};
+ assert.equal(resolveCalendarPeriod(period,[],[]).event_kind,'block');
+ assert.equal(resolveCalendarPeriod(period,[reviewed],[stay]).event_kind,'stay');
+ for(const wrong of [{...reviewed,source_id:'other'},{...reviewed,uid:'other'},{...reviewed,start_date:'2026-10-17'}])assert.equal(resolveCalendarPeriod(period,[wrong],[stay]).event_kind,'block');
+ for(const wrong of [{...stay,status:'cancelled'},{...stay,is_test:true},{...stay,property_id:2},{...stay,check_out:'2026-10-21'}])assert.equal(resolveCalendarPeriod(period,[reviewed],[wrong]).event_kind,'ambiguous');
+ assert.equal(resolveCalendarPeriod({...period,event_kind:undefined},[],[]).event_kind,'ambiguous');
 });
 test('invalid pages, missing dates, impossible dates and recurrence fail closed',()=>{for(const raw of ['<html>error</html>',wrap('BEGIN:VEVENT\r\nEND:VEVENT\r\n'),wrap(event.replace('20270310','20270230')),wrap(event.replace('UID:external','RRULE:FREQ=DAILY'))])assert.throws(()=>parseCalendar(raw),/calendar/);});
 test('cancelled events and own exported events are not reimported',()=>{assert.deepEqual(parseCalendar(wrap(event.replace('UID:external','UID:reservation-123@chalezinho-site'))),[]);assert.deepEqual(parseCalendar(wrap(event.replace('UID:external','STATUS:CANCELLED'))),[]);});
