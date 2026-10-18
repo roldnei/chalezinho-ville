@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile,writeFile} from 'node:fs/promises';
 import {PGlite} from '@electric-sql/pglite';
-import {cents,selection,totals,reportCSV,zipBlob} from '../costs-model.js';
+import {cents,selection,totals,reportCSV,fiscalRows,fiscalCSV,channelFees,zipBlob} from '../costs-model.js';
 
 test('BRL parsing uses cents and rejects ambiguous, negative or excess values',()=>{
  assert.equal(cents('1.234,56'),123456);assert.equal(cents('0,01'),1);assert.equal(cents('130'),13000);
@@ -16,6 +16,20 @@ test('competence, payment and fiscal months remain independent and archived cost
 test('CSV escapes formulas, preserves Portuguese values and maps originals to ZIP names',()=>{
  const csv=reportCSV([{id:'a',category:'energy',amount_cents:12345,exclusion_cents:0,description:'=WEBSERVICE("secret")',supplier:'A;B',fiscal_status:'operational'}],[{id:'f',expense_id:'a',original_name:'conta.pdf'}],[]);
  assert.ok(csv.includes('123,45'));assert.ok(csv.includes("'=WEBSERVICE"));assert.ok(csv.includes('a/f-conta.pdf'));assert.ok(csv.includes('Custo operacional'));
+});
+test('Carnê-Leão export uses fiscal month and never includes operating, unreviewed or unevidenced costs',()=>{
+ const base={category:'platform_commission',channel:'airbnb',property_id:1,competence:'2026-08-01',paid_on:'2026-09-05',fiscal_month:'2026-09-01',owner_borne:true,exclusion_cents:1200,amount_cents:1200,description:'Comissão Airbnb',fiscal_note:'Extrato de repasse'};
+ const rows=[{...base,id:'eligible',fiscal_status:'confirmed'},{...base,id:'review',fiscal_status:'review'},{...base,id:'water',category:'water',fiscal_status:'confirmed'},{...base,id:'missing',fiscal_status:'confirmed'},{...base,id:'archived',fiscal_status:'confirmed',archived_at:'2026-09-10'}];
+ const evidence=[{id:'receipt',expense_id:'eligible',original_name:'extrato.pdf'},{id:'waterfile',expense_id:'water'},{id:'archivedfile',expense_id:'archived'}];
+ assert.deepEqual(fiscalRows(rows,evidence,'2026-09').map(r=>r.id),['eligible']);
+ assert.deepEqual(fiscalRows(rows,evidence,'2026-08'),[]);
+ const csv=fiscalCSV(fiscalRows(rows,evidence,'2026-09'),evidence,[{id:1,name:'Signature'}]);
+ assert.ok(csv.includes('Airbnb'));assert.ok(csv.includes('12,00'));assert.ok(csv.includes('eligible/receipt-extrato.pdf'));assert.ok(!csv.includes('water'));
+});
+test('channel chart shows only recorded paid fees and never estimates missing platforms',()=>{
+ const base={category:'platform_commission',paid_on:'2026-10-02',amount_cents:2000,property_id:1};
+ const fees=channelFees([{...base,channel:'airbnb'},{...base,channel:'booking',amount_cents:3000},{...base,channel:'site',amount_cents:500},{...base,channel:'airbnb',paid_on:null},{...base,channel:null}], '2026-10');
+ assert.deepEqual(fees.map(f=>f.month),[2000,3000,500]);assert.equal(channelFees([base],'2026-10')[0].month,0);
 });
 test('ZIP contains UTF-8 names and correct uncompressed original payload',async()=>{
  const blob=await zipBlob([{name:'resumo.csv',blob:new Blob(['a;b\r\n1;2'])},{name:'custo/água.pdf',blob:new Blob([new Uint8Array([0,1,2,255])])}]);

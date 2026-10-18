@@ -2,6 +2,7 @@ export const CATEGORIES = {
  pool:['Piscina · produtos e manutenção',false],pool_service:['Piscineiro',false],cleaning:['Faxina',false],energy:['Energia',false],water:['Água',false],cleaning_products:['Produtos de limpeza',false],laundry:['Lavanderia e enxoval',false],maintenance:['Manutenção e reparos',false],equipment:['Equipamentos e melhorias',false],platform_commission:['Comissão Airbnb / Booking',true],administration:['Administração / recebimento do aluguel',true],property_tax:['IPTU e tributos do imóvel',true],condominium:['Condomínio',true],sublease:['Aluguel do imóvel sublocado',true],other:['Outros',false]
 };
 export const TAX_SOURCE='https://www.gov.br/receitafederal/pt-br/centrais-de-conteudo/publicacoes/perguntas-e-respostas/dirpf/p-r-irpf-2026-v1-00-2026-04-23.pdf';
+export const CHANNELS={airbnb:'Airbnb',booking:'Booking.com',site:'Site próprio'};
 export function cents(value){
  let text=String(value).trim().replace(/^R\$\s*/, '');
  // Decimal keyboards can emit a dot even with pt-BR selected. A single dot
@@ -19,10 +20,30 @@ export function selection(rows,month,property='all',basis='competence'){
 export function totals(rows){return {cost:rows.reduce((s,r)=>s+Number(r.amount_cents),0),paid:rows.filter(r=>r.paid_on).reduce((s,r)=>s+Number(r.amount_cents),0),exclusions:rows.filter(r=>r.fiscal_status==='confirmed').reduce((s,r)=>s+Number(r.exclusion_cents),0),pending:rows.filter(r=>r.fiscal_status==='review').length};}
 export function csvCell(v){let s=String(v??'');if(/^[\s]*[=+\-@]/.test(s))s="'"+s;return '"'+s.replaceAll('"','""')+'"';}
 export function reportCSV(rows,receipts,properties){
- const header=['ID','Imóvel','Categoria','Descrição','Fornecedor','CPF/CNPJ fornecedor','Número documento','Data documento','Competência','Pagamento','Custo R$','Situação fiscal','Mês fiscal','Exclusão revisada R$','Justificativa fiscal','Observações','Comprovantes'];
- const data=rows.map(r=>[r.id,properties.find(p=>String(p.id)===String(r.property_id))?.name||'Compartilhado / geral',CATEGORIES[r.category]?.[0]||r.category,r.description,r.supplier,r.supplier_document,r.document_number,r.document_date,r.competence,r.paid_on,(r.amount_cents/100).toFixed(2).replace('.',','),r.fiscal_status==='confirmed'?'Exclusão revisada':r.fiscal_status==='review'?'Revisar':'Custo operacional',r.fiscal_month,(r.exclusion_cents/100).toFixed(2).replace('.',','),r.fiscal_note,r.notes,receipts.filter(f=>f.expense_id===r.id).map(f=>`${r.id}/${f.id}-${safeName(f.original_name)}`).join(' | ')]);
- const t=totals(rows),total=Array(header.length).fill('');total[0]='TOTAL DO FILTRO';total[10]=(t.cost/100).toFixed(2).replace('.',',');total[13]=(t.exclusions/100).toFixed(2).replace('.',',');total[14]='Exclusões revisadas para conferência; não equivale ao imposto devido.';
+ const header=['ID','Imóvel','Categoria','Canal','Referência da reserva','Descrição','Fornecedor','CPF/CNPJ fornecedor','Número documento','Data documento','Competência','Pagamento','Custo R$','Situação fiscal','Mês fiscal','Exclusão revisada R$','Justificativa fiscal','Observações','Comprovantes'];
+ const data=rows.map(r=>[r.id,properties.find(p=>String(p.id)===String(r.property_id))?.name||'Compartilhado / geral',CATEGORIES[r.category]?.[0]||r.category,CHANNELS[r.channel]||'',r.external_reference,r.description,r.supplier,r.supplier_document,r.document_number,r.document_date,r.competence,r.paid_on,(r.amount_cents/100).toFixed(2).replace('.',','),r.fiscal_status==='confirmed'?'Exclusão revisada':r.fiscal_status==='review'?'Revisar':'Custo operacional',r.fiscal_month,(r.exclusion_cents/100).toFixed(2).replace('.',','),r.fiscal_note,r.notes,receipts.filter(f=>f.expense_id===r.id).map(f=>`${r.id}/${f.id}-${safeName(f.original_name)}`).join(' | ')]);
+ const t=totals(rows),total=Array(header.length).fill('');total[0]='TOTAL DO FILTRO';total[12]=(t.cost/100).toFixed(2).replace('.',',');total[15]=(t.exclusions/100).toFixed(2).replace('.',',');total[16]='Exclusões revisadas para conferência; não equivale ao imposto devido.';
  return '\ufeff'+[header,...data,total].map(r=>r.map(csvCell).join(';')).join('\r\n');
+}
+// Fiscal exports use the reviewed exclusion month, independently of the operational view.
+export function fiscalRows(entries,receipts,month,property='all'){
+ const evidenced=new Set(receipts.map(r=>r.expense_id));
+ return entries.filter(r=>!r.archived_at&&r.fiscal_status==='confirmed'&&CATEGORIES[r.category]?.[1]&&
+  r.owner_borne&&r.paid_on&&r.property_id!=null&&Number(r.exclusion_cents)>0&&
+  String(r.fiscal_month||'').slice(0,7)===month&&evidenced.has(r.id)&&
+  (property==='all'||(property!=='shared'&&String(r.property_id)===String(property))));
+}
+export function fiscalCSV(rows,receipts,properties){
+ const header=['Mês fiscal','Imóvel','Tipo de exclusão','Canal','Referência da reserva','Descrição','Pagamento','Valor excluído R$','Justificativa','Comprovantes'];
+ const data=rows.map(r=>[r.fiscal_month,properties.find(p=>String(p.id)===String(r.property_id))?.name||'Imóvel #'+r.property_id,CATEGORIES[r.category][0],CHANNELS[r.channel]||'',r.external_reference,r.description,r.paid_on,(Number(r.exclusion_cents)/100).toFixed(2).replace('.',','),r.fiscal_note,receipts.filter(f=>f.expense_id===r.id).map(f=>`${r.id}/${f.id}-${safeName(f.original_name)}`).join(' | ')]);
+ const total=Array(header.length).fill('');total[0]='TOTAL PARA CONFERÊNCIA';total[7]=(rows.reduce((n,r)=>n+Number(r.exclusion_cents),0)/100).toFixed(2).replace('.',',');
+ return '\ufeff'+[header,...data,total].map(r=>r.map(csvCell).join(';')).join('\r\n');
+}
+export function channelFees(entries,month,property='all'){
+ const selected=entries.filter(r=>!r.archived_at&&['platform_commission','administration'].includes(r.category)&&
+  CHANNELS[r.channel]&&(property==='all'||String(r.property_id)===String(property))&&
+  String(r.paid_on||'').slice(0,4)===month.slice(0,4));
+ return Object.entries(CHANNELS).map(([channel,label])=>({channel,label,year:selected.filter(r=>r.channel===channel).reduce((n,r)=>n+Number(r.amount_cents),0),month:selected.filter(r=>r.channel===channel&&r.paid_on.slice(0,7)===month).reduce((n,r)=>n+Number(r.amount_cents),0),count:selected.filter(r=>r.channel===channel).length}));
 }
 export function safeName(v){return String(v).normalize('NFKC').replace(/[^\p{L}\p{N}._ -]/gu,'_').replace(/^\.+/,'').slice(0,150)||'comprovante';}
 

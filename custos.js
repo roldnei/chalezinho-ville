@@ -1,14 +1,16 @@
 import {createReceiptViewer} from './cost-receipt-viewer.js';
 import {createCostAnalytics} from './costs-analytics.js';
 import {reviewExample} from './cost-receipt-regions.js';
-import {invoiceKey,DUPLICATE_INVOICE_MESSAGE,CATEGORIES,TAX_SOURCE,cents,monthStart,selection,totals,reportCSV,safeName,zipBlob} from './costs-model.js';
+import {invoiceKey,DUPLICATE_INVOICE_MESSAGE,CATEGORIES,CHANNELS,TAX_SOURCE,cents,monthStart,selection,totals,reportCSV,fiscalRows,fiscalCSV,channelFees,safeName,zipBlob} from './costs-model.js';
 import {readReceipt} from './cost-receipt-ocr.js';
+import {parseAirbnbCSV} from './costs-airbnb-import.js';
 const $=s=>document.querySelector(s),C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=n=>(Number(n)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 const date=d=>d?d.split('-').reverse().join('/'):'Não pago';
 let entries=[],receipts=[],properties=[],edit=null,queue=[],busy=false,loadVersion=0,draftId=null;
+let importRows=[],importFile=null,importBusy=false;
 let receiptController=null,receiptRun=0,receiptBusy=false,receiptActive=null,receiptSource=null,receiptReview=false,applyingReceipt=false;
 const touchedFields=new Set(),receiptDefaults=new Map(),receiptAuto=new Map();
 const receiptFields=['supplier','supplier_document','document_date','competence','document_number','amount','category','description'];
@@ -81,10 +83,12 @@ function visible(){return selection(entries,$('#cost-month').value,$('#cost-prop
 function propertyName(id){return properties.find(p=>String(p.id)===String(id))?.name||'Compartilhado / geral';}
 function render(){
  analytics.render({entries,properties,month:$('#cost-month').value,property:$('#cost-property').value,basis:$('#cost-basis').value});
+ const fees=channelFees(entries,$('#cost-month').value,$('#cost-property').value),max=Math.max(1,...fees.map(f=>f.year));
+ $('#cost-channels').innerHTML=`<div class="cost-analysis-heading"><div><h2>Taxas por canal</h2><p>Valores pagos e registrados no módulo · ${esc($('#cost-month').value)} · imóvel: ${esc($('#cost-property').selectedOptions[0]?.textContent||'Todos')}</p></div></div><div class="cost-channel-grid">${fees.map(f=>`<article class="cost-chart"><h3>${esc(f.label)}</h3><p>Este mês: <strong>${brl(f.month)}</strong></p><p>No ano: <strong>${brl(f.year)}</strong> · ${f.count} lançamento(s)</p><div class="cost-chart-track" aria-hidden="true"><span style="width:${f.year/max*100}%"></span></div></article>`).join('')}</div><p class="cost-chart-caption">Somente comissões e despesas de cobrança identificadas pelo canal. O calendário iCal não informa os valores cobrados por Airbnb ou Booking.</p>`;
  const rows=visible(),t=totals(rows),missing=rows.filter(r=>!receipts.some(f=>f.expense_id===r.id)).length;
  $('#cost-totals').innerHTML=`<article><small>CUSTOS NO FILTRO</small><strong>${brl(t.cost)}</strong><small>${rows.length} lançamento(s) · pagos: ${brl(t.paid)}</small></article><article><small>EXCLUSÕES REVISADAS NO FILTRO</small><strong>${brl(t.exclusions)}</strong><small>Para apurar por mês fiscal, altere “Organizar por”.</small></article><article><small>PENDÊNCIAS</small><strong>${t.pending} para revisar</strong><small>${missing} lançamento(s) sem comprovante</small></article>`;
  $('#cost-period-title').textContent='Lançamentos · '+$('#cost-month').value.split('-').reverse().join('/');
- $('#cost-list').innerHTML=rows.map(r=>`<article class="cost-row"><div><h3>${esc(r.description)}</h3><p>${esc(propertyName(r.property_id))} · ${esc(CATEGORIES[r.category]?.[0])}</p><p>Referência: ${esc(r.competence.slice(0,7).split('-').reverse().join('/'))} · Pagamento: ${date(r.paid_on)}</p><span class="cost-badge ${r.fiscal_status}">${r.fiscal_status==='confirmed'?'Exclusão revisada · '+brl(r.exclusion_cents):r.fiscal_status==='review'?'Revisar enquadramento':'Custo operacional'}</span>${r.fiscal_month?`<span class="cost-badge">Mês fiscal: ${r.fiscal_month.slice(0,7).split('-').reverse().join('/')}</span>`:''}<div class="cost-receipts">${filesHTML(r.id)}</div></div><div><p class="cost-amount">${brl(r.amount_cents)}</p><button type="button" data-edit="${r.id}">Ver / editar</button></div></article>`).join('')||'<p class="cost-month-empty">Nenhum custo neste mês. Adicione o primeiro comprovante.</p>';
+ $('#cost-list').innerHTML=rows.map(r=>`<article class="cost-row"><div><h3>${esc(r.description)}</h3><p>${esc(propertyName(r.property_id))} · ${esc(CATEGORIES[r.category]?.[0])}${r.channel?' · '+esc(CHANNELS[r.channel]||r.channel):''}</p><p>Referência: ${esc(r.competence.slice(0,7).split('-').reverse().join('/'))} · Pagamento: ${date(r.paid_on)}${r.external_reference?' · Reserva: '+esc(r.external_reference):''}</p><span class="cost-badge ${r.fiscal_status}">${r.fiscal_status==='confirmed'?'Exclusão revisada · '+brl(r.exclusion_cents):r.fiscal_status==='review'?'Revisar enquadramento':'Custo operacional'}</span>${r.fiscal_month?`<span class="cost-badge">Mês fiscal: ${r.fiscal_month.slice(0,7).split('-').reverse().join('/')}</span>`:''}<div class="cost-receipts">${filesHTML(r.id)}</div></div><div><p class="cost-amount">${brl(r.amount_cents)}</p><button type="button" data-edit="${r.id}">Ver / editar</button></div></article>`).join('')||'<p class="cost-month-empty">Nenhum custo neste mês. Adicione o primeiro comprovante.</p>';
  $('#cost-list').querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>openEditor(entries.find(r=>r.id===b.dataset.edit)));
  bindDownloads($('#cost-list'));
 }
@@ -100,6 +104,8 @@ async function load(){
 }
 function classify(){
  const eligible=!!CATEGORIES[field('category').value]?.[1];
+ const channelCost=['platform_commission','administration'].includes(field('category').value);
+ $('#cost-channel-label').hidden=!channelCost;$('#cost-reference-label').hidden=!channelCost;field('channel').required=channelCost;
  $('#cost-classification').textContent=eligible?'Exclusão possível, sujeita à revisão das condições legais e do comprovante.':'Custo operacional: não integra as exclusões de aluguel de pessoa física.';
  $('#cost-confirm-label').hidden=!eligible;
  if(!eligible)field('confirm_fiscal').checked=false;
@@ -112,9 +118,9 @@ function openEditor(row){
  edit=row?{...row}:null;draftId=row?.id||crypto.randomUUID();queue=[];form.reset();$('#cost-form-message').textContent='';$('#cost-dialog-title').textContent=row?'Editar custo':'Novo custo';$('#cost-archive').hidden=!row;
  field('category').innerHTML='<option value="">Selecione a categoria</option>'+Object.entries(CATEGORIES).map(([k,[v]])=>`<option value="${k}">${esc(v)}</option>`).join('');
  field('property_id').innerHTML='<option value="">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
- for(const key of ['description','supplier','supplier_document','document_number','document_date','paid_on','notes','fiscal_note'])field(key).value=row?.[key]||'';
+ for(const key of ['description','supplier','supplier_document','document_number','document_date','paid_on','notes','fiscal_note','external_reference'])field(key).value=row?.[key]||'';
  for(const name of ['amount','exclusion']){field(name).setCustomValidity('');field(name).removeAttribute('aria-invalid');$('#cost-'+name+'-error').hidden=true;}
- field('amount').value=row?brl(row.amount_cents):'';field('category').value=row?.category||'';field('property_id').value=row?.property_id||'';
+ field('amount').value=row?brl(row.amount_cents):'';field('category').value=row?.category||'';field('channel').value=row?.channel||'';field('property_id').value=row?.property_id||'';
  field('competence').value=row?.competence.slice(0,7)||$('#cost-month').value;field('document_date').value=row?.document_date||today();field('paid_on').max=today();field('exclusion').value=row?.exclusion_cents?brl(row.exclusion_cents):'';field('fiscal_month').value=row?.fiscal_month?.slice(0,7)||row?.paid_on?.slice(0,7)||today().slice(0,7);
  field('owner_borne').checked=!!row?.owner_borne;field('confirm_fiscal').checked=row?.fiscal_status==='confirmed';$('#cost-existing-files').innerHTML=row?filesHTML(row.id):'';bindDownloads($('#cost-existing-files'));renderQueue();classify();for(const input of form.querySelectorAll('[name]'))receiptDefaults.set(input.name,input.value);$('#cost-dialog').showModal();
 }
@@ -136,7 +142,9 @@ function payload(){
  const invalid=$('#cost-document-viewer').querySelector('input[aria-invalid="true"]');if(invalid)throw Error(invalid.validationMessage||'Corrija o campo destacado na nota antes de salvar.');
  if(receiptReview&&!field('receipt_reviewed').checked)throw Error('Confira os dados lidos da nota e marque a confirmação antes de salvar.');
  if(!CATEGORIES[field('category').value])throw Error('Selecione a categoria do custo.');
- const p={description:field('description').value.trim(),category:field('category').value,property_id:field('property_id').value?Number(field('property_id').value):null,amount_cents:cents(field('amount').value),competence:monthStart(field('competence').value),document_date:field('document_date').value,paid_on:field('paid_on').value||null,supplier:field('supplier').value.trim(),supplier_document:field('supplier_document').value.trim(),document_number:field('document_number').value.trim(),notes:field('notes').value.trim(),fiscal_note:field('fiscal_note').value.trim(),owner_borne:field('owner_borne').checked,fiscal_status:CATEGORIES[field('category').value][1]?'review':'operational',fiscal_month:null,exclusion_cents:0};
+ const channelCost=['platform_commission','administration'].includes(field('category').value);
+ if(channelCost&&!CHANNELS[field('channel').value])throw Error('Selecione Airbnb, Booking ou site próprio para esta taxa.');
+ const p={description:field('description').value.trim(),category:field('category').value,channel:channelCost?field('channel').value:null,external_reference:channelCost?field('external_reference').value.trim():null,property_id:field('property_id').value?Number(field('property_id').value):null,amount_cents:cents(field('amount').value),competence:monthStart(field('competence').value),document_date:field('document_date').value,paid_on:field('paid_on').value||null,supplier:field('supplier').value.trim(),supplier_document:field('supplier_document').value.trim(),document_number:field('document_number').value.trim(),notes:field('notes').value.trim(),fiscal_note:field('fiscal_note').value.trim(),owner_borne:field('owner_borne').checked,fiscal_status:CATEGORIES[field('category').value][1]?'review':'operational',fiscal_month:null,exclusion_cents:0};
  if(p.paid_on&&p.paid_on>today())throw Error('A data do pagamento não pode estar no futuro.');
  if(field('confirm_fiscal').checked){if(!p.property_id)throw Error('Vincule a exclusão fiscal a um imóvel. Para custos compartilhados, registre o rateio documentado por imóvel.');if(!p.paid_on||!p.owner_borne||p.fiscal_note.length<5)throw Error('Informe pagamento, justificativa e confirme que o encargo foi do locador.');if(!queue.length&&!receipts.some(f=>f.expense_id===edit?.id))throw Error('Anexe o comprovante antes de revisar a exclusão.');
  const fiscal=monthStart(field('fiscal_month').value),value=cents(field('exclusion').value);if(value>p.amount_cents)throw Error('A exclusão não pode superar o custo.');if(fiscal<p.paid_on.slice(0,7)+'-01'||fiscal.slice(0,4)!==p.paid_on.slice(0,4))throw Error('Revise o mês fiscal: deve ser igual ou posterior ao pagamento, dentro do mesmo ano.');p.fiscal_status='confirmed';p.fiscal_month=fiscal;p.exclusion_cents=value;}
@@ -190,13 +198,65 @@ async function exportMonth(bundle){
  download(await zipBlob(archive),name+'.zip');message(`Pacote pronto: resumo e ${files.length} comprovante(s).`);
  }catch{message('O pacote não foi concluído porque um comprovante não pôde ser baixado. Tente novamente.');}finally{$('#cost-zip').disabled=false;$('#cost-csv').disabled=false;}
 }
+async function exportFiscal(bundle){
+ const month=$('#cost-month').value,rows=fiscalRows(entries,receipts,month,$('#cost-property').value);
+ if(!rows.length){message('Nenhuma exclusão revisada com comprovante neste mês fiscal e imóvel.');return;}
+ const files=receipts.filter(f=>rows.some(r=>r.id===f.expense_id));
+ const csv=fiscalCSV(rows,files,properties),name='carne-leao-exclusoes-'+month;
+ if(!bundle){download(new Blob([csv],{type:'text/csv;charset=utf-8'}),name+'.csv');message(`${rows.length} exclusão(ões) revisada(s) exportada(s).`);return;}
+ if(files.reduce((n,f)=>n+Number(f.size_bytes),0)>100*1024*1024){message('Os comprovantes superam 100 MB. Filtre por imóvel ou baixe individualmente.');return;}
+ $('#cost-tax-zip').disabled=true;$('#cost-tax-csv').disabled=true;
+ try{
+  const archive=[{name:'exclusoes.csv',blob:new Blob([csv],{type:'text/csv;charset=utf-8'})},{name:'LEIA-ME.txt',blob:new Blob([`Carnê-Leão · exclusões revisadas\nMês fiscal: ${month}\nSomente lançamentos confirmados, pagos e com comprovante. Custos operacionais e pendentes foram excluídos. Não é arquivo de importação na Receita; confira rendimentos e valores antes de lançar.\nFonte: ${TAX_SOURCE}\n`])}];
+  for(let i=0;i<files.length;i++){message(`Preparando comprovante ${i+1} de ${files.length}…`);const f=files[i];archive.push({name:`${f.expense_id}/${f.id}-${safeName(f.original_name)}`,blob:await receiptBlob(f)});}
+  download(await zipBlob(archive),name+'.zip');message(`Pacote fiscal pronto: ${rows.length} exclusão(ões) e ${files.length} comprovante(s).`);
+ }catch{message('Não foi possível baixar todos os comprovantes. O pacote fiscal não foi gerado.');}
+ finally{$('#cost-tax-zip').disabled=false;$('#cost-tax-csv').disabled=false;}
+}
+function importMapping(){
+ const names=[...new Set(importRows.map(r=>r.listing))];
+ $('#cost-import-preview').innerHTML='<p>'+importRows.length+' taxas; total '+brl(importRows.reduce((n,r)=>n+r.amount_cents,0))+'. Vincule cada anúncio a um imóvel:</p>'+names.map((name,i)=>`<label class="cost-import-map">${esc(name)}<select data-import-listing="${i}"><option value="">Selecione o imóvel</option>${properties.map(p=>`<option value="${p.id}" ${name.toLocaleLowerCase('pt-BR').includes(p.name.toLocaleLowerCase('pt-BR'))?'selected':''}>${esc(p.name)}</option>`).join('')}</select></label>`).join('')+'<p>O CSV privado será anexado a cada taxa. Somente taxas de serviço de reservas entram; ajustes, repasses e taxas cobradas dos hóspedes ficam fora.</p>';
+ $('#cost-import-save').disabled=false;
+}
+async function importAirbnb(){
+ if(importBusy||!importFile||!importRows.length)return;
+ const names=[...new Set(importRows.map(r=>r.listing))],mapping=new Map(names.map((name,i)=>[name,Number($(`[data-import-listing="${i}"]`).value)]));
+ if([...mapping.values()].some(id=>!properties.some(p=>p.id===id))){$('#cost-import-message').textContent='Vincule todos os anúncios a um imóvel cadastrado.';return;}
+ importBusy=true;$('#cost-import-save').disabled=true;$('#cost-import-close').disabled=true;
+ const status=$('#cost-import-message');let imported=0,skipped=0;
+ try{
+  const existing=check(await sb.from('cost_entries').select('*').eq('channel','airbnb').eq('category','platform_commission'));
+  for(const row of importRows){
+   let cost=existing.find(e=>e.external_reference===row.reference);
+   if(cost){if(cost.property_id!==mapping.get(row.listing)||Number(cost.amount_cents)!==row.amount_cents)throw Error(`A reserva ${row.reference} já existe com outro imóvel ou valor. Revise-a antes de importar.`);
+    if(cost.fiscal_status==='confirmed'){skipped++;continue;}
+   }
+   const id=cost?.id||crypto.randomUUID(),fiscalMonth=row.paid_on.slice(0,7)+'-01';
+   if(!cost){const data={id,property_id:mapping.get(row.listing),category:'platform_commission',channel:'airbnb',external_reference:row.reference,description:'Taxa de serviço Airbnb · '+row.reference,supplier:'Airbnb',document_number:'',document_date:row.paid_on,competence:fiscalMonth,paid_on:row.paid_on,amount_cents:row.amount_cents,notes:'Taxa de serviço discriminada na transação paga do Airbnb. Anúncio: '+row.listing,fiscal_status:'review',fiscal_note:'Comissão retida no repasse do aluguel; extrato original da plataforma anexado.',owner_borne:true};
+    cost=check(await sb.from('cost_entries').insert(data).select().single());existing.push(cost);
+   }
+   const prior=check(await sb.from('cost_receipts').select('id').eq('expense_id',id).limit(1));
+   if(!prior.length){const receiptId=crypto.randomUUID(),path=`${id}/${receiptId}.csv`;
+    check(await sb.storage.from('cost-receipts').upload(path,importFile,{contentType:'text/csv',upsert:false}));
+    check(await sb.from('cost_receipts').insert({id:receiptId,expense_id:id,object_path:path,original_name:importFile.name.slice(0,240),mime_type:'text/csv',size_bytes:importFile.size}));
+   }
+   check(await sb.from('cost_entries').update({fiscal_status:'confirmed',fiscal_month:fiscalMonth,exclusion_cents:row.amount_cents,owner_borne:true,fiscal_note:'Comissão retida no repasse do aluguel; extrato original da plataforma anexado.'}).eq('id',id).select().single());
+   imported++;status.textContent=`Importadas ${imported} de ${importRows.length} taxas; ${skipped} já existentes.`;
+  }
+  status.textContent=`Concluído: ${imported} taxas importadas; ${skipped} já existentes. Extrato anexado a cada lançamento.`;
+  await load();
+ }catch(error){status.textContent=`Importação interrompida após ${imported} taxa(s). ${error.message||'Revise o CSV e tente novamente.'} Repetir a importação preserva as já lançadas.`;}
+ finally{importBusy=false;$('#cost-import-save').disabled=false;$('#cost-import-close').disabled=false;}
+}
 async function boot(){try{
  const {data:{session}}=await sb.auth.getSession();if(!session){location.href='auth.html?mode=login&return='+encodeURIComponent('custos.html');return;}
  const profile=check(await sb.from('profiles').select('role,full_name,pms_access_status').eq('id',session.user.id).single());if(profile.role!=='admin'||profile.pms_access_status!=='active'){$('#cost-loading').textContent='Custos e comprovantes são restritos à administração.';return;}
  $('#cost-user').textContent=profile.full_name||session.user.email;$('#cost-month').value=today().slice(0,7);$('#cost-tax-source').href=TAX_SOURCE;
  bindMoneyInput('amount');bindMoneyInput('exclusion');
  for(const id of ['cost-month','cost-property','cost-basis'])$('#'+id).onchange=()=>{if($('#cost-month').validity.valid&&$('#cost-month').value)render();};
- $('#cost-new').onclick=()=>openEditor();$('#cost-refresh').onclick=load;$('#cost-csv').onclick=()=>exportMonth(false);$('#cost-zip').onclick=()=>exportMonth(true);$('#cost-close').onclick=()=>{cancelReceiptRead();viewer.clear();$('#cost-dialog').close();};$('#cost-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else{cancelReceiptRead();viewer.clear();}});field('category').onchange=classify;field('confirm_fiscal').onchange=classify;
+ $('#cost-new').onclick=()=>openEditor();$('#cost-refresh').onclick=load;$('#cost-csv').onclick=()=>exportMonth(false);$('#cost-zip').onclick=()=>exportMonth(true);$('#cost-tax-csv').onclick=()=>exportFiscal(false);$('#cost-tax-zip').onclick=()=>exportFiscal(true);$('#cost-close').onclick=()=>{cancelReceiptRead();viewer.clear();$('#cost-dialog').close();};$('#cost-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();else{cancelReceiptRead();viewer.clear();}});field('category').onchange=classify;field('confirm_fiscal').onchange=classify;
+ $('#cost-import-open').onclick=()=>$('#cost-import-dialog').showModal();$('#cost-import-close').onclick=()=>$('#cost-import-dialog').close();$('#cost-import-dialog').addEventListener('cancel',e=>{if(importBusy)e.preventDefault();});$('#cost-import-save').onclick=importAirbnb;
+ $('#cost-import-file').onchange=async event=>{const file=event.target.files[0];importRows=[];importFile=null;$('#cost-import-save').disabled=true;$('#cost-import-preview').replaceChildren();try{if(!file||file.size>10485760||file.size===0)throw Error('Selecione um CSV com até 10 MB.');importRows=parseAirbnbCSV(await file.text());importFile=file;importMapping();$('#cost-import-message').textContent='Confira anúncios, imóveis e total antes de importar.';}catch(error){$('#cost-import-message').textContent=error.message;}};
  $('#cost-receipt-cancel').onclick=()=>{cancelReceiptRead();$('#cost-receipt-status').textContent='Leitura cancelada. Você pode preencher os campos.';};
  $('#cost-upload').onclick=()=>$('#cost-files').click();
  for(const input of form.querySelectorAll('[name]'))for(const type of ['input','change'])input.addEventListener(type,()=>{if(!applyingReceipt){touchedFields.add(input.name);input.classList.remove('cost-ocr-filled');if(receiptFields.includes(input.name)&&receiptSource){const item=queue.find(q=>q.id===receiptSource);if(item){item.corrections||={};item.corrections[input.name]=input.value;}requireReceiptReview();viewer.refresh();}}});
