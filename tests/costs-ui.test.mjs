@@ -2,7 +2,7 @@ import {test} from 'node:test';import assert from 'node:assert/strict';import {r
 const pause=()=>new Promise(resolve=>setTimeout(resolve,15));
 async function setup({reader=async()=>({fields:{},warnings:[],text:''})}={}){
  const dom=new JSDOM(await readFile(new URL('../custos.html',import.meta.url),'utf8'),{url:'https://test.local/custos.html',runScripts:'outside-only'}),w=dom.window;
- const data={cost_entries:[],cost_receipts:[],cost_receipt_reviews:[],properties:[{id:1,name:'Ville Signature'},{id:2,name:'Ville Essenza'}]},files=new Map();let tick=0,uploadFailure=false;
+ const data={cost_entries:[],cost_receipts:[],cost_source_links:[],cost_source_documents:[],cost_receipt_reviews:[],properties:[{id:1,name:'Ville Signature'},{id:2,name:'Ville Essenza'}]},files=new Map();let tick=0,uploadFailure=false;
  class Query{constructor(table){this.table=table;this.filters=[];this.mode='read';}select(){return this;}eq(k,v){this.filters.push([k,v]);return this;}order(){return this;}range(){return this;}single(){this.singleRow=true;return this;}insert(p){this.mode='insert';this.p=p;return this;}upsert(p){this.mode='upsert';this.p=p;return this;}update(p){this.mode='update';this.p=p;return this;}
  then(resolve){if(this.table==='profiles')return Promise.resolve({data:{role:'admin',full_name:'QA',pms_access_status:'active'}}).then(resolve);
  let rows=data[this.table].filter(r=>this.filters.every(([k,v])=>r[k]===v));
@@ -30,6 +30,20 @@ test('UI persists expense, photo, fiscal review and separate reporting months wi
  $('#cost-month').value='2026-10';$('#cost-basis').value='competence';$('#cost-month').dispatchEvent(new w.Event('change'));assert.ok($('#cost-list').textContent.includes('Nenhum custo'));
  $('#cost-basis').value='fiscal_month';$('#cost-basis').dispatchEvent(new w.Event('change'));assert.ok($('#cost-list').textContent.includes('IPTU Signature'));assert.ok($('#cost-totals').textContent.includes('100,00'));
  $('[data-edit]').click();field('category').value='energy';field('category').dispatchEvent(new w.Event('change'));assert.equal(field('confirm_fiscal').checked,false);assert.equal($('#cost-confirm-label').hidden,true);
+ }finally{s.dom.window.close();}
+});
+test('platform statement is shown as downloadable evidence and permits fiscal export',async()=>{
+ const s=await setup(),{$,w,data}=s;try{
+  const id='fee-1',source='statement-1';
+  data.cost_entries.push({id,property_id:1,category:'platform_commission',channel:'airbnb',external_reference:'ABC123',description:'Taxa Airbnb',supplier:'Airbnb',document_date:'2026-10-12',competence:'2026-10-01',paid_on:'2026-10-12',amount_cents:1234,exclusion_cents:1234,fiscal_status:'confirmed',fiscal_month:'2026-10-01',owner_borne:true,fiscal_note:'Extrato da plataforma',archived_at:null});
+  data.cost_source_links.push({id:'link-1',expense_id:id,document_id:source,cost_source_documents:{original_name:'extrato.csv',mime_type:'text/csv',size_bytes:10}});
+  data.cost_source_documents.push({id:source,content:'Data;Valor',mime_type:'text/csv'});
+  await w.load();$('#cost-month').value='2026-10';$('#cost-month').dispatchEvent(new w.Event('change'));
+  assert.match($('#cost-list').textContent,/extrato\.csv/);
+  const blob=await w.receiptBlob({source_document_id:source});
+  const content=await new Promise((resolve,reject)=>{const reader=new w.FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsText(blob);});
+  assert.equal(content,'Data;Valor');
+  assert.match(w.fiscalCSV(w.fiscalRows(data.cost_entries,data.cost_source_links,'2026-10'),data.cost_source_links.map(l=>({id:l.id,expense_id:l.expense_id,original_name:'extrato.csv'})),data.properties),/extrato\.csv/);
  }finally{s.dom.window.close();}
 });
 test('upload failure leaves a single pending expense and retry attaches once',async()=>{

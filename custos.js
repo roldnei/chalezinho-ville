@@ -78,7 +78,7 @@ async function startReceiptRead(item){
  catch(error){if(run!==receiptRun)return;readingNotice='Leitura incompleta. Confira e preencha as caixas.';viewer.refresh();$('#cost-receipt-status').textContent=error.name==='AbortError'?'Leitura cancelada. Você pode preencher os campos.':error.message||'Não foi possível ler a nota. Preencha os campos ou tente outra foto.';}
  finally{clearTimeout(deadline);if(run===receiptRun){viewer.setReading(null);viewer.setNotice(readingNotice);receiptBusy=false;receiptController=null;receiptActive=null;$('#cost-receipt-progress').hidden=true;$('#cost-receipt-cancel').hidden=true;$('#cost-save').disabled=busy;$('#cost-archive').disabled=busy;}}
 }
-async function allRows(table,build=q=>q){let rows=[];for(let offset=0;;offset+=1000){const page=check(await build(sb.from(table).select('*')).range(offset,offset+999));rows.push(...page);if(page.length<1000)return rows;}}
+async function allRows(table,build=q=>q,columns='*'){let rows=[];for(let offset=0;;offset+=1000){const page=check(await build(sb.from(table).select(columns)).range(offset,offset+999));rows.push(...page);if(page.length<1000)return rows;}}
 function visible(){return selection(entries,$('#cost-month').value,$('#cost-property').value,$('#cost-basis').value);}
 function propertyName(id){return properties.find(p=>String(p.id)===String(id))?.name||'Compartilhado / geral';}
 function render(){
@@ -96,8 +96,8 @@ function filesHTML(id){const files=receipts.filter(f=>f.expense_id===id);return 
 function bindDownloads(root){root.querySelectorAll('[data-download]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{await downloadReceipt(receipts.find(f=>f.id===b.dataset.download));}catch{message('Não foi possível baixar o comprovante. Tente novamente.');}finally{b.disabled=false;}});}
 async function load(){
  const version=++loadVersion;message('Consultando lançamentos…');$('#cost-csv').disabled=true;$('#cost-zip').disabled=true;
- try{const [nextEntries,nextReceipts,nextProperties]=await Promise.all([allRows('cost_entries',q=>q.order('created_at').order('id')),allRows('cost_receipts',q=>q.order('created_at').order('id')),allRows('properties',q=>q.order('id'))]);if(version!==loadVersion)return;
-  entries=nextEntries;receipts=nextReceipts;properties=nextProperties;
+ try{const [nextEntries,nextReceipts,nextSources,nextProperties]=await Promise.all([allRows('cost_entries',q=>q.order('created_at').order('id')),allRows('cost_receipts',q=>q.order('created_at').order('id')),allRows('cost_source_links',q=>q.order('created_at').order('id'),'id,expense_id,document_id,cost_source_documents(original_name,mime_type,size_bytes)'),allRows('properties',q=>q.order('id'))]);if(version!==loadVersion)return;
+  entries=nextEntries;receipts=[...nextReceipts,...nextSources.map(link=>({id:link.id,expense_id:link.expense_id,source_document_id:link.document_id,original_name:link.cost_source_documents.original_name,mime_type:link.cost_source_documents.mime_type,size_bytes:link.cost_source_documents.size_bytes}))];properties=nextProperties;
   const selected=$('#cost-property').value;$('#cost-property').innerHTML='<option value="all">Todos os imóveis</option><option value="shared">Compartilhado / geral</option>'+properties.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');$('#cost-property').value=selected;
   $('#cost-loading').hidden=true;$('#cost-app').hidden=false;render();message('');$('#cost-csv').disabled=false;$('#cost-zip').disabled=false;
  }catch{if(version!==loadVersion)return;message('Não foi possível consultar os custos. Atualize para tentar novamente.');$('#cost-loading').textContent='Custos indisponíveis. Recarregue a página para tentar novamente.';}
@@ -185,7 +185,10 @@ async function save(event){event.preventDefault();if(busy||receiptBusy)return;le
 }
 function setBusy(value){form.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=value);$('#cost-close').disabled=value;}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safeName(name);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
-async function receiptBlob(r){return check(await sb.storage.from('cost-receipts').download(r.object_path));}
+async function receiptBlob(r){
+ if(r.source_document_id){const source=check(await sb.from('cost_source_documents').select('content,mime_type').eq('id',r.source_document_id).single());return new Blob([source.content],{type:source.mime_type+';charset=utf-8'});}
+ return check(await sb.storage.from('cost-receipts').download(r.object_path));
+}
 async function downloadReceipt(r){download(await receiptBlob(r),r.original_name);}
 async function exportMonth(bundle){
  const rows=visible();if(!rows.length){message('Não há custos neste filtro para exportar.');return;}
