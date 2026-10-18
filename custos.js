@@ -207,7 +207,7 @@ async function exportFiscal(bundle){
  if(files.reduce((n,f)=>n+Number(f.size_bytes),0)>100*1024*1024){message('Os comprovantes superam 100 MB. Filtre por imóvel ou baixe individualmente.');return;}
  $('#cost-tax-zip').disabled=true;$('#cost-tax-csv').disabled=true;
  try{
-  const archive=[{name:'exclusoes.csv',blob:new Blob([csv],{type:'text/csv;charset=utf-8'})},{name:'LEIA-ME.txt',blob:new Blob([`Carnê-Leão · exclusões revisadas\nMês fiscal: ${month}\nSomente lançamentos confirmados, pagos e com comprovante. Custos operacionais e pendentes foram excluídos. Não é arquivo de importação na Receita; confira rendimentos e valores antes de lançar.\nFonte: ${TAX_SOURCE}\n`])}];
+  const archive=[{name:'exclusoes.csv',blob:new Blob([csv],{type:'text/csv;charset=utf-8'})},{name:'LEIA-ME.txt',blob:new Blob([`Carnê-Leão · exclusões revisadas\nMês fiscal: ${month}\nSomente lançamentos confirmados, pagos e com comprovante. Custos operacionais e pendentes foram excluídos. Se os rendimentos já foram declarados líquidos da comissão, não exclua a mesma taxa novamente. Não é arquivo de importação na Receita; confira rendimentos e valores antes de lançar.\nFonte: ${TAX_SOURCE}\n`])}];
   for(let i=0;i<files.length;i++){message(`Preparando comprovante ${i+1} de ${files.length}…`);const f=files[i];archive.push({name:`${f.expense_id}/${f.id}-${safeName(f.original_name)}`,blob:await receiptBlob(f)});}
   download(await zipBlob(archive),name+'.zip');message(`Pacote fiscal pronto: ${rows.length} exclusão(ões) e ${files.length} comprovante(s).`);
  }catch{message('Não foi possível baixar todos os comprovantes. O pacote fiscal não foi gerado.');}
