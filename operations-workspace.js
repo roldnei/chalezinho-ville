@@ -18,7 +18,7 @@ async function compress(file){
   const base64=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(blob)});return {base64,content_type:blob.type};
  }finally{URL.revokeObjectURL(url)}
 }
-async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null,taskId=null,reviewOnly=false}={}){
+async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null,taskId=null,stayId=null,reviewOnly=false}={}){
  const C=window.CHALEZINHO_CONFIG,endpoint=C.supabaseUrl+'/functions/v1/multichannel-operations';let state,tab=initial,todayFilter=null,taskSearch='',taskFilter='pending',disposed=false;
  host.innerHTML='<section class="ville-ops"><p role="status">'+(reviewOnly?'Carregando fotos e respostas…':'Consultando a operação multicanal…')+'</p></section>';const root=host.firstElementChild;let photoDialog=null;
  root.addEventListener('click',e=>{const link=e.target.closest('[data-view-photo]');if(!link)return;e.preventDefault();photoDialog?.remove();const dialog=document.createElement('dialog');photoDialog=dialog;dialog.className='ops-photo-viewer';dialog.setAttribute('aria-label','Foto ampliada da conferência');dialog.innerHTML='<button type="button" autofocus>Fechar foto ×</button><p></p><img>';
@@ -180,7 +180,7 @@ async function mount(host,{sb,initial='today',onSummary=()=>{},inspection=null,t
    draw();
   }catch(e){if(inspection)inspection.onError(e);else message(errorText(e))}
  }
- if(inspection){state=await inspection.api('hub');await openTask(inspection.taskId);}else {await refresh();if(taskId&&alive())await openTask(taskId);}return ()=>{disposed=true;photoDialog?.remove()};
+ if(inspection){state=await inspection.api('hub');await openTask(inspection.taskId);}else {await refresh();if(taskId&&alive())await openTask(taskId);else if(stayId&&alive()){if(state?.stays.some(s=>s.id===stayId))openStay(stayId);else message('Hospedagem não encontrada nesta consulta. Atualize e confira o acesso.');}}return ()=>{disposed=true;photoDialog?.remove()};
 }
 window.VilleOperations={mount,compress,queue};
 })();

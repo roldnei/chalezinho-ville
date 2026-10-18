@@ -10,6 +10,21 @@ vm.runInContext(source.slice(source.indexOf('function calendarInterval('),source
 const property={id:1,name:'Ville Signature',check_in_time:'15:00',check_out_time:'11:00'},bounds={start:'2026-10-16',days:7};
 const event={id:'stay-a',property_id:1,source:'airbnb',guest_name:'Ana',start:'2026-10-16',end:'2026-10-18'};
 const render=events=>new JSDOM(scope.calendarColumn(property,bounds,[],events)).window.document;
+test('same-day Airbnb cutoff and shortened Booking block never cover the confirmed Booking stay',()=>{
+ const stay={...event,id:'canonical',source:'booking',start:'2026-10-18',end:'2026-10-20',event_kind:'stay',status:'confirmed'};
+ const block={...event,id:'cutoff',source:'airbnb',start:'2026-10-18',end:'2026-10-19',event_kind:'block'};
+ const doc=render([block,{...block,id:'remaining',source:'booking',start:'2026-10-19',end:'2026-10-20'},stay]);
+ assert.equal(doc.querySelectorAll('button').length,1);assert.equal(doc.querySelector('button').dataset.reservation,'canonical');
+ assert.equal(doc.querySelector('.calendar-column-range').textContent,'18/10 → 20/10');assert.equal(doc.querySelector('.availability-block'),null);
+ assert.equal(render([block]).querySelectorAll('.availability-block').length,1);
+});
+test('partly overlapping channel closures retain their uncovered dates and other properties',()=>{
+ const block={...event,id:'long-block',start:'2026-10-17',end:'2026-10-23',event_kind:'block'};
+ const stay={...event,id:'confirmed',source:'booking',start:'2026-10-18',end:'2026-10-20',event_kind:'stay',status:'confirmed'};
+ const events=scope.calendarDisplayEvents(property,[],[block,stay,{...stay,id:'other',property_id:2}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(events.filter(e=>e.event_kind==='block').map(({start,end})=>({start,end})))),[{start:'2026-10-17',end:'2026-10-18'},{start:'2026-10-20',end:'2026-10-23'}]);
+ assert.equal(block.start,'2026-10-17');assert.equal(block.end,'2026-10-23');
+});
 test('monthly calendar starts today, can reveal previous days, and preserves other months',()=>{
  const ctx={calendarSpan:'month',calendarMonth:'2026-10',calendarShowPreviousDays:false,today:()=> '2026-10-15'};
  vm.createContext(ctx);

@@ -87,7 +87,7 @@ function applyGuestContacts(){
   if(guest){r.guest_name=guest.name;r.guest_phone=guest.phone;r.contact_id=guest.id;}
  }
 }
-function stayButton(r){return !String(r.id).includes(':')?`data-reservation="${esc(r.id)}"`:['airbnb','booking','ical'].includes(r.source)&&r.status!=='integration_error'?`data-guest-stay="${esc(r.id)}"`:'disabled';}
+function stayButton(r){return !String(r.id).includes(':')?`data-reservation="${esc(r.id)}"`:(r.operational_stay_id||['airbnb','booking','ical'].includes(r.source))&&r.status!=='integration_error'?`data-guest-stay="${esc(r.id)}"`:'disabled';}
 let guestSearch='';
 function renderGuests(){
  $('#admin-content').innerHTML=`<section class="admin-panel"><div class="admin-panel-head"><div><small>CONTATOS DA OPERAÇÃO</small><h2>Hóspedes</h2></div><button id="new-guest" ${state.guest_error?'disabled':''}>+ Novo hóspede</button></div><p>Um cadastro pode ser vinculado a várias estadias. Atualize o telefone aqui ou abra uma reserva no calendário.</p>${state.guest_error?'<p role="alert">Não foi possível consultar os hóspedes. Clique em Atualizar para tentar novamente.</p>':'<label class="admin-search">Buscar por nome ou telefone<input id="guest-search" type="search" placeholder="Nome ou telefone"></label><div id="guest-results" class="admin-stack"></div>'}</section>`;
@@ -184,6 +184,7 @@ function bindCards(){
 
 function openCalendarEvent(id){
  const e=state.channel_periods.find(x=>x.id===id);if(!e)return;const timing=calendarInterval(e,prop(e.property_id)||{});
+ if(e.operational_stay_id&&e.event_kind==='stay'){$('#admin-modal-content').innerHTML=`<small>${esc(sourceLabel(e.source))} · HOSPEDAGEM CONFIRMADA</small><h2>${esc(e.guest_name||e.calendar_label||'Hospedagem confirmada')}</h2><p>${esc(prop(e.property_id)?.name)} · ${date(timing.startDate)} ${timing.startTime} a ${date(timing.endDate)} ${timing.endTime}</p>${e.guest_phone?`<p>${esc(e.guest_phone)}</p>`:''}<a class="admin-primary" href="pms-operacao.html?view=reservations&stay=${encodeURIComponent(e.operational_stay_id)}">Abrir hospedagem no PMS</a>`;openModal();return;}
  if(timing.unavailable){$('#admin-modal-content').innerHTML=`<small>${esc(sourceLabel(e.source))} · INDISPONIBILIDADE</small><h2>${esc(timing.blockLabel)}</h2><p>${esc(prop(e.property_id)?.name)} · ${date(timing.startDate)}</p><p>Sem hospedagem, check-in, checkout ou faxina. O canal mantém o período indisponível; isso não confirma uma reserva.</p>`;openModal();return;}
  $('#admin-modal-content').innerHTML=`<small>${esc(sourceLabel(e.source))} · CALENDÁRIO EXTERNO</small><h2>${esc(e.guest_name||e.calendar_label||'Período importado')}</h2><p>${esc(prop(e.property_id)?.name)} · ${date(timing.startDate)} ${timing.startTime} a ${date(timing.endDate)} ${timing.endTime}</p><p>${e.status==='integration_error'?'Falha de sincronização. Confira o canal de origem.':'Estas datas estão indisponíveis pelo calendário conectado. O iCal recebido não distingue com segurança uma reserva de um bloqueio.'}</p>${e.guest_name?`<p>Contato vinculado: ${esc(e.guest_name)} · ${esc(e.guest_phone||'Sem telefone')}</p>`:''}<button type="button" id="event-contact">Vincular ou editar contato</button>`;
  openModal();$('#event-contact').onclick=()=>openStayGuest(id);
@@ -217,9 +218,24 @@ function calendarInterval(e,p){
  const startDate=rawStart;
  return {start:point(startDate,startTime),end:point(endDate,endTime),startDate,endDate,startTime,endTime,external:!['direct','manual','operational'].includes(e.source||'direct'),operational,unavailable,blockLabel:e.event_kind==='ambiguous'?'Período a confirmar':'Bloqueio '+(e.source==='booking'?'Booking':e.source==='airbnb'?'Airbnb':String(e.calendar_label||'do canal'))};
 }
+function calendarDisplayEvents(p,direct,external){
+ const events=[...direct.filter(r=>Number(r.property_id)===Number(p.id)).map(r=>({...r,start:r.check_in,end:r.check_out,source:r.source||'direct'})),...external.filter(e=>Number(e.property_id)===Number(p.id))];
+ const stays=events.filter(e=>e.event_kind==='stay'||(!e.event_kind&&e.status==='confirmed'));
+ // Only the display is clipped. Keep every imported block and its original
+ // classification in the data; an availability closure cannot cover a stay.
+ return events.flatMap(e=>{
+  if(!['block','ambiguous'].includes(e.event_kind))return [e];
+  let spans=[{start:e.start,end:e.end}];
+  for(const stay of stays)spans=spans.flatMap(span=>stay.start>=span.end||stay.end<=span.start?[span]:[
+   ...(span.start<stay.start?[{start:span.start,end:stay.start}]:[]),
+   ...(stay.end<span.end?[{start:stay.end,end:span.end}]:[])
+  ]);
+  return spans.map(span=>({...e,...span}));
+ });
+}
 function calendarColumn(p,b,direct,external){
  const origin=Date.parse(b.start+'T00:00:00Z'),limit=origin+b.days*86400000;
- const events=[...direct.filter(r=>Number(r.property_id)===Number(p.id)).map(r=>({...r,start:r.check_in,end:r.check_out,source:r.source||'direct'})),...external.filter(e=>Number(e.property_id)===Number(p.id))]
+ const events=calendarDisplayEvents(p,direct,external)
   .map(e=>({e,timing:calendarInterval(e,p)})).filter(x=>x.timing.start<limit&&x.timing.end>origin).sort((a,c)=>a.timing.start-c.timing.start);
  const ends=[];
  const placed=events.map(x=>{let lane=ends.findIndex(end=>end<=x.timing.start);if(lane<0)lane=ends.length;ends[lane]=x.timing.end;return {...x,lane}});

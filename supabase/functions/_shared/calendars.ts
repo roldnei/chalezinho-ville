@@ -95,6 +95,27 @@ export function resolveCalendarPeriod(period:any,events:any[],stays:any[]){
  if(review?.classification_at&&['block','maintenance'].includes(review.kind))return {...period,event_kind:'block'};
  return {...period,event_kind:period.event_kind||'ambiguous'};
 }
+// Confirmed operational stays survive feed UID changes, split CLOSED periods,
+// missing events and provider outages. Raw availability never cancels a stay.
+export function reconcileCalendarPeriods(periods:any[],events:any[],stays:any[]){
+ const resolved=periods.map(period=>resolveCalendarPeriod(period,events,stays));
+ const confirmed=stays.filter(s=>s.status==='confirmed'&&!s.is_test&&!s.reservation_id&&validCalendarDate(s.check_in)&&validCalendarDate(s.check_out)&&s.check_out>s.check_in);
+ const canonical=confirmed.map(s=>{
+  const review=events.find(e=>e.stay_id===s.id&&e.kind==='stay');
+  const live=resolved.find(e=>e.operational_stay_id===s.id);
+  const source=['airbnb','booking','ical'].includes(s.channel)?s.channel:s.channel==='direct'?'manual':'ical';
+  const calendarId=review?.source_id;
+  const label=resolved.find(e=>e.calendar_id===calendarId)?.calendar_label;
+  return {...live,id:calendarId?calendarPeriodKey(source,s.property_id,{calendar_id:calendarId,start:s.check_in,end:s.check_out}):'ops:'+s.id,
+   property_id:s.property_id,source,calendar_id:calendarId,event_uid:review?.uid||s.external_id,
+   calendar_label:label||live?.calendar_label||({airbnb:'Airbnb',booking:'Booking',manual:'Hospedagem direta',ical:'Hospedagem externa'}[source]),
+   start:s.check_in,end:s.check_out,status:'confirmed',event_kind:'stay',operational_stay_id:s.id,
+   guest_name:s.guest_name||live?.guest_name,guest_phone:s.guest_phone||live?.guest_phone,
+   needs_review:s.needs_review||null};
+ });
+ const represented=new Set(canonical.map(s=>s.operational_stay_id));
+ return [...resolved.filter(e=>!represented.has(e.operational_stay_id)),...canonical];
+}
 // Temporary, owner-authorized DEV fixture. Expires at midnight in Guarapari.
 export function developmentApprovalCalendar(raw:string,projectUrl:string,sourceId:string,now=new Date()){
  if(projectUrl!=='https://pxfqmnhqodqyaaqeyjgr.supabase.co'||sourceId!=='91f67f0c-5b4c-4627-afc0-bb722a333ed8'||now.toISOString()<'2026-10-03T03:00:00.000Z'||now.toISOString()>='2026-10-04T03:00:00.000Z')return raw;

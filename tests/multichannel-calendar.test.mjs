@@ -1,8 +1,30 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {parseOperationalCalendar,operationSummary} from '../supabase/functions/_shared/operational-calendar.ts';
-import {parseCalendar,resolveCalendarPeriod} from '../supabase/functions/_shared/calendars.ts';
+import {parseCalendar,resolveCalendarPeriod,reconcileCalendarPeriods} from '../supabase/functions/_shared/calendars.ts';
 const ical=(lines)=>'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:qa-calendar\r\nDTSTART;VALUE=DATE:20261009\r\nDTEND;VALUE=DATE:20261012\r\n'+lines+'\r\nEND:VEVENT\r\nEND:VCALENDAR';
+test('confirmed Booking 18–20 October survives changed UID and a shortened CLOSED event',()=>{
+ const stay={id:'booking-stay',property_id:1,channel:'booking',status:'confirmed',check_in:'2026-10-18',check_out:'2026-10-20'};
+ const evidence={source_id:'booking-source',uid:'original-uid',stay_id:stay.id,kind:'stay',start_date:stay.check_in,end_date:stay.check_out,missing_count:8};
+ const periods=[{id:'airbnb-today',property_id:1,source:'airbnb',calendar_id:'airbnb-source',start:'2026-10-18',end:'2026-10-19',event_kind:'block'},
+  {id:'booking-shortened',property_id:1,source:'booking',calendar_id:'booking-source',calendar_label:'Booking — CH1',event_uid:'new-uid',start:'2026-10-19',end:'2026-10-20',event_kind:'block'}];
+ const rows=reconcileCalendarPeriods(periods,[evidence],[stay]);
+ const confirmed=rows.filter(e=>e.event_kind==='stay');assert.equal(confirmed.length,1);
+ assert.equal(confirmed[0].operational_stay_id,stay.id);assert.equal(confirmed[0].start,stay.check_in);assert.equal(confirmed[0].end,stay.check_out);assert.equal(confirmed[0].source,'booking');assert.equal(confirmed[0].status,'confirmed');
+ assert.equal(rows.filter(e=>e.event_kind==='block').length,2);assert.deepEqual(periods.map(e=>e.event_kind),['block','block']);
+ assert.equal(reconcileCalendarPeriods([], [evidence],[stay])[0].operational_stay_id,stay.id);
+});
+test('reconciliation deduplicates linked live events, excludes fixtures, cancelled and site reservations, and supports every channel',()=>{
+ for(const channel of ['airbnb','booking','ical','direct','other']){
+  const stay={id:'s',property_id:1,channel,status:'confirmed',check_in:'2026-10-18',check_out:'2026-10-20'};
+  const period={id:'calendar:source:2026-10-18:2026-10-20',calendar_id:'source',event_uid:'uid',property_id:1,source:channel,start:stay.check_in,end:stay.check_out,event_kind:'block'};
+  const event={source_id:'source',uid:'uid',stay_id:stay.id,kind:'stay',start_date:stay.check_in,end_date:stay.check_out};
+  const rows=reconcileCalendarPeriods([period],[event],[stay,{...stay,id:'test',is_test:true},{...stay,id:'cancelled',status:'cancelled'},{...stay,id:'site',reservation_id:'reservation'}]);
+  assert.equal(rows.length,1);assert.equal(rows[0].operational_stay_id,'s');
+  assert.equal(rows[0].id,period.id);
+ }
+ assert.equal(reconcileCalendarPeriods([{event_kind:'block'}],[],[])[0].event_kind,'block');
+});
 test('provider evidence, not occupancy, classifies Airbnb/Booking stays',()=>{
  for(const provider of ['airbnb','booking'])assert.equal(parseOperationalCalendar(ical('SUMMARY:Reserved'),provider)[0].kind,'stay');
  assert.equal(parseOperationalCalendar(ical('SUMMARY:Reserved'),'ical')[0].kind,'ambiguous');

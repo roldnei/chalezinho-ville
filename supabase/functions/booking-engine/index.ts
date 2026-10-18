@@ -14,7 +14,7 @@ import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-reques
 import {brazilClock,availabilityDefaults,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
-import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey,bookingStayOverlap,resolveCalendarPeriod} from "../_shared/calendars.ts";
+import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey,bookingStayOverlap,reconcileCalendarPeriods} from "../_shared/calendars.ts";
 import {experiencePaymentEntries} from "../_shared/finance/experience-payment-entries.ts";
 import {experienceCreditService} from "../_shared/finance/experience-credits.ts";
 import {paymentGateway} from "../_shared/finance/gateway.ts";
@@ -1247,7 +1247,7 @@ async function adminHubData(req:Request,body:any){
     airbnbCalendarData().catch(()=>({ok:false,listings:[]})),
     bookingCalendarData().catch(()=>({configured:true,ok:false,listings:[]})),
     admin.from("ops_calendar_events").select("source_id,uid,kind,stay_id,classification_at,cancelled,start_date,end_date").lte("start_date",end).gte("end_date",start),
-    admin.from("ops_stays").select("id,property_id,status,is_test,check_in,check_out,guest_name,guest_phone").lte("check_in",end).gte("check_out",start)
+    admin.from("ops_stays").select("id,property_id,reservation_id,channel,external_id,status,is_test,check_in,check_out,guest_name,guest_phone,needs_review").lte("check_in",end).gte("check_out",start)
   ]);
   if(propertiesQ.error||reservationsQ.error||notificationsQ.error||integrationsQ.error||settingsQ.error||blocksQ.error||calendarEventsQ.error||operationalStaysQ.error)
     return json({ok:false,error:"admin_hub_unavailable"},500);
@@ -1293,7 +1293,7 @@ async function adminHubData(req:Request,body:any){
     notifications:notificationsQ.data||[],integrations:integrationsQ.data||[],settings:settingsQ.data||{},
     cancellation_policies:cancellationPolicies,
     calendar_blocks:blocksQ.data||[],
-    channel_periods:channelPeriods.map(period=>resolveCalendarPeriod(period,calendarEventsQ.data||[],operationalStaysQ.data||[])),
+    channel_periods:reconcileCalendarPeriods(channelPeriods,calendarEventsQ.data||[],operationalStaysQ.data||[]),
     channel_health:{airbnb:Boolean(airbnb?.ok),booking_configured:Boolean(booking?.configured),booking:Boolean(booking?.ok)}
   });
 }
