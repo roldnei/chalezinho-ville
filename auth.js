@@ -16,7 +16,8 @@ const returnTarget=safeReturn(ret),returnURL=new URL(returnTarget,location.origi
 if(momentsSignup){
  document.title='Convite | Ville Moments';
  if(accountHeading)accountHeading.textContent='VILLE MOMENTS'+(C.environment==='development'?' · DESENVOLVIMENTO':'');
- document.querySelector('.auth-card h1').innerHTML='Viva e compartilhe<br><em>seus momentos.</em>';
+ document.body.classList.add('moments-invitation');
+ document.querySelector('.auth-card h1').innerHTML='Compartilhe<br><em>seus momentos.</em>';
  by('moments-invite-note').hidden=false;
  by('signup-stay-details').hidden=true;by('signup-stay-details').disabled=true;
  document.querySelector('.back-home').href='index.html?view=moments';document.querySelector('.back-home').textContent='← Ville Moments';

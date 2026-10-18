@@ -25,3 +25,9 @@ Base preservada: produção `1f0aea87a479a13a6e21818493ddad105958f107`, branch `
 ## Limites e validação externa
 
 Os testes automatizados de cadastro, confirmação e recuperação usam respostas simuladas do Auth. O teste no banco DEV executou os gatilhos reais, sem envio de e-mail. Entrega real de confirmação e abertura/envio no aplicativo WhatsApp do celular exigem validação com uma pessoa de teste; nenhuma mensagem foi enviada automaticamente. A prévia depende de o domínio de validação estar autorizado no redirect do Supabase Auth, como qualquer cadastro existente. Antes de promover produção, aplicar a migração correspondente naquele ambiente e validar o callback no domínio final.
+
+## Publicação de validação
+
+Branch `feature/moments-whatsapp-invites-20261017`, PR https://github.com/roldnei/chalezinho-ville/pull/11. A primeira prévia ficou READY em `chalezinho-ville-5ail6lvxj-roldneicosta-4140.vercel.app`; o alias da branch acompanha as revisões posteriores. Os arquivos `auth.html`, `auth.js`, `villegram-admin.html`, `villegram-invitations.js` e `app-config.js` retornaram HTTP 200 via conexão autorizada. O config publicado usa exclusivamente DEV, perfil WhatsApp e as funcionalidades Moments/social, sem ativar Feelings ou checkout público.
+
+O navegador real confirmou a tela do convite, a identificação de desenvolvimento e somente nome, e-mail e senha. A prévia mantém a proteção da Vercel; um link temporário da prévia foi usado para a inspeção, sem alterar a proteção do projeto. A inspeção visual foi feita em viewport de computador; celular com fonte ampliada e envio efetivo pelo aplicativo continuam pendentes.
