@@ -186,7 +186,11 @@ async function save(event){event.preventDefault();if(busy||receiptBusy)return;le
 function setBusy(value){form.querySelectorAll('input,select,textarea,button').forEach(x=>x.disabled=value);$('#cost-close').disabled=value;}
 function download(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safeName(name);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
 async function receiptBlob(r){
- if(r.source_document_id){const source=check(await sb.from('cost_source_documents').select('content,mime_type').eq('id',r.source_document_id).single());return new Blob([source.content],{type:source.mime_type+';charset=utf-8'});}
+ if(r.source_document_id){
+  const source=check(await sb.from('cost_source_documents').select('content,body_base64,mime_type').eq('id',r.source_document_id).single());
+  if(source.body_base64)return new Blob([Uint8Array.from(atob(source.body_base64),char=>char.charCodeAt(0))],{type:source.mime_type});
+  return new Blob([source.content],{type:source.mime_type+';charset=utf-8'});
+ }
  return check(await sb.storage.from('cost-receipts').download(r.object_path));
 }
 async function downloadReceipt(r){download(await receiptBlob(r),r.original_name);}

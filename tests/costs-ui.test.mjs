@@ -44,6 +44,10 @@ test('platform statement is shown as downloadable evidence and permits fiscal ex
   const content=await new Promise((resolve,reject)=>{const reader=new w.FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error);reader.readAsText(blob);});
   assert.equal(content,'Data;Valor');
   assert.match(w.fiscalCSV(w.fiscalRows(data.cost_entries,data.cost_source_links,'2026-10'),data.cost_source_links.map(l=>({id:l.id,expense_id:l.expense_id,original_name:'extrato.csv'})),data.properties),/extrato\.csv/);
+  data.cost_source_documents[0]={id:source,content:null,body_base64:w.btoa(String.fromCharCode(0xff,0xd8,0xff,0xd9)),mime_type:'image/jpeg'};
+  const screenshot=await w.receiptBlob({source_document_id:source});
+  const bytes=await new Promise((resolve,reject)=>{const reader=new w.FileReader();reader.onload=()=>resolve(new Uint8Array(reader.result));reader.onerror=()=>reject(reader.error);reader.readAsArrayBuffer(screenshot);});
+  assert.deepEqual([...bytes],[0xff,0xd8,0xff,0xd9]);assert.equal(screenshot.type,'image/jpeg');
  }finally{s.dom.window.close();}
 });
 test('upload failure leaves a single pending expense and retry attaches once',async()=>{
