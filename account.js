@@ -42,7 +42,7 @@ async function renderSameDayRequests(){
 }
 
 async function boot({afterRefundRefresh=false}={}){
- const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode=login&return="+encodeURIComponent("conta.html"+location.search+location.hash);return}
+ const {data:{session:s}}=await sb.auth.getSession();session=s;if(!session){location.href="auth.html?mode="+(new URLSearchParams(location.search).has("convite")||new URLSearchParams(location.search).get("moments_invite")==="1"?"signup":"login")+"&return="+encodeURIComponent("conta.html"+location.search+location.hash);return}
  $("#account-email").textContent=session.user.email||"";
  window.VillegramAccount?.identity({display_name:session.user.user_metadata?.full_name||session.user.user_metadata?.name},"account");
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([

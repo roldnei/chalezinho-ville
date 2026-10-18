@@ -20,7 +20,7 @@
  buttons.forEach(b=>b.onclick=()=>{
   choose(b.dataset.accountMode);closeMenu();
   const target=b.dataset.accountTarget?document.getElementById(b.dataset.accountTarget):document.querySelector(b.dataset.accountMode==='private'?'#account-private':'#community-root');
-  history.replaceState(null,'',b.dataset.accountTarget?'#dados':b.dataset.accountMode==='private'?'#reservas':'#villegram');
+  const destination=new URL(location.href);destination.hash=b.dataset.accountTarget?'dados':b.dataset.accountMode==='private'?'reservas':'villegram';history.replaceState(null,'',destination);
   if(target){target.scrollIntoView?.({block:'start'});const focus=b.dataset.accountTarget?target.querySelector('input'):document.querySelector('#account-name');if(focus){if(focus.tagName==='H1')focus.tabIndex=-1;focus.focus({preventScroll:true})}}
  });
  if(toggle&&menu){
