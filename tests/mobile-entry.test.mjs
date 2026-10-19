@@ -66,3 +66,9 @@ test('disabled split flag never delays or switches the mobile entry during calib
  w.CHALEZINHO_CONFIG.mobileEntryExperimentEnabled=false;
  assert.equal(await w.VilleMobileMeasurement.entry(),null);dom.window.close();
 });
+
+test('lost enrollment response retries the same visitor instead of counting a new visitor',async()=>{
+ const {dom,w,calls}=await browser();let attempts=0;const ids=[];
+ w.fetch=async(_,o)=>{const b=JSON.parse(o.body);ids.push(b.visitor_id);if(++attempts===1)throw Error('response lost');return {ok:true,json:async()=>({ok:true,participant:{id:visitor,variant:'baseline',phase:'baseline',reference:'MV-0123456789AB'},experiment:{status:'baseline'}})}};
+ w.eval(script);assert.equal((await w.VilleMobileMeasurement.ready).phase,'baseline');assert.equal(attempts,2);assert.equal(ids[0],ids[1]);w.close();
+});

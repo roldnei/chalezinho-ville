@@ -21,7 +21,8 @@
   try{
    if(!C?.supabaseUrl||!pages.includes(page)||!phone()||navigator.webdriver||navigator.globalPrivacyControl||navigator.doNotTrack==='1'||localStorage.getItem('ville-measurement-excluded')==='true')return null;
    visitor=localStorage.getItem(key)||'';if(!uuid.test(visitor)){visitor=crypto.randomUUID();localStorage.setItem(key,visitor)}
-   const data=await api({operation:'enroll',routing_ready:C.mobileEntryExperimentEnabled===true,page:location.pathname,search:eligibleHome()?new URLSearchParams([...new URLSearchParams(location.search)].filter(([k])=>k==='utm_campaign')).toString():'?direct_target=1',hash:location.hash,width:innerWidth,source:source(),campaign:new URLSearchParams(location.search).get('utm_campaign')},10000);
+   const enrollment={operation:'enroll',routing_ready:C.mobileEntryExperimentEnabled===true,page:location.pathname,search:eligibleHome()?new URLSearchParams([...new URLSearchParams(location.search)].filter(([k])=>k==='utm_campaign')).toString():'?direct_target=1',hash:location.hash,width:innerWidth,source:source(),campaign:new URLSearchParams(location.search).get('utm_campaign')};
+   let data;try{data=await api(enrollment,10000)}catch{data=await api(enrollment,10000)}
    if(!data.participant||data.participant.excluded)return null;
    participant=data.participant;experiment=data.experiment;enabled=true;
    return {variant:participant.variant,status:experiment.status,phase:participant.phase};
