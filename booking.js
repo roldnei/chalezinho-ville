@@ -35,7 +35,7 @@ function accessSessionId(){
   return visit&&Date.now()-visit.last<=30*60*1000?visit.id:null;
  }catch{return null}
 }
-function track(event_name,payload={}){if(PUBLIC)return;api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
+function track(event_name,payload={}){if(['search_started','search_completed'].includes(event_name))window.VilleMobileMeasurement?.track(event_name,{details:payload.metadata||{}});if(PUBLIC)return;api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 
 async function flushVillegramAttribution(){
  if(PUBLIC||!state.session?.access_token)return;
@@ -164,7 +164,7 @@ async function search({scroll=true}={}){
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
   state.search=d.listings;document.body.classList.add("booking-results-screen");renderResults(d.listings,{scroll});error("");
   track("search_completed",{metadata:{nights:nights(bi,bo),guests,available_count:d.listings.filter(x=>x.available).length}});
- }catch(e){if(sequence===searchSequence){$('#availability-count').textContent='Consulta indisponível';$('#booking-list').innerHTML='<p role="status">Não foi possível consultar agora. Use “Alterar datas e hóspedes” para tentar novamente.</p>';error("Não foi possível consultar agora. Tente novamente.");}}
+ }catch(e){window.VilleMobileMeasurement?.track('search_failed');if(sequence===searchSequence){$('#availability-count').textContent='Consulta indisponível';$('#booking-list').innerHTML='<p role="status">Não foi possível consultar agora. Use “Alterar datas e hóspedes” para tentar novamente.</p>';error("Não foi possível consultar agora. Tente novamente.");}}
 }
 function renderResults(list,{scroll=true}={}){
  const code=$("#book-chalet").value;
@@ -810,7 +810,7 @@ async function continueWhatsApp(){
   const current=window.VilleConsultationSummary.message({quote:state.quote,rate:state.rate});
   // Ignore only the consultation timestamp when checking for commercial changes.
   if(previous.replace(/Consulta:.*\n/,'')!==current.replace(/Consulta:.*\n/,'')){state.rateConfirmed=false;priceChangePending=lodgingOnly();renderReview();$('#step-next').textContent=priceChangePending?'Conferi o novo total · continuar':'Continuar pelo WhatsApp';$('#step-next').disabled=!priceChangePending;setFlowError(priceChangePending?'O total mudou. Confira o novo valor e confirme antes de continuar.':'O valor ou as condições mudaram. Revise o resumo e escolha sua tarifa novamente.');return;}
-  whatsappMessage=current;const url='https://wa.me/'+C.whatsappNumber+'?text='+encodeURIComponent(current);$('#whatsapp-open').href=url;$('#whatsapp-actions').hidden=false;$('#step-next').hidden=true;$('#whatsapp-status').textContent='Resumo atualizado. Abra o WhatsApp e envie a mensagem para iniciar o atendimento. Se o aplicativo não abrir, copie o resumo.';saveConsultation();
+  window.VilleMobileMeasurement?.track('consultation_prepared',{property_code:state.property?.code,details:{check_in:state.rate.contract_snapshot.check_in,check_out:state.rate.contract_snapshot.check_out,guests:state.rate.contract_snapshot.guests}});whatsappMessage=window.VilleMobileMeasurement?.message(current)||current;const url='https://wa.me/'+C.whatsappNumber+'?text='+encodeURIComponent(whatsappMessage);$('#whatsapp-open').href=url;$('#whatsapp-actions').hidden=false;$('#step-next').hidden=true;$('#whatsapp-status').textContent='Resumo atualizado. Abra o WhatsApp e envie a mensagem para iniciar o atendimento. Se o aplicativo não abrir, copie o resumo.';saveConsultation();
   // The explicit link is a second gesture: mobile browsers cannot block it as an async popup.
   $('#whatsapp-open').focus();
  }catch(e){state.quote=null;state.rate=null;$('#summary-content').textContent='Consulta indisponível. Consulte novamente antes de continuar.';setFlowError(window.VilleOffers.issues[e.message]||'Não foi possível reconfirmar os valores e a disponibilidade. Faça uma nova consulta.');}
@@ -818,7 +818,7 @@ async function continueWhatsApp(){
 }
 async function copyWhatsAppSummary(){
  if(!whatsappMessage)return;
- const message=whatsappMessage;
+ const message=whatsappMessage;window.VilleMobileMeasurement?.track('summary_copied');
  document.querySelector('#whatsapp-manual-copy')?.remove();
  const field=document.createElement('textarea');field.id='whatsapp-manual-copy';field.className='consultation-summary';field.style.width='100%';field.style.minHeight='220px';field.value=message;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();
  $('#whatsapp-status').textContent='Selecione e copie o resumo abaixo. Tentando também a cópia automática…';

@@ -7,6 +7,7 @@ window.CHALEZINHO_CONFIG={
   environment:"development",
   releaseProfile:"checkout-development",
   whatsappNumber:"5593991592266",
+  mobileEntryExperimentEnabled:false,
   features:{feelings:true,guestPublications:true,social:true}
 };
 
