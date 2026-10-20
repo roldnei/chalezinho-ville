@@ -137,6 +137,13 @@ export async function communityOperation(ctx:any){
   const r=await db.rpc('villegram_save_guest',{actor:u.id,post_id:body.id||null,revision:body.updated_at||null,value,tagged_ids:tags.data.filter((p:Row)=>p.id!==u.id).map((p:Row)=>p.id)});if(r.error)return fail(r.error.message?.includes('post_limit')?'post_limit':'edit_conflict',409);
   return ok({publication:(await resolveMedia([{...r.data,mention_handles:handles}]))[0]});
  }
+ if(op==='community_set_property'||op==='community_moderate'&&body.status==='published'&&Object.hasOwn(body,'property_id')){
+  if(!isAdmin)return fail('admin_required',403);
+  if(body.property_id!==null&&(!Number.isSafeInteger(body.property_id)||body.property_id<1))return fail('invalid_link');
+  const r=await db.rpc('villegram_review_property',{actor:u.id,post_id:body.id,revision:body.updated_at,property_id:body.property_id,decision:op==='community_moderate'?'published':null,reason:''});
+  if(r.error)return fail(r.error.message?.includes('invalid_link')?'invalid_link':'edit_conflict',r.error.message?.includes('invalid_link')?400:409);
+  return ok({publication:(await resolveMedia([r.data]))[0]});
+ }
  if(op==='community_moderate'){
   if(!isAdmin)return fail('admin_required',403);if(!['published','archived'].includes(body.status))return fail('invalid_status');
   const reason=String(body.reason||'').trim().slice(0,500);if(body.status==='archived'&&!reason)return fail('moderation_reason_required');

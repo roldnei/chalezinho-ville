@@ -9,9 +9,9 @@ const owner='4069a585-7cc6-48ad-9263-567358a45c0c',other='11111111-1111-4111-811
 const draft={title:'Meu momento',caption:'Café no chalé',status:'published',property_id:1,media:[{kind:'photo',path:owner+'/'+other+'.webp'}],cover_index:0};
 const db=new PGlite();
 before(async()=>{
- await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
- for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql','20261015200104_guest_trips_week_expiry.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
- await db.exec(`insert into auth.users values('${owner}'),('${other}'),('${staff}');insert into properties values(1);insert into profiles values('${staff}','admin','active');insert into villegram_profiles(id,handle,display_name,is_public,can_post) values('${owner}','hospede','Nome público',true,true),('${other}','amiga','Amiga',true,true);`);
+ await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key,active boolean default true);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
+ for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql','20261015200104_guest_trips_week_expiry.sql','20261020115651_review_trip_property.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ await db.exec(`insert into auth.users values('${owner}'),('${other}'),('${staff}');insert into properties(id) values(1);insert into profiles values('${staff}','admin','active');insert into villegram_profiles(id,handle,display_name,is_public,can_post) values('${owner}','hospede','Nome público',true,true),('${other}','amiga','Amiga',true,true);`);
 });after(()=>db.close());
 test('guest sanitization cannot impersonate team, publish directly, store prices or use another owner media',()=>{
  const p=guestInput({...draft,source:'automatic',author_name:'Equipe',featured:true,offer_id:other,stay_selection:{total_cents:1}},dev,owner);
@@ -67,6 +67,31 @@ test('invites are single-use, expire and cannot be self-redeemed',async()=>{
 });
 test('anonymous callers cannot mutate community and non-admin cannot moderate',async()=>{
  const args={db:{},body:{},op:'guest_save',u:null};assert.equal((await communityOperation(args)).status,401);assert.equal((await communityOperation({...args,u:{id:owner,is_anonymous:true}})).status,401);assert.equal((await communityOperation({...args,u:{id:owner},op:'community_moderate'})).status,403);
+});
+test('reviewer links a pending Trip and approves atomically, then can correct the chalet without extending its lifetime',async()=>{
+ const value=guestInput({...draft,property_id:null},dev,owner);
+ const row=(await db.query('select villegram_save_guest($1,null,null,$2,$3) p',[owner,JSON.stringify(value),[]])).rows[0].p;
+ const call=(actor,revision,property,decision=null)=>db.query('select villegram_review_property($1,$2,$3,$4,$5,$6) p',[actor,row.id,revision,property,decision,'']);
+ for(const role of ['anon','authenticated'])assert.equal((await db.query("select has_function_privilege($1,'villegram_review_property(uuid,uuid,timestamptz,bigint,text,text)','EXECUTE') allowed",[role])).rows[0].allowed,false);
+ await assert.rejects(call(other,row.updated_at,1),/admin_required/);
+ await assert.rejects(call(staff,row.updated_at,999),/invalid_link/);
+ const linked=(await call(staff,row.updated_at,1,'published')).rows[0].p;
+ assert.equal(linked.property_id,1);assert.equal(linked.status,'published');assert.equal(linked.cta,'property');assert.equal(linked.type,'property');assert.deepEqual(linked.media,row.media);assert.equal(linked.author_id,row.author_id);assert.equal(linked.caption,row.caption);
+ await assert.rejects(call(staff,row.updated_at,null),/edit_conflict/);
+ const corrected=(await call(staff,linked.updated_at,null)).rows[0].p;assert.equal(corrected.property_id,null);assert.equal(corrected.cta,'dates');assert.equal(corrected.status,'published');assert.equal(Date.parse(corrected.published_at),Date.parse(linked.published_at));assert.equal(Date.parse(corrected.expires_at),Date.parse(linked.expires_at));
+ const relinked=(await call(staff,corrected.updated_at,1)).rows[0].p;assert.equal(relinked.property_id,1);assert.equal(Date.parse(relinked.expires_at),Date.parse(linked.expires_at));
+ const pending=(await db.query('select villegram_save_guest($1,null,null,$2,$3) p',[owner,JSON.stringify(value),[]])).rows[0].p;
+ await db.query("update villegram_profiles set is_public=false where id=$1",[owner]);
+ await assert.rejects(db.query('select villegram_review_property($1,$2,$3,1,$4,$5)',[staff,pending.id,pending.updated_at,'published','']),/edit_conflict/);
+ assert.equal((await db.query('select property_id from villegram_publications where id=$1',[pending.id])).rows[0].property_id,null);
+ await db.query('update villegram_profiles set is_public=true where id=$1',[owner]);
+});
+test('only admins reach the chalet-link RPC, approval includes the selected property and invalid IDs fail closed',async()=>{
+ const calls=[],ctx={db:{rpc:async(name,args)=>{calls.push({name,args});return {data:{id:'trip',property_id:1,status:'published'}};}},u:{id:staff},isAdmin:true,op:'community_set_property',body:{id:'trip',updated_at:'revision',property_id:1},resolveMedia:async rows=>rows};
+ assert.equal((await communityOperation({...ctx,isAdmin:false})).status,403);assert.equal(calls.length,0);
+ for(const property_id of [undefined,'1',-1,1.5])assert.equal((await communityOperation({...ctx,body:{...ctx.body,property_id}})).body.error,'invalid_link');
+ assert.equal(calls.length,0);assert.equal((await communityOperation(ctx)).status,200);assert.equal(calls[0].args.decision,null);
+ assert.equal((await communityOperation({...ctx,op:'community_moderate',body:{...ctx.body,status:'published'}})).status,200);assert.equal(calls[1].args.decision,'published');assert.equal(calls[1].name,'villegram_review_property');
 });
 test('public feed excludes disabled guest profiles and only projects accepted public mentions',async()=>{
  const data={villegram_profiles:[{id:owner,handle:'hospede',display_name:'Nome público',is_public:true}],villegram_mentions:[{publication_id:owner,user_id:owner,status:'accepted'}]};
