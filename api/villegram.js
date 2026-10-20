@@ -1,8 +1,10 @@
 import {publicServiceTarget} from '../scripts/public-service-target.mjs';
+import {publicationShare} from '../scripts/publication-share.mjs';
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export default async function handler(req,res){
- const host=String(req.headers.host||'');if(req.method!=='GET')return res.status(405).end();let release;try{release=publicServiceTarget(process.env,host)}catch{return res.status(404).end()}
+ const host=String(req.headers.host||'');if(!['GET','HEAD'].includes(req.method))return res.status(405).end();let release;try{release=publicServiceTarget(process.env,host)}catch{return res.status(404).end()}
  const input=new URL(req.url,'https://'+host),q=input.searchParams,id=q.get('villegram'),code=q.get('chalet');
+ if(q.has('publication'))return publicationShare(req,res,release,input);
  if(!/^[a-f0-9-]{36}$/i.test(id||'')||!/^[A-Z0-9_-]{1,32}$/.test(code||''))return res.status(400).end('Link inválido');
  const safe=new URLSearchParams({villegram:id,chalet:code});for(const field of ['check_in','check_out'])if(/^\d{4}-\d{2}-\d{2}$/.test(q.get(field)||''))safe.set(field,q.get(field));
  const target='/index.html?'+safe;let title='Ville Moments · Chalezinho Ville',description='Conheça a experiência e consulte as datas disponíveis.',image='/assets/hero-signature.webp';

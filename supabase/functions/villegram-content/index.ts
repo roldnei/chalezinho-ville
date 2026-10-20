@@ -1,5 +1,6 @@
 import {releaseTarget,commercialItem} from '../_shared/release-policy.ts';
 import {communityOperation,communityPublic} from '../_shared/villegram-community.ts';
+import {publicPublicationShare} from '../_shared/villegram-share.ts';
 import {resolvePublicationStay} from '../_shared/villegram-stay.ts';
 import {createClient} from 'npm:@supabase/supabase-js@2';
 import {publicationInput,automationInput,eligiblePublication,guestPublicationVisible,generatePublications,signalInput,summarizePublications,recordVillegramBooking} from '../_shared/villegram-publications.ts';
@@ -25,7 +26,8 @@ Deno.serve(async req=>{
  let target;try{target=releaseTarget(projectUrl)}catch{return json({ok:false,error:'unknown_release_target'},403)}
  try{
  const query=new URL(req.url).searchParams,body=req.method==='POST'?await req.json():{},requested=body.operation||query.get('operation')||'feed',op=target==='production'&&requested==='feed'?'public_feed':requested;
- if(target==='production'&&!['public_feed','feed','signals','admin_list','save_settings','generate','save','preview','report','social','like','comment','remove_comment'].includes(op)&&!op.startsWith('community_')&&!op.startsWith('guest_'))return json({ok:false,error:'feature_not_released'},403);
+ if(target==='production'&&!['public_share','public_feed','feed','signals','admin_list','save_settings','generate','save','preview','report','social','like','comment','remove_comment'].includes(op)&&!op.startsWith('community_')&&!op.startsWith('guest_'))return json({ok:false,error:'feature_not_released'},403);
+ if(op==='public_share'){const r=await publicPublicationShare({db:admin,catalog,resolveMedia,production:target==='production'},body.publication_id||query.get('publication'));return json(r.body,r.status);}
  if(op==='feed'||op==='public_feed'||op==='generate_due'){
   if(op==='generate_due'){await generate();return json({ok:true})}if(op!=='public_feed')try{await generate()}catch{console.warn('villegram_generation_unavailable')}
   const [c,s,posts]=await Promise.all([catalog(true),settings(),admin.from('villegram_publications').select('*').eq('status','published').or('source.neq.guest_submission,expires_at.gt.'+new Date().toISOString()).order('featured',{ascending:false}).order('display_order').order('created_at').limit(200)]);if(posts.error)throw Error('feed_unavailable');

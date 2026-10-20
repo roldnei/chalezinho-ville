@@ -4,6 +4,9 @@
   "functions": {
     "api/stay-showcase.js": {
       "maxDuration": 60
+    },
+    "api/villegram.js": {
+      "maxDuration": 30
     }
   }
 }
