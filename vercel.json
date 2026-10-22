@@ -7,6 +7,23 @@
     },
     "api/villegram.js": {
       "maxDuration": 30
+    },
+    "api/moments.js": {
+      "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/momentos/:trip",
+      "destination": "/api/moments?trip=:trip"
+    },
+    {
+      "source": "/galeria/:chale",
+      "destination": "/api/moments?chale=:chale"
+    },
+    {
+      "source": "/sitemap-moments.xml",
+      "destination": "/api/moments?sitemap=1"
+    }
+  ]
 }

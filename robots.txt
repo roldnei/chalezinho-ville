@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 
 Sitemap: https://chalezinhoville.com.br/sitemap.xml
+
+Sitemap: https://chalezinhoville.com.br/sitemap-moments.xml
