@@ -4,3 +4,5 @@
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
 .guide-history{margin-top:40px;padding:28px;background:#e8e9dd}.guide-history h3{font-size:1.45rem;margin-bottom:14px}.guide-history p{font-size:.94rem;color:#596457;max-width:860px}.guide-map-link{font-size:.85rem;margin-top:20px}.guide-map-link a{text-underline-offset:5px}
+
+.guide-center-photo{margin-top:44px}.guide-center-photo img{width:100%;height:auto;aspect-ratio:16/9;object-fit:cover;object-position:center 55%}.guide-center-photo figcaption{font-size:.68rem;color:#766f64;margin-top:12px}.guide-center-photo a{text-underline-offset:3px}.guide-coast img{min-height:0;aspect-ratio:3/2}.guide-header nav a{white-space:nowrap}
