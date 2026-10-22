@@ -10,3 +10,22 @@ test('legacy publications remain valid and have no generated sound or timeline v
 test('mixed sequence uses displayed seconds after speed and locates every scene across a boundary',async()=>{const d=new JSDOM('',{runScripts:'outside-only'}),w=d.window;w.eval(await readFile(new URL('../villegram-timeline.js',import.meta.url),'utf8'));const T=w.VillegramTimeline,clips=T.sequence([photo,video,photo]);assert.deepEqual(Array.from(clips,c=>[c.start,c.end]),[[0,4],[4,12],[12,16]]);assert.equal(T.locate(clips,4).index,1);assert.equal(T.locate(clips,7).local,3);assert.equal(T.locate(clips,999).index,2);assert.equal(T.enabled([photo,video]),true);d.window.close()});
 
 test('changing speed or photo duration keeps the selected sound inside the shortened scene',async()=>{const d=new JSDOM('',{runScripts:'outside-only'});d.window.eval(await readFile(new URL('../villegram-timeline.js',import.meta.url),'utf8'));const m={kind:'photo',clip_duration:1,sound:{id:'coffee',offset:2,length:3,source_start:0,volume:.5}};d.window.VillegramTimeline.fitSound(m);assert.equal(m.sound.offset,.9);assert.equal(m.sound.length,.1);const v={...video,speed:1,sound:{...video.sound}};d.window.VillegramTimeline.fitSound(v);assert.equal(v.sound.offset,2);assert.equal(v.sound.length,2);d.window.close()});
+
+test('player defers hidden videos and distant photos, loads on seek and releases media on exit',async()=>{
+ const d=new JSDOM('<div id="host"></div>',{runScripts:'outside-only'}),w=d.window;
+ w.requestAnimationFrame=()=>1;w.cancelAnimationFrame=()=>{};
+ w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};
+ w.eval(await readFile(new URL('../villegram-timeline.js',import.meta.url),'utf8'));
+ const media=[{...photo,url:'https://media.example/first.webp'},{...video,url:'https://media.example/second.mp4'},{...photo,url:'https://media.example/third.webp'},{...video,url:'https://media.example/fourth.mp4'}];
+ const player=w.VillegramTimeline.player({host:w.document.querySelector('#host'),media});
+ assert.equal(player.elements[0].hasAttribute('src'),true);
+ for(const n of [1,2,3])assert.equal(player.elements[n].hasAttribute('src'),false);
+ player.seek(4);assert.equal(player.elements[1].preload,'metadata');assert.equal(player.elements[1].getAttribute('src'),media[1].url);assert.equal(player.elements[2].getAttribute('src'),media[2].url);assert.equal(player.elements[3].hasAttribute('src'),false);
+ player.seek(16);assert.equal(player.elements[3].getAttribute('src'),media[3].url);
+ player.destroy();assert.equal(player.elements.some(el=>el.hasAttribute('src')),false);d.window.close();
+});
+test('export can explicitly load every scene while normal playback remains selective',async()=>{
+ const d=new JSDOM('<div></div>',{runScripts:'outside-only'}),w=d.window;w.requestAnimationFrame=()=>1;w.cancelAnimationFrame=()=>{};w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};
+ w.eval(await readFile(new URL('../villegram-timeline.js',import.meta.url),'utf8'));
+ const player=w.VillegramTimeline.player({host:w.document.querySelector('div'),media:[{...photo,url:'a.webp'},{...video,url:'b.mp4'}],preloadAll:true});assert.equal(player.elements.every(el=>el.hasAttribute('src')),true);player.destroy();d.window.close();
+});
