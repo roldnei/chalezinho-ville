@@ -30,3 +30,17 @@ test('temporary backend failure is retried once and a missing trip is never retr
  let calls=0;const res=response();await momentsHandler({method:'GET',url:'/api/moments?chale=CH2',headers:{host:'chalezinhoville.com.br'}},res,{env,request:async()=>{calls++;if(calls===1)throw Error('temporary timeout');return Response.json({ok:true,publications:[]})}});assert.equal(calls,2);assert.equal(res.statusCode,200);
  calls=0;await momentsHandler({method:'GET',url:'/api/moments?trip='+id,headers:{host:'chalezinhoville.com.br'}},response(),{env,request:async()=>{calls++;return new Response('',{status:404})}});assert.equal(calls,1);
 });
+
+test('owner-selected old Trips stay public only while published, undeleted and on public profiles',()=>{
+ const legacy={...post,id:'0f124ca5-21c3-4bea-87c6-572ec6faacda'};
+ assert.equal(galleryEligible(legacy,props[1],[],people),true);
+ assert.equal(galleryEligible({...legacy,deleted_at:'2026-10-22'},props[1],[],people),false);
+ assert.equal(galleryEligible({...legacy,status:'archived'},props[1],[],people),false);
+ assert.equal(galleryEligible(legacy,props[1],[],[{id:owner,is_public:false}]),false);
+ assert.equal(galleryEligible(post,props[1],[],people),false);
+});
+test('commercial fallback uses one card belonging to the current chalet even when guest Trips are shared',()=>{
+ const fallback=props.flatMap(p=>[{...post,id:'offer:'+p.code,property_id:p.id},{...post,id:'property:'+p.code,property_id:p.id}]);
+ for(const prop of props){const result=rankedGallery([],fallback,prop.code,props,[]);assert.equal(result.length,1);assert.equal(result[0].property_id,prop.id);assert.equal(result[0].id,'offer:'+prop.code);}
+ const result=rankedGallery([post],fallback,'CH3',props,[]);assert.equal(result.length,2);assert.equal(result[0].id,post.id);assert.equal(result[1].property_id,3);
+});

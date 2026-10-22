@@ -1,14 +1,24 @@
 import {commercialItem} from './release-policy.ts';
 import {eligiblePublication} from './villegram-publications.ts';
+// Exact existing public Trips selected by the site owner on 2026-10-22.
+// This selection is separate from, and never backfills, guest signup acceptance.
+const ownerSelectedLegacyTrips=new Set([
+ '9b46bcbd-6209-4637-b210-ca82656cb24d', // Roldnei: Seu próximo respiro
+ '7a4cbb9d-05ea-44ef-a728-dcdf071fc1b7', // Roldnei: Piscina 31°C
+ '00813df4-bb70-44e0-953a-4e8ee1d50051', // Roldnei: Piscina com amigos
+ '48e333a1-afd9-440b-b696-3c180eec1232', // Roldnei
+ '2cbc5c5a-0aba-4320-b066-6645a9b465de', // Edgar: Refúgio de Fim de Semana
+ '0f124ca5-21c3-4bea-87c6-572ec6faacda', // Merielen
+]);
 export function galleryEligible(p:any,property:any,consents:any[],profiles:any[]){
- return !p.deleted_at&&p.status==='published'&&Date.parse(p.published_at||'')<=Date.now()&&p.source==='guest_submission'&&!p.offer_id&&!p.experience_id&&property?.active!==false&&property?.id===p.property_id&&commercialItem(p)&&commercialItem(property)&&profiles.some(v=>v.id===p.author_id&&v.is_public)&&consents.some(t=>t.user_id===p.author_id&&t.terms_version==='2026-10-22.1'&&Date.parse(t.accepted_at)<=Date.parse(p.created_at));
+ return !p.deleted_at&&p.status==='published'&&Date.parse(p.published_at||'')<=Date.now()&&p.source==='guest_submission'&&!p.offer_id&&!p.experience_id&&property?.active!==false&&property?.id===p.property_id&&commercialItem(p)&&commercialItem(property)&&profiles.some(v=>v.id===p.author_id&&v.is_public)&&(ownerSelectedLegacyTrips.has(p.id)||consents.some(t=>t.user_id===p.author_id&&t.terms_version==='2026-10-22.1'&&Date.parse(t.accepted_at)<=Date.parse(p.created_at)));
 }
 export function rankedGallery(guests:any[],fallback:any[],code:string,properties:any[],views:any[]){
  const shared=code==='CH2'||code==='CH3',codes=shared?['CH2','CH3']:[code],ids=properties.filter(p=>codes.includes(p.code)).map(p=>p.id);
  const count=new Map(views.map(v=>[v.publication_id,Number(v.views)||0]));
  const sorted=guests.filter(p=>ids.includes(p.property_id)).sort((a,b)=>(count.get(b.id)||0)-(count.get(a.id)||0)||Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
- const chosen=sorted.slice(0,6),spares=fallback.filter(p=>ids.includes(p.property_id)).sort((a,b)=>Number(String(a.id).startsWith('property:'))-Number(String(b.id).startsWith('property:'))||Number(b.source==='manual')-Number(a.source==='manual')||Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
- return [...chosen,...spares.slice(0,6-chosen.length)];
+ const chosen=sorted.slice(0,6),spares=fallback.filter(p=>properties.some(prop=>prop.code===code&&prop.id===p.property_id)).sort((a,b)=>Number(String(a.id).startsWith('property:'))-Number(String(b.id).startsWith('property:'))||Number(b.source==='manual')-Number(a.source==='manual')||Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
+ return [...chosen,...spares.slice(0,Math.min(1,6-chosen.length))];
 }
 export async function publicGallery(ctx:any,body:any){
  const fail=(status:number)=>({status,body:{ok:false,error:'gallery_unavailable'}});
