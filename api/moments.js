@@ -9,7 +9,10 @@ export async function momentsHandler(req,res,{env=process.env,request=fetch}={})
  if(isMedia&&(!id||!/^\d$/.test(q.get('media'))))return res.status(400).end('Mídia inválida');
  const origin=release.environment==='production'?'https://chalezinhoville.com.br':input.origin,backend=new URL('/functions/v1/villegram-content',release.endpoint);
  try{
-  const response=await request(backend,{method:'POST',headers:{'Content-Type':'application/json',Origin:origin,'X-Chalezinho-Env':release.environment},body:JSON.stringify({operation:'public_gallery',...(id?{publication_id:id}:code?{property_code:code}:{})}),signal:AbortSignal.timeout(15000)});
+  let response;for(let attempt=0;attempt<2;attempt++){
+   try{response=await request(backend,{method:'POST',headers:{'Content-Type':'application/json',Origin:origin,'X-Chalezinho-Env':release.environment},body:JSON.stringify({operation:'public_gallery',...(id?{publication_id:id}:code?{property_code:code}:{})}),signal:AbortSignal.timeout(15000)});if(response.status<500||attempt===1)break;await response.body?.cancel();}
+   catch(error){if(attempt===1)throw error;}
+  }
   if(response.status===404||response.status===400){res.setHeader('X-Robots-Tag','noindex');return res.status(response.status).end('Momento indisponível');}
   const d=await response.json();if(!response.ok||!d.ok)throw Error('gallery_unavailable');const posts=d.publications;
   if(isMedia){

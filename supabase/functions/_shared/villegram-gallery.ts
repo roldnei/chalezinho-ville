@@ -24,7 +24,7 @@ export async function publicGallery(ctx:any,body:any){
  const [t,v]=authors.length?await Promise.all([ctx.db.from('account_terms_acceptances').select('user_id,terms_version,accepted_at').in('user_id',authors).eq('terms_version','2026-10-22.1'),ctx.db.from('villegram_profiles').select('id,handle,display_name,is_public').in('id',authors).eq('is_public',true)]):[{data:[]},{data:[]}];
  if(t.error||v.error)throw Error('gallery_unavailable');
  const guests=(r.data||[]).filter((p:any)=>galleryEligible(p,properties.find((x:any)=>x.id===p.property_id),t.data,v.data));
- let fallback=(r.data||[]).filter((p:any)=>p.source!=='guest_submission'&&p.property_id&&commercialItem(p)&&eligiblePublication(p,properties,c.products,c.offers));
+ let fallback=(r.data||[]).filter((p:any)=>p.source!=='guest_submission'&&!p.experience_id&&p.property_id&&commercialItem(p)&&eligiblePublication(p,properties,c.products,c.offers));
  const today=new Date().toISOString().slice(0,10);
  for(const prop of properties){
   for(const offer of c.offers.filter((o:any)=>o.status==='active'&&o.property_ids.includes(prop.id)&&(!o.end_date||o.end_date>=today)&&commercialItem(o))){
