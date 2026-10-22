@@ -44,7 +44,7 @@ export function operationSummary(stays:any[],tasks:any[],today:string,now=new Da
   // An overdue stay from a previous day requires review, not presumed occupancy.
   // Today's checkout remains in house until an actual departure is recorded.
   present:active.filter(s=>s.checked_in_at&&Date.parse(s.checked_in_at)<=now.getTime()&&!ended(s)&&s.check_out>=today),
-  cleanings:operationalTasks.filter(t=>t.stage==='preparation'&&day(t.scheduled_for)===today),
+  cleanings:pending.filter(t=>t.stage==='preparation'&&t.status!=='inspection'&&day(t.scheduled_for)===today),
   cleaning_completed:operationalTasks.filter(t=>t.stage==='preparation'&&['inspection','approved'].includes(t.status)&&day(t.submitted_at)===today),today_tasks,
   upcoming:active.filter(s=>!ended(s)&&boundary(s,'check_out')>now.getTime()),
   attendance_review:active.filter(s=>!ended(s)&&boundary(s,'check_out')<=now.getTime()),

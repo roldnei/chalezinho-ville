@@ -87,11 +87,29 @@ test('daily cleaning agenda uses scheduled date and completion uses submitted da
  const task={stage:'preparation',status:'pending',scheduled_for:'2026-10-16T01:00:00Z',due_at:'2026-10-16T02:00:00Z'};
  const tasks=[{...task,id:'standalone'},{...task,id:'started',status:'in_progress'},{...task,id:'blocked',status:'blocked'},...['inspection','approved','cancelled','superseded'].map(status=>({...task,id:status,status,submitted_at:'2026-10-15T18:00:00Z'})),{...task,id:'future',scheduled_for:'2026-10-16T03:00:00Z',due_at:'2026-10-16T04:00:00Z'},{...task,id:'fixture',is_test:true},{...task,id:'departure',stage:'departure'},{...task,id:'due-today',scheduled_for:'2026-10-14T18:00:00Z',due_at:'2026-10-15T17:30:00Z'}];
  const s=operationSummary([],tasks,'2026-10-15',new Date('2026-10-15T19:00:00Z'));
- assert.deepEqual(s.cleanings.map(t=>t.id),['standalone','started','blocked','inspection','approved']);assert.deepEqual(s.cleaning_completed.map(t=>t.id),['inspection','approved']);assert.ok(!s.cleanings.some(t=>t.id==='due-today'));assert.ok(s.today_tasks.some(t=>t.id==='inspection'));assert.ok(!s.today_tasks.some(t=>t.id==='future'||t.id==='fixture'));
+ assert.deepEqual(s.cleanings.map(t=>t.id),['standalone','started','blocked']);assert.deepEqual(s.cleaning_completed.map(t=>t.id),['inspection','approved']);assert.ok(!s.cleanings.some(t=>t.id==='due-today'));assert.ok(s.today_tasks.some(t=>t.id==='inspection'));assert.ok(!s.today_tasks.some(t=>t.id==='future'||t.id==='fixture'));
 });
 
 test('approval on another day does not move the cleaning execution date',()=>{
  const base={stage:'preparation',status:'approved',scheduled_for:'2026-10-14T18:00:00Z',submitted_at:'2026-10-14T19:00:00Z',completed_at:'2026-10-15T19:00:00Z'};
  const s=operationSummary([],[base,{...base,id:'completed-today',status:'inspection',submitted_at:'2026-10-15T19:00:00Z'}],'2026-10-15',new Date('2026-10-15T20:00:00Z'));
  assert.equal(s.cleanings.length,0);assert.deepEqual(s.cleaning_completed.map(t=>t.id),['completed-today']);
+});
+
+test('early cleaning is completed on its execution day and never forecast again on its scheduled day',()=>{
+ const task={id:'redley-preparation',property_id:3,stage:'preparation',status:'approved',scheduled_for:'2026-10-22T18:00:00Z',submitted_at:'2026-10-22T00:21:10.261667Z',completed_at:'2026-10-22T00:23:28.352783Z'};
+ const yesterday=operationSummary([],[task],'2026-10-21',new Date('2026-10-22T01:00:00Z'));
+ assert.deepEqual(yesterday.cleaning_completed.map(t=>t.id),[task.id]);assert.equal(yesterday.cleanings.length,0);
+ for(const date of ['2026-10-22','2026-10-23','2026-10-24','2026-10-25','2026-10-26','2026-10-27','2026-10-28']){
+  const summary=operationSummary([],[task],date,new Date(date+'T16:00:00Z'));
+  assert.equal(summary.cleanings.length,0);assert.equal(summary.cleaning_completed.length,0);assert.equal(summary.pending.length,0);
+ }
+});
+
+test('sent for approval is finished work, while reopened cleaning becomes forecast again',()=>{
+ const task={id:'awaiting-review',stage:'preparation',status:'inspection',scheduled_for:'2026-10-22T18:00:00Z',submitted_at:'2026-10-22T16:00:00Z'};
+ let summary=operationSummary([],[task],'2026-10-22',new Date('2026-10-22T17:00:00Z'));
+ assert.equal(summary.cleanings.length,0);assert.equal(summary.cleaning_completed.length,1);assert.equal(summary.pending.length,1);
+ summary=operationSummary([],[{...task,status:'pending'}],'2026-10-22',new Date('2026-10-22T17:00:00Z'));
+ assert.equal(summary.cleanings.length,1);assert.equal(summary.cleaning_completed.length,0);
 });
