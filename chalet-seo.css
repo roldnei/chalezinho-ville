@@ -7,3 +7,5 @@
 .chalet-related{display:flex;flex-wrap:wrap;gap:16px}.chalet-related h2{width:100%}.chalet-related>a{flex:1 1 260px;display:grid;gap:10px;padding:22px;border:1px solid #ffffff29;border-radius:8px;color:#f3ebdf;text-decoration:none}.chalet-related span{font-size:.9rem;color:#cfc1ae;line-height:1.6}.chalet-related>a:hover{border-color:#b59c77}
 .chalet-faq summary:focus-visible,.chalet-related a:focus-visible,.chalet-breadcrumb a:focus-visible{outline:2px solid #dba969;outline-offset:5px}
 @media(max-width:600px){.chalet-faq,.chalet-related{margin:24px auto}.chalet-related>a{flex-basis:100%}}
+
+.region-guide-link{font-size:.9rem;line-height:1.7;text-decoration:underline;text-underline-offset:4px}.region-guide-link a{text-decoration:underline}
