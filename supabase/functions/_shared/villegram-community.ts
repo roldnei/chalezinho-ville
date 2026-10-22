@@ -75,8 +75,27 @@ export async function communityOperation(ctx:any){
   const r=await db.from('villegram_publications').select('*',{count:'exact'}).eq('source','guest_submission').eq('status','pending_review').order('created_at').order('id').range(page*50,page*50+49);
   if(r.error)throw Error('community_unavailable');return ok({publications:await resolveMedia(r.data||[]),total:r.count||0,page});
  }
+ const cleanupDeletedMedia=async()=>{
+  const jobs=await db.from('villegram_media_deletions').select('publication_id,media_paths').eq('author_id',u.id).is('completed_at',null).limit(5);
+  if(jobs.error)return;
+  for(const job of jobs.data||[]){let complete=true;for(const path of job.media_paths){
+   if(!path.startsWith(u.id+'/')){complete=false;continue;}
+   const [main,poster]=await Promise.all(['path','poster_path'].map(key=>db.from('villegram_publications').select('id').is('deleted_at',null).contains('media',[{[key]:path}]).limit(1)));
+   if(main.error||poster.error){complete=false;continue;}
+   if(main.data?.length||poster.data?.length)continue;
+   const removed=await db.storage.from('villegram-media').remove([path]);if(removed.error)complete=false;
+  }if(complete)await db.from('villegram_media_deletions').update({completed_at:new Date().toISOString(),media_paths:[]}).eq('publication_id',job.publication_id).eq('author_id',u.id);}
+ };
+ if(op==='guest_delete'){
+  if(!/^[a-f0-9-]{36}$/i.test(body.id||''))return fail('publication_unavailable',404);
+  const r=await db.rpc('villegram_delete_guest',{actor:u.id,post_id:body.id,revision:body.updated_at||null});
+  if(r.error)return fail(r.error.message?.includes('edit_conflict')?'edit_conflict':'publication_unavailable',r.error.message?.includes('edit_conflict')?409:404);
+  try{await cleanupDeletedMedia()}catch{console.warn('trip_media_cleanup_pending')}
+  return ok({deleted:true});
+ }
  if(op==='community_me'){
-  const [profile,rights,posts,notifications,mentions,invites]=await Promise.all([mine(),eligible(),db.from('villegram_publications').select('*').eq('author_id',u.id).eq('source','guest_submission').order('created_at',{ascending:false}).limit(100),db.from('villegram_notifications').select('id,kind,actor_id,publication_id,created_at,read_at').eq('user_id',u.id).order('created_at',{ascending:false}).limit(60),db.from('villegram_mentions').select('publication_id,status').eq('user_id',u.id).neq('status','removed'),db.from('villegram_invites').select('id,expires_at,accepted_by,revoked_at').eq('inviter_id',u.id).order('created_at',{ascending:false}).limit(10)]);
+  try{await cleanupDeletedMedia()}catch{console.warn('trip_media_cleanup_pending')}
+  const [profile,rights,posts,notifications,mentions,invites]=await Promise.all([mine(),eligible(),db.from('villegram_publications').select('*').eq('author_id',u.id).eq('source','guest_submission').is('deleted_at',null).order('created_at',{ascending:false}).limit(100),db.from('villegram_notifications').select('id,kind,actor_id,publication_id,created_at,read_at').eq('user_id',u.id).order('created_at',{ascending:false}).limit(60),db.from('villegram_mentions').select('publication_id,status').eq('user_id',u.id).neq('status','removed'),db.from('villegram_invites').select('id,expires_at,accepted_by,revoked_at').eq('inviter_id',u.id).order('created_at',{ascending:false}).limit(10)]);
   for(const r of [posts,notifications,mentions,invites])if(r.error)throw Error('community_unavailable');
   const taggedIds=(mentions.data||[]).map((m:Row)=>m.publication_id);const tagged=taggedIds.length?await db.from('villegram_publications').select('*').in('id',taggedIds).eq('status','published'):{data:[]};if(tagged.error)throw Error('community_unavailable');
   const publicTagged=await resolveMedia(await communityPublic(db,tagged.data||[]));
@@ -122,13 +141,13 @@ export async function communityOperation(ctx:any){
  if(op==='guest_list'){
   const profile=await mine(),rights=await eligible();if(!profile?.is_public)return fail('public_profile_required',403);if(!rights.allowed)return fail('guest_required',403);
   await check(db.from('villegram_profiles').update({can_post:true}).eq('id',u.id));
-  const [c,p]=await Promise.all([catalog(),db.from('villegram_publications').select('*').eq('author_id',u.id).eq('source','guest_submission').order('created_at',{ascending:false}).limit(100)]);if(p.error)throw Error('community_unavailable');const t=p.data.length?await db.from('villegram_mentions').select('publication_id,user_id,status').in('publication_id',p.data.map((v:Row)=>v.id)):{data:[]};if(t.error)throw Error('community_unavailable');
+  const [c,p]=await Promise.all([catalog(),db.from('villegram_publications').select('*').eq('author_id',u.id).eq('source','guest_submission').is('deleted_at',null).order('created_at',{ascending:false}).limit(100)]);if(p.error)throw Error('community_unavailable');const t=p.data.length?await db.from('villegram_mentions').select('publication_id,user_id,status').in('publication_id',p.data.map((v:Row)=>v.id)):{data:[]};if(t.error)throw Error('community_unavailable');
   const tagIds=[...new Set((t.data||[]).filter((m:Row)=>p.data.some((v:Row)=>v.id===m.publication_id)).map((m:Row)=>m.user_id))];const people=tagIds.length?await db.from('villegram_profiles').select('id,handle').in('id',tagIds).eq('is_public',true):{data:[]};if(people.error)throw Error('community_unavailable');
   return ok({...c,profile,suggested_property_id:rights.property_ids[0]||null,publications:await resolveMedia(p.data.map((v:Row)=>({...v,mention_handles:t.data.filter((m:Row)=>m.publication_id===v.id&&m.status!=='removed').map((m:Row)=>people.data.find((x:Row)=>x.id===m.user_id)?.handle).filter(Boolean)}))),settings:{templates:{}}});
  }
  if(op==='guest_save'||op==='guest_preview'){
   const profile=await mine(),rights=await eligible();if(!profile?.is_public||!rights.allowed)return fail('guest_profile_required',403);
-  const existing=body.id?await check(db.from('villegram_publications').select('*').eq('id',body.id).eq('author_id',u.id).eq('source','guest_submission').maybeSingle()):null;if(body.id&&!existing)return fail('publication_unavailable',404);
+  const existing=body.id?await check(db.from('villegram_publications').select('*').eq('id',body.id).eq('author_id',u.id).eq('source','guest_submission').is('deleted_at',null).maybeSingle()):null;if(body.id&&!existing)return fail('publication_unavailable',404);
   const value=guestInput(body.publication,projectUrl,u.id),handles=mentionHandles(body.mentions),c=await catalog();
   if(value.property_id&&!c.properties.some((p:Row)=>p.id===value.property_id&&p.active))return fail('invalid_link');
   for(const m of value.media)for(const path of [m.path,m.poster_path].filter(Boolean))await mediaExists(path);

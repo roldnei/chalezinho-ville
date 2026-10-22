@@ -9,8 +9,8 @@ const owner='4069a585-7cc6-48ad-9263-567358a45c0c',other='11111111-1111-4111-811
 const draft={title:'Meu momento',caption:'Café no chalé',status:'published',property_id:1,media:[{kind:'photo',path:owner+'/'+other+'.webp'}],cover_index:0};
 const db=new PGlite();
 before(async()=>{
- await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key);create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key,active boolean default true);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
- for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql','20261015200104_guest_trips_week_expiry.sql','20261020115651_review_trip_property.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
+ await db.exec(`create role anon;create role authenticated;create role service_role;create schema auth;create schema storage;create table auth.users(id uuid primary key,raw_user_meta_data jsonb default '{}');create function auth.uid() returns uuid language sql as $$select nullif(current_setting('test.uid',true),'')::uuid$$;create table public.profiles(id uuid primary key,role text,pms_access_status text);create table public.properties(id bigint primary key,active boolean default true);create table public.experience_products(id uuid primary key);create table public.stay_offers(id uuid primary key);create table public.reservations(id uuid primary key);create table storage.buckets(id text primary key,name text,public bool,file_size_limit bigint,allowed_mime_types text[]);create table storage.objects(id uuid,name text,bucket_id text);create function storage.foldername(text) returns text[] language sql as $$select string_to_array($1,'/')$$;create table public.audit_events(actor_user_id uuid,action text,entity_type text,entity_id uuid,new_value jsonb);`);
+ for(const file of ['20261006170228_villegram_publications.sql','20261007033341_villegram_stay_selection.sql','20261007120738_villegram_guest_community.sql','20261014163239_iphone_mov_uploads.sql','20261015200104_guest_trips_week_expiry.sql','20261020115651_review_trip_property.sql','20261022150053_moments_terms_and_content_deletion.sql'])await db.exec(await readFile(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'));
  await db.exec(`insert into auth.users values('${owner}'),('${other}'),('${staff}');insert into properties(id) values(1);insert into profiles values('${staff}','admin','active');insert into villegram_profiles(id,handle,display_name,is_public,can_post) values('${owner}','hospede','Nome público',true,true),('${other}','amiga','Amiga',true,true);`);
 });after(()=>db.close());
 test('guest sanitization cannot impersonate team, publish directly, store prices or use another owner media',()=>{
@@ -312,3 +312,46 @@ test('already public profile has no consent reminder and can open the composer',
 test('general Moments invitation opens consent form without making the profile public automatically',async()=>{const state={profile:null,allowed:false,publications:[],notifications:[],mentions:[],invites:[]};const {w,calls}=await communityPage('conta.html','?moments_invite=1',()=>state);try{assert.equal(w.document.querySelector('#community-profile-form').hidden,false);assert.equal(w.document.querySelector('#community-profile-form').elements.is_public.checked,false);assert.equal(calls.some(c=>c.operation==='community_save_profile'),false);assert.equal(new URL(w.location.href).searchParams.has('moments_invite'),false);}finally{w.close()}});
 
 test('revoked invitation fails and competing accept attempts leave exactly one recipient',async()=>{for(const [hash,revoked]of [['c'.repeat(64),true],['d'.repeat(64),false]]){await db.query("insert into villegram_invites(inviter_id,token_hash,expires_at,revoked_at) values($1,$2,now()+interval '7 days',$3)",[owner,hash,revoked?new Date():null]);const results=await Promise.allSettled([other,staff].map(id=>db.query('select villegram_accept_invite($1,$2)',[id,hash])));assert.equal(results.filter(r=>r.status==='fulfilled').length,revoked?0:1);}});
+
+
+test('signup terms are captured by the server once and cannot be rewritten through editable metadata',async()=>{
+ const id='55555555-5555-4555-8555-555555555555';
+ await db.query('insert into auth.users(id,raw_user_meta_data) values($1,$2)',[id,JSON.stringify({terms_version:'2026-10-22.1',terms_acceptance_source:'signup_create_account',accepted_at:'1999-01-01'})]);
+ const acceptance=(await db.query('select * from account_terms_acceptances where user_id=$1',[id])).rows[0];
+ assert.equal(acceptance.terms_version,'2026-10-22.1');assert.ok(acceptance.accepted_at.getTime()>Date.parse('2026-01-01'));
+ await db.query("update auth.users set raw_user_meta_data='{}' where id=$1",[id]);
+ assert.equal((await db.query('select count(*)::int n from account_terms_acceptances where user_id=$1',[id])).rows[0].n,1);
+ assert.equal((await db.query('select count(*)::int n from account_terms_acceptances where user_id=$1',[owner])).rows[0].n,0);
+ for(const role of ['anon','authenticated'])assert.equal((await db.query("select has_table_privilege($1,'account_terms_acceptances','INSERT') p",[role])).rows[0].p,false);
+});
+test('only author can delete; content and interactions disappear atomically and stale moderation cannot resurrect it',async()=>{
+ const p=(await db.query("insert into villegram_publications(author_id,source,type,title,caption,media,cta) values($1,'guest_submission','trust','Meu café','Conteúdo real',$2,'dates') returning *",[owner,JSON.stringify(draft.media)])).rows[0];
+ await db.query("insert into villegram_post_comments(id,publication_id,user_id,display_name,body) values(gen_random_uuid(),$1,$2,'Amiga','Lindo')",[p.id,other]);
+ await assert.rejects(db.query('select villegram_delete_guest($1,$2,$3)',[other,p.id,p.updated_at]),/publication_unavailable/);
+ await assert.rejects(db.query('select villegram_delete_guest($1,$2,null)',[owner,p.id]),/edit_conflict/);
+ await db.query('select villegram_delete_guest($1,$2,$3)',[owner,p.id,p.updated_at]);
+ const gone=(await db.query('select * from villegram_publications where id=$1',[p.id])).rows[0];
+ assert.ok(gone.deleted_at);assert.equal(gone.status,'archived');assert.equal(gone.caption,'Conteúdo excluído');assert.equal(JSON.stringify(gone.media).includes(owner),false);
+ assert.equal((await db.query('select count(*)::int n from villegram_post_comments where publication_id=$1',[p.id])).rows[0].n,0);
+ assert.deepEqual((await db.query('select media_paths from villegram_media_deletions where publication_id=$1',[p.id])).rows[0].media_paths,[draft.media[0].path]);
+ await assert.rejects(db.query("update villegram_publications set status='published',published_at=now() where id=$1",[p.id]),/publication_deleted/);
+ assert.equal((await db.query('select villegram_delete_guest($1,$2,null) r',[owner,p.id])).rows[0].r.deleted,true);
+ for(const role of ['anon','authenticated'])assert.equal((await db.query("select has_function_privilege($1,'villegram_delete_guest(uuid,uuid,timestamptz)','EXECUTE') p",[role])).rows[0].p,false);
+});
+test('own trip deletion asks for confirmation, cancellation sends nothing, and confirmation removes the card',async()=>{
+ const post={id:other,title:'Meu café',status:'draft',source:'guest_submission',updated_at:'2026-10-22T12:00:00Z',media:[{kind:'photo',url:'https://example.test/photo.jpg'}]};
+ const state={profile:null,allowed:true,publications:[post],notifications:[],mentions:[],invites:[]};
+ const {w,calls}=await communityPage('conta.html','',b=>{if(b.operation==='guest_delete'){state.publications=[];return {deleted:true}}return state});
+ w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'))};
+ try{const d=w.document;d.querySelector('[data-delete-post]').click();assert.equal(calls.some(c=>c.operation==='guest_delete'),false);d.querySelector('[data-cancel]').click();assert.equal(d.querySelector('dialog'),null);
+ d.querySelector('[data-delete-post]').click();d.querySelector('[data-confirm]').click();await tick();await tick();
+ assert.equal(calls.filter(c=>c.operation==='guest_delete').length,1);assert.equal(calls.find(c=>c.operation==='guest_delete').updated_at,post.updated_at);assert.equal(d.querySelector('[data-delete-post]'),null);
+ }finally{w.close()}
+});
+
+test('delete endpoint derives author from session and purges only unshared owner media',async()=>{
+ const removed=[],completed=[],calls=[];const solo=owner+'/'+other+'.webp',shared=owner+'/'+staff+'.webp';
+ const database={rpc:async(name,args)=>{calls.push({name,args});return {data:{deleted:true},error:null}},from(table){let filter,patch;return {select(){return this},eq(){return this},is(){return this},limit(){return this},contains(_c,v){filter=v;return this},update(v){patch=v;return this},then(resolve){if(patch){completed.push(patch);return Promise.resolve({error:null}).then(resolve)}return Promise.resolve({data:table==='villegram_media_deletions'?[{publication_id:other,media_paths:[solo,shared]}]:filter?.[0]?.path===shared?[{id:staff}]:[],error:null}).then(resolve)}}},storage:{from(){return {remove:async paths=>{removed.push(...paths);return {error:null}}}}}};
+ const result=await communityOperation({db:database,u:{id:owner},isAdmin:false,op:'guest_delete',body:{id:other,actor:staff,updated_at:'2026-10-22T12:00:00Z'}});
+ assert.equal(result.status,200);assert.equal(calls[0].args.actor,owner);assert.deepEqual(removed,[solo]);assert.deepEqual(completed[0].media_paths,[]);
+});

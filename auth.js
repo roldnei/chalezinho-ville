@@ -69,7 +69,7 @@ by("pane-signup")?.addEventListener("submit",async e=>{e.preventDefault();if(sig
  if(!momentsSignup&&documentType==="passport"&&(!/^[A-Z0-9]{5,20}$/.test(documentNumber)||!/^[A-Z]{2}$/.test(issuingCountry)))return msg("Confira o número do passaporte e o código de duas letras do país emissor.");
  const callback=DEV_BASE+"/auth-callback.html?next="+encodeURIComponent(returnTarget);
  signupBusy=true;button.disabled=true;msg("Criando sua conta…");try{
- const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,...(momentsSignup?{onboarding:"moments"}:{phone,document_type:documentType,document_number:documentNumber,issuing_country:issuingCountry}),marketing_opt_in:by("signup-promotions")?.checked===true,marketing_preference_at:new Date().toISOString()},emailRedirectTo:callback}});
+ const {data,error}=await sb.auth.signUp({email,password,options:{data:{full_name:name,...(momentsSignup?{onboarding:"moments"}:{phone,document_type:documentType,document_number:documentNumber,issuing_country:issuingCountry}),terms_version:"2026-10-22.1",terms_acceptance_source:"signup_create_account",marketing_opt_in:by("signup-promotions")?.checked===true,marketing_preference_at:new Date().toISOString()},emailRedirectTo:callback}});
  if(error){if(Number(error.status)===429||String(error.code||'').includes('rate_limit')){confirmation(email,pendingConfirmation?.email===email&&pendingConfirmation.sent===true);return}msg(authMessage(error,'signup'));return}
  track('account_signup_submitted',{source:'auth_page',email_confirmation_required:!data.session});
  if(data.session){msg('Conta criada.',true);location.href=returnTarget}else confirmation(email,true);

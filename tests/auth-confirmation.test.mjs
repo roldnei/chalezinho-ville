@@ -33,3 +33,8 @@ test('callback without a token never claims that the email was confirmed',async(
 test('legacy email links restore the fragment session explicitly and remove tokens from the URL',async()=>{
  let received;const w=callback('','#access_token=fixture-access&refresh_token=fixture-refresh',{setSession:async v=>{received=v;return {error:null}},getSession:async()=>({data:{session:{user:{id:'fixture'}}}})});try{await tick();assert.deepEqual({...received},{access_token:'fixture-access',refresh_token:'fixture-refresh'});assert.equal(w.location.hash,'')}finally{w.close()}
 });
+
+test('signup uses one Create account action with visible terms and records the presented version',async()=>{
+ let captured;const w=signup(async args=>{captured=args;return {data:{session:null},error:null}});
+ try{const notice=w.document.getElementById('signup-terms');assert.match(notice.textContent,/Ao tocar em Criar conta/);assert.ok(notice.querySelector('a[href="termos-de-uso.html"]'));assert.equal(w.document.querySelector('#pane-signup button[type=submit]').textContent,'Criar conta');submit(w);await tick();assert.equal(captured.options.data.terms_version,'2026-10-22.1');assert.equal(captured.options.data.terms_acceptance_source,'signup_create_account');assert.equal(captured.options.data.marketing_opt_in,false)}finally{w.close()}
+});
