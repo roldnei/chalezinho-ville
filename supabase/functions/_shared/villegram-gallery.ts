@@ -16,7 +16,7 @@ export function galleryEligible(p:any,property:any,consents:any[],profiles:any[]
 export function rankedGallery(guests:any[],fallback:any[],code:string,properties:any[],views:any[]){
  const shared=code==='CH2'||code==='CH3',codes=shared?['CH2','CH3']:[code],ids=properties.filter(p=>codes.includes(p.code)).map(p=>p.id);
  const count=new Map(views.map(v=>[v.publication_id,Number(v.views)||0]));
- const sorted=guests.filter(p=>ids.includes(p.property_id)).sort((a,b)=>(count.get(b.id)||0)-(count.get(a.id)||0)||Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
+ const sorted=guests.filter(p=>ids.includes(p.property_id)).sort((a,b)=>Number(b.retain_until_removed===true)-Number(a.retain_until_removed===true)||(count.get(b.id)||0)-(count.get(a.id)||0)||Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
  const chosen=sorted.slice(0,6),spares=fallback.filter(p=>properties.some(prop=>prop.code===code&&prop.id===p.property_id)).sort((a,b)=>Number(String(a.id).startsWith('property:'))-Number(String(b.id).startsWith('property:'))||Number(b.source==='manual')-Number(a.source==='manual')||Date.parse(b.published_at)-Date.parse(a.published_at)||a.id.localeCompare(b.id));
  return [...chosen,...spares.slice(0,Math.min(1,6-chosen.length))];
 }

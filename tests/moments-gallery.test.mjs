@@ -44,3 +44,9 @@ test('commercial fallback uses one card belonging to the current chalet even whe
  for(const prop of props){const result=rankedGallery([],fallback,prop.code,props,[]);assert.equal(result.length,1);assert.equal(result[0].property_id,prop.id);assert.equal(result[0].id,'offer:'+prop.code);}
  const result=rankedGallery([post],fallback,'CH3',props,[]);assert.equal(result.length,2);assert.equal(result[0].id,post.id);assert.equal(result[1].property_id,3);
 });
+
+test('owner-retained Trips remain in the six slots ahead of rotating guest Trips',()=>{
+ const pinned={...post,id:'pinned',retain_until_removed:true},popular=Array.from({length:7},(_,i)=>({...post,id:'new'+i}));
+ const selected=rankedGallery([...popular,pinned],[],'CH2',props,popular.map(p=>({publication_id:p.id,views:1000})));
+ assert.equal(selected.length,6);assert.equal(selected[0].id,'pinned');
+});

@@ -29,3 +29,11 @@ test('export can explicitly load every scene while normal playback remains selec
  w.eval(await readFile(new URL('../villegram-timeline.js',import.meta.url),'utf8'));
  const player=w.VillegramTimeline.player({host:w.document.querySelector('div'),media:[{...photo,url:'a.webp'},{...video,url:'b.mp4'}],preloadAll:true});assert.equal(player.elements.every(el=>el.hasAttribute('src')),true);player.destroy();d.window.close();
 });
+
+test('retention is service-owned and does not bypass removal or approval',async()=>{
+ const {guestPublicationVisible}=await import('../supabase/functions/_shared/villegram-publications.ts');
+ const p={source:'guest_submission',status:'published',published_at:'2026-01-01',expires_at:null,retain_until_removed:true};
+ assert.equal(guestPublicationVisible(p),true);assert.equal(guestPublicationVisible({...p,retain_until_removed:false}),false);
+ for(const change of [{status:'archived'},{status:'pending_review'},{deleted_at:'2026-10-24'}])assert.equal(guestPublicationVisible({...p,...change}),false);
+ const saved=guestInput({...post([{kind:'photo',path:id+'/'+id+'.webp'}]),retain_until_removed:true},project,id);assert.equal(saved.retain_until_removed,undefined);
+});

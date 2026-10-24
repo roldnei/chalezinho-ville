@@ -58,7 +58,7 @@ export function automationInput(raw:Row={}){
 export function guestPublicationVisible(p:Row,now=Date.now()){
  if(p.source!=='guest_submission')return true;
  const published=Date.parse(p.published_at||''),deadline=published+7*86400000;
- return p.status==='published'&&Number.isFinite(published)&&published<=now&&now<deadline&&(!p.expires_at||Date.parse(p.expires_at)>now);
+ return !p.deleted_at&&p.status==='published'&&Number.isFinite(published)&&published<=now&&(p.retain_until_removed===true||now<deadline)&&(!p.expires_at||Date.parse(p.expires_at)>now);
 }
 export function eligiblePublication(p:Row,properties:Row[],products:Row[],offers:Row[],now=Date.now()){
  return guestPublicationVisible(p,now)&&p.status==='published'&&Date.parse(p.published_at||'')<=now&&(!p.expires_at||Date.parse(p.expires_at)>now)&&(!p.property_id||properties.some(x=>x.id===p.property_id&&x.active!==false))&&(!p.experience_id||products.some(x=>x.id===p.experience_id&&x.status==='active'&&(x.inventory==null||x.inventory>0)))&&(!p.offer_id||offers.some(x=>x.id===p.offer_id&&x.status==='active'));
