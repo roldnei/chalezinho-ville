@@ -1,0 +1,18 @@
+{
+  "status": "DRAFT_NOT_CREATED_IN_GOOGLE_ADS",
+  "campaign": "CV | Pesquisa | Guarapari",
+  "network": "Google Search only",
+  "search_partners": false,
+  "display": false,
+  "language": "Portuguese",
+  "initial_geography_proposal": "Espírito Santo; presence setting. Reassess origins from actual bookings.",
+  "budget_approved_brl": null,
+  "daily_budget": null,
+  "bidding_proposal": "Maximize clicks with explicit CPC ceiling after Keyword Planner review; no target CPA/ROAS until verified conversions.",
+  "initial_test_proposal_days": 30,
+  "brand_campaign": "optional, separate and paused",
+  "auto_apply_recommendations": false,
+  "auto_tagging_required": true,
+  "timezone": "America/Sao_Paulo",
+  "start_date": null
+}

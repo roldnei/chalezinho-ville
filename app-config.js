@@ -8,6 +8,7 @@ window.CHALEZINHO_CONFIG={
   releaseProfile:"checkout-development",
   whatsappNumber:"5593991592266",
   mobileEntryExperimentEnabled:false,
+  marketing:{enabled:false,ga4Id:"",googleAdsId:"",whatsappLabel:""},
   features:{feelings:true,guestPublications:true,social:true}
 };
 
