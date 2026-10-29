@@ -18,7 +18,16 @@ export async function buildReceiptNeural(directory){
  const cache=process.env.RECEIPT_MODEL_CACHE||join(tmpdir(),'chalezinho-receipt-models');await mkdir(cache,{recursive:true});
  for(const model of receiptModels){const name=model.name+'.tar',path=join(cache,name);let bytes;try{bytes=await readFile(path);}catch{}
   const valid=data=>data&&data.length===model.bytes&&createHash('sha256').update(data).digest('hex')===model.sha256;
-  if(!valid(bytes)){const response=await fetch('https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/'+model.name+'_onnx_infer.tar',{signal:AbortSignal.timeout(120000)});if(!response.ok)throw Error('Falha no download do modelo '+model.name);bytes=Buffer.from(await response.arrayBuffer());if(!valid(bytes))throw Error('Modelo OCR não corresponde ao hash fixado: '+model.name);await writeFile(path,bytes);}
+  if(!valid(bytes)){
+   // Reuse the already published, hash-pinned archive before the upstream host.
+   // Both paths must match the same reviewed size and SHA-256; fail closed.
+   const sources=[['https://chalezinhoville.com.br/assets/receipt-ocr/neural/'+name,30000],['https://paddle-model-ecology.bj.bcebos.com/paddlex/official_inference_model/paddle3.0.0/'+model.name+'_onnx_infer.tar',120000]];
+   for(const [url,timeout] of sources){
+    try{const response=await fetch(url,{signal:AbortSignal.timeout(timeout)});if(!response.ok)continue;const candidate=Buffer.from(await response.arrayBuffer());if(valid(candidate)){bytes=candidate;break}}catch{}
+   }
+   if(!valid(bytes))throw Error('Falha ao obter modelo OCR com tamanho e hash fixados: '+model.name);
+   await writeFile(path,bytes);
+  }
   await writeFile(new URL(name,directory),bytes);
  }
  const licenses=new URL('../assets/receipt-model-licenses/',import.meta.url);for(const name of await readdir(licenses))await copyFile(new URL(name,licenses),new URL(name,directory));
