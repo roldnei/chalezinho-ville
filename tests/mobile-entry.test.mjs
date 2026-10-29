@@ -72,3 +72,46 @@ test('lost enrollment response retries the same visitor instead of counting a ne
  w.fetch=async(_,o)=>{const b=JSON.parse(o.body);ids.push(b.visitor_id);if(++attempts===1)throw Error('response lost');return {ok:true,json:async()=>({ok:true,participant:{id:visitor,variant:'baseline',phase:'baseline',reference:'MV-0123456789AB'},experiment:{status:'baseline'}})}};
  w.eval(script);assert.equal((await w.VilleMobileMeasurement.ready).phase,'baseline');assert.equal(attempts,2);assert.equal(ids[0],ids[1]);w.close();
 });
+
+test('first delivered entry stays distinct from later visits to Moments',async()=>{
+ const {dom,w,calls}=await browser('https://site.example/','B','running');await w.VilleMobileMeasurement.entry();
+ w.VilleMobileMeasurement.rendered('site');w.VilleMobileMeasurement.rendered('moments');await new Promise(r=>setTimeout(r,20));
+ const entries=calls.filter(c=>c.event_name==='entry_rendered');assert.equal(entries.length,1);assert.equal(entries[0].details.rendered,'site');w.close();
+});
+test('failed events survive page navigation and replay with their original ID',async()=>{
+ const {w,calls}=await browser();const original=w.fetch;w.fetch=async()=>{throw Error('offline')};
+ assert.equal(await w.VilleMobileMeasurement.track('property_viewed',{property_code:'CH1'}),false);
+ const queued=JSON.parse(w.localStorage.getItem('ville-mobile-pending:development'));assert.equal(queued.length,1);
+ w.fetch=original;w.dispatchEvent(new w.Event('online'));await new Promise(r=>setTimeout(r,20));
+ assert.ok(calls.some(c=>c.event_id===queued[0].event_id&&c.property_code==='CH1'));assert.deepEqual(JSON.parse(w.localStorage.getItem('ville-mobile-pending:development')),[]);w.close();
+});
+test('admin can qualify a direct contact; public and incomplete submissions remain rejected',async()=>{
+ const now=new Date().toISOString(),data={mobile_entry_experiments:[{id:'mobile-home-v1',status:'baseline',protocol:{}}],profiles:[{id:'admin',role:'admin',pms_access_status:'active'}],mobile_entry_participants:[{id:visitor,reference:'MV-0123456789AB',phase:'baseline',assigned_at:now}],mobile_entry_events:[]};
+ const body={operation:'record_outcome',reference:'MV-0123456789AB',kind:'request_received',qualification:{property_code:'CH1',check_in:'2026-12-01',check_out:'2026-12-03',guests:2}};
+ await assert.rejects(()=>mobileEntryService(fakeDb(data),req,body),/admin_required/);
+ await assert.rejects(()=>mobileEntryService(fakeDb(data),req,{...body,qualification:{}},{id:'admin'}),/qualified_consultation_required/);
+ assert.equal((await mobileEntryService(fakeDb(data),req,body,{id:'admin'})).ok,true);assert.equal(data.mobile_entry_outcomes.length,1);assert.equal(data.mobile_entry_outcomes[0].actor_id,'admin');
+});
+test('queued telemetry cannot claim arbitrary or future timestamps',async()=>{
+ const now=Date.now(),data={mobile_entry_experiments:[{id:'mobile-home-v1',status:'running',protocol:{attribution_days:7}}],mobile_entry_participants:[{id:visitor,visitor_id:visitor,experiment_id:'mobile-home-v1',phase:'test',assigned_at:new Date(now-3600000).toISOString()}]},base={operation:'event',visitor_id:visitor,participant_id:visitor,event_id:visitor,event_name:'property_viewed'};
+ for(const occurred_at of ['invalid',new Date(now+3600000).toISOString(),new Date(now-172800000).toISOString()])await assert.rejects(()=>mobileEntryService(fakeDb(data),req,{...base,occurred_at}),/invalid_event_time/);
+ const occurred_at=new Date(now-60000).toISOString();await mobileEntryService(fakeDb(data),req,{...base,occurred_at});assert.equal(data.mobile_entry_events[0].occurred_at,occurred_at);
+});
+test('calibration includes repeat activity after seven days',()=>{
+ const p=[{id:'a',phase:'baseline',variant:'baseline',assigned_at:'2026-10-01T00:00:00Z'}],events=[{participant_id:'a',event_name:'property_viewed',occurred_at:'2026-10-15T00:00:00Z'}];
+ assert.equal(summarizeMobile(p,events,[],{},new Date('2026-10-20T00:00:00Z')).groups.baseline.counts.property_viewed,1);
+});
+
+test('actual mobile mount opens Moments for A, conventional home for B, and does not label background failures as entry failures',async()=>{
+ const content=readFileSync(new URL('../villegram-content.js',import.meta.url),'utf8');
+ for(const variant of ['A','B']){
+  const {w,calls}=await browser('https://site.example/',variant,'running');w.document.body.insertAdjacentHTML('afterbegin','<header><nav></nav></header><main><div class="hero">Site</div></main>');
+  w.matchMedia=()=>({matches:true,addEventListener(){}});let opens=0;
+  w.Villegram={configurePublications(){},openHome(){opens++;const node=w.document.createElement('div');node.id='villegram';w.document.body.append(node)}};
+  const measurement=w.fetch;w.fetch=async(url,options)=>url.endsWith('public-consultation')?measurement(url,options):{ok:true,json:async()=>({ok:true,publications:[],products:[],offers:[],properties:[{id:'p',code:'CH1',name:'Signature',active:true,cover_image:'x.webp'}]})};
+  w.eval(content);await new Promise(r=>setTimeout(r,40));assert.equal(opens,variant==='A'?1:0);
+  const entries=calls.filter(c=>c.event_name==='entry_rendered');assert.equal(entries.length,1);assert.equal(entries[0].details.rendered,variant==='A'?'moments':'site');
+  w.close();
+ }
+ const {w,calls}=await browser('https://site.example/','B','running');w.document.body.insertAdjacentHTML('afterbegin','<header><nav></nav></header><main><div class="hero">Site</div></main>');w.matchMedia=()=>({matches:true,addEventListener(){}});w.Villegram={configurePublications(){}};const measurement=w.fetch;w.fetch=async(url,options)=>{if(url.endsWith('public-consultation'))return measurement(url,options);throw Error('feed unavailable')};w.eval(content);await new Promise(r=>setTimeout(r,40));assert.equal(calls.filter(c=>c.event_name==='entry_failed').length,0);w.close();
+});

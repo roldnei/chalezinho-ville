@@ -28,8 +28,8 @@ export function summarizeMobile(participants:any[],events:any[],outcomes:any[],p
  const byOutcome=new Map<string,any[]>();for(const o of outcomes){const list=byOutcome.get(o.participant_id)||[];list.push(o);byOutcome.set(o.participant_id,list);}
  for(const variant of ['baseline','A','B']){
   const rows=participants.filter(p=>!p.excluded&&p.variant===variant),mature=rows.filter(p=>Date.parse(p.assigned_at)+windowDays*86400000<=now.getTime());
-  const count=(list:any[],name:string)=>list.filter(p=>(byParticipant.get(p.id)||[]).some(e=>e.event_name===name&&Date.parse(e.occurred_at)>=Date.parse(p.assigned_at)&&Date.parse(e.occurred_at)<=Math.min(now.getTime(),Date.parse(p.assigned_at)+windowDays*86400000))).length;
-  const outcome=(list:any[],kind:string)=>list.filter(p=>(byOutcome.get(p.id)||[]).some(o=>o.kind===kind&&Date.parse(o.occurred_at)>=Date.parse(p.assigned_at)&&Date.parse(o.occurred_at)<=Math.min(now.getTime(),Date.parse(p.assigned_at)+windowDays*86400000))).length;
+  const count=(list:any[],name:string)=>list.filter(p=>(byParticipant.get(p.id)||[]).some(e=>e.event_name===name&&Date.parse(e.occurred_at)>=Date.parse(p.assigned_at)&&Date.parse(e.occurred_at)<=Math.min(now.getTime(),Date.parse(p.assigned_at)+(p.phase==='baseline'?Infinity:windowDays*86400000)))).length;
+  const outcome=(list:any[],kind:string)=>list.filter(p=>(byOutcome.get(p.id)||[]).some(o=>o.kind===kind&&Date.parse(o.occurred_at)>=Date.parse(p.assigned_at)&&Date.parse(o.occurred_at)<=Math.min(now.getTime(),Date.parse(p.assigned_at)+(p.phase==='baseline'?Infinity:windowDays*86400000)))).length;
   const counts=Object.fromEntries([...EVENTS].map(name=>[name,count(rows,name)]));
   Object.assign(counts,{request_received:outcome(rows,'request_received'),reservation_confirmed:outcome(rows,'reservation_confirmed')});
   const matureCounts=Object.fromEntries([...EVENTS].map(name=>[name,count(mature,name)]));

@@ -4,7 +4,7 @@
  const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
  const page=location.pathname.split('/').pop()||'index.html';
  const pages=['index.html','reservar.html','imovel.html','chale-premium.html','chale-com-hidro.html','chale-romantico.html'];
- let participant=null,experiment=null,visitor='',enabled=false,decisionTaken=false;
+ let participant=null,experiment=null,visitor='',enabled=false,decisionTaken=false,entryRecorded=false,flushing=false;
  const eligibleHome=()=>page==='index.html'&&!location.hash&&[...new URLSearchParams(location.search).keys()].every(k=>/^utm_(source|medium|campaign|term|content)$/.test(k)||['gclid','fbclid'].includes(k));
  const phone=()=>/iPhone|iPod|Android.+Mobile/i.test(navigator.userAgent)&&matchMedia('(max-width:700px)').matches;
  const key='ville-mobile-visitor:'+C?.environment;
@@ -29,20 +29,35 @@
   }catch{return null}
  }
  const ready=initialize();
+ const queueKey='ville-mobile-pending:'+C?.environment;
+ function pending(){try{return JSON.parse(localStorage.getItem(queueKey)||'[]').filter(e=>e.participant_id===participant?.id&&Date.now()-Date.parse(e.occurred_at)<86400000).slice(-50)}catch{return []}}
+ function savePending(rows){try{localStorage.setItem(queueKey,JSON.stringify(rows));return true}catch{return false}}
+ async function flush(){
+  if(flushing||!enabled||!participant)return;flushing=true;
+  try{for(let attempt=0;attempt<50&&pending().length;attempt++){
+   const body=pending()[0];
+   if(!enabled)break;
+   try{await api(body)}catch{try{await api(body)}catch{break}}
+   savePending(pending().filter(e=>e.event_id!==body.event_id));
+  }}finally{flushing=false;}
+ }
+ ready.then(()=>flush());
+ window.addEventListener('online',()=>flush());
+ window.addEventListener('pageshow',()=>flush());
  async function track(event_name,payload={}){
   await ready;if(!enabled||!participant)return false;
-  const body={operation:'event',participant_id:participant.id,event_id:crypto.randomUUID(),event_name,...payload};
-  try{await api(body);return true}catch{try{await api(body);return true}catch{return false}}
+  const body={operation:'event',participant_id:participant.id,event_id:crypto.randomUUID(),occurred_at:new Date().toISOString(),event_name,...payload};
+  if(!savePending([...pending(),body])){try{await api(body);return true}catch{return false}}await flush();return !pending().some(e=>e.event_id===body.event_id);
  }
  async function entry(){
   if(C?.mobileEntryExperimentEnabled!==true){decisionTaken=true;return null;}
   // Do not delay the experience indefinitely on a failed analytics request.
-  const value=await Promise.race([ready,new Promise(resolve=>setTimeout(()=>resolve(null),1300))]);decisionTaken=true;
+  const value=await Promise.race([ready,new Promise(resolve=>setTimeout(()=>resolve(null),4000))]);decisionTaken=true;
   if(!value){ready.then(v=>{if(v&&eligibleHome())track('entry_failed',{details:{reason:'decision_timeout'}})});return null;}
   return eligibleHome()&&value.status==='running'&&value.phase==='test'?value.variant:null;
  }
- function message(text){return enabled&&participant?text+'\nReferência: '+participant.reference:text;}
- window.VilleMobileMeasurement={ready,entry,track,message,rendered(rendered){if(eligibleHome()&&decisionTaken)track('entry_rendered',{details:{rendered}})},excluded(){try{localStorage.setItem('ville-measurement-excluded','true')}catch{}enabled=false;participant=null;}};
+ function message(text){return enabled&&participant?text.replace(/\nReferência: MV-[A-F0-9]{12}/g,'')+'\nReferência: '+participant.reference:text;}
+ window.VilleMobileMeasurement={ready,entry,track,message,rendered(rendered){if(eligibleHome()&&decisionTaken&&!entryRecorded){entryRecorded=true;track('entry_rendered',{details:{rendered}})}},excluded(){try{localStorage.setItem('ville-measurement-excluded','true')}catch{}enabled=false;participant=null;try{localStorage.removeItem(queueKey)}catch{}}};
  // This listener covers floating/contact links, but not social sharing to wa.me/?text.
  document.addEventListener('click',e=>{
   const a=e.target.closest?.('a[href]');if(!a)return;let url;try{url=new URL(a.href,location.href)}catch{return}

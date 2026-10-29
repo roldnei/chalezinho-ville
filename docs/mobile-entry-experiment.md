@@ -1,5 +1,7 @@
 # Entrada mobile: Ville Moments x site
 
+Histórico da preparação; o protocolo vigente está em `mobile-entry-launch-20261029.md`.
+
 Preparado em 19/10/2026. Experimento `mobile-home-v1`. A preparação não inicia o teste.
 
 ## Estado e alcance

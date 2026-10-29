@@ -29,7 +29,13 @@ export async function mobileEntryService(db:any,req:Request,body:any,user:any=nu
   const p=await checked(db.from('mobile_entry_participants').select('*').eq('reference',body.reference).single());
   if(p.excluded)throw Error('excluded_visitor');
   const prepared=await checked(db.from('mobile_entry_events').select('*').eq('participant_id',p.id).eq('event_name','consultation_prepared').order('occurred_at',{ascending:false}).limit(100));
-  if(!prepared.length)throw Error('qualified_consultation_required');
+  if(!prepared.length){
+   // A direct WhatsApp contact can become qualified during the conversation.
+   // Only an authenticated active administrator can supply that evidence.
+   const details=safeDetails(body.qualification),code=body.qualification?.property_code;
+   if(!/^CH[123]$/.test(code||'')||!details.check_in||!details.check_out||details.check_out<=details.check_in||![1,2].includes(details.guests))throw Error('qualified_consultation_required');
+   prepared.push({property_code:code,details});
+  }
   let reservationId=null;
   if(body.kind==='reservation_confirmed'){
    if(!UUID.test(body.reservation_id||''))throw Error('invalid_reservation');
@@ -38,6 +44,8 @@ export async function mobileEntryService(db:any,req:Request,body:any,user:any=nu
    if(r.status!=='confirmed'||!['direct','manual'].includes(r.source)||Date.parse(r.created_at)<Date.parse(p.assigned_at)||/\bQA\b|\[DEV\]|teste/i.test(property.name)||!prepared.some(e=>e.property_code===property.code&&e.details.check_in===r.check_in&&e.details.check_out===r.check_out&&e.details.guests===r.guests))throw Error('reservation_not_attributable');
    reservationId=r.id;
   }
+  const deadline=Date.parse(p.assigned_at)+(Number(cfg.protocol.attribution_days)||7)*86400000;
+  if(p.phase==='test'&&Date.now()>deadline)throw Error('attribution_window_closed');
   await checked(db.from('mobile_entry_outcomes').upsert({participant_id:p.id,kind:body.kind,reservation_id:reservationId,actor_id:user.id},{onConflict:'participant_id,kind',ignoreDuplicates:true}));
   return {ok:true};
  }
@@ -67,12 +75,19 @@ export async function mobileEntryService(db:any,req:Request,body:any,user:any=nu
   const p=await checked(db.from('mobile_entry_participants').select('*').eq('id',body.participant_id).eq('visitor_id',body.visitor_id).eq('experiment_id',EXPERIMENT).single());
   if(p.excluded)return {ok:true,excluded:true};
   const deadline=Date.parse(p.assigned_at)+(Number(cfg.protocol.attribution_days)||7)*86400000;
-  if(p.phase==='test'&&Date.now()>deadline)return {ok:true,expired:true};
+  if(p.phase==='test'&&Date.now()>deadline&&body.occurred_at===undefined)return {ok:true,expired:true};
   if(p.phase==='baseline'&&cfg.status!=='baseline')return {ok:true,expired:true};
+  let occurredAt=new Date().toISOString();
+  if(body.occurred_at!==undefined){
+   const stamp=Date.parse(body.occurred_at),now=Date.now();
+   if(!Number.isFinite(stamp)||stamp>now+300000||stamp<now-86400000||stamp<Date.parse(p.assigned_at)-30000)throw Error('invalid_event_time');
+   occurredAt=new Date(Math.max(Date.parse(p.assigned_at),Math.min(now,stamp))).toISOString();
+   if(p.phase==='test'&&Date.parse(occurredAt)>deadline)return {ok:true,expired:true};
+  }
   const details=safeDetails(body.details);
   const propertyCode=typeof body.property_code==='string'&&/^CH\d{1,6}$/.test(body.property_code)?body.property_code:null;
   if(body.event_name==='consultation_prepared'&&(!propertyCode||!details.check_in||!details.check_out||!details.guests||details.check_out<=details.check_in))throw Error('qualified_consultation_required');
-  await checked(db.from('mobile_entry_events').upsert({id:body.event_id,participant_id:p.id,event_name:body.event_name,property_code:propertyCode,details},{onConflict:'id',ignoreDuplicates:true}));
+  await checked(db.from('mobile_entry_events').upsert({id:body.event_id,participant_id:p.id,event_name:body.event_name,property_code:propertyCode,details,occurred_at:occurredAt},{onConflict:'id',ignoreDuplicates:true}));
   return {ok:true};
  }
  throw Error('measurement_operation_not_allowed');
