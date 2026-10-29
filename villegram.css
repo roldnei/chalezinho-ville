@@ -298,3 +298,5 @@
 
 /* Long text keeps native scrolling; compact text and prices use the Trip gesture. */
 #villegram .vg-purchase.vg-reading-scroll,#villegram .vg-purchase.vg-reading-scroll>:not(details){touch-action:pan-y}
+
+.chalet-mobile-nav [aria-current="page"]{background:#b59a612b;color:#eddbac}
