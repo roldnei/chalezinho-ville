@@ -53,6 +53,13 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 function applyPropertyMedia(properties){
+ // Thumbnail links always show the current real cover of the destination chalet.
+ document.querySelectorAll('[data-related-property-code]').forEach(link=>{
+  const property=properties.find(p=>p.code===link.dataset.relatedPropertyCode),img=link.querySelector('img');
+  const cover=property?.cover_image||property?.gallery?.[0]?.url||property?.gallery?.[0];
+  if(img&&isPropertyImage(cover))window.VilleImages.set(img,cover,{sizes:'112px'});
+ });
+
  const list=new Map(properties.map(p=>[p.code,p]));
  const cards=document.querySelector('.collection .cards');
  if(cards)properties.filter(p=>(p.cover_image||(Array.isArray(p.gallery)&&p.gallery.length))&&!cards.querySelector(`[data-property-code="${CSS.escape(p.code)}"]`)).forEach(p=>{

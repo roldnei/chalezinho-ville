@@ -1,0 +1,13 @@
+/* Compact links use real chalet covers, separate from the main carousel. */
+#chales{scroll-margin-top:0}
+.chalet-alternatives{padding:16px 24px 18px;text-align:left;border-bottom:1px solid #b6926d26}
+.chalet-alternatives .chalet-alternatives-title{margin:0 0 10px;font:500 11px/1.4 "DM Sans",sans-serif;letter-spacing:1.6px;text-transform:uppercase;color:#b6926d}
+.chalet-alternative-list{display:flex;gap:14px;align-items:flex-start}
+.chalet-alternative{display:grid;gap:7px;width:112px;max-width:calc(50% - 7px);text-decoration:none;border-radius:8px}
+.chalet-alternative img,.collection .cards .chalet-alternatives img{display:block;width:112px!important;max-width:100%!important;height:72px!important;aspect-ratio:14/9!important;object-fit:cover!important;border-radius:6px;transition:filter .15s ease}
+.chalet-alternative span,.collection .cards .chalet-alternative span{font:500 12px/1.4 "DM Sans",sans-serif;letter-spacing:0;text-transform:none;color:inherit}
+.chalet-alternative:hover img{filter:brightness(1.12)}
+.chalet-alternative:focus-visible{outline:2px solid #b6926d;outline-offset:5px}
+main>.chalet-alternatives{max-width:1280px;margin:0 auto;padding:20px 6vw}
+@media(min-width:801px){.collection .cards .chalet-alternatives{padding:18px 28px}.chalet-alternative-list{gap:16px}}
+@media(prefers-reduced-motion:reduce){.chalet-alternative img{transition:none}}
