@@ -102,7 +102,7 @@ async function maintainFinance(){
   const gateway=paymentGateway("pagbank_sandbox",token),results:{id:string;status:string}[]=[];
   const {data:payments,error:paymentError}=await admin.from('payments')
     .select('id,amount_cents,metadata,provider_payment_id,status')
-    .eq('provider','pagbank_sandbox').in('status',['awaiting_payment','processing','under_review','expired'])
+    .eq('provider','pagbank_sandbox').in('status',['awaiting_payment','processing','under_review','expired','cancelled'])
     .not('provider_payment_id','is',null).gte('created_at',new Date(Date.now()-48*3600000).toISOString())
     .order('updated_at').limit(50);
   if(paymentError)return reply({ok:false,error:'payments_unavailable'},503);

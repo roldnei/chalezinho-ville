@@ -710,6 +710,9 @@ async function startPayment(req:Request,body:any,development:boolean){
   const {data:paymentQuote,error:paymentQuoteError}=await admin.from("quotes").select("property_id,check_in,check_out,guests,pricing_snapshot").eq("id",quote_id).single();
   const {data:existingHold,error:existingHoldError}=await admin.from("reservations").select("id").eq("quote_id",quote_id).in("status",["hold","pending_payment","confirmed"]).limit(1);
   if(paymentQuoteError||existingHoldError||!paymentQuote)return json({ok:false,error:"availability_unavailable"},503);
+  const checkoutGuests=Number(guests??paymentQuote.guests);
+  if(!Number.isInteger(checkoutGuests)||checkoutGuests!==Number(paymentQuote.guests))
+    return json({ok:false,error:"quote_guests_changed"},400);
   if(paymentQuote.pricing_snapshot?.same_day_user_id&&paymentQuote.pricing_snapshot.same_day_user_id!==user.id)return json({ok:false,error:"same_day_approval_required"},403);
   if(!existingHold?.length){
     const requestId=paymentQuote.pricing_snapshot?.same_day_request_id;
@@ -729,7 +732,7 @@ async function startPayment(req:Request,body:any,development:boolean){
 
   const {data:rpc,error:rpcErr}=await admin.rpc("start_payment_hold",{
     p_quote_id:quote_id,p_quote_option_id:quote_option_id,p_user_id:user.id,
-    p_guest_name:guest_name,p_guest_email:guest_email,p_guest_phone:guest_phone,p_guests:Number(guests||2)
+    p_guest_name:guest_name,p_guest_email:guest_email,p_guest_phone:guest_phone,p_guests:Number(paymentQuote.guests)
   });
   if(rpcErr){
     const msg=String(rpcErr.message||"");
@@ -922,7 +925,18 @@ async function cancelPendingPayment(req:Request,body:any,development:boolean){
   if(!paymentId) return json({ok:false,error:"missing_data"},400);
 
   const {data:settings}=await admin.from("payment_settings").select("active_provider").eq("id",1).single();
-  if(settings?.active_provider!=="mock") return json({ok:false,error:"not_allowed"},403);
+  if(settings?.active_provider==="pagbank_sandbox"){
+    const {data:payment,error:paymentError}=await admin.from("payments")
+      .select("id,provider,provider_payment_id,metadata").eq("id",paymentId).eq("user_id",user.id).maybeSingle();
+    if(paymentError||!payment)return json({ok:false,error:"not_found"},404);
+    if(payment.provider!=="pagbank_sandbox"||!payment.provider_payment_id)
+      return json({ok:false,error:"payment_result_uncertain"},409);
+    try{
+      const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+      if(!token)throw Error("not_configured");
+      await reconcileSandboxCharge(payment.id,payment.provider_payment_id,token,payment.metadata?.order_id);
+    }catch{return json({ok:false,error:"payment_reconciliation_unavailable"},503)}
+  }else if(settings?.active_provider!=="mock") return json({ok:false,error:"not_allowed"},403);
 
   const {data,error}=await admin.rpc("cancel_pending_payment_mock_atomic",{
     p_payment_id:paymentId,p_user_id:user.id
@@ -2193,7 +2207,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     if(action==="search"){
       const start=url.searchParams.get("start")||body.start;
       const end=url.searchParams.get("end")||body.end;
-      const guests=Number(url.searchParams.get("guests")||body.guests||2);
+      const guests=Number(url.searchParams.get("guests")??body.guests??2);
       const listings=await searchData(start,end,guests,null,development);
       const offerId=body.stay_offer_id||url.searchParams.get("stay_offer_id");
       const raw=offerId?await stayOffers.catalog():null,catalog=consultation&&raw?lodgingLaunchCatalog(raw):raw;

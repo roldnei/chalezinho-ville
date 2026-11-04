@@ -1,0 +1,10 @@
+import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs';
+import {calculateCancellationRefund as calc} from '../supabase/functions/booking-engine/refund-policy.ts';
+const records=[],arrival=Date.parse('2027-03-08T15:00:00-03:00'),accepted=Date.parse('2027-01-01T10:00:00-03:00');
+for(const plan of ['refundable','non_refundable'])for(const method of ['card','pix'])for(const [boundary,t] of [['24h',accepted+86400000],['7d-after-purchase',accepted+7*86400000],['20d-before-arrival',arrival-20*86400000],['7d-before-arrival',arrival-7*86400000],['arrival',arrival]])for(const delta of [-1,0,1]){
+ const requestedAt=new Date(t+delta).toISOString(),beforeArrival=t+delta<arrival;let reason,percent;
+ if(!beforeArrival)reason='stay_started';else if(t+delta<=accepted+86400000){reason='commercial_free_window';percent=100}else if(t+delta<=accepted+7*86400000){reason='withdrawal_window';percent=100}else if(plan==='refundable'&&t+delta<=arrival-20*86400000){reason='early_refundable';percent=100}else{reason='late_policy';percent=plan==='refundable'?50:0}
+ const input={plan,acceptedAt:new Date(accepted).toISOString(),requestedAt,checkIn:'2027-03-08',withdrawalDays:7,commercialFreeCancellationHours:24,fullRefundDaysBeforeCheckIn:20,lateAccommodationRefundPercent:plan==='refundable'?50:0,accommodationCents:100001,cleaningCents:29000,unprovidedExperiencesCents:49900,paidModificationCents:100};
+ test(`${plan}/${method}/${boundary}/${delta}ms`,()=>{const observed=calc(input);assert.equal(observed.reason,reason);if(beforeArrival){assert.equal(observed.totalRefundCents,Math.round(100101*percent/100)+78900);assert.equal(observed.retentionCents,100101-Math.round(100101*percent/100))}else assert.equal(observed.requiresReview,true);records.push({layer:'C',method,plan,boundary,delta_ms:delta,accepted_at_brasilia:new Date(accepted-3*3600000).toISOString().replace('Z','-03:00'),requested_at_utc:requestedAt,expected:{reason,percent},observed,status:'APROVADO'})});
+}
+test.after(()=>fs.writeFileSync('../audit/evidence/policy-boundaries.json',JSON.stringify(records,null,2)));
