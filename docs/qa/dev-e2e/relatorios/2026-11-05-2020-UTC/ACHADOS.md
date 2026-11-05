@@ -72,3 +72,10 @@ Resultados desta rodada; nenhum resultado histórico foi importado como prova at
 - Diagnóstico: falha reproduzida pela suíte; causa de gesto, alvo de rolagem ou produto ainda não isolada. Não extrapolar para dispositivo físico ou prévia.
 - Aceite: conferir painel e elemento de rolagem em cada viewport, toque/teclado, preservando a posição do Trip durante leitura e permitindo a navegação posterior.
 - Handoff: NOVO; nenhuma correção implementada nem reteste remoto realizado.
+
+
+## Retomada após publicação do ambiente — 05/11/2026
+
+Acesso de rede agora aplicado com permissão `*`. O bloqueio anterior de proxy foi resolvido. Nova tentativa real no Chromium, em 390×844 e 1366×768, terminou em `vercel.com/login`, título `Login – Vercel`. Não houve acesso à interface do produto nem escrita remota. Esta sessão não possui autenticação Vercel utilizável, bindings de credenciais DEV, contas A/B/admin, caixa de teste ou acesso de conferência ao banco/sandbox. Commit servido e inventário sintético continuam não confirmados. Os 41 cenários DEV, incluindo os 26 P0, permanecem BLOCKED; os resultados locais anteriores não foram repetidos nem promovidos a E2E. Esta atualização substitui o diagnóstico de transporte como bloqueio atual, preservando a evidência histórica.
+
+Para retomar: disponibilizar sessão Vercel autorizada em navegador acessível ao executor, ou mecanismo seguro oficialmente suportado para automação, mantendo a proteção. Disponibilizar também contas sintéticas e acessos DEV/sandbox por canal seguro, sem valores no chat ou Git. Nenhum segredo, cookie, URL de autenticação ou log bruto foi incluído nesta atualização.

@@ -213,3 +213,10 @@ O navegador é real; autenticação, dados e provedor são fixtures. Nenhuma lin
 | BROWSER-103 | desktop: tests/browser/villegram-swipes.spec.mjs:48:1 › taps, horizontal drags, multitouch and reading panels never switch Trips | UI SIMULADA | Asserções do teste existente | FAIL, 6.7s | FAIL | E07; teste e projeto identificados nesta linha |
 | BROWSER-104 | desktop: tests/browser/villegram-swipes.spec.mjs:64:1 › open inclusion details still scroll and mouse dragging still navigates | UI SIMULADA | Asserções do teste existente | PASS, 1.5s | PASS | E07; teste e projeto identificados nesta linha |
 | BROWSER-105 | desktop: tests/browser/villegram-swipes.spec.mjs:75:1 › overflowing inline text scrolls without changing the Trip | UI SIMULADA | Asserções do teste existente | PASS, 1.7s | PASS | E07; teste e projeto identificados nesta linha |
+
+
+## Retomada após publicação do ambiente — 05/11/2026
+
+Acesso de rede agora aplicado com permissão `*`. O bloqueio anterior de proxy foi resolvido. Nova tentativa real no Chromium, em 390×844 e 1366×768, terminou em `vercel.com/login`, título `Login – Vercel`. Não houve acesso à interface do produto nem escrita remota. Esta sessão não possui autenticação Vercel utilizável, bindings de credenciais DEV, contas A/B/admin, caixa de teste ou acesso de conferência ao banco/sandbox. Commit servido e inventário sintético continuam não confirmados. Os 41 cenários DEV, incluindo os 26 P0, permanecem BLOCKED; os resultados locais anteriores não foram repetidos nem promovidos a E2E. Esta atualização substitui o diagnóstico de transporte como bloqueio atual, preservando a evidência histórica.
+
+Para retomar: disponibilizar sessão Vercel autorizada em navegador acessível ao executor, ou mecanismo seguro oficialmente suportado para automação, mantendo a proteção. Disponibilizar também contas sintéticas e acessos DEV/sandbox por canal seguro, sem valores no chat ou Git. Nenhum segredo, cookie, URL de autenticação ou log bruto foi incluído nesta atualização.

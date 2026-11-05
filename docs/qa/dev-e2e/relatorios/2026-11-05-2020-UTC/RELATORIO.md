@@ -44,3 +44,10 @@ Nenhum dado remoto foi criado: nada a remover no DEV/sandbox e nenhuma operaçã
 Para retomar: liberar o host da prévia no proxy preservando as proteções; confirmar deployment/funções, projeto DEV e gateway; disponibilizar por canal seguro contas A/B/admin e papéis complementares, caixa de teste, inventário sintético isolado e acesso de conferência banco/sandbox. Usar instância isolada para versionar política. Executar primeiro os 26 P0 com dados novos; conciliar antes de repetir qualquer operação financeira incerta. A lista copiável de requisitos foi entregue ao solicitante para encaminhar ao Work.
 
 Confirmação de escopo: apenas código local e tentativa de acesso à prévia DEV autorizada; nenhuma escrita em aplicação remota, contato real, dado de hóspede, cobrança real ou calendário externo.
+
+
+## Retomada após publicação do ambiente — 05/11/2026
+
+Acesso de rede agora aplicado com permissão `*`. O bloqueio anterior de proxy foi resolvido. Nova tentativa real no Chromium, em 390×844 e 1366×768, terminou em `vercel.com/login`, título `Login – Vercel`. Não houve acesso à interface do produto nem escrita remota. Esta sessão não possui autenticação Vercel utilizável, bindings de credenciais DEV, contas A/B/admin, caixa de teste ou acesso de conferência ao banco/sandbox. Commit servido e inventário sintético continuam não confirmados. Os 41 cenários DEV, incluindo os 26 P0, permanecem BLOCKED; os resultados locais anteriores não foram repetidos nem promovidos a E2E. Esta atualização substitui o diagnóstico de transporte como bloqueio atual, preservando a evidência histórica.
+
+Para retomar: disponibilizar sessão Vercel autorizada em navegador acessível ao executor, ou mecanismo seguro oficialmente suportado para automação, mantendo a proteção. Disponibilizar também contas sintéticas e acessos DEV/sandbox por canal seguro, sem valores no chat ou Git. Nenhum segredo, cookie, URL de autenticação ou log bruto foi incluído nesta atualização.
