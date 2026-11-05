@@ -53,7 +53,7 @@ const stayOffers=stayOfferService({admin,currentUser,userIsAdmin,json,projectUrl
 
 async function developmentPolicies(){
   const {data,error}=await admin.from("cancellation_policy_assignments")
-    .select("rate_plan_code,cancellation_policy_rules!inner(commercial_free_cancellation_hours,withdrawal_days,full_refund_days_before_checkin,late_accommodation_refund_percent,policy_documents!inner(id,title,body,version,code))")
+    .select("rate_plan_code,cancellation_policy_rules!inner(commercial_free_cancellation_hours,withdrawal_days,full_refund_days_before_checkin,late_accommodation_refund_percent,policy_documents!inner(id,title,body,version,code,document_type,effective_at))")
     .eq("environment","development");
   if(error) throw new Error("cancellation_policy_unavailable");
   return data||[];
@@ -374,7 +374,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     check_in,check_out,guests:Number(guests),
     base_amount_cents:baseCents,
     cleaning_fee_cents:cleaningCents,
-    pricing_snapshot:{source:"pricelabs",base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,stay_offer_id:offer?.id||null,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
+    pricing_snapshot:{source:"pricelabs",...(development&&!launch?{cancellation_policy_scope:"development"}:{}),base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,stay_offer_id:offer?.id||null,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
     rules_version:"2026-09-v1",
     expires_at:expiresAt
   }).select().single():{data:{id:null},error:null};
@@ -673,7 +673,7 @@ async function startPayment(req:Request,body:any,development:boolean){
     return json({ok:false,error:"invalid_installments"},400);
 
   const {data:option,error:optionError}=await admin.from("quote_options")
-    .select("id,quote_id,cancellation_policy_id,total_amount_cents,contract_snapshot,quotes(property_id,pricing_snapshot)")
+    .select("id,quote_id,cancellation_policy_id,total_amount_cents,contract_snapshot,rate_plans(code),quotes(property_id,pricing_snapshot)")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
   if((option.quotes as any)?.pricing_snapshot?.modification_only)return json({ok:false,error:"modification_quote_not_payable"},409);
@@ -702,6 +702,13 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(method==="card"&&Number(body?.quoted_total_cents)!==chargedAmount)
     return json({ok:false,error:"installment_quote_changed"},409);
   const requiredPolicyId=option.cancellation_policy_id;
+  if(development){
+    let currentPolicyId:string|undefined;
+    try{currentPolicyId=policyForPlan(await developmentPolicies(),(option.rate_plans as any)?.code)?.id}
+    catch{return json({ok:false,error:"cancellation_policy_unavailable"},503)}
+    if(!currentPolicyId)return json({ok:false,error:"cancellation_policy_unavailable"},503);
+    if(currentPolicyId!==requiredPolicyId)return json({ok:false,error:"cancellation_policy_version_changed"},409);
+  }
   const {data:termsRows,error:termsError}=await admin.from("policy_documents").select("id,document_type,code,version,status,title,body").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft"]:["active"]);
   if(termsError)return json({ok:false,error:"booking_terms_unavailable"},503);
   const requiredTerms=bookingDocuments(termsRows||[],development);
@@ -766,7 +773,7 @@ async function startPayment(req:Request,body:any,development:boolean){
     reservation_id:reservationId,user_id:user.id,document_id:doc.id,
     document_code:doc.code,document_version:doc.version
   })));
-  if(acceptanceError) return json({ok:false,error:acceptanceError.message?.includes("policy_version_changed")?"policy_version_changed":"policy_acceptance_failed"},409);
+  if(acceptanceError) return json({ok:false,error:acceptanceError.message?.includes("cancellation_policy_version_changed")?"cancellation_policy_version_changed":acceptanceError.message?.includes("policy_version_changed")?"policy_version_changed":"policy_acceptance_failed"},409);
 
   const {data:qitems}=await admin.from("quote_experience_items").select("*").eq("quote_id",quote_id);
   let paidExperienceItems:any[]=[];
@@ -1324,7 +1331,23 @@ async function legalDocuments(req:Request,body:any,development:boolean){
  const isAdmin=!!user&&await userIsAdmin(user);
  const {data,error}=await admin.from("policy_documents").select("id,document_type,code,version,title,body,status,effective_at,created_at,published_by").in("document_type",["hosting_terms","property_rules","privacy_policy"]).in("status",development?["active","draft","archived"]:["active"]).order("created_at",{ascending:false});
  if(error)return json({ok:false,error:"booking_terms_unavailable"},503);
- return json({ok:true,documents:bookingDocuments(data||[],development),...(isAdmin?{history:data||[]}:{} )});
+ let cancellationPolicies:any[]=[];
+ if(development){
+  try{
+   const assignments=await developmentPolicies();
+   cancellationPolicies=["refundable","non_refundable"].flatMap(code=>{
+    const document=policyForPlan(assignments,code);
+    return document?[{...document,rate_plan_code:code}]:[];
+   });
+  }catch{return json({ok:false,error:"cancellation_policy_unavailable"},503)}
+ }else{
+  const {data:plans,error:policyError}=await admin.from("rate_plans")
+   .select("code,policy_documents!inner(id,title,body,version,code,document_type,effective_at)")
+   .eq("active",true).eq("selectable",true).eq("policy_documents.status","active");
+  if(policyError)return json({ok:false,error:"cancellation_policy_unavailable"},503);
+  cancellationPolicies=(plans||[]).map((p:any)=>({...p.policy_documents,rate_plan_code:p.code}));
+ }
+ return json({ok:true,documents:bookingDocuments(data||[],development),cancellation_policies:cancellationPolicies,...(isAdmin?{history:data||[]}:{} )});
 }
 
 async function adminCancellationPolicyAction(req:Request,body:any,development:boolean){
@@ -2091,7 +2114,7 @@ Deno.serve(async(req)=>{
     if(consultation&&!consultationActions.has(action))return json({ok:false,error:'consultation_operation_not_allowed'},403);
     // Production can expose only the explicitly prepared consultation and core
     // PMS operations. Spoofed development headers never unlock the financial code.
-    if(target==='production'&&!consultation&&!['calendar_export',...launchAdminActions].includes(action))return json({ok:false,error:'public_checkout_disabled'},403);
+    if(target==='production'&&!consultation&&!['calendar_export','reservation_policy',...launchAdminActions].includes(action))return json({ok:false,error:'public_checkout_disabled'},403);
     if(target==='production'&&!consultation&&launchAdminActions.has(action)){
       const actor=await currentUser(req);if(!actor||!await userIsAdmin(actor))return json({ok:false,error:'admin_required'},403);
       if(!launchAdminOperationAllowed(action,body))return json({ok:false,error:'public_checkout_disabled'},403);

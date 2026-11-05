@@ -590,6 +590,17 @@ async function performStartPayment(choice){
    renderSandboxPayment({payment:{id,amount_cents:Number(state.rate?.total_amount_cents||0)},confirmation_code:"Cobrança de teste em verificação"});
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
+  if(e.message==="cancellation_policy_version_changed"){
+   try{
+    state.installmentQuote=null;
+    await generateQuote(true);
+    state.rate=state.quote.rate_options.find(r=>r.code===state.rateCode&&r.selectable)||null;
+    if(!state.rate)throw new Error("tariff_unavailable");
+    renderSummary();
+    setFlowError("A política de cancelamento mudou. Leia e aceite a nova versão antes de pagar.");
+   }catch{state.rate=null;state.rateConfirmed=false;directCheckoutError()}
+   return;
+  }
   if(e.message==="policy_version_changed"){try{const current=await api("legal_documents");state.config.required_booking_documents=current.documents;renderSummary()}catch{}setFlowError("Os documentos foram atualizados. Leia e aceite a nova versão antes de pagar.");return}
   setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":["dates_unavailable","occupied"].includes(e.message)?"Essas datas acabaram de ficar indisponíveis. Volte e escolha outro chalé ou período.":e.message==="guarantee_consent_required"?"O aceite da garantia e da renovação automática é obrigatório para reservar.":e.message==="policy_acceptance_required"?"Aceite os termos e a política de cancelamento antes de pagar.":e.message==="booking_terms_unavailable"?"Os termos da reserva estão indisponíveis. Tente novamente mais tarde.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }

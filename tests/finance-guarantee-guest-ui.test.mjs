@@ -73,3 +73,38 @@ test('replacement sends encrypted card, reservation-scoped ID and explicit renew
  assert.equal(sent.encrypted_card,'encrypted-fixture-only-no-real-card');assert.equal(sent.consent,true);
  assert.ok(!JSON.stringify(calls).includes('4111111111111111'));assert.equal(f.number.value,'');assert.equal(f.cvv.value,'');dom.window.close();
 });
+
+test('guest sees the policy accepted by each reservation and can request cancellation after arrival without a reason',async()=>{
+ const {dom,w,calls}=await setup({extraReservation:true,reservationOverride:{check_in:'2026-09-29',check_out:'2026-10-01',checked_in_at:'2026-09-29T18:00:00Z'}});
+ try{
+  const baseFetch=w.fetch;
+  w.fetch=async(url,opts)=>{
+   const body=JSON.parse(opts.body);
+   if(body.action==='reservation_policy'){
+    const version=body.reservation_id===rid?'1.2':'1.3';
+    return {ok:true,json:async()=>({ok:true,documents:[{title:'Cancelamento',body:'Texto contratado '+version,version,accepted_at:'2026-09-29T18:00:00Z'}]})};
+   }
+   if(body.action==='reservation_cancel_request'&&body.operation==='request'){
+    calls.push(body);
+    return {ok:true,json:async()=>({ok:true,request:{id:'protocolo-teste'}})};
+   }
+   return baseFetch(url,opts);
+  };
+  const cards=[...w.document.querySelectorAll('.account-reservation')];
+  assert.equal(cards.length,2);
+  for(const card of cards)card.querySelector('[data-download-reservation-policy]').click();
+  await new Promise(r=>setTimeout(r,15));
+  for(const card of cards){
+   const version=card.dataset.reservationId===rid?'1.2':'1.3';
+   assert.match(card.querySelector('.accepted-documents').textContent,new RegExp('Texto contratado '+version));
+  }
+  const old=cards.find(card=>card.dataset.reservationId===rid);
+  const form=old.querySelector('form:has([name="reason"])');
+  assert.ok(form);assert.equal(form.elements.reason.required,false);assert.equal(form.elements.reason.value,'');
+  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,15));
+  assert.equal(calls.find(x=>x.operation==='request').reason,'');
+  assert.match(form.textContent,/Protocolo: protocolo-teste/);
+  assert.doesNotMatch(form.textContent,/estorno confirmado/i);
+ }finally{dom.window.close()}
+});

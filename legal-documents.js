@@ -2,7 +2,7 @@
  const host=document.querySelector('#legal-content'),type=new URLSearchParams(location.search).get('type')||'hosting_terms',C=window.CHALEZINHO_CONFIG;
  try{
   const r=await fetch(C.bookingEngine+'?action=legal_documents',{cache:'no-store',headers:{'X-Chalezinho-Env':C.environment},signal:AbortSignal.timeout(10000)}),data=await r.json();
-  const doc=data.documents?.find(d=>d.document_type===type);if(!r.ok||!data.ok||!doc)throw new Error();
+  const doc=type.startsWith('cancellation_')?data.cancellation_policies?.find(d=>'cancellation_'+d.rate_plan_code===type):data.documents?.find(d=>d.document_type===type);if(!r.ok||!data.ok||!doc)throw new Error();
   host.textContent='';const title=document.createElement('h1');title.textContent=doc.title;
   const meta=document.createElement('p');meta.textContent='Versão '+doc.version+(doc.effective_at?' · publicada em '+new Date(doc.effective_at).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo'})+' (Brasília)':'');
   const body=document.createElement('p');body.className='legal-body';body.textContent=doc.body;

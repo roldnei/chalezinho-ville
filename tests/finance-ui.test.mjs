@@ -134,3 +134,29 @@ test('new experience credit UI links item and requires decision before refund ap
  assert.equal(calls.some(c=>c.action==='reservation_refund_action'&&c.operation==='approve'),false);
  assert.match(w.document.querySelector('#admin-modal-content').textContent,/499/);dom.window.close();
 });
+
+test('admin must classify each charged experience before preparing the late refund',async()=>{
+ const {dom,w}=await setup();
+ try{
+  const calls=[],baseFetch=w.fetch;
+  w.fetch=async(url,opts)=>{
+   const body=JSON.parse(opts.body);
+   if(body.action!=='reservation_refund_action'||body.operation!=='prepare')return baseFetch(url,opts);
+   calls.push(body.experience_delivery);
+   if(!body.experience_delivery.length)return {ok:false,status:409,json:async()=>({ok:false,error:'experience_delivery_review_required',experience_lines:[{id:'one',description:'Experiência A',amount_cents:2000},{id:'two',description:'Experiência B',amount_cents:1000}]})};
+   return {ok:true,json:async()=>({ok:true,status:'prepared',cancellation_id:'new',refund_due_cents:1000,confirmed_cents:0,calculation:{allocations:[]},refunds:[]})};
+  };
+  w.document.querySelector('[data-cancel-reservation]').click();
+  const form=w.document.querySelector('#refund-prepare');
+  Object.defineProperty(form,'reason',{value:form.elements.reason});form.reason.value='Cancelamento de teste';
+  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,15));
+  const options=[...form.querySelectorAll('[data-delivery-entry]')];
+  assert.equal(options.length,2);assert.equal(form.checkValidity(),false);
+  options[0].value='provided';options[1].value='unprovided';
+  assert.equal(form.checkValidity(),true);
+  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,15));
+  assert.deepEqual(calls[1],[{id:'one',status:'provided'},{id:'two',status:'unprovided'}]);
+ }finally{dom.window.close()}
+});

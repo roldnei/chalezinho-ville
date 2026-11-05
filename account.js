@@ -82,23 +82,24 @@ async function showCancellationRequests(rows){
       processing:"Estorno em processamento. A reserva continua válida até confirmação.",
       completed:"Cancelamento concluído após confirmação do estorno.",
       rejected:"Solicitação recusada. Sua reserva continua válida."}[current.status];
-    if(message){const node=document.createElement("p");node.className="reservation-inline-pending";node.textContent=message;target.append(node)}
+    if(message){const node=document.createElement("p");node.className="reservation-inline-pending";node.textContent=message+" Protocolo: "+current.id;target.append(node)}
    }
    const {cases}=await api("reservation_refund_status",{reservation_id:r.id});
    if((cases||[]).some(c=>c.kind==="policy_cancellation"))return;
-   if(r.status!=="confirmed"||["requested","approved","processing"].includes(current?.status)||
-      Date.parse(r.check_in+"T15:00:00-03:00")<=Date.now())return;
+   if((r.status!=="confirmed"&&!r.checked_in_at&&!r.checked_out_at)||["requested","approved","processing"].includes(current?.status))return;
    const form=document.createElement("form");form.className="account-form";
    form.innerHTML='<button type="button" class="reservation-action">Solicitar cancelamento</button>'+
-     '<div hidden><label>Motivo da solicitação<textarea name="reason" rows="3" minlength="5" required></textarea></label>'+
-     '<p>A reserva permanece válida até a aprovação e a confirmação do estorno conforme a política aceita.</p>'+
+     '<div hidden><label>Observação (opcional)<textarea name="reason" rows="3" maxlength="1000"></textarea></label>'+
+     '<p>Você receberá um protocolo ao enviar. Se a estadia já começou, a equipe analisará o pedido conforme a política e a legislação aplicável.</p>'+
      '<button class="primary-action">Enviar solicitação</button><p role="status"></p></div>';
    target.append(form);form.querySelector('button[type="button"]').onclick=()=>{form.querySelector("div").hidden=false};
    form.onsubmit=async event=>{
     event.preventDefault();const button=form.querySelector(".primary-action"),message=form.querySelector('[role="status"]');
     button.disabled=true;message.textContent="Enviando solicitação…";
-    try{await api("reservation_cancel_request",{operation:"request",reservation_id:r.id,reason:form.elements.reason.value});
-      form.innerHTML='<p class="reservation-inline-pending">Solicitação enviada. A reserva permanece válida até a decisão e a conciliação.</p>'}
+    try{const {request}=await api("reservation_cancel_request",{operation:"request",reservation_id:r.id,reason:form.elements.reason.value});
+      const receipt=document.createElement("p");receipt.className="reservation-inline-pending";receipt.setAttribute("role","status");
+      receipt.textContent="Solicitação recebida. Protocolo: "+request.id+". A devolução será confirmada separadamente.";
+      form.replaceChildren(receipt)}
     catch{message.textContent="Não foi possível enviar a solicitação. A reserva permanece válida.";button.disabled=false}
    };
   }catch{/* The reservation remains visible when cancellation status is unavailable. */}

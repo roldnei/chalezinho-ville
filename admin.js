@@ -659,11 +659,18 @@ async function reservationAction(id,operation){
 function cancelReservation(id,requestId=null){
   const request=(state.cancel_requests||[]).find(x=>x.id===requestId);
   $("#admin-modal-content").innerHTML=`<small>CANCELAMENTO · PAGBANK SANDBOX</small><h2>${request?"Analisar pedido do hóspede":"Calcular devolução"}</h2><form id="refund-prepare" class="admin-form"><p>A reserva permanece ativa até a confirmação do PagBank e da conciliação.</p><label>${request?"Motivo informado pelo hóspede":"Justificativa"}<textarea name="reason" rows="3" required ${request?"readonly":""}>${esc(request?.reason||"")}</textarea></label><p class="admin-form-message" role="status"></p><button class="admin-primary">Ver cálculo e cobranças</button>${request?.status==="requested"?'<button type="button" id="reject-guest-cancel">Recusar solicitação</button>':""}</form>`;
-  openModal();$("#refund-prepare").onsubmit=async e=>{
+  openModal();$("#refund-prepare .admin-form-message").insertAdjacentHTML("beforebegin",'<div id="experience-delivery-review" hidden></div>');$("#refund-prepare").onsubmit=async e=>{
     e.preventDefault();const f=e.currentTarget,m=f.querySelector(".admin-form-message"),b=f.querySelector("button");
     b.disabled=true;m.textContent="Conferindo pagamentos e política aceita…";
-    try{const d=await api("reservation_refund_action",{reservation_id:id,operation:"prepare",reason:f.reason.value,guest_request_id:requestId});renderRefundDecision(id,d)}
-    catch(err){m.textContent=refundError(err)}finally{b.disabled=false}
+    const decisions=[...f.querySelectorAll("[data-delivery-entry]")].map(x=>({id:x.dataset.deliveryEntry,status:x.value}));
+    try{const d=await api("reservation_refund_action",{reservation_id:id,operation:"prepare",reason:f.reason.value,guest_request_id:requestId,experience_delivery:decisions});renderRefundDecision(id,d)}
+    catch(err){
+      if(err.message==="experience_delivery_review_required"&&Array.isArray(err.data?.experience_lines)){
+        const review=f.querySelector("#experience-delivery-review");review.hidden=false;
+        if(!review.children.length)review.innerHTML='<p>Confira o que foi prestado antes de calcular a devolução.</p>'+err.data.experience_lines.map(x=>`<label>${esc(x.description)} · ${brl(x.amount_cents)}<select required data-delivery-entry="${esc(x.id)}"><option value="">Selecione</option><option value="provided">Prestado</option><option value="unprovided">Não prestado</option></select></label>`).join("");
+        m.textContent="Informe o estado de cada item. Se houve prestação parcial, encaminhe para análise individual.";
+      }else m.textContent=refundError(err)
+    }finally{b.disabled=false}
   };
   const reject=$("#reject-guest-cancel");if(reject)reject.onclick=async()=>{
     const note=window.prompt("Motivo da recusa para o hóspede:");if(!note?.trim())return;
