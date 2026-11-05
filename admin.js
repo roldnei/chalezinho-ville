@@ -21,7 +21,7 @@ async function api(action,body={},endpointOverride=null){
  const fresh=await sb.auth.getSession();session=fresh.data.session;if(!session)throw new Error("session_expired");
 
   const endpoint=endpointOverride||(["authorize","authorize_saved","status","report_incident","decide_incident","attach_incident_evidence","capture","release","refund","retry_refund","authorization_history","recover_authorization"].includes(action)&&body.guarantee_id?C.guaranteeEngine:ENGINE);
-  const r=await fetch(endpoint+"?action="+action,{method:"POST",headers:{"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...body})});
+  const r=await fetch(endpoint+"?action="+action,{method:"POST",headers:{"Content-Type":"application/json",...(endpointOverride?{}:{"X-Chalezinho-Env":"development"}),"Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...body})});
   const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
   if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});
   return d;

@@ -28,3 +28,12 @@ A cotação registra origem, motivo de fallback, desconto e valor por noite em c
 ## Fixture
 
 No DEV, o imóvel `QA-DEV-20261105-2220` usa terça de R$ 231,37 e exceção de quarta de R$ 257,68 para a estadia de 17 a 19/11/2026, sem integração ou fonte de calendário e com exportação desligada. Espera-se subtotal de 48.905 centavos e limpeza de 9.000 centavos. Com os planos ativos, os totais são 62.796 centavos na tarifa não reembolsável e 67.686 centavos na reembolsável.
+
+## Reteste DEV em 05/11/2026
+
+- Busca restrita ao imóvel sintético antes de configurar preço retornou `rate_unavailable`. Depois da configuração retornou um imóvel disponível, origem `own` e 48.905 centavos.
+- A cotação DEV e suas opções gravadas tiveram diárias de 23.137 e 25.768 centavos, limpeza de 9.000 centavos e totais de 62.796 e 67.686 centavos. Ao acrescentar 100 centavos à exceção de quarta, a nova cotação teve subtotal de 49.005 centavos e total não reembolsável de 62.906 centavos. A anterior manteve seu snapshot. A exceção foi restaurada.
+- O imóvel sintético terminou com zero reservas, zero integrações, zero fontes de calendário e exportação desabilitada. Conexões, configurações de calendário, exportações e regras de disponibilidade dos três chalés reais foram comparadas antes e depois e mantiveram os mesmos valores.
+- Seis regressões específicas aprovadas. A suíte geral aprovou 1.052 de 1.054 testes. As falhas de `pms-review.test.mjs` e `stay-showcase.test.mjs` também reproduziram no commit-base. O build de checkout e o TypeScript passaram.
+- O reteste remoto cobriu busca e cotação sem sessão. PriceLabs e controles do PMS foram testados com fixtures. O checkout, o recibo e o PMS autenticado em navegador fazem parte da homologação seguinte.
+- O patch de preço foi aplicado sobre a versão 79 do booking-engine já ativa no DEV para preservar as regras de calendário e o formato da exportação que estavam implantados. O booking-engine resultante é a versão 80.
