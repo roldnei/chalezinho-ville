@@ -12,6 +12,7 @@ import {persistentShowcase,showcaseCacheKey} from "../_shared/showcase-cache.ts"
 import {stayOfferService} from "../_shared/stay-offer-service.ts";
 import {sameDayRequests,approvedSameDayRequest} from "../_shared/same-day-requests.ts";
 import {brazilClock,availabilityDefaults,availabilityRules,availabilityDecision,preparationOverlap,shiftDate} from "../_shared/availability.ts";
+import {loadPropertyPriceLabs,normalizeOwnPricing,resolvePropertyPricing} from "../_shared/property-pricing.ts";
 import {guestDirectory} from "../_shared/guest-directory.ts";
 import {accessInput,accessReport,recordAccessBooking} from "../_shared/access-metrics.ts";
 import {calendarService,calendarUrl,calendarProvider,fetchCalendar,calendarPeriodKey,bookingStayOverlap,reconcileCalendarPeriods} from "../_shared/calendars.ts";
@@ -169,13 +170,13 @@ async function prodJson(path:string){
 }
 
 const calendars=calendarService(admin,projectUrl);
-async function bookingCalendarData(){return calendars.channels("booking")}
-async function airbnbCalendarData(){
- const data=await calendars.channels("airbnb");
+async function bookingCalendarData(propertyId:number|null=null,recordHealth=true){return calendars.channels("booking",propertyId,recordHealth)}
+async function airbnbCalendarData(propertyId:number|null=null,recordHealth=true){
+ const data=await calendars.channels("airbnb",propertyId,recordHealth);
  // Transitional compatibility for existing Airbnb channels; newly entered links always win.
  if(!data.listings.some((x:any)=>x.error==="calendar_not_configured"))return data;
  const legacy=await prodJson("/api/ical-airbnb-all").catch(()=>({listings:[]}));
- const listings=data.listings.map((x:any)=>x.error==="calendar_not_configured"?(()=>{const old=(legacy.listings||[]).find((y:any)=>y.name===x.name);return {...x,...(old||{}),periods:[...x.periods,...(old?.periods||[])],migration_pending:true}})():x);
+ const listings=data.listings.map((x:any)=>x.error==="calendar_not_configured"?(()=>{const old=(legacy.listings||[]).find((y:any)=>y.name===x.name);return {...x,...(old||{}),property_id:x.property_id,periods:[...x.periods,...(old?.periods||[])],migration_pending:true}})():x);
  return {...data,listings,ok:listings.every((x:any)=>x.ok)};
 }
 async function adminCalendarAction(req:Request,body:any){
@@ -220,54 +221,80 @@ async function adminCalendarAction(req:Request,body:any){
  return json({ok:true,...await calendars.configuration()});
 }
 
-async function searchSources(start:string,end:string){
+async function fetchPriceLabsPrices(listings:{id:string,pms:string}[], start:string, end:string){
+  const key=Deno.env.get("PRICELABS_API_KEY");
+  if(!key){
+    // Compatibility with the existing read-only source for the established Airbnb listings.
+    const data=await prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end));
+    if(!Array.isArray(data.listings))throw Error("invalid_pricelabs_response");
+    return data.listings.map((row:any)=>({...row,pms:"airbnb"}));
+  }
+  const response=await fetch("https://api.pricelabs.co/v1/listing_prices",{
+    method:"POST",headers:{"X-API-Key":key,Accept:"application/json","Content-Type":"application/json"},
+    body:JSON.stringify({listings}),signal:AbortSignal.timeout(8000),
+  });
+  if(!response.ok)throw Error("pricelabs_unavailable");
+  const data=await response.json();
+  return Array.isArray(data)?data:data?.data;
+}
+
+async function searchSources(start:string,end:string,propertyId:number|null=null){
+  const scope=(query:any)=>propertyId===null?query:query.eq("property_id",propertyId);
+  const integrations=retryDb("search_pricelabs_integrations",()=>scope(admin.from("property_integrations")
+    .select("property_id,provider,external_listing_id,pms,active").eq("provider","pricelabs").eq("active",true)));
   return Promise.all([
-    retryDb("search_properties",()=>admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone").eq("active",true).order("id")),
+    retryDb("search_properties",()=>{
+      const query=admin.from("properties").select("id,code,name,slug,property_type,tagline,summary,cover_image,gallery,features,cleaning_fee,max_guests,guarantee_amount_cents,check_in_time,check_out_time,timezone,own_pricing").eq("active",true).order("id");
+      return propertyId===null?query:query.eq("id",propertyId);
+    }),
     retryDb("search_reservations",async()=>{
-      const [native,external,fixtures]=await Promise.all([admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"]),admin.from("ops_stays").select("id,property_id,check_in,check_out,status").is("reservation_id",null).eq("is_test",false).eq("status","confirmed").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)),admin.from("ops_stays").select("reservation_id").eq("is_test",true).not("reservation_id","is",null)]);
+      const [native,external,fixtures]=await Promise.all([scope(admin.from("reservations").select("id,property_id,check_in,check_out,status,hold_expires_at")).lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)).in("status",["hold","pending_payment","confirmed"]),scope(admin.from("ops_stays").select("id,property_id,check_in,check_out,status")).is("reservation_id",null).eq("is_test",false).eq("status","confirmed").lt("check_in",shiftDate(end,7)).gt("check_out",shiftDate(start,-7)),scope(admin.from("ops_stays").select("reservation_id")).eq("is_test",true).not("reservation_id","is",null)]);
       const fixtureIds=new Set((fixtures.data||[]).map((row:any)=>row.reservation_id));
       return {data:[...(native.data||[]).filter((row:any)=>!fixtureIds.has(row.id)),...(external.data||[])],error:native.error||external.error||fixtures.error};
     }),
-    retryDb("search_change_holds",()=>admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
-      .eq("kind","modification").in("status",["awaiting_payment","processing","paid"])
-      .lt("target_check_in",shiftDate(end,7)).gt("target_check_out",shiftDate(start,-7)).gt("expires_at",new Date().toISOString())),
-    retryDb("search_operational_blocks",()=>admin.from("pms_calendar_blocks").select("id,property_id,start_date,end_date")
+    retryDb("search_change_holds",()=>{
+      const query=admin.from("post_booking_charges").select("id,reservation_id,target_property_id,target_check_in,target_check_out,status,expires_at")
+        .eq("kind","modification").in("status",["awaiting_payment","processing","paid"])
+        .lt("target_check_in",shiftDate(end,7)).gt("target_check_out",shiftDate(start,-7)).gt("expires_at",new Date().toISOString());
+      return propertyId===null?query:query.eq("target_property_id",propertyId);
+    }),
+    retryDb("search_operational_blocks",()=>scope(admin.from("pms_calendar_blocks").select("id,property_id,start_date,end_date,reason"))
       .eq("status","active").lt("start_date",end).gt("end_date",start)),
-    airbnbCalendarData(),
-    bookingCalendarData(),
-    prodJson("/api/pricelabs-availability?start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)),
+    airbnbCalendarData(propertyId,propertyId===null),
+    bookingCalendarData(propertyId,propertyId===null),
+    integrations.then(result=>loadPropertyPriceLabs(result.data||[],start,end,fetchPriceLabsPrices)),
+    integrations,
   ]);
 }
-async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false,sources:any=null){
+async function searchData(start:string,end:string,guests:number,excludeReservationId:string|null=null,development=false,approvedSameDay=false,sources:any=null,propertyId:number|null=null){
   if(!Number.isInteger(guests)||guests<1||guests>12)throw Error("capacity");
   if(!validDate(start)||!validDate(end)||end<=start||nights(start,end)>availabilityDefaults.max_nights)throw Error("invalid_dates");
   const stay=nights(start,end);if(stay<1)throw Error("invalid_dates");
-  const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices]=sources||await searchSources(start,end);
+  const [propertiesQ,reservationsQ,changeHoldsQ,blocksQ,ical,bookingIcal,prices,integrationsQ]=sources||await searchSources(start,end,propertyId);
   const {data:properties,error:pe}=propertiesQ;
   const {data:dbRows,error:re}=reservationsQ;
   const {data:changeHolds,error:he}=changeHoldsQ;
   const {data:operationalBlocks,error:be}=blocksQ;
-  if(pe||re||he||be){
-    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null,change_holds:he?.code||null,operational_blocks:be?.code||null}));
+  if(pe||re||he||be||integrationsQ.error){
+    console.error(JSON.stringify({event:"booking_search_db_error",properties:pe?.code||null,reservations:re?.code||null,change_holds:he?.code||null,operational_blocks:be?.code||null,integrations:integrationsQ.error?.code||null}));
     throw new Error("database_unavailable");
   }
   if(!development && !bookingIcal.configured) throw new Error("booking_not_configured");
   const now=Date.now();
   const dbActive=(dbRows||[]).filter((r:any)=>String(r.id)!==String(excludeReservationId||"")).filter((r:any)=>r.status!=="hold" && r.status!=="pending_payment" ? true : !r.hold_expires_at || Date.parse(r.hold_expires_at)>now);
   const changeHoldActive=(changeHolds||[]).filter((c:any)=>String(c.reservation_id)!==String(excludeReservationId||"") && Date.parse(c.expires_at)>now);
-  const icalMap=Object.fromEntries((ical.listings||[]).map((x:any)=>[x.name,x]));
-  const bookingMap=Object.fromEntries((bookingIcal.listings||[]).map((x:any)=>[x.name,x]));
-  const priceMap=Object.fromEntries((prices.listings||[]).map((x:any)=>[x.name,x]));
+  const icalMap=Object.fromEntries((ical.listings||[]).map((x:any)=>[x.property_id,x]));
+  const bookingMap=Object.fromEntries((bookingIcal.listings||[]).map((x:any)=>[x.property_id,x]));
+  const integrationMap=new Map((integrationsQ.data||[]).map((x:any)=>[Number(x.property_id),x]));
 
   return (properties||[]).map((p:any)=>{
-    const cal=icalMap[p.name];
-    const bookingCal=bookingMap[p.name];
-    const rawPrice:any=priceMap[p.name];
-    const pricedDays=sources?(rawPrice?.days||[]).filter((d:any)=>d.date>=start&&d.date<end):null;
-    const pr=sources&&rawPrice?{...rawPrice,days:pricedDays,total_price:pricedDays.reduce((sum:number,d:any)=>sum+Number(d.price),0),min_stay:pricedDays.find((d:any)=>d.date===start)?.min_stay}:rawPrice;
+    const {own_pricing,...property}=p;
+    const cal=icalMap[p.id];
+    const bookingCal=bookingMap[p.id];
+    const pr=resolvePropertyPricing(own_pricing,integrationMap.get(Number(p.id)),prices,start,end);
     const rules=availabilityRules(p.features?.availability||{});
     const sameDayApproval=rules.allow_same_day_requests&&start===brazilClock().date;
-    const decision=availabilityDecision(sameDayApproval?{...rules,lead_days:0,same_day_cutoff:"23:59"}:rules,start,end,pr?.min_stay);
+    const decision=availabilityDecision(sameDayApproval?{...rules,lead_days:0,same_day_cutoff:"23:59"}:rules,start,end,pr.minStay);
     const occupied=(x:any)=>preparationOverlap(start,end,x.start,x.end,rules.preparation_days);
     const airbnbOccupied=!cal?.ok || (cal.periods||[]).some(occupied);
     const bookingOccupied=bookingIcal.configured && (!bookingCal?.ok || (bookingCal.periods||[]).some((x:any)=>bookingStayOverlap(start,end,x,p,rules.preparation_days)));
@@ -276,15 +303,19 @@ async function searchData(start:string,end:string,guests:number,excludeReservati
       || changeHoldActive.some((x:any)=>Number(x.target_property_id)===Number(p.id)&&occupied({start:x.target_check_in,end:x.target_check_out}))
       || (operationalBlocks||[]).some((x:any)=>Number(x.property_id)===Number(p.id)&&overlaps(start,end,x.start_date,x.end_date));
     const minStay=decision.min_stay;
-    const hasPrice=Array.isArray(pr?.days)&&pr.days.length===stay&&Number.isFinite(Number(pr?.total_price));
+    const hasPrice=pr.totalCents!==null;
     const requestable=!channelOccupied&&!dbOccupied&&guests<=Number(p.max_guests)&&!decision.reason&&hasPrice;
     const available=requestable&&(!sameDayApproval||approvedSameDay);
     return {
-      ...p,
+      ...property,
       cleaning_fee:Number(p.cleaning_fee||0),
       min_stay:minStay,
-      base_price:hasPrice?Number(pr.total_price):null,
-      pricing_days:hasPrice?pr.days:null,
+      base_price:pr.totalCents===null?null:pr.totalCents/100,
+      base_amount_cents:pr.totalCents,
+      pricing_days:pr.days,
+      pricing_source:pr.source,
+      pricing_fallback_reason:pr.fallbackReason,
+      pricing_discount_bps:pr.discountBps,
       available,same_day_approval_required:sameDayApproval,requestable:sameDayApproval&&requestable,
       unavailable_reason: !cal?.ok || bookingIcal.configured&&!bookingCal?.ok ? "calendar_unavailable" : channelOccupied||dbOccupied ? "occupied" : guests>Number(p.max_guests) ? "capacity" : decision.reason ? decision.reason : !hasPrice ? "rate_unavailable" : sameDayApproval&&!approvedSameDay ? "same_day_approval_required" : null
     };
@@ -305,6 +336,8 @@ async function showcaseQuoteContext(catalog:any,development:boolean){
 }
 async function createQuote(body:any, development:boolean,excludeReservationId:string|null=null,approvedRequest:any=null,availableList:any[]=null,persist=true,offerCatalog:any=null,readContext:any=null,launch=false){
   const {property_id,check_in,check_out,guests}=body||{};
+  const propertyId=Number(property_id);
+  if(!Number.isSafeInteger(propertyId)||propertyId<1)throw Error("property_not_found");
   if(launch)assertLodgingLaunchSelection(body);
   let experience_variant_ids=Array.isArray(body.experience_variant_ids)?[...new Set(body.experience_variant_ids)]:[];
   let offer:any=null;
@@ -323,7 +356,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
       experience_variant_ids.push(variant.id);
     }
   }
-  const list=availableList||await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development,!!approvedRequest);
+  const list=availableList||await searchData(String(check_in||""),String(check_out||""),Number(guests||0),excludeReservationId,development,!!approvedRequest,null,propertyId);
   const property=list.find((x:any)=>Number(x.id)===Number(property_id));
   if(!property) throw new Error("property_not_found");
   if(!property.available){
@@ -365,7 +398,9 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     }
   }
 
-  const baseCents=cents(property.base_price);
+  const baseCents=property.base_amount_cents;
+  const sourceSnapshot={source:property.pricing_source,fallback_reason:property.pricing_fallback_reason,discount_bps:property.pricing_discount_bps,
+    nights:property.pricing_days.map(({date,price_cents,source}:any)=>({date,price_cents,source}))};
   const cleaningCents=cents(property.cleaning_fee);
   const expiresAt=new Date(Date.now()+15*60000).toISOString();
   const result=persist?await admin.from("quotes").insert({
@@ -374,7 +409,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     check_in,check_out,guests:Number(guests),
     base_amount_cents:baseCents,
     cleaning_fee_cents:cleaningCents,
-    pricing_snapshot:{source:"pricelabs",...(development&&!launch?{cancellation_policy_scope:"development"}:{}),base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,stay_offer_id:offer?.id||null,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
+    pricing_snapshot:{...sourceSnapshot,...(development&&!launch?{cancellation_policy_scope:"development"}:{}),base_price:property.base_price,min_stay:property.min_stay,experience_total_cents:experienceTotal,stay_offer_id:offer?.id||null,...(approvedRequest?{same_day_request_id:approvedRequest.id,same_day_user_id:approvedRequest.user_id}:{})},
     rules_version:"2026-09-v1",
     expires_at:expiresAt
   }).select().single():{data:{id:null},error:null};
@@ -404,7 +439,7 @@ async function createQuote(body:any, development:boolean,excludeReservationId:st
     if(!launch&&development&&p.selectable&&!cancellationPolicy) throw new Error("cancellation_policy_unavailable");
     const accommodation=Math.round(baseCents*Number(p.multiplier_bps)/10000);
     const price=launch?lodgingLaunchPrice(property,accommodation,cleaningCents):priceStayOffer([{key:"accommodation",gross_cents:accommodation,included:!!offer},{key:"cleaning",gross_cents:cleaningCents,included:!!offer},...expSnapshots.map(x=>({key:x.product.id,gross_cents:Number(x.variant.price_cents),included:x.included}))],offer);
-    const contract={property_id:property.id,property_name:property.name,check_in,check_out,guests:Number(guests),rate_code:p.code,rate_name:p.name,cancellation_policy:cancellationPolicy,offer_version:offer?.updated_at||null,offer_rules:offer?{min_nights:offer.min_nights,max_nights:offer.max_nights,start_date:offer.start_date,end_date:offer.end_date,property_ids:offer.property_ids}:null,payment_terms:property.features?.payment_terms||null,price_source:"pricelabs",offer_id:offer?.id||null,offer_name:offer?.name||null,description:offer?.description||null,discount_bps:offer?.discount_bps||0,discount_enabled:offer?.discount_enabled||false,...price,experiences:expSnapshots.map(x=>({...x.composition,included:x.included,net_price_cents:price.lines.find(l=>l.key===x.product.id)?.net_cents}))};
+    const contract={property_id:property.id,property_name:property.name,check_in,check_out,guests:Number(guests),rate_code:p.code,rate_name:p.name,cancellation_policy:cancellationPolicy,offer_version:offer?.updated_at||null,offer_rules:offer?{min_nights:offer.min_nights,max_nights:offer.max_nights,start_date:offer.start_date,end_date:offer.end_date,property_ids:offer.property_ids}:null,payment_terms:property.features?.payment_terms||null,price_source:sourceSnapshot.source,price_fallback_reason:sourceSnapshot.fallback_reason,price_nights:sourceSnapshot.nights,property_discount_bps:sourceSnapshot.discount_bps,offer_id:offer?.id||null,offer_name:offer?.name||null,description:offer?.description||null,discount_bps:offer?.discount_bps||0,discount_enabled:offer?.discount_enabled||false,...price,experiences:expSnapshots.map(x=>({...x.composition,included:x.included,net_price_cents:price.lines.find(l=>l.key===x.product.id)?.net_cents}))};
     const netAccommodation=price.lines[0].net_cents,netCleaning=price.lines[1].net_cents,netExperiences=price.lines.slice(2).reduce((s,x)=>s+x.net_cents,0);
     const total=price.total_cents;
     const row={
@@ -724,7 +759,7 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(!existingHold?.length){
     const requestId=paymentQuote.pricing_snapshot?.same_day_request_id;
     if(requestId)await approvedSameDayRequest(admin,requestId,user.id,paymentQuote);
-    const refreshed=await searchData(paymentQuote.check_in,paymentQuote.check_out,paymentQuote.guests,null,development,!!requestId);
+    const refreshed=await searchData(paymentQuote.check_in,paymentQuote.check_out,paymentQuote.guests,null,development,!!requestId,null,Number(paymentQuote.property_id));
     const selected=refreshed.find((p:any)=>p.id===paymentQuote.property_id);
     if(!selected?.available)return json({ok:false,error:selected?.unavailable_reason||"dates_unavailable",min_stay:selected?.min_stay},409);
   }
@@ -1033,7 +1068,9 @@ async function modificationQuote(r:any,propertyId:number,checkIn:string,checkOut
     if(issue.error)throw Error("experience_lookup_failed");if(issue.data)throw Error(issue.data);
   }
   const quote=await createQuote({property_id:propertyId,check_in:checkIn,check_out:checkOut,guests:r.guests,experience_variant_ids:[]},development,r.id);
-  const mark=await admin.from("quotes").update({pricing_snapshot:{modification_only:true,reservation_id:r.id,source:"pricelabs"}}).eq("id",quote.quote_id);if(mark.error)throw Error("modification_quote_failed");
+  const saved=await admin.from("quotes").select("pricing_snapshot").eq("id",quote.quote_id).single();
+  if(saved.error||!saved.data)throw Error("modification_quote_failed");
+  const mark=await admin.from("quotes").update({pricing_snapshot:{...saved.data.pricing_snapshot,modification_only:true,reservation_id:r.id}}).eq("id",quote.quote_id);if(mark.error)throw Error("modification_quote_failed");
   const original=r.contract_snapshot;
   if(original?.offer_id){
     const count=nights(checkIn,checkOut),rules=original.offer_rules||{};
@@ -1044,7 +1081,7 @@ async function modificationQuote(r:any,propertyId:number,checkIn:string,checkOut
       const price=priceStayOffer([{key:"accommodation",gross_cents:option.accommodation_amount_cents,included:true},{key:"cleaning",gross_cents:option.cleaning_fee_cents,included:true}],{discount_enabled:true,discount_bps:bps});
       option.accommodation_amount_cents=price.lines[0].net_cents;option.cleaning_fee_cents=price.lines[1].net_cents;
       option.stay_amount_cents=price.total_cents;option.total_amount_cents=price.total_cents;
-      option.contract_snapshot={...original,...price,check_in:checkIn,check_out:checkOut,property_id:propertyId,amendment:true,original_contract_total_cents:original.total_cents,experiences:original.experiences};
+      option.contract_snapshot={...original,...price,check_in:checkIn,check_out:checkOut,property_id:propertyId,price_source:option.contract_snapshot.price_source,price_fallback_reason:option.contract_snapshot.price_fallback_reason,price_nights:option.contract_snapshot.price_nights,property_discount_bps:option.contract_snapshot.property_discount_bps,amendment:true,original_contract_total_cents:original.total_cents,experiences:original.experiences};
       if(option.quote_option_id){const result=await admin.from("quote_options").update({accommodation_amount_cents:option.accommodation_amount_cents,cleaning_fee_cents:option.cleaning_fee_cents,total_amount_cents:option.total_amount_cents,contract_snapshot:option.contract_snapshot}).eq("id",option.quote_option_id);if(result.error)throw Error("modification_quote_failed")}
     }
   }
@@ -1500,6 +1537,45 @@ async function adminPropertyAction(req:Request,body:any){
   const user=await currentUser(req);
   if(!user || !(await userIsAdmin(user))) return json({ok:false,error:"admin_required"},403);
   const operation=String(body?.operation||"");
+  if(operation==="pricing_calendar"){
+    const id=Number(body.id),start=String(body.start||""),end=String(body.end||"");
+    if(!Number.isSafeInteger(id)||id<1||!validDate(start)||!validDate(end)||end<=start||nights(start,end)>31)
+      return json({ok:false,error:"invalid_dates"},400);
+    const {data:property,error}=await admin.from("properties").select("id,own_pricing,updated_at").eq("id",id).maybeSingle();
+    if(error||!property)return json({ok:false,error:"property_not_found"},404);
+    const [,reservations,holds,blocks,airbnb,booking,prices,integrations]=await searchSources(start,end,id);
+    if(reservations.error||holds.error||blocks.error||integrations.error)
+      return json({ok:false,error:"database_unavailable"},503);
+    const integration=(integrations.data||[])[0];
+    const expiry=Date.now();
+    const reserved=(reservations.data||[]).filter((row:any)=>row.status==="confirmed"||!row.hold_expires_at||Date.parse(row.hold_expires_at)>expiry);
+    const events=[
+      ...reserved.map((row:any)=>({start:row.check_in,end:row.check_out,label:"Reserva"})),
+      ...(holds.data||[]).filter((row:any)=>Number(row.target_property_id)===id).map((row:any)=>({start:row.target_check_in,end:row.target_check_out,label:"Alteração de reserva"})),
+      ...(blocks.data||[]).map((row:any)=>({start:row.start_date,end:row.end_date,label:row.reason,block_id:row.id})),
+      ...[airbnb,booking].flatMap(calendar=>(calendar.listings||[]).flatMap((listing:any)=>
+        listing.periods.map((period:any)=>({start:period.start,end:period.end,label:period.calendar_label||"Calendário conectado"})))),
+    ];
+    const now=new Date(),days=[];
+    for(let day=start;day<end;day=shiftDate(day,1)){
+      const result=resolvePropertyPricing(property.own_pricing,integration,prices,day,shiftDate(day,1),now,false);
+      days.push({date:day,price_cents:result.totalCents,source:result.source,fallback_reason:result.fallbackReason});
+    }
+    return json({ok:true,property,days,events,pricelabs_connected:!!integration,
+      calendar_unavailable:[airbnb,booking].some(calendar=>calendar.listings.some((listing:any)=>!listing.ok))});
+  }
+  if(operation==="save_pricing"){
+    const id=Number(body.id);
+    if(!Number.isSafeInteger(id)||id<1)return json({ok:false,error:"invalid_property"},400);
+    let ownPricing;
+    try{ownPricing=normalizeOwnPricing(body.own_pricing)}
+    catch(error){return json({ok:false,error:(error as Error).message},400)}
+    const {data,error}=await admin.from("properties").update({own_pricing:ownPricing,updated_at:new Date().toISOString()})
+      .eq("id",id).eq("updated_at",String(body.updated_at||"")).select("id,own_pricing,updated_at").maybeSingle();
+    if(error||!data)return json({ok:false,error:"property_pricing_conflict"},409);
+    await admin.from("audit_events").insert({actor_user_id:user.id,action:"property_pricing_updated",entity_type:"property",entity_id:String(id),new_value:ownPricing});
+    return json({ok:true,property:data});
+  }
   if(operation!=="save") return json({ok:false,error:"invalid_operation"},400);
   const galleryInput=body?.gallery;
   if(!Array.isArray(galleryInput)||galleryInput.length>40) return json({ok:false,error:"invalid_gallery"},400);
@@ -1520,7 +1596,14 @@ async function adminPropertyAction(req:Request,body:any){
   try { terms=paymentTerms({payment_terms:{max_installments:Number(body?.max_installments??12),
     no_interest_installments:Number(body?.no_interest_installments??6),interest_payer:body?.interest_payer}}); }
   catch { return json({ok:false,error:"invalid_payment_terms"},400); }
-  const {data:previous}=id?await admin.from("properties").select("features").eq("id",id).single():{data:null};
+  const {data:previous,error:previousError}=id?await admin.from("properties").select("features").eq("id",id).single():{data:null,error:null};
+  if(previousError)return json({ok:false,error:"property_not_found"},404);
+  let ownPricing;
+  if(body.own_pricing!=null){
+    try{ownPricing=normalizeOwnPricing(body.own_pricing)}
+    catch(error){return json({ok:false,error:(error as Error).message},400)}
+  }
+  if(!id&&body.active!==false&&!ownPricing)return json({ok:false,error:"own_pricing_required"},400);
   const payload={
     name,code,slug,property_type:propertyType,cover_image:coverImage||null,gallery,
     tagline:String(body?.tagline||"").trim().slice(0,240)||null,
@@ -1529,11 +1612,12 @@ async function adminPropertyAction(req:Request,body:any){
     cleaning_fee:Math.max(0,Math.min(100000,Number(body?.cleaning_fee||0))),
     guarantee_amount_cents:Math.max(0,Math.min(100000000,Math.round(Number(body?.guarantee_amount_cents||0)))),
     check_in_time:checkIn,check_out_time:checkOut,timezone:"America/Sao_Paulo",active:body?.active!==false,
-    features:{...(previous?.features||{}),payment_terms:terms},updated_at:new Date().toISOString()
+    features:{...(previous?.features||{}),payment_terms:terms},...(ownPricing?{own_pricing:ownPricing}:{}),updated_at:new Date().toISOString()
   };
   const result=id
     ? await admin.from("properties").update(payload).eq("id",id).select().single()
     : await admin.from("properties").insert(payload).select().single();
+  if(result.error?.message==="own_pricing_required")return json({ok:false,error:"own_pricing_required"},400);
   if(result.error||!result.data) return json({ok:false,error:"property_save_failed"},409);
   await admin.from("audit_events").insert({actor_user_id:user.id,action:id?"property_updated":"property_created",entity_type:"property",entity_id:String(result.data.id),new_value:{name,code,active:payload.active}});
   return json({ok:true,property:result.data});
@@ -2231,7 +2315,10 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
       const start=url.searchParams.get("start")||body.start;
       const end=url.searchParams.get("end")||body.end;
       const guests=Number(url.searchParams.get("guests")??body.guests??2);
-      const listings=await searchData(start,end,guests,null,development);
+      const selectedProperty=url.searchParams.get("property_id")??body.property_id;
+      const propertyId=selectedProperty==null?null:Number(selectedProperty);
+      if(propertyId!==null&&(!Number.isSafeInteger(propertyId)||propertyId<1))throw Error("property_not_found");
+      const listings=await searchData(start,end,guests,null,development,false,null,propertyId);
       const offerId=body.stay_offer_id||url.searchParams.get("stay_offer_id");
       const raw=offerId?await stayOffers.catalog():null,catalog=consultation&&raw?lodgingLaunchCatalog(raw):raw;
       const listingOffers=await Promise.all(listings.map(async(x:any)=>{

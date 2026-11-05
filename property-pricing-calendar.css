@@ -1,0 +1,22 @@
+.pricing-calendar {display:grid;gap:1rem;min-width:0}
+.pricing-calendar h2,.pricing-calendar h3,.pricing-calendar p {margin:0}
+.price-toolbar {display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.price-grid,.price-weekdays {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.25rem}
+.price-grid>strong {text-align:center;font-size:.75rem}
+.price-grid>button {display:grid;align-content:start;justify-items:center;gap:.2rem;min-width:0;min-height:4rem;padding:.3rem .08rem;font-size:clamp(.59rem,1.65vw,.78rem);text-align:center;overflow-wrap:anywhere}
+.price-grid>button>b {font-size:.88rem}
+.price-grid>button[aria-current=date] b {text-decoration:underline;text-underline-offset:.2rem}
+.price-grid>button[aria-pressed=true] {background:#705132;color:#fff;outline:2px solid #e4af73;outline-offset:-2px}
+.price-grid>button.price-occupied:not([aria-pressed=true]) {background:rgba(145,59,50,.27)}
+.price-grid>button small {font-size:.64rem}
+.price-filter {display:flex;flex-wrap:wrap;gap:.35rem .8rem}
+.price-filter>label {display:flex;flex-direction:row;align-items:center;gap:.2rem}
+.price-filter input {width:auto}
+.price-selection,.pricing-calendar [data-defaults],.new-property-pricing {border:1px solid rgba(211,164,111,.36);border-radius:.7rem;padding:.9rem}
+.price-weekdays input {min-width:0;width:100%}
+.pricing-calendar [data-price-status] {position:sticky;bottom:0;background:#201711;padding:.5rem;color:#f5d5ad}
+.pricing-calendar [data-price-status]:empty {display:none}
+@media(max-width:540px) {
+  .price-weekdays {grid-template-columns:repeat(4,minmax(0,1fr))}
+  .price-grid>button {min-height:3.5rem}
+}

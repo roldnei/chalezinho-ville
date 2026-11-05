@@ -159,8 +159,9 @@ export function calendarService(admin:any,projectUrl:string){
    rows.push(...page);if(page.length<500)return rows;
   }
  }
- async function channels(provider:string){
-  const properties=checked(await admin.from('properties').select('id,name').eq('active',true));
+ async function channels(provider:string,propertyId:number|null=null,recordHealth=true){
+  const query=admin.from('properties').select('id,name').eq('active',true);
+  const properties=checked(await (propertyId===null?query:query.eq('id',propertyId)));
   const sources=(await readSources()).filter((x:any)=>x.provider===provider||(provider==='booking'&&x.provider==='ical'));
   const listings=await Promise.all(properties.map(async(p:any)=>{
    const selected=sources.filter((x:any)=>x.property_id===p.id&&x.enabled);
@@ -168,7 +169,7 @@ export function calendarService(admin:any,projectUrl:string){
    let periods:CalendarPeriod[]=[],error:string|null=null;
    try{if(!s.feed_url)throw new Error('calendar_not_configured');periods=await fetchCalendar(s.feed_url,s.provider,projectUrl,s.id)}catch(e){error=e instanceof Error&&['invalid_calendar','invalid_calendar_event','unsupported_calendar_recurrence','calendar_not_configured','invalid_calendar_url','calendar_too_large'].includes(e.message)?e.message:'calendar_unreachable'}
    const now=new Date().toISOString();
-   await admin.from('property_calendar_sources').update({last_checked_at:now,last_error:error,...(!error?{last_success_at:now,event_count:periods.length}:{})}).eq('id',s.id).eq('updated_at',s.updated_at);
+   if(recordHealth)await admin.from('property_calendar_sources').update({last_checked_at:now,last_error:error,...(!error?{last_success_at:now,event_count:periods.length}:{})}).eq('id',s.id).eq('updated_at',s.updated_at);
    return {ok:!error,error,periods:periods.map(period=>({...period,source:s.provider,calendar_label:s.label,calendar_id:s.id}))};
    }));const failure=results.find((r:any)=>r.error&&r.error!=='calendar_not_configured')||results.find((r:any)=>r.error);
    return {property_id:p.id,name:p.name,ok:!failure,error:failure?.error||null,periods:results.flatMap((r:any)=>r.periods)};

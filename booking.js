@@ -157,6 +157,8 @@ async function search({scroll=true}={}){
  window.VillegramSignals?.mark("dates_query");track("search_started",{metadata:{nights:nights(bi,bo),guests}});
  try{
   const q=new URLSearchParams({action:"search",start:bi,end:bo,guests:String(guests)});
+  const selectedProperty=state.properties?.find(property=>property.code===$("#book-chalet").value);
+  if(selectedProperty)q.set("property_id",String(selectedProperty.id));
   if(state.offerId)q.set("stay_offer_id",state.offerId);
   persistSelection();
   const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
