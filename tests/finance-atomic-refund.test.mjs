@@ -37,7 +37,7 @@ test('guest role cannot invoke refund preparation',async()=>{
 });
 
 test('Pix rejection closes only after a definitive response and unchanged provider totals',async()=>{
- for(const name of ['20260928162500_refund_precheck_event.sql','20260928174500_refund_provider_observations.sql','20261106221500_finance_reject_expired_pix_refund.sql']){
+ for(const name of ['20260928162500_refund_precheck_event.sql','20260928174500_refund_provider_observations.sql','20261106221118_finance_reject_expired_pix_refund.sql']){
   await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  }
  const c=await fixture(),a=await prepare(c);
