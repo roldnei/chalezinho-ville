@@ -21,5 +21,29 @@
 
 ## Achados anteriores
 
-- [Tabela própria ausente em CH1–CH3](../2026-11-05-2329-UTC/ACHADOS.md): CH1 foi reinspecionado e ainda aparece sem diária base própria; CH2/CH3 não foram reinspecionados hoje. Não atribuir preço próprio aos chalés reais sem validação do responsável.
+- [Tabela própria ausente em CH1–CH3](../2026-11-05-2329-UTC/ACHADOS.md): os três foram reinspecionados em leitura e ainda aparecem sem diária base própria. Não atribuir preço próprio aos chalés reais sem validação do responsável.
 - [Condições de parcelamento ausentes no imóvel QA legado](../2026-11-05-2329-UTC/ACHADOS.md): o imóvel **novo**, criado pausado e configurado pelo PMS, ofereceu 1× a 12×. O dado legado segue como caso de migração/fallback, não como falha comprovada do fluxo pausado atual.
+
+## DEVQA-2026-11-06-1600-UTC-003 — Singular incorreto na tarifa de uma noite
+
+- **Caso/prioridade/severidade:** UX-03; P2, baixo. No checkout do imóvel QA para 23–24/11/2026, as duas tarifas e o resumo exibiram “1 noites”. O valor e a disponibilidade estavam corretos, então o impacto é de clareza e acabamento.
+- **Reprodução:** buscar uma noite útil permitida, abrir “Escolher esta estadia” e comparar os rótulos de tarifa e resumo. Esperado: “1 noite”. Observado: “Total para 1 noites” e “Hospedagem e limpeza · 1 noites”.
+- **Aceite:** pluralização correta em busca, comparação, resumo e recibo para 1 e para 2 noites, sem mudar cálculo financeiro.
+- **Handoff:** NOVO; correção/PR, prévia, data e resultado de reteste pendentes.
+
+## DEVQA-2026-11-06-1600-UTC-004 — Imóvel ativo sem foto mostra imagem quebrada
+
+- **Caso/prioridade/severidade:** PUB-01, UX-03; P2, baixo. A vitrine de resultados apresenta área escura com ícone de imagem quebrada quando um imóvel ativo ainda não tem fotos.
+- **Pré-condições:** imóvel sintético `QA-DEV-20261106-E2E` ativo, 0 fotos no PMS, busca disponível para 17–19/11/2026 na prévia DEV.
+- **Reprodução:** abrir a busca e observar o cartão do imóvel. Esperado: placeholder visual íntegro e informativo ou impedimento explícito de ativar anúncio sem foto, conforme regra de produto. Observado: o elemento `<img>` tinha `src="null"`, `naturalWidth=0` e `naturalHeight=0`; a captura de tela exibiu imagem quebrada sobre retângulo escuro. O preço e o botão de escolha permaneciam visíveis.
+- **Aceite:** a busca renderiza um placeholder acessível quando não há imagem válida, sem requisitar `null`; ao cadastrar foto, a imagem real aparece. Definir se foto deve ser requisito de ativação, mantendo erro de validação claro no PMS.
+- **Handoff:** NOVO; correção/PR, prévia, data e resultado de reteste pendentes.
+
+## DEVQA-2026-11-06-1600-UTC-005 — Datas liberadas enquanto Pix segue pendente na conta
+
+- **Caso/prioridade/severidade:** PAY-01, RES-04, FIN-01; P1, médio, para investigação. A apresentação do estado financeiro diverge da disponibilidade após a retenção temporária.
+- **Pré-condições:** reserva sintética do imóvel QA para 17–19/11, Pix sandbox de R$ 212 criado e não pago. O checkout informa expiração em 15 minutos; o simulador mantém essa faixa de valor em espera sem pagamento automático.
+- **Reprodução:** iniciar o Pix, constatar busca pública com 0 opções durante a retenção, aguardar a liberação e recarregar busca e conta. Observado: a busca voltou a mostrar **1 opção disponível** para 17–19/11, enquanto a conta ainda exibia “Aguardando confirmação / Aguardando pagamento” em leituras subsequentes. Não houve pagamento tardio nem segunda reserva realizada no mesmo intervalo.
+- **Risco a verificar:** se o PagBank confirmar uma cobrança depois de a retenção terminar e outra reserva ocupar as datas, o backend precisa impedir dupla confirmação e devolver ou tratar o pagamento tardio de forma segura. O estado pendente pode também ser apenas atraso de baixa/rotulagem; o provedor não foi consultado diretamente nesta rodada.
+- **Aceite:** ao vencer o prazo, refletir expiração/cancelamento ou uma explicação precisa na conta e no PMS; garantir que confirmação tardia nunca resulte em duas reservas válidas para as mesmas noites; conciliar pagamento e eventual estorno em centavos. Testar com relógio controlado e webhook tardio/repetido.
+- **Handoff:** NOVO; confirmar regra de expiração, logs/provedor, correção/PR, prévia e reteste.
