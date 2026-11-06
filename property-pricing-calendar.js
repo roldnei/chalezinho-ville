@@ -54,34 +54,43 @@ function editPeriods(periods, start, end, days, valueFor) {
   return merged;
 }
 
-function mount(host, {property, api, block, back, availability, esc, brl, formatDate, today, initialMonth, onSaved}) {
+function mount(host, {property, api, block, back, availability, esc, brl, formatDate, today, initialMonth, initialSelection, onContext, onSaved}) {
   host.innerHTML = `<div class="pricing-calendar"><button type="button" class="workspace-back" data-price-back>← ${esc(property.name)}</button>
-    <h2>Preços e calendário</h2><div class="price-toolbar"><button type="button" data-prev aria-label="Mês anterior">‹</button>
+    <h2>Preços e calendário</h2><p class="price-context">${esc(property.code || property.name)} · <span data-price-context-month></span></p><div class="price-toolbar"><button type="button" data-prev aria-label="Mês anterior">‹</button>
       <input type="month" aria-label="Mês do calendário" data-price-month min="1900-01" max="9998-12" value="${initialMonth || today.slice(0, 7)}">
       <button type="button" data-next aria-label="Próximo mês">›</button><button type="button" data-today>Hoje</button>
       <button type="button" data-rules>Regras de disponibilidade</button></div>
-    <p data-price-origin></p><div class="price-grid" data-price-grid></div>
+    <p data-price-origin></p><div class="price-legend"><span>Hoje</span><span>Selecionado</span><span>Ocupado</span><span>Bloqueado</span><span>Sem preço</span></div><div class="price-grid" data-price-grid role="group" aria-label="Diárias e disponibilidade"></div>
     <form class="admin-form price-selection" data-selection><h3>Editar noites</h3><p>Clique em uma data e depois na última noite do período, ou informe as datas abaixo.</p>
-      <div class="admin-form-grid"><label>Primeira noite<input name="start" type="date" required value="${today}"></label>
-      <label>Última noite (inclusive)<input name="end" type="date" required value="${today}"></label></div>
+      <div class="admin-form-grid"><label>Primeira noite<input name="start" type="date" required value="${initialSelection?.start || today}"></label>
+      <label>Última noite (inclusive)<input name="end" type="date" required value="${initialSelection?.end || today}"></label></div><p data-selection-summary role="status"></p>
       <fieldset class="price-filter"><legend>Aplicar nestes dias da semana</legend>${weekdays.map((day,i) => `<label><input type="checkbox" value="${i}" name="weekday" checked> ${day}</label>`).join('')}</fieldset>
       <div class="admin-form-grid"><label>Alteração<select name="change"><option value="fixed">Definir diária manual</option><option value="percent">Ajustar tabela própria (%)</option><option value="restore">Remover diária manual</option></select></label>
         ${amount('value', 'Valor (R$)', null)}</div>
-      <div class="price-toolbar"><button type="submit" class="admin-primary">Aplicar preço</button><button type="button" data-block>Bloquear período</button></div>
+      <div class="price-toolbar"><button type="submit" class="admin-primary">Revisar alteração</button><button type="button" data-block>Bloquear período</button></div><label>Motivo do bloqueio<input data-block-reason maxlength="160" value="Uso do proprietário"></label>
+      <div class="price-review" data-price-review hidden role="status"><strong>Confira antes de salvar</strong><p data-review-summary></p><button type="button" class="admin-primary" data-review-confirm>Confirmar alteração</button><button type="button" data-review-cancel>Voltar à edição</button></div>
       <div data-price-events></div></form>
     <form class="admin-form" data-defaults><h3>Tabela própria</h3><div data-base-fields></div>
-      <label>Origem das diárias<select name="mode"><option value="auto">PriceLabs quando conectado, com diárias manuais e tabela de reserva</option><option value="own">Usar somente a tabela própria</option></select></label>
+      <label>Origem das diárias<select name="mode"><option value="auto">PriceLabs quando conectado, com diárias manuais e tabela de reserva</option><option value="own">Usar somente a tabela própria</option></select></label><p data-mode-help></p>
       <details><summary>Descontos da tabela própria</summary><p>Vale o maior desconto elegível nas estadias com todas as diárias próprias. Deixe a porcentagem em branco para desativar.</p><div data-discounts></div></details>
       <button type="submit" class="admin-primary">Salvar tabela própria</button></form>
     <p data-price-status role="status" aria-live="polite"></p></div>`;
   const root = host.firstElementChild, $ = selector => root.querySelector(selector);
   const month = $('[data-price-month]'), grid = $('[data-price-grid]');
   const selection = $('[data-selection]'), settings = $('[data-defaults]'), status = $('[data-price-status]');
-  let pricing, calendar, anchor = null, version = 0, busy = false;
+  let pricing, calendar, anchor = null, version = 0, busy = false, pendingChange = null;
+  const context = () => ({month:month.value,selection:{start:selection.elements.start.value,end:selection.elements.end.value}});
+  const rememberContext = () => onContext?.(context());
+  const review = (summary,action) => {pendingChange=action;$('[data-review-summary]').textContent=summary;$('[data-price-review]').hidden=false;$('[data-review-confirm]').focus()};
+  const clearReview = () => {pendingChange=null;$('[data-price-review]').hidden=true};
+  $('[data-review-confirm]').onclick=()=>{if(!pendingChange)return;const action=pendingChange;clearReview();change(action,'Alteração salva.').then(()=>{if(root.isConnected)selection.querySelector('[type=submit]').focus()})};
+  $('[data-review-cancel]').onclick=()=>{clearReview();selection.elements.start.focus()};
+  settings.elements.mode.onchange=()=>{const own=settings.elements.mode.value==='own';$('[data-mode-help]').textContent=own?'Somente a tabela própria será usada nas novas cotações. PriceLabs conectado não altera este modo.':'PriceLabs é usado quando houver diária sincronizada; se faltar preço, a tabela própria assume. Diárias manuais têm prioridade.'};
 
   function settingsFields() {
     $('[data-base-fields]').innerHTML = baseFields(pricing);
     settings.elements.mode.value = pricing?.mode || 'auto';
+    settings.elements.mode.onchange();
     $('[data-discounts]').innerHTML = discountOptions.map(([kind, label, min, max, fallback]) => {
       const rule = pricing?.discounts?.find(item => item.kind === kind);
       return `<fieldset><legend>${label}</legend><div class="admin-form-grid"><label>${kind === 'last_minute' ? 'Até quantos dias antes' : kind === 'advance' ? 'A partir de quantos dias antes' : 'A partir de quantas noites'}
@@ -95,6 +104,10 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
       const day = button.dataset.day;
       button.setAttribute('aria-pressed', String(day >= start.value && day <= end.value));
     });
+    const valid=start.value&&end.value&&end.value>=start.value;
+    const count=valid?Math.round((Date.parse(end.value)-Date.parse(start.value))/86400000)+1:0;
+    $('[data-selection-summary]').textContent=valid?`${count} noite${count===1?'':'s'} selecionada${count===1?'':'s'} · ${formatDate(start.value)} a ${formatDate(end.value)}`:'Escolha uma primeira e uma última noite válidas.';
+    rememberContext();
     const events = (calendar?.events || []).filter(event => event.start <= end.value && event.end > start.value);
     const detail = $('[data-price-events]');
     detail.innerHTML = events.map(event => `<p>${esc(event.label)} · ${formatDate(event.start)} a ${formatDate(shift(event.end, -1))}
@@ -103,14 +116,17 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
   function showCalendar() {
     const offset = weekday(month.value + '-01');
     const labels = {own: 'PMS', pricelabs: 'PriceLabs'};
+    $('[data-price-context-month]').textContent=new Date(month.value+'-01T12:00:00Z').toLocaleDateString('pt-BR',{month:'long',year:'numeric',timeZone:'UTC'});
     grid.innerHTML = weekdays.map(day => `<strong>${day}</strong>`).join('') + '<span></span>'.repeat(offset) +
       calendar.days.map(day => {
-        const occupied = calendar.events.some(event => event.start <= day.date && event.end > day.date);
+        const events=calendar.events.filter(event => event.start <= day.date && event.end > day.date);
+        const blocked=events.some(event=>event.block_id),occupied=events.length>0&&!blocked;
         const price = day.price_cents == null ? 'Sem preço' : brl(day.price_cents);
         const manual = pricing?.periods?.some(period => period.start <= day.date && period.end >= day.date);
         const source = manual ? 'Manual' : day.fallback_reason ? 'PMS reserva' : labels[day.source] || '';
-        return `<button type="button" data-day="${day.date}" class="${occupied ? 'price-occupied' : ''}" ${day.date === today ? 'aria-current="date"' : ''}
-          aria-label="${formatDate(day.date)}, ${price}${source ? ', ' + source : ''}${occupied ? ', ocupado' : ''}"><b>${Number(day.date.slice(-2))}</b><span>${price}</span><small>${occupied ? 'Ocupado' : source}</small></button>`;
+        const state=blocked?'Bloqueado':occupied?'Ocupado':day.price_cents==null?'Sem preço':source;
+        return `<button type="button" data-day="${day.date}" class="${blocked?'price-blocked':occupied?'price-occupied':day.price_cents==null?'price-missing':''}" ${day.date === today ? 'aria-current="date"' : ''}
+          aria-label="${formatDate(day.date)}${day.date===today?', hoje':''}, ${price}${source ? ', ' + source : ''}, ${state}"><b>${Number(day.date.slice(-2))}${day.date===today?'<em>Hoje</em>':''}</b><span>${price}</span><small>${state}</small></button>`;
       }).join('');
     showSelection();
   }
@@ -127,11 +143,11 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
       settingsFields();
       onSaved?.(data.property);
       $('[data-price-origin]').textContent = [
-        data.pricelabs_connected ? 'PriceLabs conectado.' : 'Preço do PMS.',
+        pricing?.mode==='own'?'Fonte ativa: somente tabela própria.':data.pricelabs_connected?'Fonte ativa: PriceLabs; tabela própria usada quando faltar preço.':'Fonte ativa: tabela própria.',
         'Os valores no calendário são diárias antes das taxas e dos descontos por estadia.',
         data.calendar_unavailable ? 'Há um calendário externo indisponível.' : '',
       ].filter(Boolean).join(' ');
-      showCalendar();
+      showCalendar();rememberContext();
     } catch {
       if (root.isConnected && request === version) grid.textContent = 'Não foi possível carregar o mês. Tente trocar de mês ou clique em Hoje.';
     }
@@ -145,6 +161,7 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
       await load();
       if (!root.isConnected) return;
       status.textContent = message;
+      delete host.dataset.dirty;
     } catch (err) {
       status.textContent = ({
         invalid_own_pricing: 'Confira os valores, os descontos e o limite de 1.000 períodos.',
@@ -185,7 +202,7 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
   };
   selection.onsubmit = event => {
     event.preventDefault();
-    change(() => {
+    try {
       if (!pricing) throw Error('missing_pricing');
       const {start, end, days} = range(true), x = selection.elements;
       const raw = x.value.value.trim().replace(',', '.');
@@ -193,6 +210,9 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
       const fixed = parseCents(raw);
       if (x.change.value === 'fixed' && !fixed || x.change.value === 'percent' && (!Number.isFinite(percent) || percent <= -100 || percent > 1000))
         throw Error('invalid_own_pricing');
+      const count=Array.from({length:Math.round((Date.parse(end)-Date.parse(start))/86400000)+1},(_,i)=>shift(start,i)).filter(day=>days.includes(weekday(day))).length;
+      const title=x.change.value==='fixed'?`Definir ${brl(fixed)} por noite`:x.change.value==='percent'?`Ajustar ${percent}% sobre a tabela própria`:'Remover diárias manuais';
+      review(`${title} em ${count} noite${count===1?'':'s'}, de ${formatDate(start)} a ${formatDate(end)}. Confira os dias da semana selecionados.`,() => {
       const periods = editPeriods(pricing.periods, start, end, days, (day, previous) => {
         if (x.change.value === 'restore') return null;
         if (x.change.value === 'fixed') return fixed;
@@ -200,7 +220,8 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
         return Math.max(1, Math.round((previous ?? pricing.weekdays_cents[weekday(day)]) * (10000 + bps) / 10000));
       });
       return save({...pricing, periods});
-    }, 'Preços do período salvos.');
+      });
+    } catch(err){status.textContent=err.message==='missing_pricing'?'Salve a tabela própria antes de editar datas.':err.message==='invalid_range'?'Selecione de 1 a 366 noites e ao menos um dia da semana.':'Confira o valor informado.'}
   };
   selection.elements.change.onchange = () => {
     const mode = selection.elements.change.value;
@@ -209,6 +230,7 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
     input.parentElement.firstChild.textContent = mode === 'percent' ? 'Ajuste (%)' : 'Valor (R$)';
   };
   selection.onchange = event => {
+    clearReview();
     if (['start','end'].includes(event.target.name)) { anchor = null; showSelection(); }
   };
   grid.onclick = event => {
@@ -218,32 +240,26 @@ function mount(host, {property, api, block, back, availability, esc, brl, format
     x.start.value = anchor && anchor < day ? anchor : day;
     x.end.value = anchor && anchor > day ? anchor : day;
     anchor = anchor ? null : day;
+    clearReview();
     showSelection();
   };
-  $('[data-block]').onclick = () => change(() => {
-    const {start, end} = range(false);
-    const reason = window.prompt('Motivo do bloqueio de todas as noites do intervalo', 'Uso do proprietário');
-    if (reason === null) throw Error('block_cancelled');
-    return block({operation:'create', property_id:property.id, start_date:start, end_date:shift(end, 1), reason, block_type:'owner_use'});
-  }, 'Período bloqueado.');
+  $('[data-block]').onclick = () => {try{const {start,end}=range(false),reason=$('[data-block-reason]').value.trim();if(reason.length<2)throw Error('invalid_block');review(`Bloquear todas as noites de ${formatDate(start)} a ${formatDate(end)}. Motivo: ${reason}.`,()=>block({operation:'create',property_id:property.id,start_date:start,end_date:shift(end,1),reason,block_type:'owner_use'}))}catch{status.textContent='Confira o intervalo e informe um motivo com pelo menos duas letras.'}};
   $('[data-price-events]').onclick = event => {
     const id = event.target.closest('[data-release]')?.dataset.release;
-    if (id && window.confirm('Remover este bloqueio operacional inteiro?')) {
-      change(() => block({operation:'cancel', block_id:id}), 'Bloqueio removido.');
-    }
+    if (id) {const item=calendar.events.find(row=>String(row.block_id)===String(id));review(`Remover o bloqueio inteiro${item?` de ${formatDate(item.start)} a ${formatDate(shift(item.end,-1))}`:''}?`,()=>block({operation:'cancel',block_id:id}))}
   };
-  month.onchange = load;
+  month.onchange = () => {clearReview();rememberContext();load()};
   function navigate(delta) {
     const [year, value] = month.value.split('-').map(Number);
     if (!year || !value) return;
     month.value = new Date(Date.UTC(year, value - 1 + delta, 1)).toISOString().slice(0, 7);
-    load();
+    clearReview();rememberContext();load();
   }
   $('[data-prev]').onclick = () => navigate(-1);
   $('[data-next]').onclick = () => navigate(1);
-  $('[data-today]').onclick = () => {month.value = today.slice(0, 7); load();};
+  $('[data-today]').onclick = () => {month.value = today.slice(0, 7);clearReview();rememberContext();load();};
   $('[data-price-back]').onclick = back;
-  $('[data-rules]').onclick = availability;
+  $('[data-rules]').onclick = () => availability(context());
   load();
 }
 window.VillePropertyPricing = {mount, baseFields, readBase, editPeriods};

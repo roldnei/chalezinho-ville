@@ -8,7 +8,17 @@
 .price-grid>button[aria-current=date] b {text-decoration:underline;text-underline-offset:.2rem}
 .price-grid>button[aria-pressed=true] {background:#705132;color:#fff;outline:2px solid #e4af73;outline-offset:-2px}
 .price-grid>button.price-occupied:not([aria-pressed=true]) {background:rgba(145,59,50,.27)}
+.price-grid>button.price-blocked:not([aria-pressed=true]) {background:repeating-linear-gradient(135deg,#40372d,#40372d 7px,#54412f 7px,#54412f 9px);border-style:dashed}
+.price-grid>button.price-missing:not([aria-pressed=true]) {border-color:#ba854f}
 .price-grid>button small {font-size:.64rem}
+.price-grid>button em{display:block;font:600 .55rem/1 sans-serif;text-decoration:none;color:#f7cf9e}
+.price-context{color:#d9bf9f;font-weight:600;text-transform:capitalize}
+.price-legend{display:flex;flex-wrap:wrap;gap:.45rem .8rem;font-size:.76rem;color:#e3d4c4}
+.price-legend span{display:inline-flex;align-items:center;gap:.3rem}.price-legend span:before{content:"";width:.75rem;height:.75rem;border:1px solid #bb9168;border-radius:2px}.price-legend span:nth-child(2):before{background:#705132}.price-legend span:nth-child(3):before{background:#76413a}.price-legend span:nth-child(4):before{background:repeating-linear-gradient(135deg,#40372d,#40372d 3px,#8f7655 3px,#8f7655 5px)}
+.price-review{display:grid;gap:.6rem;border:1px solid #d1ac83;border-radius:.7rem;padding:1rem;background:#352719}.price-review button{justify-self:start}.price-review p{line-height:1.5}
+.pricing-calendar [data-selection-summary],.pricing-calendar [data-mode-help]{color:#e4c49b;line-height:1.5}
+.pricing-calendar button:focus-visible,.pricing-calendar input:focus-visible,.pricing-calendar select:focus-visible{outline:3px solid #f4ca89;outline-offset:2px}
+.pricing-calendar .price-toolbar input[type=month]{max-width:100%;min-width:0}
 .price-filter {display:flex;flex-wrap:wrap;gap:.35rem .8rem}
 .price-filter>label {display:flex;flex-direction:row;align-items:center;gap:.2rem}
 .price-filter input {width:auto}
@@ -18,5 +28,8 @@
 .pricing-calendar [data-price-status]:empty {display:none}
 @media(max-width:540px) {
   .price-weekdays {grid-template-columns:repeat(4,minmax(0,1fr))}
-  .price-grid>button {min-height:3.5rem}
+  .price-grid>button {min-height:4.5rem;font-size:.65rem}
+  .price-grid>button span{font-size:.58rem}
+  .price-grid>button small{font-size:.53rem}
+  .price-grid>button em{font-size:.48rem}
 }

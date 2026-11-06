@@ -107,3 +107,11 @@
 .calendar-legend .availability-block:before{background:#756650}
 
 .calendar-columns-panel #calendar-previous-days{display:block;background:none;border:0;box-shadow:none;color:#d6b48c;font:400 12px/1.4 'DM Sans',sans-serif;letter-spacing:0;text-transform:none;text-decoration:underline;padding:10px 0;min-height:44px}
+.property-cover-placeholder{display:grid;place-items:center;width:80px;height:80px;margin-bottom:14px;border:1px solid #6f5745;border-radius:12px;background:#34271d;color:#dbc5ab;font:500 36px/1 'Playfair Display',serif}
+.calendar-columns-scroll{max-width:100%;max-height:min(68vh,700px);overflow:auto;overscroll-behavior:contain;border:1px solid #504032;border-radius:10px}
+.calendar-columns-grid{border:0;border-radius:0;overflow:visible}
+.calendar-columns-heading{position:sticky;top:0;z-index:5}
+.calendar-columns-heading>span{position:sticky;left:0;z-index:6;background:#211b15}
+.calendar-columns-dates{position:sticky;left:0;z-index:3;background:#18130e}
+.admin-content,.admin-panel,.admin-modal,#admin-modal-content{min-width:0}
+.admin-content button:focus-visible,.admin-modal button:focus-visible,.admin-drawer button:focus-visible,.admin-bottom-nav button:focus-visible{outline:3px solid #f4ca89;outline-offset:2px}
