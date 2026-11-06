@@ -54,8 +54,8 @@ function editPeriods(periods, start, end, days, valueFor) {
   return merged;
 }
 
-function mount(host, {property, api, block, back, availability, esc, brl, formatDate, today, initialMonth, initialSelection, onContext, onSaved}) {
-  host.innerHTML = `<div class="pricing-calendar"><button type="button" class="workspace-back" data-price-back>← ${esc(property.name)}</button>
+function mount(host, {property, api, block, back, backLabel, availability, esc, brl, formatDate, today, initialMonth, initialSelection, onContext, onSaved}) {
+  host.innerHTML = `<div class="pricing-calendar"><button type="button" class="workspace-back" data-price-back>← ${esc(backLabel || property.name)}</button>
     <h2>Preços e calendário</h2><p class="price-context">${esc(property.code || property.name)} · <span data-price-context-month></span></p><div class="price-toolbar"><button type="button" data-prev aria-label="Mês anterior">‹</button>
       <input type="month" aria-label="Mês do calendário" data-price-month min="1900-01" max="9998-12" value="${initialMonth || today.slice(0, 7)}">
       <button type="button" data-next aria-label="Próximo mês">›</button><button type="button" data-today>Hoje</button>
