@@ -118,3 +118,19 @@ test('expired unpaid reservation does not remain collectible in the financial ba
  const events=[{sequence:1,source:'reservations',entity_id:'r',payload:{id:'r',status:'not_confirmed',total_amount:1500}}];
  assert.equal(projectFinance(events).balance_due_cents,0);
 });
+test('a definitively rejected Pix refund releases the pending amount without changing money received',()=>{
+ const events=[];
+ const add=(source,id,payload)=>events.push({sequence:events.length+1,source,entity_id:id,payload:{id,...payload}});
+ add('reservations','r',{status:'confirmed',total_amount:99.2});
+ add('payments','p',{status:'paid',amount_cents:9920});
+ add('reservation_cancellations','c',{status:'pending_provider',approved_at:'2026-11-06',refund_due_cents:2500});
+ add('reservation_refunds','f',{payment_id:'p',cancellation_id:'c',state:'uncertain',requested_cents:2500,confirmed_cents:0});
+ assert.equal(projectFinance(events).pending_refund_cents,2500);
+ add('reservation_refunds','f',{payment_id:'p',cancellation_id:'c',state:'failed',requested_cents:2500,confirmed_cents:0});
+ add('reservation_cancellations','c',{status:'needs_review',approved_at:'2026-11-06',refund_due_cents:2500});
+ const finance=projectFinance(events);
+ assert.equal(finance.pending_refund_cents,0);
+ assert.equal(finance.credit_balance_cents,0);
+ assert.equal(finance.refunded_cents,0);
+ assert.equal(finance.net_received_cents,9920);
+});

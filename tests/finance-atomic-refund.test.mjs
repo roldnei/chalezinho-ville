@@ -35,3 +35,27 @@ test('guest role cannot invoke refund preparation',async()=>{
  const c=await fixture();await db.exec('set role authenticated');
  try{await assert.rejects(prepare(c),/permission denied/)}finally{await db.exec('reset role')}
 });
+
+test('Pix rejection closes only after a definitive response and unchanged provider totals',async()=>{
+ for(const name of ['20260928162500_refund_precheck_event.sql','20260928174500_refund_provider_observations.sql','20261106221500_finance_reject_expired_pix_refund.sql']){
+  await db.exec(await readFile(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
+ }
+ const c=await fixture(),a=await prepare(c);
+ const refund=await one('select id,payment_id from reservation_refunds where cancellation_id=$1',[a.id]);
+ await db.query("update reservations set status='confirmed' where id=$1",[c.reservation_id]);
+ await db.query("update payments set method='pix' where id=$1",[refund.payment_id]);
+ await db.query("update reservation_cancellations set status='pending_provider',approved_at=now() where id=$1",[a.id]);
+ await db.query("update reservation_refunds set state='uncertain',sent_at=now() where id=$1",[refund.id]);
+ const reject=async()=> (await one('select reject_expired_pix_refund($1) as rejected',[refund.id])).rejected;
+ const recordError=code=>db.query("insert into reservation_refund_provider_observations(refund_id,phase,source,charge_id,http_status,error_code) values($1,'post','charge','CHAR_A',400,$2)",[refund.id,code]);
+ const recordRead=refunded=>db.query("insert into reservation_refund_provider_observations(refund_id,phase,source,charge_id,http_status,charge_status,amount_value,summary_total,summary_paid,summary_refunded) values($1,'get','charge','CHAR_A',200,'PAID',10000,10000,10000,$2)",[refund.id,refunded]);
+ await recordError('40008');await recordRead(0);assert.equal(await reject(),false);
+ await recordError('40007');assert.equal(await reject(),false);
+ await recordRead(1);assert.equal(await reject(),false);
+ await recordRead(0);assert.equal(await reject(),true);
+ assert.equal(await reject(),false);
+ assert.deepEqual(await one("select state,provider_status,confirmed_cents from reservation_refunds where id=$1",[refund.id]),
+  {state:'failed',provider_status:'REFUND_DEADLINE_REACHED',confirmed_cents:0});
+ assert.equal((await one('select status from reservation_cancellations where id=$1',[a.id])).status,'needs_review');
+ assert.equal((await one('select status from reservations where id=$1',[c.reservation_id])).status,'confirmed');
+});

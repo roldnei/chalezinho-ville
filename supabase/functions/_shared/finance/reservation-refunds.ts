@@ -161,7 +161,8 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
   const latestIssues=(refunds||[]).filter((x:any)=>x.state!=="confirmed")
     .map((x:any)=>(providerFailures||[]).find((o:any)=>o.refund_id===x.id))
     .filter(Boolean);
-  let providerIssue=latestIssues.some((o:any)=>o.error_code==="40005")?"pagbank_refund_key_in_use":
+  let providerIssue=(refunds||[]).some((x:any)=>x.state==="failed")&&latestIssues.some((o:any)=>o.error_code==="40007")?"pagbank_refund_deadline_reached":
+    latestIssues.some((o:any)=>o.error_code==="40005")?"pagbank_refund_key_in_use":
     latestIssues.some((o:any)=>o.error_code==="40008")?"pagbank_refund_temporarily_unavailable":null;
   if(operation==="prepare"||operation==="status") return json({ok:true,cancellation_id:cancellation.id,kind:cancellation.kind,
     status:cancellation.status,accepted_version:cancellation.accepted_version,calculation:cancellation.calculation,
@@ -267,7 +268,8 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
     }
   }
   for(const refund of refunds||[]){
-    if(refund.state==="confirmed") continue;
+    if(["confirmed","failed"].includes(refund.state)) continue;
+    let expiredRefund=latestIssues.some((issue:any)=>issue.refund_id===refund.id&&issue.error_code==="40007");
     if(operation==="approve"&&refund.state==="prepared"){
       const {data:claim,error:claimError}=await admin.rpc("claim_reservation_refund",{p_refund_id:refund.id});
       if(claimError) return json({ok:false,error:"refund_claim_unavailable",cancellation_id:cancellation.id},503);
@@ -315,6 +317,7 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           }
           const diagnostic=String((error as Error)?.message||"");
           const providerError=error as Error&{httpStatus?:number;errorCode?:string};
+          expiredRefund=providerError.httpStatus===400&&providerError.errorCode==="40007";
           providerIssue=providerError.errorCode==='40005'?'pagbank_refund_key_in_use':
             providerError.errorCode==='40008'?'pagbank_refund_temporarily_unavailable':null;
           if(Number.isInteger(providerError?.httpStatus)){
@@ -345,6 +348,11 @@ async function reservationRefundAction(req:Request,body:any,development:boolean)
           .select("id,amount_cents,provider_payment_id").eq("id",refund.payment_id).single();
         if(paymentError||!originalPayment)throw new Error("payment_unavailable");
         await reconcileReservationRefunds(admin,originalPayment,charge,observed.source as "charge"|"order");
+        if(expiredRefund){
+          const {data:rejected,error}=await admin.rpc("reject_expired_pix_refund",{p_refund_id:refund.id});
+          if(error)throw new Error("refund_rejection_unavailable");
+          if(rejected)providerIssue="pagbank_refund_deadline_reached";
+        }
       }catch{providerChecks.push({refund_id:refund.id,status:"unavailable"});}
     }
   }
@@ -373,10 +381,11 @@ async function reservationRefundStatus(req:Request,body:any,development:boolean)
   const {data:refunds}=cases?.length?await admin.from("reservation_refunds")
     .select("cancellation_id,requested_cents,confirmed_cents,state").in("cancellation_id",cases.map((c:any)=>c.id)):{data:[]};
   return json({ok:true,cases:(cases||[]).map((c:any)=>{
-    const confirmed=(refunds||[]).filter((x:any)=>x.cancellation_id===c.id)
-      .reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0);
-    return {kind:c.kind,credit_reason:c.calculation?.reason==='unprovided_experience'?'unprovided_experience':null,status:c.status,refund_due_cents:Number(c.refund_due_cents),
-      confirmed_cents:confirmed,pending_cents:Number(c.refund_due_cents)-confirmed,
+    const caseRefunds=(refunds||[]).filter((x:any)=>x.cancellation_id===c.id);
+    const confirmed=caseRefunds.reduce((s:number,x:any)=>s+Number(x.confirmed_cents),0);
+    const rejected=c.status==="needs_review"&&caseRefunds.length===1&&caseRefunds[0].state==="failed";
+    return {kind:c.kind,credit_reason:c.calculation?.reason==='unprovided_experience'?'unprovided_experience':null,status:rejected?"rejected":c.status,refund_due_cents:Number(c.refund_due_cents),
+      confirmed_cents:confirmed,pending_cents:rejected?0:Number(c.refund_due_cents)-confirmed,
       accepted_version:c.accepted_version,created_at:c.created_at};
   })});
 }

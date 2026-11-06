@@ -76,7 +76,9 @@ export function projectFinance(events:any[]) {
   if(reservations.length>1)throw new Error('ledger_multiple_reservations');
   const reservation=reservations[0];
   const contract=reservation?money(Math.round(Number(reservation.total_amount)*100)):null;
-  const approvedCredits=pick('reservation_cancellations').filter(c=>c.approved_at||c.status==='confirmed')
+  const rejectedCases=new Set(refunds.filter(r=>r.state==='failed').map(r=>r.cancellation_id));
+  const approvedCredits=pick('reservation_cancellations')
+    .filter(c=>(c.approved_at||c.status==='confirmed')&&!(c.status==='needs_review'&&rejectedCases.has(c.id)))
     .reduce((s,c)=>s+money(c.refund_due_cents||0),0);
   const damageDue=pick('incidents').filter(i=>i.decision==='approved').reduce((s,i)=>s+money(i.requested_capture_cents||0),0);
   // A legacy captured guarantee can predate occurrence decisions. Its capture is

@@ -115,7 +115,7 @@ async function showRefundStatuses(rows,allowRefresh=true){
    for(const c of cases){
     const note=document.createElement("div");note.className="reservation-payment-state "+(c.status==="confirmed"?"success":"info");
     const due=Number(c.refund_due_cents),confirmed=Number(c.confirmed_cents);
-    note.innerHTML="<small>"+(c.credit_reason==="unprovided_experience"?"DEVOLUÇÃO DE EXPERIÊNCIA":c.kind==="voluntary_refund"?"ESTORNO VOLUNTÁRIO":"ESTORNO DO CANCELAMENTO")+"</small><strong>"+(c.status==="confirmed"?"Concluído":c.status==="prepared"?"Em análise administrativa":"Aguardando confirmação do PagBank")+"</strong><p>Solicitado: "+brlC(due)+" · Confirmado: "+brlC(confirmed)+" · Restante: "+brlC(Math.max(0,due-confirmed))+"</p>";
+    note.innerHTML="<small>"+(c.credit_reason==="unprovided_experience"?"DEVOLUÇÃO DE EXPERIÊNCIA":c.kind==="voluntary_refund"?"ESTORNO VOLUNTÁRIO":"ESTORNO DO CANCELAMENTO")+"</small><strong>"+(c.status==="confirmed"?"Concluído":c.status==="rejected"?"Recusado pelo PagBank":c.status==="prepared"?"Em análise administrativa":"Aguardando confirmação do PagBank")+"</strong><p>Solicitado: "+brlC(due)+" · Confirmado: "+brlC(confirmed)+" · Restante: "+brlC(Number(c.pending_cents??Math.max(0,due-confirmed)))+"</p>";
     target.prepend(note);
    }
   }catch{/* A failure to read a refund never changes the displayed payment state. */}
