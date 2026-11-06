@@ -40,8 +40,8 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | CAN-04 | Estorno Pix/cartão | UI DEV + API DEV + PagBank DEV parcial | Integral/parcial no PMS e provedor | Pix R$ 80 e cartão 1× R$ 212 estornados e Cancelado no portal; cartão 6× R$ 212 e 12× R$ 238,63 conciliados no PMS/conta, portal pendente; parcial não verificado | BLOCKED | Também 1 integral cartão 8× comprovado em 05/11 |
 | CAN-04a | PMS, hóspede e PagBank DEV | UI DEV + API DEV + provedor | Estorno integral Pix e reserva cancelada após conciliação | PMS: R$ 80 estornado, R$ 0 líquido; hóspede reembolsado; provedor Cancelado; datas liberadas | PASS | QA 23–24/11 |
 | CAN-04b | PMS, hóspede e PagBank DEV | UI DEV + API DEV + provedor | Estorno integral cartão 1× | PMS: R$ 212 estornado, R$ 0 líquido; hóspede reembolsado; provedor Cancelado e webhook HTTP 200 | PASS | QA 25–27/11 |
-| CAN-04c | PMS e hóspede | UI DEV + API DEV | Estorno integral cartão 6× | PMS: R$ 212 estornado, R$ 0 líquido; hóspede reembolsado | PASS | QA 30/11–02/12; provedor direto pendente |
-| CAN-04d | PMS e hóspede | UI DEV + API DEV | Estorno integral cartão 12× inclusive juros | PMS: R$ 238,63 estornado, R$ 0 líquido; hóspede reembolsado | PASS | QA 02–04/12; provedor direto pendente |
+| CAN-04c | PMS, hóspede e busca | UI DEV + API DEV | Estorno integral cartão 6× | PMS: R$ 212 estornado, R$ 0 líquido; hóspede reembolsado; datas disponíveis | PASS | QA 30/11–02/12; provedor direto pendente |
+| CAN-04d | PMS, hóspede e busca | UI DEV + API DEV | Estorno integral cartão 12× inclusive juros | PMS: R$ 238,63 estornado, R$ 0 líquido; hóspede reembolsado; datas disponíveis | PASS | QA 02–04/12; provedor direto pendente |
 | CAN-05 | Estorno repetido/excedente | — | Sem duplicidade | Não executado | NOT_RUN | — |
 | CAN-06 | Serviços prestados/não prestados | — | Classificar/estornar só elegíveis | Não executado | BLOCKED | Sem pacote sintético salvo |
 | CAN-07 | Análise/rejeição | — | Fluxo completo | Não repetido hoje | NOT_RUN | Ver rodada anterior |
