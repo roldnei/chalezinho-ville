@@ -160,3 +160,31 @@ test('admin must classify each charged experience before preparing the late refu
   assert.deepEqual(calls[1],[{id:'one',status:'provided'},{id:'two',status:'unprovided'}]);
  }finally{dom.window.close()}
 });
+
+test('a definitively refused Pix refund shows zero remaining and offers no retry',async()=>{
+ const {w,dom}=await setup(false,true,{payments:[{id:'pix',reservation_id:rid,provider:'pagbank_sandbox',method:'pix',status:'paid',amount_cents:9920}]});
+ try{
+  const originalFetch=w.fetch;
+  w.fetch=async(url,options)=>{
+   const {action,operation}=JSON.parse(options.body);
+   if(action!=='reservation_refund_action')return originalFetch(url,options);
+   const rejected=operation==='approve';
+   return {ok:true,json:async()=>({ok:true,cancellation_id:'case-pix',kind:'voluntary_refund',
+    status:rejected?'needs_review':'prepared',refund_due_cents:2500,confirmed_cents:0,ready:true,
+    provider_issue:rejected?'pagbank_refund_deadline_reached':null,calculation:{allocations:[]}})};
+  };
+  w.document.querySelector('[data-voluntary-refund]').click();
+  const form=w.document.querySelector('#voluntary-refund');
+  for(const name of ['amount','reason'])Object.defineProperty(form,name,{value:form.elements[name]});
+  form.amount.value='25';form.reason.value='QA Pix';
+  form.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+  await new Promise(r=>setTimeout(r,20));
+  w.document.querySelector('#refund-approve').click();
+  await new Promise(r=>setTimeout(r,20));
+  const content=w.document.querySelector('#admin-modal-content');
+  const text=content.textContent.replace(/\s/g,' ');
+  assert.match(text,/Recusado pelo PagBank/);
+  assert.match(text,/Restante: R\$ 0,00/);
+  assert.equal(content.querySelector('.drawer-actions button'),null);
+ }finally{dom.window.close()}
+});
