@@ -39,11 +39,11 @@
 - **Aceite:** a busca renderiza um placeholder acessível quando não há imagem válida, sem requisitar `null`; ao cadastrar foto, a imagem real aparece. Definir se foto deve ser requisito de ativação, mantendo erro de validação claro no PMS.
 - **Handoff:** NOVO; correção/PR, prévia, data e resultado de reteste pendentes.
 
-## DEVQA-2026-11-06-1600-UTC-005 — Datas liberadas enquanto Pix segue pendente na conta
+## DEVQA-2026-11-06-1600-UTC-005 — Conta defasada entre liberação das datas e baixa do Pix
 
-- **Caso/prioridade/severidade:** PAY-01, RES-04, FIN-01; P1, médio, para investigação. A apresentação do estado financeiro diverge da disponibilidade após a retenção temporária.
+- **Caso/prioridade/severidade:** PAY-01, RES-04, FIN-01; P2, médio, para investigação. A apresentação do estado financeiro divergiu temporariamente da disponibilidade após a retenção.
 - **Pré-condições:** reserva sintética do imóvel QA para 17–19/11, Pix sandbox de R$ 212 criado e não pago. O checkout informa expiração em 15 minutos; o simulador mantém essa faixa de valor em espera sem pagamento automático.
-- **Reprodução:** iniciar o Pix, constatar busca pública com 0 opções durante a retenção, aguardar a liberação e recarregar busca e conta. Observado: a busca voltou a mostrar **1 opção disponível** para 17–19/11, enquanto a conta ainda exibia “Aguardando confirmação / Aguardando pagamento” em leituras subsequentes. Não houve pagamento tardio nem segunda reserva realizada no mesmo intervalo.
-- **Risco a verificar:** se o PagBank confirmar uma cobrança depois de a retenção terminar e outra reserva ocupar as datas, o backend precisa impedir dupla confirmação e devolver ou tratar o pagamento tardio de forma segura. O estado pendente pode também ser apenas atraso de baixa/rotulagem; o provedor não foi consultado diretamente nesta rodada.
-- **Aceite:** ao vencer o prazo, refletir expiração/cancelamento ou uma explicação precisa na conta e no PMS; garantir que confirmação tardia nunca resulte em duas reservas válidas para as mesmas noites; conciliar pagamento e eventual estorno em centavos. Testar com relógio controlado e webhook tardio/repetido.
-- **Handoff:** NOVO; confirmar regra de expiração, logs/provedor, correção/PR, prévia e reteste.
+- **Reprodução:** iniciar o Pix, constatar busca pública com 0 opções durante a retenção, aguardar a liberação e recarregar busca e conta. Observado: a busca voltou a mostrar **1 opção disponível** por volta de 13h30, enquanto a conta ainda exibia “Aguardando confirmação / Aguardando pagamento” às ~13h34. O portal PagBank DEV registrou notificação às **13h35**, webhook HTTP 200 e cobrança **Cancelado**; mais tarde o PMS exibiu **NÃO CONFIRMADA**. Não houve pagamento tardio nem segunda reserva realizada no intervalo.
+- **Risco a verificar:** durante a janela entre liberar datas e receber/conciliar a baixa final, uma confirmação tardia do provedor precisa ser tratada sem dupla reserva. A observação prova defasagem temporária da UI; não prova falha financeira ou overbooking.
+- **Aceite:** exibir estado/expiração coerente na conta durante a janela de baixa; garantir que confirmação tardia nunca resulte em duas reservas válidas para as mesmas noites; testar com relógio controlado e webhook tardio/repetido.
+- **Handoff:** NOVO; regra de sincronização e segurança para confirmação tardia, correção/PR, prévia e reteste pendentes. A baixa normal foi confirmada no provedor e PMS nesta rodada.
