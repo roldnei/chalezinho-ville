@@ -9,17 +9,18 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | AUTH-02 | Hóspedes, sessão | — | Logout/expiração/recuperação | Não executado | NOT_RUN | — |
 | AUTH-03 | Papéis, PMS | UI DEV parcial | Permissões de admin, anfitrião e equipe | Admin operou imóvel QA; outros papéis não testados hoje | BLOCKED | Faltam papéis sintéticos anfitrião/equipe |
 | AUTH-04 | Navegação/auth | — | Retorno seguro | Não executado | NOT_RUN | — |
-| PUB-01 | Público, reserva | UI DEV | Vitrine e CTAs completos | Página de reserva QA aberta por link; cartão sem foto mostra imagem quebrada; demais entradas não percorridas | BLOCKED | DEVQA-004 |
+| PUB-01 | Público, reserva | UI DEV | Vitrine e CTAs completos | Vitrine em 320 px e CTA “Escolher datas” abriram a busca; cartão QA sem foto mostra imagem quebrada; demais entradas não percorridas | BLOCKED | DEVQA-004 |
 | RES-01 | Público, busca | UI DEV + API DEV | Disponibilidade, capacidade, mínimos e datas válidos | Sexta de 1 noite bloqueada por mínimo 2; segunda de 1 noite permitida; 3 hóspedes retornou erro genérico | FAIL | DEVQA-002 |
 | RES-01a | Público, 1 e 2 noites | UI DEV + API DEV | Disponibilidade coerente | Imóvel QA oferecido em 17–18 e 17–19/11 | PASS | R$ 108 não reembolsável em 1 noite; R$ 196 em 2 |
 | RES-01b | Público, 3 hóspedes | UI DEV | Capacidade 2 respeitada com mensagem útil | Nenhuma reserva oferecida, mas “Consulta indisponível” | FAIL | DEVQA-002 |
 | RES-01c | Público, mínimo por dia | UI DEV + API DEV | Regras refletidas na busca | 20–21/11 mostra mínimo 2; 23–24/11 oferece 1 noite | PASS | Mesmo imóvel QA, sem canais |
-| RES-02 | Público, duas tarifas | UI DEV + API DEV | Preços e composição, adicionais/descontos | R$ 212 reembolsável e R$ 196 não reembolsável; adicionais não disponíveis | BLOCKED | Tabela própria PMS R$ 80/100; limpeza R$ 20 |
+| RES-02 | Público, duas tarifas | UI DEV + API DEV | Preços e composição, adicionais/descontos | R$ 212 reembolsável e R$ 196 não reembolsável; pacote QA R$ 60 somou R$ 272 reembolsável; descontos não exercitados | BLOCKED | Tabela própria PMS R$ 80/100; limpeza R$ 20 |
 | RES-02a | Público, escolha de tarifa | UI DEV | Nenhuma opção pré-selecionada | Duas opções com rádio vazio até escolha | PASS | 17–19/11 |
 | RES-03 | Admin, checkout | UI DEV + API DEV parcial | Aceite/cotação/expiração e persistência | Dois Pix e três cartões persistidos; expiração de cotação não exercitada | BLOCKED | Aceites autorizados nos cinco checkouts sintéticos |
 | RES-04 | Público, concorrência | UI DEV parcial | Sem dupla reserva/cobrança | Datas do Pix pendente ficaram indisponíveis e depois voltaram; conta ainda mostrava pagamento pendente; segunda reserva não tentada | BLOCKED | DEVQA-005 |
 | RES-04a | Público, busca durante Pix pendente | UI DEV | Retenção impede segunda venda | 0 opções no mesmo período | PASS | Pix R$ 212 pendente |
-| RES-05 | Pacote/experiência | UI DEV parcial | Pacote de 2 itens e avulso no checkout | Formulário preenchido, upload obrigatório não concluído, nada salvo | BLOCKED | Ferramenta de arquivo nesta sessão |
+| RES-05 | Pacote/experiência | UI DEV + API DEV parcial | Pacote de 2 itens e avulso no checkout | Pacote de 2 itens R$ 60 e café avulso R$ 40 ativos somente no imóvel QA; pacote adicionado à cotação R$ 272; compra ainda não enviada | BLOCKED | Aceite específico de novos contratos pendente |
+| RES-05a | Admin e checkout QA | UI DEV + API DEV | Cadastro e cotação do pacote próprio | Foto sintética enviada; 2 itens, entrega na chegada/saída, estoque 10; R$ 212 + R$ 60 = R$ 272 | PASS | QA 07–09/12, sem pagamento |
 | PAY-01 | Pix | UI DEV + API DEV + PagBank DEV | Criado/pago/expirado/abandonado | Pix R$ 212 não pago: datas liberadas, provedor Cancelado, PMS NÃO CONFIRMADA e conta “Pix expirado”; Pix R$ 80 aprovado e estornado | PASS | DEVQA-005 registra apenas defasagem temporária antes da baixa |
 | PAY-01a | Conta e checkout | UI DEV | Pix criado sem confirmação indevida | R$ 212 em espera; recebido R$ 0 na conta | PASS | Pagamento pendente, datas retidas temporariamente |
 | PAY-01b | Conta, checkout, PMS e PagBank DEV | UI DEV + API DEV + provedor | Pix de até R$ 100 aprovado | R$ 80 confirmado na conta/PMS; cobrança Cancelado no portal após estorno | PASS | QA 23–24/11 |
@@ -32,7 +33,7 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | PAY-03c | Hóspede, checkout, PMS e PagBank DEV | UI DEV + API DEV + provedor | Cartão 12× com juros cobrado | R$ 212 de hospedagem/limpeza + R$ 26,63 de juros; total R$ 238,63 recebido; provedor conferiu 12 parcelas/total | PASS | QA 02–04/12; status final Cancelado após estorno |
 | PAY-04 | Repetição/rede | — | Idempotência | Não executado | NOT_RUN | — |
 | PAY-05 | Webhooks | — | Assinatura/replay/ordem | Não executado | NOT_RUN | — |
-| PAY-06 | Pós-reserva | — | Adicional/upgrade | Não executado | BLOCKED | Sem pacote sintético salvo |
+| PAY-06 | Pós-reserva | UI DEV parcial | Adicional/upgrade | Café avulso QA R$ 40 ativo; checkout de hospedagem sem adicional preparado, compra posterior ainda não iniciada | BLOCKED | Depende de nova reserva sintética paga |
 | CAN-01 | Políticas por reserva | UI DEV parcial | Duas versões e aceite antigo | Versões vigentes exibidas; política global não alterada | BLOCKED | Exige instância isolada para publicar |
 | CAN-02 | Pedido hóspede | UI DEV + API DEV parcial | Pedido/protocolo/repetição | Pedidos Pix R$ 80 e cartão 1×/6×/12× geraram protocolo; repetição não tentada | BLOCKED | Dados dos protocolos omitidos |
 | CAN-02a | Hóspede | UI DEV | Pedido e protocolo | Formulário aceito; protocolo e pedido apareceram no PMS | PASS | Dados do protocolo omitidos do relatório |
@@ -43,7 +44,7 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | CAN-04c | PMS, hóspede, busca e PagBank DEV | UI DEV + API DEV + provedor | Estorno integral cartão 6× | PMS: R$ 212 estornado, R$ 0 líquido; hóspede reembolsado; datas disponíveis; provedor Cancelado e webhook HTTP 200 | PASS | QA 30/11–02/12 |
 | CAN-04d | PMS, hóspede, busca e PagBank DEV | UI DEV + API DEV + provedor | Estorno integral cartão 12× inclusive juros | PMS: R$ 238,63 estornado, R$ 0 líquido; hóspede reembolsado; datas disponíveis; provedor Cancelado e webhook HTTP 200 | PASS | QA 02–04/12 |
 | CAN-05 | Estorno repetido/excedente | — | Sem duplicidade | Não executado | NOT_RUN | — |
-| CAN-06 | Serviços prestados/não prestados | — | Classificar/estornar só elegíveis | Não executado | BLOCKED | Sem pacote sintético salvo |
+| CAN-06 | Serviços prestados/não prestados | UI DEV parcial | Classificar/estornar só elegíveis | Pacote QA com item na chegada e outro na saída cadastrado; estorno ainda não executado | BLOCKED | Depende de compra sintética paga |
 | CAN-07 | Análise/rejeição | — | Fluxo completo | Não repetido hoje | NOT_RUN | Ver rodada anterior |
 | CAU-01 | Pré-autorização | UI DEV parcial | Autorização/recusa/liberação | Garantia nominal R$ 500 exibida, sem autorização | BLOCKED | Check-in futuro e sem nova reserva |
 | CAU-02 | Captura/saldo | — | Captura parcial/total | Não executado | NOT_RUN | — |
@@ -52,8 +53,9 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | SEC-02 | Hóspede/anônimo, PMS | — | Ações negadas | Não repetido hoje | NOT_RUN | Ver rodada anterior |
 | SEC-03 | Alteração de cliente | — | Servidor rejeita adulteração | Não executado | NOT_RUN | — |
 | SEC-04 | Segredos/webhook | — | Sigilo/replay | Não executado | NOT_RUN | — |
-| SEC-05 | Entrada/redirect/upload | UI DEV parcial | Upload e redirecionamento seguros | Upload de fixture não concluído pela ferramenta; nenhuma exposição comprovada | BLOCKED | Não classificar como defeito do produto |
-| UX-01 | Viewports/teclado | — | Mobile/desktop acessíveis | Controle de viewport solicitado em 390 px, mas largura real continuou 1280 px; sem prova móvel | NOT_RUN | Limitação da ferramenta de navegador nesta sessão |
+| SEC-05 | Entrada/redirect/upload | UI DEV parcial | Upload e redirecionamento seguros | PNG sintético enviado e salvo em dois produtos QA; validações de tipo/tamanho, conteúdo e redirecionamento não testadas | BLOCKED | Sem evidência de exposição |
+| UX-01 | Viewports/teclado | UI DEV parcial | Mobile/desktop acessíveis | Vitrine e entrada da reserva verificadas em 320/390 px; CTA móvel funcionou, sem rolagem horizontal; checkout completo/teclado não percorridos | BLOCKED | UX-01a; viewport padrão restaurado |
+| UX-01a | Público, vitrine e busca | UI DEV | Layout básico em 320/390 px | Larguras úteis 305/375 px, `scrollWidth` igual à largura útil; CTA abriu a reserva; campos com rótulos | PASS | Verificação visual Chromium; não prova toda a jornada móvel |
 | UX-02 | PMS e checkout | UI DEV | Formulários, erros e recuperação | Cadastro ativo mostra erro de duplicidade sem duplicata; caminho em etapas funciona | FAIL | DEVQA-001 |
 | UX-03 | Checkout | UI DEV | Valores e mensagens claros | Valores/parcelas claros; capacidade inválida gera erro genérico, uma noite usa “1 noites”, imóvel sem foto mostra imagem quebrada | FAIL | DEVQA-002/003/004 |
 | UX-04 | Navegadores | — | Chromium/WebKit/desempenho | Só Chromium embutido, sem comparação | NOT_RUN | — |
@@ -70,4 +72,4 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 
 ## Comandos e limites
 
-Nenhum teste local foi repetido porque o SHA de produto servido não mudou desde a rodada anterior. As parcelas 1×/6×/12× foram cobradas e conciliadas na UI/PMS; o portal PagBank DEV confirmou os totais/parcelas de 6×/12× e o status final Cancelado. A imagem sintética de pacote não foi enviada; o pacote não foi salvo. Os cinco aceites contratuais ocorreram com autorização do usuário. A pré-autorização da garantia de R$ 500 não ocorreu; a conta informa programação para perto do check-in. O portal confirmou status Cancelado nas quatro cobranças estornadas e no Pix não pago; as notificações dos cartões 6×/12× receberam HTTP 200.
+Nenhum teste local foi repetido porque o SHA de produto servido não mudou desde a rodada anterior. As parcelas 1×/6×/12× foram cobradas e conciliadas na UI/PMS; o portal PagBank DEV confirmou os totais/parcelas de 6×/12× e o status final Cancelado. A imagem sintética foi enviada somente aos dois produtos QA; o pacote foi salvo, mas não comprado. Os cinco aceites contratuais já realizados ocorreram com autorização do usuário; dois novos checkouts estão preparados sem aceite e sem envio. A pré-autorização da garantia de R$ 500 não ocorreu; a conta informa programação para perto do check-in. O portal confirmou status Cancelado nas quatro cobranças estornadas e no Pix não pago; as notificações dos cartões 6×/12× receberam HTTP 200.
