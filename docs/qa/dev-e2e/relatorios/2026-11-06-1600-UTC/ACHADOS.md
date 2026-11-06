@@ -1,0 +1,25 @@
+# Achados — continuação DEV 06/11/2026
+
+## DEVQA-2026-11-06-1600-UTC-001 — Cadastro ativo com tabela própria falha
+
+- **Caso/prioridade/severidade:** OPS-01, RES-01; P1, alto. O fluxo oferecido pelo PMS para ativar um imóvel novo já com diária configurada não conclui, embora exista caminho alternativo em etapas.
+- **Pré-condições:** deployment Vercel `e68ce6472f4b17a7c2347587a1c0a122be903612`, administrador autorizado, Supabase DEV, navegador Chromium, 06/11/2026 aproximadamente 13h02 Brasília. Dados sintéticos inéditos `QA-DEV-20261106-E2E`, sem integrações.
+- **Reprodução:** PMS → Imóveis → Novo imóvel; preencher nome/código/slug inéditos, diária padrão 80, fim de semana 100, limpeza 20, garantia 500, 12 parcelas máximas, 6 sem juros; manter “ativo” marcado e salvar. Esperado: registro ativo com `own_pricing` e `payment_terms` persistidos. Observado: mensagem genérica sobre código/slug e nenhum imóvel na lista após atualização.
+- **Controle para descartar duplicidade:** com **o mesmo código e slug**, desmarcar “ativo” e salvar sem preço funcionou. A tabela própria foi salva no painel de preços, taxas/parcelas foram salvas e a ativação posterior funcionou. O checkout cotou e ofereceu parcelas. Isso localiza a falha na criação ativa em uma etapa; o código e o slug não estavam em uso.
+- **Evidência:** UI DEV às ~13h02–13h06; sem HAR, credenciais ou IDs financeiros no Git. O backend respondeu erro ao formulário, mas o código HTTP específico não foi capturado; não inferir causa de banco sem log. A UI oculta a causa real sob mensagem de duplicidade.
+- **Aceite:** criar outro imóvel sintético **ativo de primeira** pelo formulário com preço e condições preenchidos; verificar no banco `own_pricing`, `features.payment_terms`, ausência de integrações por padrão, cotação e parcelas. Exibir erro específico em caso de validação, conflito e falha interna. Adicionar regressão de cadastro direto e do caminho pausado→preço→ativação.
+- **Handoff:** NOVO; correção/PR, prévia, data e resultado de reteste pendentes.
+
+## DEVQA-2026-11-06-1600-UTC-002 — Capacidade inválida por URL vira falha genérica
+
+- **Caso/prioridade/severidade:** RES-01, UX-03; P2, baixo. A tela não explica ao hóspede por que a consulta com mais pessoas que a capacidade não pode continuar.
+- **Pré-condições:** imóvel QA novo ativo, máximo 2 hóspedes, 17–19/11/2026, Chromium, aproximadamente 13h10 Brasília.
+- **Reprodução:** abrir diretamente uma busca com `guests=3` para o imóvel QA. Esperado: mensagem de capacidade excedida ou ajuste explícito para 2 antes de consultar. Observado: a URL perdeu o parâmetro, a tela mostrou “Consulta indisponível” e “Não foi possível consultar agora. Tente novamente.” Nenhuma opção/reserva foi oferecida.
+- **Diagnóstico:** validação/apresentação no frontend ou mapeamento de erro da busca; confiança média. Não é prova de aceitação indevida pelo servidor, pois não houve reserva nem cobrança.
+- **Aceite:** deep link inválido informa o limite e deixa corrigir hóspedes sem erro genérico; servidor continua rejeitando capacidade excedida. Testar 1, 2 e 3 hóspedes no mesmo imóvel sintético.
+- **Handoff:** NOVO; correção/PR, prévia, data e resultado de reteste pendentes.
+
+## Achados anteriores
+
+- [Tabela própria ausente em CH1–CH3](../2026-11-05-2329-UTC/ACHADOS.md): CH1 foi reinspecionado e ainda aparece sem diária base própria; CH2/CH3 não foram reinspecionados hoje. Não atribuir preço próprio aos chalés reais sem validação do responsável.
+- [Condições de parcelamento ausentes no imóvel QA legado](../2026-11-05-2329-UTC/ACHADOS.md): o imóvel **novo**, criado pausado e configurado pelo PMS, ofereceu 1× a 12×. O dado legado segue como caso de migração/fallback, não como falha comprovada do fluxo pausado atual.
