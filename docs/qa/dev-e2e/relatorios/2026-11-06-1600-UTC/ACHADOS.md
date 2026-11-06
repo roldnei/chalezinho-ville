@@ -47,3 +47,12 @@
 - **Risco a verificar:** durante a janela entre liberar datas e receber/conciliar a baixa final, uma confirmação tardia do provedor precisa ser tratada sem dupla reserva. A observação prova defasagem temporária da UI; não prova falha financeira ou overbooking.
 - **Aceite:** exibir estado/expiração coerente na conta durante a janela de baixa; garantir que confirmação tardia nunca resulte em duas reservas válidas para as mesmas noites; testar com relógio controlado e webhook tardio/repetido.
 - **Handoff:** NOVO; regra de sincronização e segurança para confirmação tardia, correção/PR, prévia e reteste pendentes. A baixa normal foi confirmada no provedor e PMS nesta rodada.
+
+## DEVQA-2026-11-06-1600-UTC-006 — Cobrança de experiência estornada aparece aguardando confirmação
+
+- **Caso/prioridade/severidade:** PAY-06, UX-03, FIN-01; P2, baixo. A conta do hóspede mantém um rótulo de pagamento pendente após estorno já concluído.
+- **Pré-condições:** imóvel QA, reserva confirmada de 09–11/12/2026, hospedagem paga em cartão 1× por R$ 212 e café avulso comprado depois em cobrança própria de R$ 40.
+- **Reprodução:** no PMS, retirar o café antes da prestação, calcular R$ 40 de crédito e aprovar o estorno. Atualizar conta do hóspede e abrir a reserva. Esperado: pagamento da experiência “Estornado” ou estado equivalente, com reserva de hospedagem confirmada. Observado: a conta exibiu “DEVOLUÇÃO DE EXPERIÊNCIA Concluído”, R$ 40 confirmado e R$ 0 restante, mas em “Pagamentos das experiências” exibiu “Pagamento aguardando confirmação” para o mesmo café. O PMS mostrou a cobrança de R$ 40 “Estornado”, a hospedagem de R$ 212 “Pago”; o portal PagBank DEV mostrou a transação do café **Cancelado** e webhook HTTP 200.
+- **Diagnóstico:** divergência de apresentação do status histórico da experiência após retirada/estorno; a conciliação monetária observada permaneceu correta. Não há evidência de cobrança pendente real.
+- **Aceite:** após estorno confirmado, a conta mostra “Estornado” no pagamento da experiência e mantém R$ 40 devolvidos, R$ 0 a devolver e a hospedagem ativa por R$ 212; recarregar a página e repetir o cenário não reintroduz “aguardando confirmação”.
+- **Handoff:** NOVO; correção/PR, prévia e reteste pendentes.
