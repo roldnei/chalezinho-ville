@@ -16,7 +16,7 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | RES-01c | Público, mínimo por dia | UI DEV + API DEV | Regras refletidas na busca | 20–21/11 mostra mínimo 2; 23–24/11 oferece 1 noite | PASS | Mesmo imóvel QA, sem canais |
 | RES-02 | Público, duas tarifas | UI DEV + API DEV | Preços e composição, adicionais/descontos | R$ 212 reembolsável e R$ 196 não reembolsável; adicionais não disponíveis | BLOCKED | Tabela própria PMS R$ 80/100; limpeza R$ 20 |
 | RES-02a | Público, escolha de tarifa | UI DEV | Nenhuma opção pré-selecionada | Duas opções com rádio vazio até escolha | PASS | 17–19/11 |
-| RES-03 | Admin, checkout | UI DEV + API DEV parcial | Aceite/cotação/expiração e persistência | Dois aceites e reservas Pix persistidos; expiração de cotação não exercitada | BLOCKED | Pix R$ 212 pendente e Pix R$ 80 concluído |
+| RES-03 | Admin, checkout | UI DEV + API DEV parcial | Aceite/cotação/expiração e persistência | Dois Pix e três cartões persistidos; expiração de cotação não exercitada | BLOCKED | Aceites autorizados nos cinco checkouts sintéticos |
 | RES-04 | Público, concorrência | UI DEV parcial | Sem dupla reserva/cobrança | Datas do Pix pendente ficaram indisponíveis e depois voltaram; conta ainda mostrava pagamento pendente; segunda reserva não tentada | BLOCKED | DEVQA-005 |
 | RES-04a | Público, busca durante Pix pendente | UI DEV | Retenção impede segunda venda | 0 opções no mesmo período | PASS | Pix R$ 212 pendente |
 | RES-05 | Pacote/experiência | UI DEV parcial | Pacote de 2 itens e avulso no checkout | Formulário preenchido, upload obrigatório não concluído, nada salvo | BLOCKED | Ferramenta de arquivo nesta sessão |
@@ -24,20 +24,24 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | PAY-01a | Conta e checkout | UI DEV | Pix criado sem confirmação indevida | R$ 212 em espera; recebido R$ 0 na conta | PASS | Pagamento pendente, datas retidas temporariamente |
 | PAY-01b | Conta, checkout, PMS e PagBank DEV | UI DEV + API DEV + provedor | Pix de até R$ 100 aprovado | R$ 80 confirmado na conta/PMS; cobrança Cancelado no portal após estorno | PASS | QA 23–24/11 |
 | PAY-01c | Público, conta, PMS e PagBank DEV | UI DEV + API DEV + provedor | Liberar datas após expiração sem pagamento | Busca passou de 0 a 1 opção em 17–19/11; conta “Pix expirado”, provedor Cancelado, PMS NÃO CONFIRMADA | PASS | Conta ficou defasada até antes da notificação das 13h35; DEVQA-005 |
-| PAY-02 | Cartão | UI DEV + API DEV + PagBank DEV parcial | Aprovado/recusado/erro | 1× R$ 212 aprovado no provedor; recusa/erro não testados | BLOCKED | Variante positiva PAY-02a |
+| PAY-02 | Cartão | UI DEV + API DEV + PagBank DEV parcial | Aprovado/recusado/erro | 1× R$ 212 aprovado no provedor; 6×/12× aprovados no checkout/conta; recusa/erro não testados | BLOCKED | Variantes positivas PAY-02a, PAY-03b/c |
 | PAY-02a | Checkout, conta, PMS e PagBank DEV | UI DEV + API DEV + provedor | Cartão 1× aprovado | Log de ordem 201, cobrança PAID de 21.200 centavos, reserva confirmada | PASS | QA 25–27/11 |
-| PAY-03 | Parcelas | UI DEV + API DEV + PagBank DEV parcial | 1×/6×/8×/12×, juros e cobrança | 1× R$ 212 cobrado sem juros; 6×/12× somente consultados, não cobrados | BLOCKED | 6× total R$ 212; 12× total R$ 238,63 |
+| PAY-03 | Parcelas | UI DEV + API DEV + PagBank DEV parcial | 1×/6×/8×/12×, juros e cobrança | 1×/6×/12× efetivamente cobrados no checkout e conciliados no PMS; 8× na rodada anterior; provedor direto 6×/12× pendente | BLOCKED | 6× total R$ 212; 12× total R$ 238,63, juros R$ 26,63 |
 | PAY-03a | Cartão QA novo | UI DEV + API DEV | Condições gravadas no cadastro | 1×/6× sem juros e até 12× com juros disponíveis | PASS | `payment_terms` do novo imóvel funcionais |
+| PAY-03b | Hóspede, checkout e PMS | UI DEV + API DEV | Cartão 6× sem juros cobrado | R$ 212 aprovados; conta mostrou 6× e PMS recebeu R$ 212 | PASS | QA 30/11–02/12; provedor direto pendente |
+| PAY-03c | Hóspede, checkout e PMS | UI DEV + API DEV | Cartão 12× com juros cobrado | R$ 212 de hospedagem/limpeza + R$ 26,63 de juros; total R$ 238,63 aprovado e recebido | PASS | QA 02–04/12; provedor direto pendente |
 | PAY-04 | Repetição/rede | — | Idempotência | Não executado | NOT_RUN | — |
 | PAY-05 | Webhooks | — | Assinatura/replay/ordem | Não executado | NOT_RUN | — |
 | PAY-06 | Pós-reserva | — | Adicional/upgrade | Não executado | BLOCKED | Sem pacote sintético salvo |
 | CAN-01 | Políticas por reserva | UI DEV parcial | Duas versões e aceite antigo | Versões vigentes exibidas; política global não alterada | BLOCKED | Exige instância isolada para publicar |
-| CAN-02 | Pedido hóspede | UI DEV + API DEV parcial | Pedido/protocolo/repetição | Pedido de cancelamento Pix R$ 80 gerou protocolo; repetição não tentada | BLOCKED | QA 23–24/11 |
+| CAN-02 | Pedido hóspede | UI DEV + API DEV parcial | Pedido/protocolo/repetição | Pedidos Pix R$ 80 e cartão 1×/6×/12× geraram protocolo; repetição não tentada | BLOCKED | Dados dos protocolos omitidos |
 | CAN-02a | Hóspede | UI DEV | Pedido e protocolo | Formulário aceito; protocolo e pedido apareceram no PMS | PASS | Dados do protocolo omitidos do relatório |
 | CAN-03 | Fronteiras de política | — | 24h/7d/20d e tarifas | Não executado | NOT_RUN | — |
-| CAN-04 | Estorno Pix/cartão | UI DEV + API DEV + PagBank DEV parcial | Integral/parcial no PMS e provedor | Pix R$ 80 e cartão 1× R$ 212 estornados integralmente, cobranças Cancelado no portal; parcial não verificado | BLOCKED | Também 1 integral cartão 8× comprovado em 05/11 |
+| CAN-04 | Estorno Pix/cartão | UI DEV + API DEV + PagBank DEV parcial | Integral/parcial no PMS e provedor | Pix R$ 80 e cartão 1× R$ 212 estornados e Cancelado no portal; cartão 6× R$ 212 e 12× R$ 238,63 conciliados no PMS/conta, portal pendente; parcial não verificado | BLOCKED | Também 1 integral cartão 8× comprovado em 05/11 |
 | CAN-04a | PMS, hóspede e PagBank DEV | UI DEV + API DEV + provedor | Estorno integral Pix e reserva cancelada após conciliação | PMS: R$ 80 estornado, R$ 0 líquido; hóspede reembolsado; provedor Cancelado; datas liberadas | PASS | QA 23–24/11 |
 | CAN-04b | PMS, hóspede e PagBank DEV | UI DEV + API DEV + provedor | Estorno integral cartão 1× | PMS: R$ 212 estornado, R$ 0 líquido; hóspede reembolsado; provedor Cancelado e webhook HTTP 200 | PASS | QA 25–27/11 |
+| CAN-04c | PMS e hóspede | UI DEV + API DEV | Estorno integral cartão 6× | PMS: R$ 212 estornado, R$ 0 líquido; hóspede reembolsado | PASS | QA 30/11–02/12; provedor direto pendente |
+| CAN-04d | PMS e hóspede | UI DEV + API DEV | Estorno integral cartão 12× inclusive juros | PMS: R$ 238,63 estornado, R$ 0 líquido; hóspede reembolsado | PASS | QA 02–04/12; provedor direto pendente |
 | CAN-05 | Estorno repetido/excedente | — | Sem duplicidade | Não executado | NOT_RUN | — |
 | CAN-06 | Serviços prestados/não prestados | — | Classificar/estornar só elegíveis | Não executado | BLOCKED | Sem pacote sintético salvo |
 | CAN-07 | Análise/rejeição | — | Fluxo completo | Não repetido hoje | NOT_RUN | Ver rodada anterior |
@@ -58,10 +62,12 @@ Esta matriz registra **somente a execução de 06/11**. Resultados financeiros e
 | OPS-02 | Admin, filas/financeiro | UI DEV + API DEV parcial | Trilha e papéis completos | Pedido do hóspede entrou na reserva; PMS calculou e conciliou estorno Pix | BLOCKED | Demais filas, papéis e trilha completa não executados |
 | OPS-03 | Comunicações/anexos/custos | — | Ciclo completo | Não executado | NOT_RUN | — |
 | OPS-04 | Perfil/Moments | — | Perfil/mídia/moderação | Não executado | NOT_RUN | — |
-| FIN-01 | Conciliação final | UI DEV + API DEV + PagBank DEV parcial | Todas as operações em centavos | Pix R$ 80 e cartão 1× R$ 212: recebido=estornado, líquido R$ 0; Pix não pago R$ 212 Cancelado no provedor e NÃO CONFIRMADA no PMS | BLOCKED | DEVQA-005; faltam parcelas 6×/12×, pacote, caução e parcial |
+| FIN-01 | Conciliação final | UI DEV + API DEV + PagBank DEV parcial | Todas as operações em centavos | Pix R$ 80 e cartões 1×/6×/12×: recebido=estornado no PMS, líquido R$ 0; Pix não pago R$ 212 Cancelado; provedor direto dos cartões 6×/12× pendente | BLOCKED | DEVQA-005; faltam pacote, caução, parcial e demais cenários |
 | FIN-01a | PMS e hóspede | UI DEV + API DEV | Conciliar reserva Pix cancelada | R$ 80 pagos, R$ 80 estornados, R$ 0 líquido e R$ 0 pendente | PASS | QA 23–24/11 |
 | FIN-01b | PMS e PagBank DEV | UI DEV + API DEV + provedor | Conciliar reserva cartão 1× cancelada | 21.200 centavos pagos, R$ 212 estornados, R$ 0 líquido e R$ 0 pendente | PASS | QA 25–27/11 |
+| FIN-01c | PMS e hóspede | UI DEV + API DEV | Conciliar reserva cartão 6× cancelada | R$ 212 pagos/estornados, R$ 0 líquido e R$ 0 pendente | PASS | QA 30/11–02/12; provedor direto pendente |
+| FIN-01d | PMS e hóspede | UI DEV + API DEV | Conciliar reserva cartão 12× cancelada | R$ 238,63 pagos/estornados inclusive juros, R$ 0 líquido e R$ 0 pendente | PASS | QA 02–04/12; provedor direto pendente |
 
 ## Comandos e limites
 
-Nenhum teste local foi repetido porque o SHA de produto servido não mudou desde a rodada anterior. A consulta de parcelas 6×/12× na UI/API não comprova cobrança; 1× foi cobrada e conciliada. A imagem sintética de pacote não foi enviada; o pacote não foi salvo. Os três aceites contratuais ocorreram com autorização do usuário. A pré-autorização da garantia de R$ 500 não ocorreu; a conta informa programação para perto do check-in. O portal PagBank DEV confirmou status Cancelado nas duas cobranças estornadas e no Pix não pago.
+Nenhum teste local foi repetido porque o SHA de produto servido não mudou desde a rodada anterior. As parcelas 1×/6×/12× foram cobradas e conciliadas na UI/PMS; só 1× teve confirmação independente no portal até agora. A imagem sintética de pacote não foi enviada; o pacote não foi salvo. Os cinco aceites contratuais ocorreram com autorização do usuário. A pré-autorização da garantia de R$ 500 não ocorreu; a conta informa programação para perto do check-in. O portal PagBank DEV confirmou status Cancelado no Pix R$ 80 e cartão 1× estornados e no Pix não pago; sua sessão expirou antes da conferência dos cartões 6×/12×.
