@@ -47,7 +47,7 @@ async function boot({afterRefundRefresh=false}={}){
  window.VillegramAccount?.identity({display_name:session.user.user_metadata?.full_name||session.user.user_metadata?.name},"account");
  const [{data:p},{data:reservations},{data:props},{data:m},{data:ch},{data:cart},cfg]=await Promise.all([
   sb.from("profiles").select("*").eq("id",session.user.id).maybeSingle(),
-  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,operational_status,checked_in_at,checked_out_at,not_confirmed_at,not_confirmed_reason,cancelled_at,cancellation_actor,cancellation_reason,no_show_at,guests,rate_plan_code,contract_snapshot,stay_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image,check_in_time,check_out_time),payments(id,status,amount_cents,method,installments,metadata,created_at,updated_at),guarantees(id,status,amount_cents,captured_amount_cents,provider_capture_before,provider_error_code,attention_code),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,composition_snapshot))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
+  sb.from("reservations").select("id,confirmation_code,property_id,check_in,check_out,status,hold_expires_at,operational_status,checked_in_at,checked_out_at,not_confirmed_at,not_confirmed_reason,cancelled_at,cancellation_actor,cancellation_reason,no_show_at,guests,rate_plan_code,contract_snapshot,stay_amount,cleaning_fee,experience_amount,total_amount,created_at,properties(name,cover_image,check_in_time,check_out_time),payments(id,status,amount_cents,method,installments,metadata,created_at,updated_at),guarantees(id,status,amount_cents,captured_amount_cents,provider_capture_before,provider_error_code,attention_code),experience_orders(id,status,experience_order_items(product_name_snapshot,variant_name_snapshot,unit_price_cents,quantity,status,composition_snapshot))").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("properties").select("id,name,active,features").eq("active",true).order("id"),
   sb.from("modification_requests").select("id,reservation_id,request_type,requested_check_in,requested_check_out,requested_property_id,original_amount_cents,reference_amount_cents,estimated_additional_amount_cents,admin_additional_amount_cents,status,admin_note,payment_charge_id,payment_due_at,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   sb.from("post_booking_charges").select("id,reservation_id,kind,status,amount_cents,payment_id,modification_request_id,description,expires_at,snapshot,created_at,payments(status,method,installments)").eq("user_id",session.user.id).order("created_at",{ascending:false}),
@@ -175,7 +175,11 @@ function initialPayment(r){
    .filter(p=>p?.metadata?.kind!=="post_booking_charge")
    .sort((a,b)=>Date.parse(b.created_at||b.updated_at||0)-Date.parse(a.created_at||a.updated_at||0))[0]||null;
 }
-function paymentStatus(p){
+function pixHoldElapsed(r,p,now=Date.now()){
+ return r.status==="pending_payment"&&p?.method==="pix"&&p.status==="awaiting_payment"
+   &&Boolean(r.hold_expires_at)&&Date.parse(r.hold_expires_at)<=now;
+}
+function paymentStatus(p,{pixExpired=false}={}){
  if(!p)return null;
  const map={
   awaiting_payment:{label:"Aguardando pagamento",tone:"action",detail:"O pagamento ainda não foi concluído."},
@@ -191,11 +195,14 @@ function paymentStatus(p){
   disputed:{label:"Pagamento contestado",tone:"danger",detail:"Existe uma contestação em análise junto ao meio de pagamento."},
   chargeback:{label:"Pagamento estornado",tone:"danger",detail:"O pagamento foi revertido pelo emissor."}
  };
+ if(pixExpired)return {label:"Prazo do Pix encerrado",tone:"muted",detail:"O prazo para pagar terminou e as datas foram liberadas. A baixa do Pix ainda pode estar sendo atualizada."};
  return map[p.status]||{label:p.status,tone:"muted",detail:""};
 }
-function reservationStatus(r){
+function reservationStatus(r,payment=initialPayment(r)){
  const now=Date.now(),checkIn=Date.parse(r.check_in+"T"+(r.properties?.check_in_time||"15:00:00")+"-03:00"),checkOut=Date.parse(r.check_out+"T"+(r.properties?.check_out_time||"11:00:00")+"-03:00");
  if(r.status==="not_confirmed"&&(r.payments||[]).some(p=>p.status==="paid"&&p?.metadata?.kind!=="post_booking_charge")) return {label:"Pagamento recebido · reserva em análise",tone:"danger",priority:0,needsAction:true};
+ if(r.status==="pending_payment"&&payment?.status==="paid"&&payment.metadata?.manual_review)return {label:"Pagamento recebido · reserva em análise",tone:"danger",priority:0,needsAction:true};
+ if(pixHoldElapsed(r,payment,now))return {label:"Reserva não confirmada · prazo do Pix encerrado",tone:"muted",priority:4,needsAction:false};
  if(r.status==="pending_payment") return {label:"Aguardando confirmação",tone:"action",priority:0,needsAction:true};
  if(r.status==="not_confirmed") return {label:"Não confirmada",tone:"muted",priority:4,needsAction:false};
  if(r.status==="cancelled") return {label:"Cancelada",tone:"muted",priority:4,needsAction:false};
@@ -248,7 +255,7 @@ function renderExperiencePaymentHistory(r){
  const related=charges.filter(c=>c.reservation_id===r.id&&["experience_add","experience_upgrade"].includes(c.kind));
  if(!related.length)return "";
  const entries=related.flatMap(c=>{
-  const attempts=(r.payments||[]).filter(p=>p.metadata?.post_booking_charge_id===c.id)
+  const attempts=(r.payments||[]).filter(p=>String(p.metadata?.post_booking_charge_id??"")===String(c.id)||String(p.id)===String(c.payment_id??""))
     .sort((a,b)=>Date.parse(b.created_at||0)-Date.parse(a.created_at||0));
   if(!attempts.length)return [];
   return attempts.map(p=>{
@@ -258,8 +265,12 @@ function renderExperiencePaymentHistory(r){
     :p.status==="under_review"?"Pagamento em análise · aguarde"
     :p.status==="paid"?"Pagamento recebido · conferência necessária"
     :p.status==="expired"?"Pagamento expirado · experiência não incluída"
+    :p.status==="refunded"?"Pagamento estornado"
+    :p.status==="partially_refunded"?"Pagamento estornado parcialmente"
+    :p.status==="cancelled"?"Pagamento cancelado"
+    :p.status==="chargeback"?"Pagamento estornado pelo emissor"
     :"Pagamento aguardando confirmação";
-   const tone=applied?"success":p.status==="refused"?"danger":"info";
+   const tone=applied?"success":p.status==="refused"?"danger":["refunded","cancelled","expired"].includes(p.status)?"muted":"info";
    const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":"Pagamento";
    return {date:p.created_at||c.created_at,html:'<div class="experience-payment-event '+tone+'"><strong>'+esc(label)+'</strong><span>'+esc(c.description||"Experiência")+' · '+brlC(p.amount_cents||c.amount_cents)+'</span><small>'+esc(method)+' · '+fmtDateTime(p.created_at||c.created_at)+'</small></div>'};
   });
@@ -291,15 +302,15 @@ function renderReservations(reservations){
  );
  const defaultOpen=sorted[0]?.id;
  sorted.forEach(r=>{
-  const ux=reservationStatus(r),active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&![ "requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status)).slice(0,2);
-  const payment=initialPayment(r),paymentUx=paymentStatus(payment);
-  if(paymentUx&&payment?.status==="paid"&&r.status==="not_confirmed") Object.assign(paymentUx,{label:"Pagamento recebido · conciliação necessária",tone:"danger",detail:"O PagBank informou pagamento, mas a reserva não foi confirmada. A equipe precisa verificar a disponibilidade e resolver o valor recebido."});
+  const payment=initialPayment(r),paymentUx=paymentStatus(payment,{pixExpired:pixHoldElapsed(r,payment)});
+  const ux=reservationStatus(r,payment),active=activeModification(r.id),history=mods.filter(m=>m.reservation_id===r.id&&![ "requested","quoted","awaiting_guest_acceptance","awaiting_payment","accepted"].includes(m.status)).slice(0,2);
+  if(paymentUx&&payment?.status==="paid"&&(r.status==="not_confirmed"||(r.status==="pending_payment"&&payment.metadata?.manual_review))) Object.assign(paymentUx,{label:"Pagamento recebido · conciliação necessária",tone:"danger",detail:"O PagBank informou pagamento, mas a reserva não foi confirmada. A equipe precisa verificar a disponibilidade e resolver o valor recebido."});
   const expItems=(r.experience_orders||[]).flatMap(o=>o.experience_order_items||[]).filter(i=>i.status==="active");
   const pendingExperienceCharges=liveCharges(r.id).filter(c=>["experience_add","experience_upgrade"].includes(c.kind));
   const guarantee=(r.guarantees||[])[0],n=nights(r.check_in,r.check_out),lodging=Number(r.stay_amount||0);
   const firstAppliedChange=charges.filter(c=>c.reservation_id===r.id&&c.kind==="modification"&&c.status==="applied"&&c.snapshot?.original_check_in&&c.snapshot?.original_check_out).sort((a,b)=>Date.parse(a.created_at)-Date.parse(b.created_at))[0];
   const initialNights=firstAppliedChange?nights(firstAppliedChange.snapshot.original_check_in,firstAppliedChange.snapshot.original_check_out):n;
-  const initialLodgingLabel=firstAppliedChange?"Valor inicial da reserva · "+initialNights+" noites":"Hospedagem · "+n+" noites";
+  const initialLodgingLabel=(firstAppliedChange?"Valor inicial da reserva · ":"Hospedagem · ")+initialNights+(initialNights===1?" noite":" noites");
   const initialLodgingDetails=firstAppliedChange?"":'<small>'+brl(lodging/n)+' por noite</small>';
   const paid=["paid","refunded"].includes(payment?.status)&&r.status==="confirmed";
   const appliedRevision=mods.filter(m=>m.reservation_id===r.id&&m.status==="applied").reduce((sum,m)=>sum+Number(m.admin_additional_amount_cents||0),0);

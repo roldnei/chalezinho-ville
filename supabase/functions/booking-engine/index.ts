@@ -1614,11 +1614,23 @@ async function adminPropertyAction(req:Request,body:any){
     check_in_time:checkIn,check_out_time:checkOut,timezone:"America/Sao_Paulo",active:body?.active!==false,
     features:{...(previous?.features||{}),payment_terms:terms},...(ownPricing?{own_pricing:ownPricing}:{}),updated_at:new Date().toISOString()
   };
-  const result=id
+  const insertProperty=()=>admin.from("properties").insert(payload).select().single();
+  let result=id
     ? await admin.from("properties").update(payload).eq("id",id).select().single()
-    : await admin.from("properties").insert(payload).select().single();
-  if(result.error?.message==="own_pricing_required")return json({ok:false,error:"own_pricing_required"},400);
-  if(result.error||!result.data) return json({ok:false,error:"property_save_failed"},409);
+    : await insertProperty();
+  const idCollision=(error:{code?:string;message?:string}|null)=>
+    error?.code==="23505"&&error.message?.includes('"properties_pkey"');
+  // A manually seeded DEV ID can collide with the next sequence value. PostgreSQL
+  // already advanced the sequence and rolled back the failed insert.
+  if(!id&&idCollision(result.error))result=await insertProperty();
+  if(result.error||!result.data){
+    const err=result.error;
+    if(err?.code==="23514"&&["own_pricing_required","invalid_own_pricing","overlapping_own_pricing"].includes(err.message))
+      return json({ok:false,error:err.message},400);
+    if(err?.code==="23505"&&!idCollision(err))return json({ok:false,error:"property_conflict"},409);
+    console.error(JSON.stringify({event:"property_save_failed",operation:id?"update":"insert",database_code:err?.code||null}));
+    return json({ok:false,error:"property_save_failed"},500);
+  }
   await admin.from("audit_events").insert({actor_user_id:user.id,action:id?"property_updated":"property_created",entity_type:"property",entity_id:String(result.data.id),new_value:{name,code,active:payload.active}});
   return json({ok:true,property:result.data});
 }

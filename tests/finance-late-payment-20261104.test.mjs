@@ -9,3 +9,21 @@ ${definition}`);
 const rid=crypto.randomUUID(),pid=crypto.randomUUID();await db.query("insert into reservations(id,property_id,status,hold_expires_at) values($1,1,$2,now()+$3::interval)",[rid,status,expired?'-1 minute':'15 minutes']);await db.query("insert into payments(id,reservation_id,provider,provider_payment_id,amount_cents,status) values($1,$2,'pagbank_sandbox','CHAR_LOCAL_CONTROLLED',10000,$3)",[pid,rid,status==='not_confirmed'?'cancelled':'awaiting_payment']);return {db,rid,pid,run:async status=>db.query("select * from reconcile_pagbank_sandbox_payment($1,'CHAR_LOCAL_CONTROLLED',$2,10000)",[pid,status]),row:async()=>({p:(await db.query('select status,metadata from payments where id=$1',[pid])).rows[0],r:(await db.query('select status from reservations where id=$1',[rid])).rows[0],guarantees:(await db.query('select count(*)::int n from guarantees')).rows[0].n})};}
 for(const state of ['pending_payment','not_confirmed'])test(`controlled PAID after ${state} expiry/cancellation requires review and never silently confirms`,async()=>{const f=await fixture(state);try{await f.run('PAID');const o=await f.row();assert.equal(o.p.status,'paid');assert.equal(o.p.metadata.manual_review,'paid_after_hold');assert.equal(o.r.status,state);assert.equal(o.guarantees,0)}finally{await f.db.close()}});
 test('controlled old WAITING and DECLINED cannot regress a paid confirmed payment',async()=>{const f=await fixture('pending_payment',false);try{await f.run('PAID');await f.run('WAITING');await f.run('DECLINED');const o=await f.row();assert.equal(o.p.status,'paid');assert.equal(o.r.status,'confirmed');assert.equal(o.guarantees,1)}finally{await f.db.close()}});
+test('a released booking stays unconfirmed after a replacement and repeated late PagBank events',async()=>{
+ const f=await fixture();
+ try{
+  await f.run('WAITING');
+  await f.run('EXPIRED');
+  const replacement=crypto.randomUUID();
+  await f.db.query("insert into reservations(id,property_id,status) values($1,1,'confirmed')",[replacement]);
+  await f.run('PAID');
+  await f.run('PAID');
+  await f.run('CANCELED');
+  const original=await f.row();
+  assert.equal(original.p.status,'paid');
+  assert.equal(original.p.metadata.manual_review,'paid_after_hold');
+  assert.equal(original.r.status,'not_confirmed');
+  assert.equal(original.guarantees,0);
+  assert.deepEqual((await f.db.query("select id from reservations where status='confirmed'")).rows,[{id:replacement}]);
+ }finally{await f.db.close();}
+});
