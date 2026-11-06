@@ -56,11 +56,16 @@ test('minimum showcase completes each chosen period with available peers instead
 test('period columns keep chalet order, unique dates, accurate links and facility photos; unavailable chalets are omitted and remaining rows fill the column',async()=>{
  const dom=new JSDOM('<main><section class="hero"></section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;
  try{
+  const today='2026-10-16T16:00:00Z',RealDate=w.Date;
+  w.Date=class extends RealDate{
+   constructor(...args){super(...(args.length?args:[today]));}
+   static now(){return RealDate.parse(today);}
+  };
   const properties=[1,2,3].map(id=>({id,code:'CH'+id,name:['Ville Signature','Ville Essenza','Ville Amore'][id-1]}));
   const make=(id,start,end,nights)=>({property_id:id,property_code:'CH'+id,property_name:properties[id-1].name,offer_id:'stay',offer_name:'Hospedagem e limpeza',check_in:start,check_out:end,nights,guests:2,rate_code:'non_refundable',rate_name:'Não reembolsável',total_cents:100000+id,experiences:[]});
   const cards=[make(3,'2026-10-17','2026-10-19',2),make(1,'2026-10-17','2026-10-19',2),make(2,'2026-10-17','2026-10-19',2),make(3,'2026-10-18','2026-10-21',3)];
   let opened;w.Villegram={configure:()=>{},open:c=>opened=c};w.VilleOffers={esc:s=>String(s??''),label:c=>c.name};w.CHALEZINHO_CONFIG={bookingEngine:'https://qa.example/engine',environment:'development'};w.HTMLElement.prototype.scrollTo=()=>{};
-  w.fetch=async()=>({ok:true,json:async()=>({ok:true,cards,properties,offers:[],checked_at:new Date().toISOString(),period_status:[{property_code:'CH1',check_in:'2026-10-18',check_out:'2026-10-21',reason:'minimum_stay',min_stay:4}]})});
+  w.fetch=async()=>({ok:true,json:async()=>({ok:true,cards,properties,offers:[],checked_at:today,period_status:[{property_code:'CH1',check_in:'2026-10-18',check_out:'2026-10-21',reason:'minimum_stay',min_stay:4}]})});
   w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([]);
   const doc=w.document,columns=[...doc.querySelectorAll('.showcase-period')];assert.equal(columns.length,2);
   assert.deepEqual([...columns[0].querySelectorAll('[data-property]')].map(e=>e.dataset.property),['CH1','CH2','CH3']);
