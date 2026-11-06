@@ -7,7 +7,7 @@ test('date errors identify the field, preserve input, and recover without stale 
  const w=new JSDOM('<input id="book-in" type="date"><input id="book-out" type="date"><select id="book-guests"><option>2</option></select><div id="booking-results"></div><div id="booking-period"></div><div id="availability-count"></div><div id="booking-list"></div>',{runScripts:'outside-only'}).window;
  let requests=0;
  Object.assign(w,{$:s=>w.document.querySelector(s),searchSequence:0,state:{},PUBLIC:true,clearWhatsApp(){},error(){},nights:()=>2,track(){},persistSelection(){},ENGINE:'https://test.invalid',renderResults(){},fetch:async()=>{requests++;return {ok:true,json:async()=>({ok:true,listings:[]})}}});
- w.eval(source.slice(source.indexOf('async function search('),source.indexOf('function renderResults(')));
+ w.eval(source.slice(source.indexOf('function invalidBookingField('),source.indexOf('function renderResults(')));
  const input=w.document.querySelector('#book-in'),out=w.document.querySelector('#book-out');
  try{
   await w.search();assert.equal(w.document.activeElement,input);assert.equal(w.document.querySelector('#book-in-error').textContent,'Escolha a data de entrada.');
