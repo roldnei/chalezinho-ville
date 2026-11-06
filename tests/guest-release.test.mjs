@@ -8,7 +8,9 @@ const dev='https://pxfqmnhqodqyaaqeyjgr.supabase.co';
 test('Ville Moments is independent of checkout and Feelings in both environments',()=>{
  assert.deepEqual(releaseFeatures({environment:'development',profile:'whatsapp'}),{feelings:false,guestPublications:true,social:true});
  assert.deepEqual(releaseFeatures({environment:'production',profile:'whatsapp'}),{feelings:false,guestPublications:true,social:true});
- assert.deepEqual(releaseFeatures({environment:'development',profile:'checkout-development'}),{feelings:true,guestPublications:true,social:true});
+ assert.deepEqual(releaseFeatures({environment:'development',profile:'checkout-development'}),{feelings:false,guestPublications:true,social:true});
+ assert.equal(releaseFeatures({environment:'development',profile:'checkout-development',enableFeelings:true}).feelings,true);
+ assert.equal(releaseFeatures({environment:'production',profile:'checkout-development',enableFeelings:true}).feelings,false);
 });
 test('WhatsApp account exposes Moments and preserves private navigation in both environments',async()=>{
  for(const environment of ['development','production']){

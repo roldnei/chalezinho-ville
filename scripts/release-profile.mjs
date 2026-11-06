@@ -1,7 +1,7 @@
 export const DEV='pxfqmnhqodqyaaqeyjgr',PROD='irxsaladqhbzhkoaclxy';
 // Ville Moments is independent of payments and Feelings.
 export function releaseFeatures(release){
- return {feelings:release.profile==='checkout-development',guestPublications:true,social:true};
+ return {feelings:release.environment==='development'&&release.profile==='checkout-development'&&release.enableFeelings===true,guestPublications:true,social:true};
 }
 export function releaseProfile(env){
  const profile=env.VILLE_RELEASE_PROFILE||'checkout-development';
@@ -16,5 +16,5 @@ export function releaseProfile(env){
   if(!publicKey&&key.split('.').length===3){try{publicKey=JSON.parse(Buffer.from(key.split('.')[1],'base64url').toString()).role==='anon'}catch{}}
   if(!publicKey)throw Error('Production publishable or anon key required; server secrets cannot enter browser assets');
  }
- return {profile,ref,environment:production?'production':'development'};
+ return {profile,ref,environment:production?'production':'development',enableFeelings:env.VILLE_DEV_FEELINGS==='enabled'};
 }

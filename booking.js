@@ -832,7 +832,7 @@ async function continueWhatsApp(){
 }
 async function copyWhatsAppSummary(){
  if(!whatsappMessage)return;
- const message=whatsappMessage;window.VilleMobileMeasurement?.track('summary_copied');
+ const message=window.VilleMobileMeasurement?.message(whatsappMessage)||whatsappMessage;whatsappMessage=message;window.VilleMobileMeasurement?.track('summary_copied');
  document.querySelector('#whatsapp-manual-copy')?.remove();
  const field=document.createElement('textarea');field.id='whatsapp-manual-copy';field.className='consultation-summary';field.style.width='100%';field.style.minHeight='220px';field.value=message;field.readOnly=true;field.setAttribute('aria-label','Resumo para copiar');$('#whatsapp-actions').after(field);field.focus();field.select();
  $('#whatsapp-status').textContent='Selecione e copie o resumo abaixo. Tentando também a cópia automática…';

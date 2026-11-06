@@ -19,9 +19,10 @@ import {releaseProfile,releaseFeatures} from './release-profile.mjs';
 const release=releaseProfile(process.env);
 let config=await readFile(new URL('app-config.js',root),'utf8');
 if(release.profile==='whatsapp'){
- config=config.replace('releaseProfile:"checkout-development"','releaseProfile:"whatsapp"').replace('features:{feelings:true,guestPublications:true,social:true}','features:'+JSON.stringify(releaseFeatures(release)));
+ config=config.replace('releaseProfile:"checkout-development"','releaseProfile:"whatsapp"');
  config=config.replace(/bookingEngine:"[^"]+"/,`bookingEngine:"https://${release.ref}.supabase.co/functions/v1/public-consultation"`);
 }
+config=config.replace('features:{feelings:false,guestPublications:true,social:true}','features:'+JSON.stringify(releaseFeatures(release)));
 if(release.environment==='production'){
  config=config.replaceAll('pxfqmnhqodqyaaqeyjgr',release.ref).replace('environment:"development"','environment:"production"');
  config=config.replace(/supabaseKey:"[^"]+"/,'supabaseKey:'+JSON.stringify(process.env.VILLE_PUBLIC_SUPABASE_KEY));

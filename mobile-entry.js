@@ -56,16 +56,43 @@
   if(!value){ready.then(v=>{if(v&&eligibleHome())track('entry_failed',{details:{reason:'decision_timeout'}})});return null;}
   return eligibleHome()&&value.status==='running'&&value.phase==='test'?value.variant:null;
  }
- function message(text){return enabled&&participant?text.replace(/\nReferência: MV-[A-F0-9]{12}/g,'')+'\nReferência: '+participant.reference:text;}
- window.VilleMobileMeasurement={ready,entry,track,message,rendered(rendered){if(eligibleHome()&&decisionTaken&&!entryRecorded){entryRecorded=true;track('entry_rendered',{details:{rendered}})}},excluded(){try{localStorage.setItem('ville-measurement-excluded','true')}catch{}enabled=false;participant=null;try{localStorage.removeItem(queueKey)}catch{}}};
- // This listener covers floating/contact links, but not social sharing to wa.me/?text.
+ const referenceFormat=/^MV-[A-F0-9]{12}$/;
+ const referenceLine=/(?:^|\r?\n)Referência: MV-[A-F0-9]{12}(?=\r?\n|$)/gi;
+ const reference=()=>enabled&&referenceFormat.test(participant?.reference||'')?participant.reference:null;
+ function message(text){
+  const base=text.replace(referenceLine,'').trimEnd(),ref=reference();
+  return ref?base+'\nReferência: '+ref:base;
+ }
+ let enrollmentPending=true;
+ ready.then(()=>{enrollmentPending=false;});
+ function contactURL(anchor){
+  try{
+   const url=new URL(anchor.href,location.href),number=(C?.whatsappNumber||'').replace(/\D/g,'');
+   return number&&url.protocol==='https:'&&url.hostname==='wa.me'&&url.pathname.replace(/\D/g,'')===number?url:null;
+  }catch{return null}
+ }
+ function attachReference(anchor,url=contactURL(anchor)){
+  if(!url)return null;
+  const current=url.searchParams.get('text'),text=message(current||'Olá! Gostaria de informações sobre os chalés.');
+  if(text!==current&&(current!==null||reference())){url.searchParams.set('text',text);anchor.href=url.href;}
+  return url.href;
+ }
+ function refreshContacts(){for(const a of document.querySelectorAll('a[href]'))attachReference(a);}
+ ready.then(refreshContacts);
+ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>ready.then(refreshContacts),{once:true});
+ window.VilleMobileMeasurement={ready,entry,track,message,rendered(rendered){if(eligibleHome()&&decisionTaken&&!entryRecorded){entryRecorded=true;track('entry_rendered',{details:{rendered}})}},excluded(){try{localStorage.setItem('ville-measurement-excluded','true')}catch{}enabled=false;participant=null;refreshContacts();try{localStorage.removeItem(queueKey)}catch{}}};
+ // A contact can be tapped while the enrollment request is still returning.
+ // Preserve native navigation normally; for a quick tap wait briefly and avoid async popups.
  document.addEventListener('click',e=>{
-  const a=e.target.closest?.('a[href]');if(!a)return;let url;try{url=new URL(a.href,location.href)}catch{return}
-  const number=(C.whatsappNumber||'').replace(/\D/g,'');
-  if(url.hostname==='wa.me'&&url.pathname.replace(/\D/g,'')===number&&number){
-   if(!url.searchParams.get('text')?.includes('\nReferência: MV-'))url.searchParams.set('text',message(url.searchParams.get('text')||'Olá! Gostaria de informações sobre os chalés.'));
-   a.href=url.href;track('whatsapp_clicked');
-  }
+  const a=e.target.closest?.('a[href]');if(!a)return;
+  const url=contactURL(a);if(!url)return;
+  track('whatsapp_clicked');
+  if(enrollmentPending&&visitor&&!reference()&&e.cancelable&&!e.defaultPrevented&&e.button===0&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey&&!e.altKey){
+   e.preventDefault();
+   Promise.race([ready,new Promise(resolve=>setTimeout(resolve,1500))]).then(()=>{
+    location.assign(attachReference(a,url));
+   });
+  }else attachReference(a,url);
  },true);
  const code=({'chale-premium.html':'CH1','chale-com-hidro.html':'CH2','chale-romantico.html':'CH3'})[page]||(page==='imovel.html'?(new URLSearchParams(location.search).get('codigo')||new URLSearchParams(location.search).get('chalet')):null);
  if(code)track('property_viewed',{property_code:code});

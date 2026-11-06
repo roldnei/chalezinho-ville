@@ -54,6 +54,33 @@ test('baseline never switches entry, reference follows contact, conversion claim
  await new Promise(r=>setTimeout(r,5));assert.match(w.document.querySelector('#contact').href,/MV-0123456789AB/);
  assert.ok(calls.some(c=>c.event_name==='whatsapp_clicked'));assert.ok(!calls.some(c=>c.event_name==='request_received'||c.event_name==='reservation_confirmed'));dom.window.close();
 });
+test('fast WhatsApp taps wait for the same anonymous reference for either mobile entry',async()=>{
+ for(const variant of ['A','B']){
+  const {dom,w}=await browser('https://site.example/',variant,'running');
+  const anchor=w.document.querySelector('#contact');
+  anchor.href='https://wa.me/5593991592266?text=Oi';
+  const original=w.fetch;
+  let release;
+  const hold=new Promise(resolve=>{release=resolve});
+  w.fetch=async(...args)=>{await hold;return original(...args)};
+  w.eval(script);
+  const tap=new w.MouseEvent('click',{bubbles:true,cancelable:true});
+  anchor.dispatchEvent(tap);
+  assert.equal(tap.defaultPrevented,true);
+  release();
+  await w.VilleMobileMeasurement.ready;
+  await new Promise(resolve=>setTimeout(resolve,10));
+  const text=new URL(anchor.href).searchParams.get('text');
+  assert.equal(text,'Oi\nReferência: MV-0123456789AB');
+  assert.equal(w.VilleMobileMeasurement.message(text),text);
+  const share=w.document.createElement('a');
+  share.href='https://wa.me/?text=Oi';
+  w.document.body.append(share);
+  share.dispatchEvent(new w.MouseEvent('click',{bubbles:true,cancelable:true}));
+  assert.equal(new URL(share.href).searchParams.get('text'),'Oi');
+  dom.window.close();
+ }
+});
 test('B is delivered only during a running test on an eligible homepage; desktop sends nothing',async()=>{
  for(const [url,status,expected]of [['https://site.example/','running','B'],['https://site.example/?publication=123','running',null],['https://site.example/','paused',null]]){const {dom,w}=await browser(url,'B',status);assert.equal(await w.VilleMobileMeasurement.entry(),expected);dom.window.close()}
  const {dom,calls}=await browser('https://site.example/','B','running','Windows Chrome');assert.equal(calls.length,0);dom.window.close();

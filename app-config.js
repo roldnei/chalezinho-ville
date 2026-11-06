@@ -8,7 +8,7 @@ window.CHALEZINHO_CONFIG={
   releaseProfile:"checkout-development",
   whatsappNumber:"5593991592266",
   mobileEntryExperimentEnabled:true,
-  features:{feelings:true,guestPublications:true,social:true}
+  features:{feelings:false,guestPublications:true,social:true}
 };
 
 // Shared session policy for every page on this origin. No passwords are stored.

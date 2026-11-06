@@ -1,4 +1,10 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "qa/dev-e2e-report-*": false,
+      "qa/dev-e2e-handoff-*": false
+    }
+  },
   "buildCommand": "VILLE_RELEASE_PROFILE=checkout-development node scripts/build-finance-preview.mjs",
   "outputDirectory": "dist",
   "functions": {
