@@ -30,6 +30,10 @@ if(release.environment==='production'){
 // Admin pages use the authenticated engine; the visitor cannot unlock a write
 // operation by changing a URL because the public endpoint rejects those actions.
 config+='\nif(["admin.html","experiencias-admin.html","estadias-admin.html","pms-operacao.html","villegram-admin.html","meus-imoveis.html","ops-fase1.html"].some(p=>location.pathname.endsWith("/"+p))){window.CHALEZINHO_CONFIG.bookingEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine";}\n';
+if(process.env.VILLE_CHECKOUT_RECAPTCHA_PREVIEW==='true'){
+ if(release.environment!=='development'||release.profile!=='checkout-development')throw Error('reCAPTCHA preview requires the isolated development checkout');
+ config+='\nwindow.CHALEZINHO_CONFIG.checkoutPaymentEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine-recaptcha";\n';
+}
 await writeFile(new URL('app-config.js',out),config);
 if(release.environment==='production')for(const file of ['inspection-mobile-qa.html','launch-qa.html','qa-layout.html','preview-responsive.html','villegram-media-qa.html','villegram-stories-qa.html'])await rm(new URL(file,out),{force:true});
 console.log('Release profile: '+release.profile+'; target: '+release.environment);
