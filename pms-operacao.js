@@ -114,7 +114,6 @@ renderReservations=()=>window.VilleOperations.mount($("#content"),{onSummary:ope
 renderAgenda=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"next"});
 renderTasks=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"tasks",taskId:initialTask});
 renderTemplates=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb,initial:"templates"});
-renderIndicators=()=>window.VilleOperations.mount($("#content"),{onSummary:operationSummaryChanged,sb});
 const originalShow=show;show=function(next){if(next==="legacy_tasks"){originalShow("tasks");previousTasks();if(initialTask&&state.tasks.some(t=>t.id===initialTask))openTask(initialTask);return;}originalShow(next);if(["today","agenda","tasks","templates","reservations","indicators"].includes(next))$("#new-action").hidden=true;};
 boot();
 })();

@@ -1,0 +1,136 @@
+import {test,expect} from '@playwright/test';
+import {mkdir} from 'node:fs/promises';
+
+// Local synthetic fixture. The separate DEV preview is checked manually with the QA property.
+test('property prices, rules, browser back and batch confirmation retain context',async({page},testInfo)=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/admin.html?view=properties');
+ await expect(page.locator('[data-property-edit="2"]')).toBeVisible();
+ await page.locator('[data-property-edit="2"]').click();
+ await page.locator('[data-workspace="prices"]').click();
+ await expect(page.locator('[data-price-origin]')).toContainText('tabela própria');
+ await page.locator('[data-price-month]').fill('2027-02');
+ await page.locator('[data-price-month]').dispatchEvent('change');
+ await expect(page.locator('[data-price-context-month]')).toContainText('fevereiro de 2027');
+ await page.locator('[name="start"]').fill('2027-02-05');
+ await page.locator('[name="end"]').fill('2027-02-07');
+ await page.locator('[data-selection] [name="value"]').fill('123,00');
+ const post=page.waitForRequest(r=>r.method()==='POST'&&r.postDataJSON()?.operation==='save_pricing');
+ await page.locator('[data-selection] [type="submit"]').click();
+ await expect(page.locator('[data-price-review]')).toBeVisible();
+ await page.locator('[data-review-confirm]').click();
+ expect((await post).postDataJSON().own_pricing.periods.some(p=>p.cents===12300&&p.start==='2027-02-05'&&p.end==='2027-02-07')).toBe(true);
+ await expect(page.locator('[data-price-status]')).toContainText('salva');
+ await mkdir('docs/ux/issue-14',{recursive:true});
+ await page.locator('.admin-modal').evaluate(element=>element.scrollTop=0);
+ await page.screenshot({path:`docs/ux/issue-14/prices-after-${testInfo.project.name}.png`,fullPage:true});
+ await page.locator('[data-rules]').click();
+ await expect(page.locator('[data-availability-tab="rules"]')).toHaveAttribute('aria-selected','true');
+ await page.screenshot({path:`docs/ux/issue-14/rules-after-${testInfo.project.name}.png`,fullPage:true});
+ await page.locator('#availability-form .workspace-rule').first().locator('summary').click();
+ await page.locator('#availability-form [name="min_nights"]').fill('2');
+ page.once('dialog',dialog=>dialog.dismiss());
+ await page.locator('#back-property-details').click();
+ await expect(page.locator('#availability-form')).toBeVisible();
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#back-property-details').click();
+ await expect(page.locator('[data-price-month]')).toHaveValue('2027-02');
+ await expect(page.locator('[name="start"]')).toHaveValue('2027-02-05');
+ await page.goBack();
+ await expect(page.locator('[data-workspace="prices"]')).toBeVisible();
+ await page.locator('#workspace-close').click();
+ await expect(page.locator('#admin-modal')).toBeHidden();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(errors).toEqual([]);
+ await page.screenshot({path:`docs/ux/issue-14/properties-after-${testInfo.project.name}.png`,fullPage:true});
+});
+
+test('multicalendar month and filter survive price editing; reservation financial tab survives back',async({page},testInfo)=>{
+ const errors=[];page.on('pageerror',error=>errors.push(error.message));
+ await page.goto('/admin.html?view=calendar');
+ await page.locator('#calendar-property').selectOption('2');
+ await page.locator('#calendar-month').fill('2027-03');
+ await page.locator('#calendar-month').dispatchEvent('change');
+ await page.locator('[data-calendar-availability="2"]').click();
+ await expect(page.locator('[data-price-month]')).toHaveValue('2027-03');
+ await expect(page.locator('[data-price-back]')).toContainText('Multicalendário');
+ await page.locator('[data-price-back]').click();
+ await expect(page.locator('#calendar-month')).toHaveValue('2027-03');
+ await expect(page.locator('#calendar-property')).toHaveValue('2');
+ await page.locator('#calendar-span').selectOption('month');
+ const sticky=await page.locator('.calendar-columns-scroll').evaluate(element=>{element.scrollTop=500;return Math.abs(element.querySelector('.calendar-columns-heading').getBoundingClientRect().top-element.getBoundingClientRect().top)<=2});
+ expect(sticky).toBe(true);
+ await page.locator(testInfo.project.name==='mobile'?'[data-main-view="reservations"]':'#admin-nav [data-view="reservations"]').click();
+ await page.locator('[data-reservation]').first().click();
+ await page.locator('#reservation-detail [data-detail-tab="1"]').click();
+ await expect(page.locator('#reservation-detail [data-detail-tab="1"]')).toHaveAttribute('aria-pressed','true');
+ await page.goBack();
+ await expect(page.locator('#reservation-drawer')).toBeHidden();
+ await page.goForward();
+ await expect(page.locator('#reservation-detail [data-detail-tab="1"]')).toHaveAttribute('aria-pressed','true');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(errors).toEqual([]);
+ await mkdir('docs/ux/issue-14',{recursive:true});
+ await page.screenshot({path:`docs/ux/issue-14/reservation-after-${testInfo.project.name}.png`,fullPage:true});
+});
+
+test('synthetic block and rules save survive reload without touching channel links',async({page})=>{
+ const calls=[];page.on('request',request=>{if(request.method()==='POST'){try{calls.push(request.postDataJSON())}catch{}}});
+ await page.goto('/admin.html?view=properties');
+ await page.locator('[data-property-edit="2"]').click();
+ await page.locator('[data-workspace="prices"]').click();
+ await page.locator('[data-price-month]').fill('2027-04');
+ await page.locator('[data-price-month]').dispatchEvent('change');
+ await page.locator('[name="start"]').fill('2027-04-10');
+ await page.locator('[name="end"]').fill('2027-04-11');
+ await page.locator('[data-block-reason]').fill('Bloqueio QA local');
+ await page.locator('[data-block]').click();
+ await expect(page.locator('[data-price-review]')).toContainText('Bloqueio QA local');
+ await page.locator('[data-review-confirm]').click();
+ await expect(page.locator('[data-price-status]')).toContainText('salva');
+ await expect(page.locator('[data-price-grid] .price-blocked')).toHaveCount(2);
+ await page.locator('[data-price-events] [data-release]').click();
+ await expect(page.locator('[data-price-review]')).toContainText('Remover o bloqueio inteiro');
+ await page.locator('[data-review-confirm]').click();
+ await expect(page.locator('[data-price-grid] .price-blocked')).toHaveCount(0);
+ await page.locator('[data-rules]').click();
+ await page.locator('#availability-form .workspace-rule').first().locator('summary').click();
+ await page.locator('#availability-form [name="min_nights"]').fill('3');
+ await page.locator('#availability-form [type="submit"]').click();
+ await expect(page.locator('#availability-message')).toContainText('salva');
+ await page.reload();
+ await page.locator('[data-property-edit="2"]').click();
+ await page.locator('[data-workspace="availability"]').click();
+ await page.locator('[data-availability-tab="rules"]').click();
+ await page.locator('#availability-form .workspace-rule').first().locator('summary').click();
+ await expect(page.locator('#availability-form [name="min_nights"]')).toHaveValue('3');
+ expect(calls.filter(c=>c.action==='admin_calendar'&&c.operation!=='list')).toHaveLength(0);
+});
+
+test('keyboard focus stays in the panel and Escape closes to the invoking property',async({page})=>{
+ await page.goto('/admin.html?view=properties');
+ const card=page.locator('[data-property-edit="2"]');
+ await card.click();
+ await page.locator('[data-workspace="prices"]').click();
+ await expect(page.locator('.admin-modal .admin-drawer-close')).toBeFocused();
+ await page.keyboard.press('Shift+Tab');
+ expect(await page.evaluate(()=>document.querySelector('.admin-modal').contains(document.activeElement))).toBe(true);
+ await page.keyboard.press('Escape');
+ await expect(page.locator('#admin-modal')).toBeHidden();
+ await expect(card).toBeFocused();
+});
+
+test('pricing calendar explains a load failure and recovers on month change',async({page})=>{
+ let failed=false;
+ await page.route('**/engine*',async route=>{
+  const body=route.request().method()==='POST'?route.request().postDataJSON():null;
+  if(body?.action==='admin_property_action'&&body.operation==='pricing_calendar'&&!failed){failed=true;return route.fulfill({status:503,json:{ok:false,error:'temporary_fixture_failure'}})}
+  return route.continue();
+ });
+ await page.goto('/admin.html?view=properties');
+ await page.locator('[data-property-edit="2"]').click();
+ await page.locator('[data-workspace="prices"]').click();
+ await expect(page.locator('[data-price-grid]')).toContainText('Não foi possível carregar o mês');
+ await page.locator('[data-next]').click();
+ await expect(page.locator('[data-price-grid] [data-day]').first()).toBeVisible();
+});

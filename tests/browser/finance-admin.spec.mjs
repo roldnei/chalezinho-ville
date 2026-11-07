@@ -5,6 +5,7 @@ test('reservation financial detail and pending refund remain accurate at each vi
  await page.goto('/admin.html?view=reservations');
  await page.locator('[data-reservation]').first().click();
  await expect(page.locator('#reservation-finance-summary')).toContainText('Recebido líquido');
+ await page.locator('#reservation-detail [data-detail-tab="1"]').click();
  await page.locator('#reservation-detail [data-guarantee]').click();
  await expect(page.getByRole('heading',{name:'Caução da reserva'})).toBeVisible();
  await page.locator('[name="refund_amount"]').fill('100');

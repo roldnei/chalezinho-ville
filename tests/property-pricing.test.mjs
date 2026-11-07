@@ -94,7 +94,6 @@ test('PMS calendar edits an interval by weekday, preserves other nights and call
   const requests = [], blockCalls = [];
   const host = ui.window.document.getElementById('host');
   let saved = {...own, periods:[{start:'2026-11-16',end:'2026-11-20',cents:27000}]};
-  ui.window.prompt = () => 'Uso do proprietário';
   ui.window.VillePropertyPricing.mount(host,{
     property:{id:6,name:'QA'}, today:'2026-11-17', esc:String, brl:String, formatDate:String,
     back:()=>{}, availability:()=>{},
@@ -112,6 +111,9 @@ test('PMS calendar edits an interval by weekday, preserves other nights and call
   const form=host.querySelector('[data-selection]');
   form.elements.value.value='215,39';
   form.requestSubmit();
+  assert.equal(requests.filter(r=>r.operation==='save_pricing').length,0);
+  assert.match(host.querySelector('[data-review-summary]').textContent,/1 noite/);
+  host.querySelector('[data-review-confirm]').click();
   await tick();
   assert.equal(requests.find(r=>r.operation==='save_pricing').updated_at,'v1');
   assert.deepEqual(saved.periods,[
@@ -120,6 +122,8 @@ test('PMS calendar edits an interval by weekday, preserves other nights and call
     {start:'2026-11-19',end:'2026-11-20',cents:27000},
   ]);
   host.querySelector('[data-block]').click();
+  assert.equal(blockCalls.length,0);
+  host.querySelector('[data-review-confirm]').click();
   await tick();
   assert.deepEqual(blockCalls,[{operation:'create',property_id:6,start_date:start,end_date:'2026-11-20',reason:'Uso do proprietário',block_type:'owner_use'}]);
   ui.window.close();
