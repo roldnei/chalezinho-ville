@@ -2226,6 +2226,7 @@ Deno.serve(async(req)=>{
       (origin==="https://chalezinho-ville-git-feature-romantic-fdde70-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
+        origin==="https://chalezinho-ville-git-ux-pms-e2e-issue-14-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-feature-guest-directory-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-8q4qwux69-roldneicosta-4140.vercel.app" ||
