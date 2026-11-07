@@ -4,6 +4,7 @@ import {consultationActions,launchAdminActions,launchAdminOperationAllowed,relea
 import {villegramStayQuote} from '../_shared/villegram-stay.ts';
 import {isCelebration} from "../_shared/stay-showcase.ts";
 import {villegramService} from "../_shared/villegram.ts";
+import {checkoutCaptchaSettings,verifyCheckoutCaptcha,type CheckoutCaptchaAction} from "../_shared/checkout-recaptcha.ts";
 import {bookingDocuments,assertBookingConsent} from "../_shared/booking-consent.ts";
 import {publicProperty} from "../_shared/public-property.ts";
 import {offerIssues,priceStayOffer,compositionSnapshot,experienceComponents} from "../_shared/stay-offers.ts";
@@ -672,6 +673,12 @@ async function applyUpsell(body:any,development:boolean){
   });
 }
 
+const captchaSettings = () => checkoutCaptchaSettings(name => Deno.env.get(name));
+async function checkoutCaptchaError(req:Request,body:any,action:CheckoutCaptchaAction){
+  const error=await verifyCheckoutCaptcha(captchaSettings(),req.headers.get("origin"),body?.recaptcha_token,action);
+  return error?json({ok:false,error},error==="checkout_captcha_unavailable"?503:403):null;
+}
+
 async function startPayment(req:Request,body:any,development:boolean){
   const user=await currentUser(req);
   if(!user) return json({ok:false,error:"authentication_required"},401);
@@ -685,6 +692,8 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(body?.provider==="pagbank_sandbox" && !development) return json({ok:false,error:"not_allowed"},403);
   if(!["pix","card"].includes(method)) return json({ok:false,error:"invalid_method"},400);
   if(!quote_id||!quote_option_id||!guest_name||!guest_email||!guest_phone) return json({ok:false,error:"missing_data"},400);
+  const captchaError=await checkoutCaptchaError(req,body,"checkout_payment");
+  if(captchaError)return captchaError;
   const {data:identityPresent,error:identityError}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
   if(identityError) return json({ok:false,error:"identity_check_unavailable"},500);
   if(!identityPresent) return json({ok:false,error:"identity_required"},403);
@@ -2030,6 +2039,8 @@ async function startPostBookingPayment(req:Request,body:any,development:boolean)
   const sandbox=body?.provider==="pagbank_sandbox";
   if(!sandbox) return json({ok:false,error:"invalid_provider"},400);
   if(!chargeId||!["pix","card"].includes(method)) return json({ok:false,error:"missing_data"},400);
+  const captchaError=await checkoutCaptchaError(req,body,"post_booking_payment");
+  if(captchaError)return captchaError;
 
   const {data:settings}=await admin.from("payment_settings")
     .select("active_provider,pix_enabled,card_enabled,max_card_installments,pix_expiration_minutes").eq("id",1).single();
@@ -2227,6 +2238,7 @@ Deno.serve(async(req)=>{
        origin==="https://chalezinho-ville-git-desenvolvimento-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
         origin==="https://chalezinho-ville-git-ux-pms-e2e-issue-14-roldneicosta-4140.vercel.app" ||
+       origin==="https://chalezinho-ville-git-dev-recaptcha-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-feature-guest-directory-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-8q4qwux69-roldneicosta-4140.vercel.app" ||
@@ -2280,6 +2292,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         ok:true,
         purposes:consultation?[]:purposesQ.data||[],
         payment_settings:settingsQ.data||{},
+        checkout_recaptcha:development&&!consultation?{site_key:captchaSettings()?.siteKey||null}:null,
         policy_documents:docsQ.data||[],
         required_booking_documents:bookingDocuments(docsQ.data||[],development),
         experience_products:consultation?[]:target==='production'?(productsQ.data||[]).filter(commercialItem):productsQ.data||[],stay_offers:(consultation?lodgingLaunchCatalog(await stayOffers.catalog()):await stayOffers.catalog()).offers,
