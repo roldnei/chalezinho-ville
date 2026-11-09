@@ -1,6 +1,12 @@
 import './verify-finance-target.mjs';
 import {mkdir,readdir,copyFile,cp,readFile,writeFile,rm} from 'node:fs/promises';
 import {extname} from 'node:path';
+import {releaseProfile,releaseFeatures} from './release-profile.mjs';
+const release=releaseProfile(process.env);
+const captchaPreview=process.env.VILLE_CHECKOUT_RECAPTCHA_PREVIEW==='true';
+if(captchaPreview&&(release.environment!=='development'||release.profile!=='checkout-development')){
+ throw Error('reCAPTCHA preview requires the isolated development checkout');
+}
 const root=new URL('../',import.meta.url),out=new URL('../dist/',import.meta.url);
 await rm(out,{recursive:true,force:true});
 await mkdir(out,{recursive:true});
@@ -15,8 +21,6 @@ const {buildReceiptOCR}=await import('./build-receipt-ocr.mjs');
 await buildReceiptOCR(new URL('assets/receipt-ocr/',out));
 console.log('Preview browser assets built in dist.');
 
-import {releaseProfile,releaseFeatures} from './release-profile.mjs';
-const release=releaseProfile(process.env);
 let config=await readFile(new URL('app-config.js',root),'utf8');
 if(release.profile==='whatsapp'){
  config=config.replace('releaseProfile:"checkout-development"','releaseProfile:"whatsapp"').replace('features:{feelings:true,guestPublications:true,social:true}','features:'+JSON.stringify(releaseFeatures(release)));
@@ -29,6 +33,9 @@ if(release.environment==='production'){
 // Admin pages use the authenticated engine; the visitor cannot unlock a write
 // operation by changing a URL because the public endpoint rejects those actions.
 config+='\nif(["admin.html","experiencias-admin.html","estadias-admin.html","pms-operacao.html","villegram-admin.html","meus-imoveis.html","ops-fase1.html"].some(p=>location.pathname.endsWith("/"+p))){window.CHALEZINHO_CONFIG.bookingEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine";}\n';
+if(captchaPreview){
+ config+='\nwindow.CHALEZINHO_CONFIG.checkoutPaymentEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine-recaptcha";\n';
+}
 await writeFile(new URL('app-config.js',out),config);
 if(release.environment==='production')for(const file of ['inspection-mobile-qa.html','launch-qa.html','qa-layout.html','preview-responsive.html','villegram-media-qa.html','villegram-stories-qa.html'])await rm(new URL(file,out),{force:true});
 console.log('Release profile: '+release.profile+'; target: '+release.environment);

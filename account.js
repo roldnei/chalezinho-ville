@@ -3,7 +3,7 @@ const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C
 const pagbankSandbox=C.environment==="development";
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
-let session=null,profile=null,properties=[],mods=[],charges=[],cartItems=[],reservationsCache=[],shopReservationId=null,paymentSettings={},activeCharge=null,postInstallmentQuote=null;
+let session=null,profile=null,properties=[],mods=[],charges=[],cartItems=[],reservationsCache=[],shopReservationId=null,paymentSettings={},checkoutCaptcha=null,activeCharge=null,postInstallmentQuote=null;
 const esc=v=>String(v??"").replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 let anonymousId="";
 function downloadAcceptedPolicy(doc,code){
@@ -28,7 +28,7 @@ async function downloadReservationPolicy(id,button){
 }
 try{anonymousId=localStorage.getItem("chalezinho_anon_id")||crypto.randomUUID();localStorage.setItem("chalezinho_anon_id",anonymousId)}
 catch{anonymousId=crypto.randomUUID()}
-async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const r=await fetch(ENGINE+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
+async function api(action,body={}){const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token};const endpoint=(action==="config"||action==="start_post_booking_payment")&&C.checkoutPaymentEngine||ENGINE;const r=await fetch(endpoint+"?action="+action,{method:"POST",headers,body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw Object.assign(new Error(d.error||"request_failed"),{data:d,status:r.status});return d}
 async function guaranteeApi(action,body={}){const r=await fetch(C.guaranteeEngine,{method:"POST",headers:{"Content-Type":"application/json","X-Chalezinho-Env":"development","Authorization":"Bearer "+session.access_token},body:JSON.stringify({action,...body})});const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));if(!r.ok||!d.ok)throw new Error(d.error||"guarantee_unavailable");return d}
 function track(event_name,payload={}){api("track",{event_name,anonymous_id:anonymousId,...payload}).catch(()=>{})}
 const statusLabel=s=>({confirmed:"Confirmada",pending_payment:"Aguardando confirmação",not_confirmed:"Não confirmada",no_show:"Não compareceu",cancelled:"Cancelada",quoted:"Em análise",awaiting_guest_acceptance:"Aguardando sua confirmação",awaiting_payment:"Aguardando pagamento",payment_expired:"Cancelada por falta de pagamento",accepted:"Aceita",applied:"Aplicada",rejected:"Recusada",requested:"Solicitada"}[s]||s);
@@ -54,7 +54,7 @@ async function boot({afterRefundRefresh=false}={}){
   sb.from("post_booking_cart_items").select("id,reservation_id,target_variant_id,package_type,purchase_mode,amount_cents,description,snapshot,created_at").eq("user_id",session.user.id).order("created_at",{ascending:false}),
   api("config")
  ]);
- profile=p;window.VillegramAccount?.identity({display_name:profile?.full_name||session.user.user_metadata?.full_name||session.user.user_metadata?.name},"account");properties=props||[];mods=m||[];charges=ch||[];cartItems=cart||[];reservationsCache=reservations||[];paymentSettings=cfg?.payment_settings||{};
+ profile=p;window.VillegramAccount?.identity({display_name:profile?.full_name||session.user.user_metadata?.full_name||session.user.user_metadata?.name},"account");properties=props||[];mods=m||[];charges=ch||[];cartItems=cart||[];reservationsCache=reservations||[];paymentSettings=cfg?.payment_settings||{};checkoutCaptcha=cfg?.checkout_recaptcha;
  $("#profile-name").value=profile?.full_name||"";$("#profile-phone").value=profile?.phone||"";
  if(profile?.role==="admin"){$("#ops-link").hidden=false;$("#experience-admin-link").hidden=false}
  renderExperienceCart(reservationsCache);
@@ -500,9 +500,12 @@ async function startChargePayment(){
   const plan=quote?.plans.find(p=>p.installments===installments);
   if(method==="card"&&(!plan||!quote.offer_id||quote.chargeId!==activeCharge.id||quote.cardBin!==credit_card_bin))
     throw new Error("installment_quote_required");
+  const recaptcha_token=C.checkoutPaymentEngine
+   ?await window.VilleCheckoutCaptcha.token(checkoutCaptcha,"post_booking_payment")
+   :undefined;
   const encrypted_card=method==="card"?await encryptPostBookingCard():undefined;
   const d=await api("start_post_booking_payment",{charge_id:activeCharge.id,method,installments,credit_card_bin,
-    installment_offer_id:quote?.offer_id,quoted_total_cents:plan?.total_cents,provider:"pagbank_sandbox",encrypted_card});
+    installment_offer_id:quote?.offer_id,quoted_total_cents:plan?.total_cents,provider:"pagbank_sandbox",encrypted_card,recaptcha_token});
   if(activeCharge){
    activeCharge.status="processing";
    activeCharge.payment_id=d.payment?.id||activeCharge.payment_id||null;
@@ -513,7 +516,7 @@ async function startChargePayment(){
   renderPostBookingPagBankPayment(d.payment);
  }catch(e){
   if(e.message==="pagbank_start_uncertain"&&e.data?.payment_id){renderPostBookingPagBankPayment({id:e.data.payment_id});return}
-  const msg={charge_expired:"O prazo desta cobrança expirou.",payment_provider_not_ready:"O pagamento ainda não está disponível.",invalid_installments:"Escolha um parcelamento válido.",installment_quote_required:"Consulte as parcelas no PagBank antes de pagar.",installment_quote_changed:"O valor das parcelas mudou. Consulte novamente antes de pagar.",invalid_test_card:"Confira os dados do cartão de teste."}[e.message]||"Não foi possível iniciar o pagamento.";
+  const msg=window.VilleCheckoutCaptcha?.message(e.message)||{charge_expired:"O prazo desta cobrança expirou.",payment_provider_not_ready:"O pagamento ainda não está disponível.",invalid_installments:"Escolha um parcelamento válido.",installment_quote_required:"Consulte as parcelas no PagBank antes de pagar.",installment_quote_changed:"O valor das parcelas mudou. Consulte novamente antes de pagar.",invalid_test_card:"Confira os dados do cartão de teste."}[e.message]||"Não foi possível iniciar o pagamento.";
   $("#post-payment-message").textContent=msg;btn.disabled=false;
  }
 }

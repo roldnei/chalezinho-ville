@@ -23,7 +23,8 @@ const nightly=c=>Math.round(Number(c||0)/stayNights());
 async function api(action,body=null){
  const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development"};
  if(state.session?.access_token) headers.Authorization="Bearer "+state.session.access_token;
- const r=await fetch(ENGINE+"?action="+encodeURIComponent(action),{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});
+ const endpoint=(action==="config"||action==="start_payment")&&C.checkoutPaymentEngine||ENGINE;
+ const r=await fetch(endpoint+"?action="+encodeURIComponent(action),{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});
  const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
  if(!r.ok||!d.ok) throw Object.assign(new Error(d.error||"request_failed"),{status:r.status,data:d});
  return d;
@@ -578,8 +579,11 @@ async function performStartPayment(choice){
   }
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#accept-all")?.checked)throw new Error("guarantee_consent_required");
+  const recaptcha_token=C.checkoutPaymentEngine
+   ?await window.VilleCheckoutCaptcha.token(state.config.checkout_recaptcha,"checkout_payment")
+   :undefined;
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{access_session_id:accessSessionId(),villegram_attribution:window.VillegramSignals?.attribution(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  const d=await api("start_payment",{access_session_id:accessSessionId(),villegram_attribution:window.VillegramSignals?.attribution(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,recaptcha_token,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
   const attribution=window.VillegramSignals?.attribution();if(attribution&&d.reservation_id){try{sessionStorage.setItem('villegram-pending-reservation',JSON.stringify({reservation_id:d.reservation_id,attribution,at:Date.now()}))}catch{}flushVillegramAttribution();}
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
@@ -591,6 +595,8 @@ async function performStartPayment(choice){
    showStep(6);setFlowError("A cobrança pode ter sido criada. Consultando o PagBank; não inicie outra reserva agora.");return;
   }
   if(e.message==="policy_version_changed"){try{const current=await api("legal_documents");state.config.required_booking_documents=current.documents;renderSummary()}catch{}setFlowError("Os documentos foram atualizados. Leia e aceite a nova versão antes de pagar.");return}
+  const captchaMessage=window.VilleCheckoutCaptcha?.message(e.message);
+  if(captchaMessage){setFlowError(captchaMessage);return}
   setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":["dates_unavailable","occupied"].includes(e.message)?"Essas datas acabaram de ficar indisponíveis. Volte e escolha outro chalé ou período.":e.message==="guarantee_consent_required"?"O aceite da garantia e da renovação automática é obrigatório para reservar.":e.message==="policy_acceptance_required"?"Aceite os termos e a política de cancelamento antes de pagar.":e.message==="booking_terms_unavailable"?"Os termos da reserva estão indisponíveis. Tente novamente mais tarde.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
