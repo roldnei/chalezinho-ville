@@ -57,12 +57,14 @@ test('browser loads the SDK once and obtains a fresh token for each payment atte
   w.eval(await readFile(new URL('../checkout-recaptcha.js',import.meta.url),'utf8'));
   await assert.rejects(w.VilleCheckoutCaptcha.token(null,action),/checkout_captcha_unavailable/);
   assert.equal(w.document.scripts.length,0);
-  let calls=0;
-  w.grecaptcha={enterprise:{ready:fn=>fn(),execute:async(key,options)=>[key,options.action,++calls].join(':')}};
+  let calls=0, ready;
+  w.grecaptcha={enterprise:{ready:fn=>{ready=fn}}};
   const first=w.VilleCheckoutCaptcha.token({site_key:env.RECAPTCHA_SITE_KEY},action);
   assert.equal(w.document.scripts.length,1);
   assert.match(w.document.scripts[0].src,/^https:\/\/www\.google\.com\/recaptcha\/enterprise\.js\?render=/);
   w.document.scripts[0].dispatchEvent(new w.Event('load'));
+  w.grecaptcha.enterprise.execute=async(key,options)=>[key,options.action,++calls].join(':');
+  ready();
   assert.equal(await first,env.RECAPTCHA_SITE_KEY+':checkout_payment:1');
   assert.equal(await w.VilleCheckoutCaptcha.token({site_key:env.RECAPTCHA_SITE_KEY},'post_booking_payment'),env.RECAPTCHA_SITE_KEY+':post_booking_payment:2');
   assert.equal(w.document.scripts.length,1);

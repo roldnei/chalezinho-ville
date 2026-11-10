@@ -18,11 +18,28 @@ export function validPagBankCustomerName(value: unknown): value is string {
     !/[!@#$%¨*()"”\\|{}\[\]<>;]/.test(value);
 }
 
+export function validDebitAuthentication(id: unknown, encrypted: unknown) {
+  return typeof id === "string" && /^3DS_[a-f0-9-]{36}$/i.test(id) &&
+    typeof encrypted === "string" && encrypted.length >= 20 && encrypted.length <= 10000;
+}
+
+export async function createPagBankSandbox3DSSession(token: string, fetcher: typeof fetch = fetch) {
+  const response = await fetcher("https://sandbox.sdk.pagseguro.com/checkout-sdk/sessions", {
+    method: "POST", headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    signal: AbortSignal.timeout(10000),
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || typeof body?.session !== "string" || !body.session)
+    throw new Error("pagbank_3ds_session_unavailable");
+  return body.session as string;
+}
+
 export function pagBankOrder(input: {
   referenceId: string;
   amountCents: number;
   customer: PagBankCustomer;
-  method: "pix" | "card";
+  method: "pix" | "card" | "debit";
+  authenticationId?: string;
   expiresAt?: Date;
   encryptedCard?: string;
   cardToken?: string;
@@ -45,6 +62,12 @@ export function pagBankOrder(input: {
     if (!input.expiresAt || !Number.isFinite(input.expiresAt.getTime()) || input.expiresAt.getTime() <= Date.now())
       throw new Error("invalid_pix_expiry");
     paymentMethod = { type: "PIX", pix: { expiration_date: input.expiresAt.toISOString() } };
+  } else if (method === "debit") {
+    if (!validDebitAuthentication(input.authenticationId, input.encryptedCard) || input.installments !== 1 ||
+        input.storeCard || input.cardToken || input.preAuthorize) throw new Error("invalid_debit_data");
+    paymentMethod = { type: "DEBIT_CARD", installments: 1, capture: true,
+      card: { encrypted: input.encryptedCard, store: false, holder: { name: customer.name, tax_id: customer.taxId } },
+      authentication_method: { type: "THREEDS", id: input.authenticationId } };
   } else {
     if (Boolean(input.encryptedCard) === Boolean(input.cardToken) || !Number.isInteger(input.installments) || input.installments! < 1 || input.installments! > 24)
       throw new Error("invalid_card_data");
@@ -136,7 +159,7 @@ export async function createPagBankOrder(environment: PagBankEnvironment, token:
     throw new Error("pagbank_order_response_invalid");
   return { orderId: body.id as string, chargeId: charge.id as string,
     cardToken: charge.payment_method?.card?.id as string | undefined,
-    status: charge.status as string, pixCode: charge.qr_code?.text as string | undefined,
+    httpStatus: response.status, status: charge.status as string, pixCode: charge.qr_code?.text as string | undefined,
     qrImageUrl: charge.links?.find((link: {rel:string}) => link.rel === "QRCODE.PNG")?.href as string | undefined };
 }
 
@@ -169,6 +192,9 @@ function normalizeCharge(raw: any) {
   const summary=raw?.amount?.summary;
   return {id:raw?.id as string,status:raw?.status as string,
     referenceId:raw?.reference_id as string|undefined,
+    paymentType:raw?.payment_method?.type as string|undefined,
+    authenticationStatus:raw?.payment_method?.authentication_method?.status as string|undefined,
+    paidAt:raw?.paid_at as string|undefined,
     declineCode:typeof raw?.payment_response?.code==='string'&&/^\d{1,5}$/.test(raw.payment_response.code)?raw.payment_response.code:undefined,
     amount:{value:raw?.amount?.value as number,currency:raw?.amount?.currency as string},
       captureBefore:raw?.payment_method?.capture_before as string|undefined,
@@ -258,7 +284,7 @@ export async function getPagBankOrderCharge(token:string, orderId:string, charge
   const data=await response.json();
   const charge=data?.charges?.find((entry:{id:string})=>entry.id===chargeId);
   if(!charge) throw new Error("pagbank_order_charge_missing");
-  return {...normalizeCharge(charge),httpStatus:response.status};
+  return {...normalizeCharge(charge),orderId:data.id as string|undefined,orderReferenceId:data.reference_id as string|undefined,httpStatus:response.status};
 }
 
 export async function getPagBankCardPublicKey(token: string, fetcher: typeof fetch = fetch) {
