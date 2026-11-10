@@ -19,10 +19,12 @@
         script.onerror = fail;
         script.onload = () => {
           const enterprise = window.grecaptcha?.enterprise;
-          if (!enterprise?.ready || !enterprise?.execute) return fail();
+          if (!enterprise?.ready) return fail();
           enterprise.ready(() => {
+            const readyEnterprise = window.grecaptcha?.enterprise;
+            if (!readyEnterprise?.execute) return fail();
             clearTimeout(timer);
-            resolve(enterprise);
+            resolve(readyEnterprise);
           });
         };
         document.head.appendChild(script);
