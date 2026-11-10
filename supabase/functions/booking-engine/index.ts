@@ -30,7 +30,8 @@ import {guaranteeCoverage} from "../_shared/finance/guarantee-lifecycle.ts";
 import {guaranteeState} from "../_shared/finance/model.ts";
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { getPagBankCardPublicKey, pagBankInstallmentPlans, tokenizePagBankCard, validPagBankCustomerName } from "./pagbank.ts";
+import { debitDevProject, debitPreviewOrigin, debitPreviewFunction, isDebitPreview, debitQuoteEligible, reconcileDebitOrder } from "./debit.ts";
+import { createPagBankSandbox3DSSession, validDebitAuthentication, getPagBankCardPublicKey, pagBankInstallmentPlans, tokenizePagBankCard, validPagBankCustomerName } from "./pagbank.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -675,8 +676,63 @@ async function applyUpsell(body:any,development:boolean){
 
 const captchaSettings = () => checkoutCaptchaSettings(name => Deno.env.get(name));
 async function checkoutCaptchaError(req:Request,body:any,action:CheckoutCaptchaAction){
-  const error=await verifyCheckoutCaptcha(captchaSettings(),req.headers.get("origin"),body?.recaptcha_token,action);
+  const origin=req.headers.get("origin");
+  const settings=captchaSettings();
+  if(settings&&isDebitPreview(projectUrl,req.url,origin)) settings.hosts.push(new URL(debitPreviewOrigin).hostname);
+  const error=await verifyCheckoutCaptcha(settings,origin,body?.recaptcha_token,action);
   return error?json({ok:false,error},error==="checkout_captcha_unavailable"?503:403):null;
+}
+
+async function debitSession(req:Request,body:any,development:boolean){
+  if(!development||!isDebitPreview(projectUrl,req.url,req.headers.get("origin")))
+    return json({ok:false,error:"not_allowed"},403);
+  const user=await currentUser(req);
+  if(!user)return json({ok:false,error:"authentication_required"},401);
+  const captchaError=await checkoutCaptchaError(req,body,"checkout_payment");
+  if(captchaError)return captchaError;
+  const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+  if(!token)return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
+  const [settings,identity,quote]=await Promise.all([
+    admin.from("payment_settings").select("active_provider,card_enabled").eq("id",1).single(),
+    admin.rpc("guest_payment_identity",{p_user_id:user.id}),
+    admin.from("quote_options")
+      .select("total_amount_cents,accommodation_amount_cents,cleaning_fee_cents,contract_snapshot,quotes(status,expires_at,pricing_snapshot,properties(guarantee_amount_cents))")
+      .eq("id",body.quote_option_id).eq("quote_id",body.quote_id).single(),
+  ]);
+  try{assertPaymentMethod(settings.data,"card")}
+  catch(e){return json({ok:false,error:(e as Error).message},409)}
+  const document=Array.isArray(identity.data)?identity.data[0]:identity.data;
+  if(identity.error||document?.document_type!=="cpf")return json({ok:false,error:"pagbank_cpf_required"},400);
+  const parent=quote.data?.quotes as any;
+  if(!parent||parent.status!=="active"||Date.parse(parent.expires_at)<=Date.now())
+    return json({ok:false,error:"quote_expired"},409);
+  if(!debitQuoteEligible(quote.data,parent.properties))return json({ok:false,error:"debit_unavailable"},409);
+  try{
+    const [session,public_key]=await Promise.all([
+      createPagBankSandbox3DSSession(token),getPagBankCardPublicKey(token),
+    ]);
+    return json({ok:true,session,public_key,amount_cents:quote.data!.total_amount_cents});
+  }catch{return json({ok:false,error:"pagbank_3ds_session_unavailable"},503)}
+}
+
+async function debitNotification(req:Request,body:any){
+  if(projectUrl!==debitDevProject||new URL(req.url).pathname.split("/").at(-1)!==debitPreviewFunction)
+    return json({ok:false,error:"not_allowed"},403);
+  if(req.method!=="POST")return json({ok:false,error:"method_not_allowed"},405);
+  const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
+  const orderId=String(body?.id||"");
+  const chargeId=String(body?.charges?.[0]?.id||"");
+  const ref=String(body?.reference_id||"").match(/^([a-f0-9]{8})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{4})([a-f0-9]{12})$/);
+  if(!ref||!/^ORDE_[a-z0-9-]+$/i.test(orderId)||!/^CHAR_[a-z0-9-]+$/i.test(chargeId))
+    return json({ok:false,error:"invalid_notification"},400);
+  const {data:payment,error}=await admin.from("payments").select("id,amount_cents,metadata,provider_payment_id,status")
+    .eq("id",ref.slice(1).join("-")).eq("method","debit").eq("provider","pagbank_sandbox").maybeSingle();
+  if(error)return json({ok:false,error:"debit_reconciliation_pending"},503);
+  if(!payment)return json({ok:false,error:"payment_not_found"},404);
+  if(payment.provider_payment_id&&payment.status!=="awaiting_payment")return json({ok:true});
+  // The notification is only a hint. The authenticated Order GET verifies the payment.
+  try{await reconcileDebitOrder(admin,token,payment,orderId,chargeId);return json({ok:true})}
+  catch{return json({ok:false,error:"debit_reconciliation_pending"},503)}
 }
 
 async function startPayment(req:Request,body:any,development:boolean){
@@ -690,10 +746,23 @@ async function startPayment(req:Request,body:any,development:boolean){
   if(body?.provider && body.provider!=="pagbank_sandbox") return json({ok:false,error:"invalid_provider"},400);
   if(sandbox && !sandboxToken) return json({ok:false,error:"pagbank_sandbox_not_configured"},503);
   if(body?.provider==="pagbank_sandbox" && !development) return json({ok:false,error:"not_allowed"},403);
-  if(!["pix","card"].includes(method)) return json({ok:false,error:"invalid_method"},400);
+  if(!["pix","card","debit"].includes(method)) return json({ok:false,error:"invalid_method"},400);
+  const debit=method==="debit";
+  if(debit&&!isDebitPreview(projectUrl,req.url,req.headers.get("origin")))return json({ok:false,error:"not_allowed"},403);
   if(!quote_id||!quote_option_id||!guest_name||!guest_email||!guest_phone) return json({ok:false,error:"missing_data"},400);
   const captchaError=await checkoutCaptchaError(req,body,"checkout_payment");
   if(captchaError)return captchaError;
+  if(debit){
+    const {data:existing,error}=await admin.from("reservations")
+      .select("id,confirmation_code,hold_expires_at,payments(id,method,provider,amount_cents,status)")
+      .eq("quote_id",quote_id).eq("quote_option_id",quote_option_id).eq("user_id",user.id).maybeSingle();
+    if(error)return json({ok:false,error:"payment_lookup_unavailable"},503);
+    const payment=(existing?.payments as any[])?.find(p=>p.method==="debit"&&p.provider==="pagbank_sandbox");
+    if(payment)return json({ok:true,reservation_id:existing!.id,confirmation_code:existing!.confirmation_code,
+      hold_expires_at:existing!.hold_expires_at,payment});
+    if(Number(installments)!==1||!validDebitAuthentication(body.authentication_id,body.encrypted_card))
+      return json({ok:false,error:"invalid_debit_data"},400);
+  }
   const {data:identityPresent,error:identityError}=await admin.rpc("guest_identity_present",{p_user_id:user.id});
   if(identityError) return json({ok:false,error:"identity_check_unavailable"},500);
   if(!identityPresent) return json({ok:false,error:"identity_required"},403);
@@ -712,12 +781,12 @@ async function startPayment(req:Request,body:any,development:boolean){
   }
 
   const {data:settings}=await admin.from("payment_settings").select("*").eq("id",1).single();
-  try{assertPaymentMethod(settings,method)}catch(e){return json({ok:false,error:(e as Error).message},409)}
+  try{assertPaymentMethod(settings,debit?"card":method)}catch(e){return json({ok:false,error:(e as Error).message},409)}
   if(method==="card"&&(!Number.isInteger(Number(installments))||Number(installments)<1||Number(installments)>12))
     return json({ok:false,error:"invalid_installments"},400);
 
   const {data:option,error:optionError}=await admin.from("quote_options")
-    .select("id,quote_id,cancellation_policy_id,total_amount_cents,contract_snapshot,rate_plans(code),quotes(property_id,pricing_snapshot)")
+    .select("id,quote_id,cancellation_policy_id,total_amount_cents,accommodation_amount_cents,cleaning_fee_cents,contract_snapshot,rate_plans(code),quotes(property_id,pricing_snapshot)")
     .eq("id",quote_option_id).eq("quote_id",quote_id).single();
   if(optionError||!option) return json({ok:false,error:"invalid_quote_option"},400);
   if((option.quotes as any)?.pricing_snapshot?.modification_only)return json({ok:false,error:"modification_quote_not_payable"},409);
@@ -727,6 +796,8 @@ async function startPayment(req:Request,body:any,development:boolean){
     .eq("id",(option.quotes as any)?.property_id).single();
   if(!property)return json({ok:false,error:"property_unavailable"},503);
   const needsGuarantee=Number(property.guarantee_amount_cents)>0;
+  if(debit&&(!debitQuoteEligible(option,property)||body.quoted_total_cents!==option.total_amount_cents))
+    return json({ok:false,error:"debit_unavailable"},409);
   if(needsGuarantee&&(typeof body?.encrypted_card!=="string"||
      body.encrypted_card.length<20||body.encrypted_card.length>10000))
     return json({ok:false,error:"guarantee_card_required"},400);
@@ -838,8 +909,8 @@ async function startPayment(req:Request,body:any,development:boolean){
   const paymentIdempotency=(sandbox?"pagbank-sandbox-":"mock-")+reservationId;
   const {data:payment,error:payErr}=await admin.from("payments").insert({
     reservation_id:reservationId,user_id:user.id,provider:sandbox?"pagbank_sandbox":"mock",
-    method:method==="pix"?"pix":method==="card"?"card":"mock",
-    installments:method==="card"?Number(installments):null,
+    method,
+    installments:method==="card"||debit?Number(installments):null,
     amount_cents:chargedAmount,
     status:"awaiting_payment",idempotency_key:paymentIdempotency,
     metadata:{development:true,environment:sandbox?"sandbox":"mock",
@@ -870,14 +941,27 @@ async function startPayment(req:Request,body:any,development:boolean){
       order={referenceId:payment.id.replace(/-/g,""),amountCents:chargedAmount,
         customer:{name:guest_name,email:guest_email,taxId:sandboxIdentity.document_number,
           phone:{area:phone.slice(0,2),number:phone.slice(2)}},method,
-        expiresAt:expiry,encryptedCard:method==="card"?body?.encrypted_card:undefined,
+        expiresAt:expiry,encryptedCard:method==="card"||debit?body?.encrypted_card:undefined,
+        authenticationId:debit?body.authentication_id:undefined,
         storeCard:needsGuarantee&&method==="card",installments:Number(installments),
         buyerInterest:buyerInterest?{total:buyerInterest,installments:Number(selectedPlan.buyer_interest_installments)}:undefined,
-        notificationUrl:projectUrl+"/functions/v1/pagbank-webhook"};
+        notificationUrl:projectUrl+"/functions/v1/"+(debit?debitPreviewFunction+"?action=pagbank_debit_notification":"pagbank-webhook")};
       gateway.validatePayment(order);
     }catch{return json({ok:false,error:"pagbank_customer_invalid",payment_id:payment.id},400)}
     try{
-      const result=await (method==='pix'?gateway.createPix(order):gateway.createCardPayment(order));
+      const result=await (debit?gateway.createDebitPayment(order):method==="pix"?gateway.createPix(order):gateway.createCardPayment(order));
+      if(debit){
+        // Expose the charge ID to the generic reconciler only after verification.
+        const metadata={...payment.metadata,order_id:result.orderId,debit_charge_id:result.chargeId,
+          debit_creation:{http:result.httpStatus,status:result.status}};
+        const {error}=await admin.from("payments").update({metadata}).eq("id",payment.id)
+          .is("provider_payment_id",null);
+        if(error)throw error;
+        try{await reconcileDebitOrder(admin,sandboxToken,{...payment,metadata},result.orderId,result.chargeId)}
+        catch{console.error(JSON.stringify({event:"pagbank_debit_reconcile_deferred",payment_id:payment.id}))}
+        return json({ok:true,reservation_id:reservationId,confirmation_code:hold.confirmation_code,
+          hold_expires_at:hold.hold_expires_at,payment:{...payment,status:"processing"}});
+      }
       // Persist the provider IDs first. If vaulting fails after a successful
       // charge, status reconciliation can still find the payment safely.
       const {error:saveError}=await admin.from("payments").update({provider_payment_id:result.chargeId,
@@ -929,14 +1013,17 @@ async function sandboxPaymentStatus(req:Request,body:any,development:boolean){
   if(!user) return json({ok:false,error:"authentication_required"},401);
   const token=Deno.env.get("PAGBANK_SANDBOX_TOKEN")||"";
   let paymentQuery=admin.from("payments")
-    .select("id,user_id,provider,provider_payment_id,status,metadata,amount_cents,reservations(status)")
+    .select("id,user_id,provider,provider_payment_id,status,metadata,amount_cents,method,reservations(status)")
     .eq("user_id",user.id).eq("provider","pagbank_sandbox");
   if(body?.payment_id) paymentQuery=paymentQuery.eq("id",String(body.payment_id));
   else paymentQuery=paymentQuery.gte("created_at",new Date(Date.now()-86400000).toISOString()).order("created_at",{ascending:false}).limit(1);
   const {data:rows}=await paymentQuery.limit(1);
   const p=rows?.[0];
   if(!p||p.user_id!==user.id||p.provider!=="pagbank_sandbox") return json({ok:false,error:"not_found"},404);
-  if(p.provider_payment_id && token) {
+  if(p.method==="debit"&&token&&p.status==="awaiting_payment"&&p.metadata?.order_id&&p.metadata?.debit_charge_id){
+    try{await reconcileDebitOrder(admin,token,p,p.metadata.order_id,p.metadata.debit_charge_id)}
+    catch{console.error(JSON.stringify({event:"pagbank_debit_reconcile_deferred",payment_id:p.id}))}
+  }else if(p.method!=="debit"&&p.provider_payment_id && token) {
     try { await reconcileSandboxCharge(p.id,p.provider_payment_id,token,p.metadata?.order_id,p.metadata?.kind==="post_booking_charge"); }
     catch { console.error(JSON.stringify({event:"pagbank_sandbox_status_deferred",payment_id:p.id})); }
   }
@@ -946,6 +1033,7 @@ async function sandboxPaymentStatus(req:Request,body:any,development:boolean){
     :{data:null};
   return json({ok:true,payment_id:p.id,amount_cents:p.amount_cents,payment_status:latest?.status||p.status,
     charge_status:postCharge?.status||null,
+    ...(p.method==="debit"?{method:p.method}:{}),
     reservation_status:(latest?.reservations as any)?.status||null,
     manual_review:latest?.metadata?.manual_review||null});
 }
@@ -2227,6 +2315,7 @@ Deno.serve(async(req)=>{
       if(!launchAdminOperationAllowed(action,body))return json({ok:false,error:'public_checkout_disabled'},403);
     }
     if(target==='development'){try{assertFinanceDevelopment(projectUrl,Deno.env.get('FINANCE_ENVIRONMENT'))}catch{return json({ok:false,error:'isolated_finance_environment_required'},503)}}
+    if(action==="pagbank_debit_notification")return await debitNotification(req,body);
     if(action==="calendar_export"){
       if(req.method!=="GET")return json({ok:false,error:"method_not_allowed"},405);
       return await calendars.exportFeed(url.searchParams.get("token")||"");
@@ -2239,6 +2328,7 @@ Deno.serve(async(req)=>{
        origin==="https://chalezinho-ville-git-fix-reservation-f-9818b3-roldneicosta-4140.vercel.app" ||
         origin==="https://chalezinho-ville-git-ux-pms-e2e-issue-14-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-dev-recaptcha-roldneicosta-4140.vercel.app" ||
+       origin===debitPreviewOrigin ||
        origin==="https://chalezinho-ville-git-feature-guest-directory-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-git-integracao-pagbank-roldneicosta-4140.vercel.app" ||
        origin==="https://chalezinho-ville-8q4qwux69-roldneicosta-4140.vercel.app" ||
@@ -2293,6 +2383,8 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
         purposes:consultation?[]:purposesQ.data||[],
         payment_settings:settingsQ.data||{},
         checkout_recaptcha:development&&!consultation?{site_key:captchaSettings()?.siteKey||null}:null,
+        debit_enabled:development&&!consultation&&isDebitPreview(projectUrl,req.url,req.headers.get("origin"))&&
+          (settingsQ.data as any)?.active_provider==="pagbank_sandbox"&&(settingsQ.data as any)?.card_enabled===true,
         policy_documents:docsQ.data||[],
         required_booking_documents:bookingDocuments(docsQ.data||[],development),
         experience_products:consultation?[]:target==='production'?(productsQ.data||[]).filter(commercialItem):productsQ.data||[],stay_offers:(consultation?lodgingLaunchCatalog(await stayOffers.catalog()):await stayOffers.catalog()).offers,
@@ -2379,6 +2471,7 @@ const {data:paymentIdentity,error:paymentIdentityError}=await admin.rpc("guest_p
     }
     if(action==="upsell_preview") return await upsellPreview(body);
     if(action==="apply_upsell") return await applyUpsell(body,development);
+    if(action==="pagbank_debit_session")return await debitSession(req,body,development);
     if(action==="pagbank_sandbox_card_key"){
       if(!development) return json({ok:false,error:"not_allowed"},403);
       if(!await currentUser(req)) return json({ok:false,error:"authentication_required"},401);

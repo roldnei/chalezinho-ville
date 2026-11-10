@@ -1,5 +1,5 @@
 (()=>{
-const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENGINE=C.environment==="development"?C.supabaseUrl+"/functions/v1/booking-engine":C.bookingEngine;
+const C=window.CHALEZINHO_CONFIG,sb=window.supabase.createClient(C.supabaseUrl,C.supabaseKey,C.authOptions),ENGINE=C.environment==="development"&&!C.debitPreview?C.supabaseUrl+"/functions/v1/booking-engine":C.bookingEngine;
 const pagbankSandbox=C.environment==="development";
 const $=s=>document.querySelector(s),brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}),brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const nights=(a,b)=>Math.max(1,Math.round((Date.parse(b+"T12:00:00Z")-Date.parse(a+"T12:00:00Z"))/86400000));
@@ -271,7 +271,7 @@ function renderExperiencePaymentHistory(r){
     :p.status==="chargeback"?"Pagamento estornado pelo emissor"
     :"Pagamento aguardando confirmação";
    const tone=applied?"success":p.status==="refused"?"danger":["refunded","cancelled","expired"].includes(p.status)?"muted":"info";
-   const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":"Pagamento";
+   const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":p.method==="debit"?"Cartão de débito à vista":"Pagamento";
    return {date:p.created_at||c.created_at,html:'<div class="experience-payment-event '+tone+'"><strong>'+esc(label)+'</strong><span>'+esc(c.description||"Experiência")+' · '+brlC(p.amount_cents||c.amount_cents)+'</span><small>'+esc(method)+' · '+fmtDateTime(p.created_at||c.created_at)+'</small></div>'};
   });
  }).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
@@ -284,7 +284,7 @@ function renderModificationPaymentHistory(r){
   .map(p=>{
    const applied=c.status==="applied"&&p.status==="paid";
    const label=applied?"Pagamento aprovado · alteração aplicada":p.status==="refused"?"Pagamento recusado · alteração não aplicada":p.status==="under_review"?"Pagamento em análise · aguarde":"Pagamento aguardando confirmação";
-   const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":"Pagamento";
+   const method=p.method==="card"?"Cartão · "+(p.installments||1)+"x":p.method==="pix"?"Pix":p.method==="debit"?"Cartão de débito à vista":"Pagamento";
    return {date:p.created_at||c.created_at,html:'<div class="experience-payment-event '+(applied?"success":p.status==="refused"?"danger":"info")+'"><strong>'+esc(label)+'</strong><span>'+esc(c.description||"Alteração de reserva")+' · '+brlC(p.amount_cents||c.amount_cents)+'</span><small>'+esc(method)+' · '+fmtDateTime(p.created_at||c.created_at)+'</small></div>'};
   })).sort((a,b)=>Date.parse(b.date||0)-Date.parse(a.date||0));
  return entries.length?'<section class="experience-payment-history" aria-label="Pagamentos das alterações"><h4>Pagamentos das alterações</h4>'+entries.map(e=>e.html).join("")+'</section>':"";
@@ -330,7 +330,7 @@ function renderReservations(reservations){
   const reservationActions='<div class="reservation-actions">'+experienceAction+modificationAction+policyAction+'</div>';
   const period=r.check_in.split("-").reverse().join("/")+' → '+r.check_out.split("-").reverse().join("/");
   const paymentBadge=paymentUx?'<span class="payment-status-badge '+paymentUx.tone+'">'+esc(paymentUx.label)+'</span>':'';
-  const paymentPanel=paymentUx?'<div class="reservation-payment-state '+paymentUx.tone+'"><small>STATUS DO PAGAMENTO</small><strong>'+esc(paymentUx.label)+'</strong><p>'+esc(paymentUx.detail)+'</p>'+(payment.method?'<span>'+(payment.method==="pix"?'Pix':payment.method==="card"?'Cartão'+(payment.installments?' · '+payment.installments+'x':''):'Pagamento de teste')+'</span>':'')+'</div>':'';
+  const paymentPanel=paymentUx?'<div class="reservation-payment-state '+paymentUx.tone+'"><small>STATUS DO PAGAMENTO</small><strong>'+esc(paymentUx.label)+'</strong><p>'+esc(paymentUx.detail)+'</p>'+(payment.method?'<span>'+(payment.method==="pix"?'Pix':payment.method==="card"?'Cartão'+(payment.installments?' · '+payment.installments+'x':''):payment.method==='debit'?'Cartão de débito à vista':'Pagamento de teste')+'</span>':'')+'</div>':'';
   const experiencePaymentHistory=renderExperiencePaymentHistory(r);
   const modificationPaymentHistory=renderModificationPaymentHistory(r);
   art.innerHTML='<summary class="reservation-summary"><div class="reservation-summary-copy"><strong>'+esc(r.properties?.name||"Reserva")+'</strong><span>Reserva em '+fmtDate(r.created_at)+' · Estadia '+period+'</span></div><span class="reservation-badge-stack"><span class="reservation-status-badge '+ux.tone+'">'+ux.label+'</span>'+paymentBadge+'</span><span class="reservation-summary-arrow">⌄</span></summary><div class="reservation-detail-grid"><img src="'+(r.properties?.cover_image||"assets/hero-signature.webp")+'" alt=""><div class="reservation-detail-copy"><small>RESERVA · '+ux.label.toUpperCase()+'</small><h3>'+esc(r.properties?.name||"Reserva")+'</h3><p>'+period+' · '+r.guests+' hóspedes</p>'+paymentPanel+(r.contract_snapshot?'<details class="contract-history"><summary>Contratação original · '+esc(r.contract_snapshot.offer_name||"Somente hospedagem")+(r.contract_snapshot.discount_cents?' · desconto de '+brlC(r.contract_snapshot.discount_cents):'')+'</summary>'+window.VilleOffers.contractMarkup(r.contract_snapshot)+'</details>':'')+'<div class="reservation-breakdown"><div class="reservation-breakdown-row"><span>'+initialLodgingLabel+initialLodgingDetails+'</span><strong>'+brl(lodging)+'</strong></div>'+expRows+revisionRow+buyerFeeRow+'<div class="reservation-breakdown-total"><span>VALOR TOTAL DA RESERVA</span><strong>'+brl(r.total_amount)+'</strong></div></div>'+(expItems.some(i=>i.composition_snapshot)?window.VilleOffers.contractMarkup({offer_name:'Experiências desta reserva',experiences:expItems.filter(i=>i.composition_snapshot).map(i=>i.composition_snapshot)}):'')+experiencePaymentHistory+modificationPaymentHistory+'<span>Código '+(r.confirmation_code||"—")+'</span>'+renderGuarantee(guarantee,r)+pendingCharges+reservationActions+(active?renderModification(active):"")+(history.length?'<details class="mod-history"><summary>Histórico de alterações</summary>'+history.map(renderModification).join("")+'</details>':'')+'</div></div>';

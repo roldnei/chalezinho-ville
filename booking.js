@@ -24,7 +24,7 @@ const nightly=c=>Math.round(Number(c||0)/stayNights());
 async function api(action,body=null){
  const headers={"Content-Type":"application/json","X-Chalezinho-Env":"development"};
  if(state.session?.access_token) headers.Authorization="Bearer "+state.session.access_token;
- const endpoint=(action==="config"||action==="start_payment")&&C.checkoutPaymentEngine||ENGINE;
+ const endpoint=["config","start_payment","pagbank_debit_session"].includes(action)&&C.checkoutPaymentEngine||ENGINE;
  const r=await fetch(endpoint+"?action="+encodeURIComponent(action),{method:body?"POST":"GET",headers,body:body?JSON.stringify({action,...body}):undefined});
  const d=await r.json().catch(()=>({ok:false,error:"invalid_response"}));
  if(!r.ok||!d.ok) throw Object.assign(new Error(d.error||"request_failed"),{status:r.status,data:d});
@@ -532,14 +532,23 @@ function renderSummary(){
  pay.innerHTML='<label><input type="radio" name="pay-method" value="pix" checked> PIX · expira em '+state.config.payment_settings.pix_expiration_minutes+' min</label><label><input type="radio" name="pay-method" value="card"> Cartão · até '+free+'x sem juros; até '+max+'x com juros após '+free+'x</label><label id="installment-field">Parcelamento<select id="installments" aria-label="Parcelas no cartão"><option value="">Consultando parcelas…</option></select></label><p id="installment-total" role="status">Total no Pix e cartão sem juros: '+brlC(total)+'.</p><p id="installment-warning" role="status"></p><p class="dev-note">Ambiente de teste: nenhum PIX ou cartão real será criado.</p>';
  if(pagbankSandbox){
   const enabled=state.config.payment_settings;
+  const snapshot=state.rate.contract_snapshot;
+  if(state.config.debit_enabled&&!guarantee&&total>=100&&snapshot&&
+      !snapshot.offer_id&&!snapshot.experiences?.length&&!state.approvedRequest){
+   pay.querySelector("#installment-field").insertAdjacentHTML("beforebegin",
+    '<label><input type="radio" name="pay-method" value="debit"> Cartão de débito · à vista</label>');
+  }
   const methods=[...pay.querySelectorAll('input[name="pay-method"]')];
-  methods.forEach(r=>{r.disabled=enabled.active_provider!=="pagbank_sandbox"||enabled[r.value+"_enabled"]!==true;r.checked=false;});
+  methods.forEach(r=>{r.disabled=enabled.active_provider!=="pagbank_sandbox"||enabled[(r.value==="debit"?"card":r.value)+"_enabled"]!==true;r.checked=false;});
   const first=methods.find(r=>!r.disabled);if(first)first.checked=true;
   else $("#installment-warning").textContent="Pagamentos temporariamente indisponíveis.";
   pay.querySelector(".dev-note").textContent="PagBank sandbox: use somente cartões de teste. Nenhuma cobrança real será feita.";
   const card=document.createElement("div");card.id="sandbox-card-fields";card.hidden=!guarantee;
   card.innerHTML='<label>Nome no cartão<input id="card-holder" autocomplete="cc-name"></label><label>Número do cartão<input id="card-number" inputmode="numeric" autocomplete="cc-number"></label><div class="sandbox-card-row"><label>Mês<input id="card-month" inputmode="numeric" maxlength="2" autocomplete="cc-exp-month"></label><label>Ano<input id="card-year" inputmode="numeric" maxlength="4" autocomplete="cc-exp-year"></label><label>CVV<input id="card-cvv" inputmode="numeric" autocomplete="cc-csc"></label></div>';
   pay.appendChild(card);
+  const billing=document.createElement("fieldset");billing.id="debit-billing";billing.hidden=true;
+  billing.innerHTML='<legend>Endereço de cobrança do cartão</legend><label>CEP<input id="debit-postal" autocomplete="billing postal-code" inputmode="numeric" maxlength="9"></label><label>Rua<input id="debit-street" autocomplete="billing address-line1" maxlength="100"></label><div class="sandbox-card-row"><label>Número<input id="debit-number" maxlength="20"></label><label>Cidade<input id="debit-city" autocomplete="billing address-level2" maxlength="80"></label><label>UF<input id="debit-region" autocomplete="billing address-level1" maxlength="2"></label></div>';
+  pay.appendChild(billing);
   const optionId=state.rate.quote_option_id;
   const refreshPlans=async()=>{
     const previousInstallments=$("#installments").value;
@@ -559,7 +568,11 @@ function renderSummary(){
     }catch{$("#installment-total").textContent="Parcelas indisponíveis. Tente consultar novamente.";}
   };
   $("#installments").addEventListener("change",()=>{
-    if(paymentChoice().method!=="card"){$("#installment-total").textContent="Total no Pix: "+brlC(total)+".";return;}
+    const method=paymentChoice().method;
+    if(method!=="card"){
+      $("#installment-total").textContent=(method==="debit"?"Total no débito à vista: ":"Total no Pix: ")+brlC(total)+".";
+      return;
+    }
     const plan=state.installmentQuote?.plans.find(p=>p.installments===Number($("#installments").value));
     $("#installment-total").textContent=plan?`${state.installmentQuote?.indicative?"Estimativa; informe o cartão para confirmar":"Total a cobrar"}: ${brlC(plan.total_cents)}. ${plan.interest_free?"Sem juros.":"Juros: "+brlC(plan.buyer_interest_cents)+"."} Condição válida até ${new Date(state.installmentQuote.expires_at).toLocaleTimeString("pt-BR")}.`:"Escolha uma opção de parcelamento disponível para este cartão.";
   });
@@ -570,10 +583,17 @@ function renderSummary(){
    const bin=$("#card-number").value.replace(/\D/g,"").slice(0,6);
    if(bin===previousBin)return;previousBin=bin;state.installmentQuote=null;
    $("#installments").disabled=true;clearTimeout(binTimer);
-   if(bin.length===6)binTimer=setTimeout(refreshPlans,300);
+   if(bin.length===6&&paymentChoice().method!=="debit")binTimer=setTimeout(refreshPlans,300);
   });
-  const updateMethod=()=>{const isCard=paymentChoice().method==="card";
-    card.hidden=(state.fastCheckout&&!state.session)||(!guarantee&&!isCard);$("#installment-field").hidden=!isCard;retryPlans.hidden=!isCard;
+  let previousMethod=paymentChoice().method;
+  const updateMethod=()=>{
+    const method=paymentChoice().method,isCard=method==="card",isDebit=method==="debit";
+    const needsRefresh=isCard&&previousMethod==="debit";
+    previousMethod=method;
+    card.hidden=(state.fastCheckout&&!state.session)||(!guarantee&&!isCard&&!isDebit);
+    billing.hidden=card.hidden||!isDebit;
+    $("#installment-field").hidden=!isCard;retryPlans.hidden=!isCard;
+    if(needsRefresh)refreshPlans();
     $("#installments").dispatchEvent(new Event("change"));};
   pay.querySelectorAll('input[name="pay-method"]').forEach(r=>r.addEventListener("change",updateMethod));updateMethod();
   const resume=document.createElement("button");resume.type="button";resume.className="text-action";
@@ -581,7 +601,7 @@ function renderSummary(){
   resume.onclick=async()=>{resume.disabled=true;
    try{const s=await api("pagbank_sandbox_status",{});
     state.activePayment={payment_id:s.payment_id,provider:"pagbank_sandbox",status:s.payment_status};
-    renderSandboxPayment({payment:{id:s.payment_id,amount_cents:s.amount_cents},confirmation_code:"Última cobrança de teste",receiptOnly:true});
+    renderSandboxPayment({payment:{id:s.payment_id,amount_cents:s.amount_cents,method:s.method},confirmation_code:"Última cobrança de teste",receiptOnly:true});
     showStep(6);setFlowError("");
    }catch(e){setFlowError(e.message==="not_found"?"Nenhuma cobrança de teste recente foi encontrada.":"Não foi possível consultar a cobrança agora.");}
    finally{resume.disabled=false;}};
@@ -591,14 +611,60 @@ function loadPagBankSdk(){
  if(window.PagSeguro?.encryptCard)return Promise.resolve();
  return new Promise((resolve,reject)=>{const script=document.createElement("script");script.src="https://assets.pagseguro.com.br/checkout-sdk-js/rc/dist/browser/pagseguro.min.js";script.onload=resolve;script.onerror=()=>reject(new Error("card_sdk_unavailable"));document.head.appendChild(script)});
 }
-async function encryptSandboxCard(){
- const key=await api("pagbank_sandbox_card_key");await loadPagBankSdk();
- const card=window.PagSeguro.encryptCard({publicKey:key.public_key,holder:$("#card-holder").value.trim(),
+function encryptSandboxCardFields(publicKey){
+ const card=window.PagSeguro.encryptCard({publicKey,holder:$("#card-holder").value.trim(),
   number:$("#card-number").value.replace(/\D/g,""),expMonth:$("#card-month").value,
   expYear:$("#card-year").value,securityCode:$("#card-cvv").value});
  if(card.hasErrors||!card.encryptedCard)throw new Error("invalid_test_card");
- ["#card-number","#card-month","#card-year","#card-cvv"].forEach(id=>$(id).value="");
  return card.encryptedCard;
+}
+function clearSandboxCardFields(){
+ ["#card-number","#card-month","#card-year","#card-cvv"].forEach(id=>$(id).value="");
+}
+async function encryptSandboxCard(){
+ const key=await api("pagbank_sandbox_card_key");await loadPagBankSdk();
+ const encrypted=encryptSandboxCardFields(key.public_key);
+ clearSandboxCardFields();
+ return encrypted;
+}
+async function authenticateDebit(quoteId, optionId, total){
+ const field=id=>$("#debit-"+id).value.trim();
+ const billingAddress={street:field("street"),number:field("number"),city:field("city"),
+   regionCode:field("region").toUpperCase(),country:"BRA",postalCode:field("postal").replace(/\D/g,"")};
+ if(!billingAddress.street||!billingAddress.number||!billingAddress.city||
+    !/^[A-Z]{2}$/.test(billingAddress.regionCode)||!/^\d{8}$/.test(billingAddress.postalCode)){
+  $("#debit-postal").focus();
+  throw new Error("invalid_debit_billing");
+ }
+ const recaptcha_token=await window.VilleCheckoutCaptcha.token(state.config.checkout_recaptcha,"checkout_payment");
+ const {session,public_key,amount_cents}=await api("pagbank_debit_session",{
+   quote_id:quoteId,quote_option_id:optionId,recaptcha_token,
+ });
+ if(amount_cents!==total)throw new Error("debit_amount_changed");
+ await loadPagBankSdk();
+ const encryptedForAuthentication=encryptSandboxCardFields(public_key);
+ const encrypted_card=encryptSandboxCardFields(public_key);
+ clearSandboxCardFields();
+ const digits=$("#guest-phone").value.replace(/\D/g,"");
+ const phone=digits.startsWith("55")&&digits.length>=12?digits.slice(2):digits;
+ setFlowError("Conclua a autenticação de segurança do seu banco para pagar.");
+ let result,timer;
+ try{
+  await window.PagSeguro.setUp({session,env:"SANDBOX"});
+  result=await Promise.race([
+   window.PagSeguro.authenticate3DS({data:{
+    customer:{name:$("#guest-name").value.trim(),email:$("#guest-email").value.trim(),
+      phones:[{country:"55",area:phone.slice(0,2),number:phone.slice(2),type:"MOBILE"}]},
+    paymentMethod:{type:"DEBIT_CARD",installments:1,card:{encrypted:encryptedForAuthentication}},
+    amount:{value:amount_cents,currency:"BRL"},billingAddress,dataOnly:false,
+   }}),
+   new Promise((_,reject)=>{timer=setTimeout(reject,5*60*1000)}),
+  ]);
+ }catch{throw new Error("debit_auth_incomplete")}
+ finally{clearTimeout(timer)}
+ if(result?.status!=="AUTH_FLOW_COMPLETED"||result.authenticationStatus!=="AUTHENTICATED"||!result.id)
+   throw new Error("debit_auth_incomplete");
+ return {encrypted_card,authentication_id:result.id,quoted_total_cents:amount_cents};
 }
 function bookingConsentPayload(){
  const accepted=$('#accept-all')?.checked===true;
@@ -607,7 +673,7 @@ function bookingConsentPayload(){
 }
 async function performStartPayment(choice){
  if(state.fastCheckout&&!state.rateConfirmed){setFlowError('Escolha uma tarifa antes de pagar.');return}
- const method=choice?.method||"pix",installments=Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
+ const method=choice?.method||"pix",installments=method==="debit"?1:Number(choice?.installments||1);setFlowError("Protegendo temporariamente as datas para iniciar o pagamento…");
  track("payment_started",{property_id:state.property?.id||null,metadata:{method,installments,total_cents:Number(state.rate?.total_amount_cents||0)}});
  try{
   const credit_card_bin=method==="card"?$("#card-number").value.replace(/\D/g,"").slice(0,6):undefined;
@@ -622,9 +688,13 @@ async function performStartPayment(choice){
   }
   const hasGuarantee=Number(state.property?.guarantee_amount_cents||0)>0;
   if(hasGuarantee&&!$("#accept-all")?.checked)throw new Error("guarantee_consent_required");
+  const quoteId=state.quote.quote_id,optionId=state.rate.quote_option_id;
+  const debit=method==="debit"?await authenticateDebit(quoteId,optionId,Number(state.rate.total_amount_cents)):null;
+  if(debit&&(state.quote?.quote_id!==quoteId||state.rate?.quote_option_id!==optionId||
+    paymentChoice().method!=="debit"||!$("#accept-all")?.checked))throw new Error("debit_auth_incomplete");
   const recaptcha_token=await window.VilleCheckoutCaptcha.token(state.config.checkout_recaptcha,"checkout_payment");
   const encrypted_card=pagbankSandbox&&(method==="card"||hasGuarantee)?await encryptSandboxCard():undefined;
-  const d=await api("start_payment",{access_session_id:accessSessionId(),villegram_attribution:window.VillegramSignals?.attribution(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,recaptcha_token,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{})});
+  const d=await api("start_payment",{access_session_id:accessSessionId(),villegram_attribution:window.VillegramSignals?.attribution(),quote_id:state.quote.quote_id,quote_option_id:state.rate.quote_option_id,guest_name:$("#guest-name").value.trim(),guest_email:$("#guest-email").value.trim(),guest_phone:$("#guest-phone").value.trim(),guests:Number($("#book-guests").value),travel_purpose_code:$("#trip-purpose-initial").value,...bookingConsentPayload(),method,installments,credit_card_bin,recaptcha_token,installment_offer_id:quoted?.offer_id,quoted_total_cents:plan?.total_cents,...(pagbankSandbox?{provider:"pagbank_sandbox",encrypted_card}:{}),...debit});
   const attribution=window.VillegramSignals?.attribution();if(attribution&&d.reservation_id){try{sessionStorage.setItem('villegram-pending-reservation',JSON.stringify({reservation_id:d.reservation_id,attribution,at:Date.now()}))}catch{}flushVillegramAttribution();}
   state.activePayment={payment_id:d.payment.id,reservation_id:d.reservation_id,status:d.payment.status||"awaiting_payment",provider:d.payment.provider};
   if(pagbankSandbox)renderSandboxPayment(d);else renderMockPayment(d);
@@ -647,19 +717,27 @@ async function performStartPayment(choice){
    return;
   }
   if(e.message==="policy_version_changed"){try{const current=await api("legal_documents");state.config.required_booking_documents=current.documents;renderSummary()}catch{}setFlowError("Os documentos foram atualizados. Leia e aceite a nova versão antes de pagar.");return}
+  const debitErrors={
+   debit_auth_incomplete:"A autenticação do banco não foi concluída. Informe o cartão novamente ou escolha outro meio de pagamento.",
+   invalid_debit_billing:"Confira o CEP, a rua, o número, a cidade e a UF de cobrança.",
+   debit_amount_changed:"O total mudou. Gere uma nova cotação antes de pagar.",
+   debit_unavailable:"Débito indisponível para esta reserva. Escolha Pix ou crédito.",
+   pagbank_3ds_session_unavailable:"A autenticação do cartão está indisponível. Tente novamente em instantes.",
+  };
+  if(debitErrors[e.message]){setFlowError(debitErrors[e.message]);return}
   const captchaMessage=window.VilleCheckoutCaptcha?.message(e.message);
   if(captchaMessage){setFlowError(captchaMessage);return}
   setFlowError(e.message==="pagbank_cpf_required"?cpfPaymentMessage:e.message==="quote_expired"?"A cotação expirou. Gere uma nova cotação.":e.message==="installment_quote_required"||e.message==="installment_quote_changed"?"Consulte novamente as parcelas no PagBank antes de pagar.":["dates_unavailable","occupied"].includes(e.message)?"Essas datas acabaram de ficar indisponíveis. Volte e escolha outro chalé ou período.":e.message==="guarantee_consent_required"?"O aceite da garantia e da renovação automática é obrigatório para reservar.":e.message==="policy_acceptance_required"?"Aceite os termos e a política de cancelamento antes de pagar.":e.message==="booking_terms_unavailable"?"Os termos da reserva estão indisponíveis. Tente novamente mais tarde.":e.message==="guarantee_card_unavailable"?"O PagBank não conseguiu guardar o cartão da caução. Nenhuma reserva foi iniciada; tente novamente.":e.message==="guarantee_card_required"?"Informe o cartão da caução e aceite as regras antes de pagar.":e.message==="pagbank_customer_name_invalid"?"Revise o nome completo: remova colchetes e outros símbolos especiais.":e.message==="pagbank_card_rejected"?"O PagBank recusou os dados da solicitação. Confira os dados do hóspede e do cartão e inicie uma nova cotação.":e.message==="invalid_test_card"?"Confira os dados do cartão de teste.":"Não foi possível iniciar o pagamento de teste.")}
 }
 function renderSandboxPayment(d){
  // Keep only the public payment receipt; never persist card data or credentials.
- state.paymentView={payment:{id:d.payment.id,amount_cents:d.payment.amount_cents,pix_code:d.payment.pix_code||null},confirmation_code:d.confirmation_code,receiptOnly:d.receiptOnly===true};
+ state.paymentView={payment:{id:d.payment.id,amount_cents:d.payment.amount_cents,method:d.payment.method,pix_code:d.payment.pix_code||null},confirmation_code:d.confirmation_code,receiptOnly:d.receiptOnly===true};
  if(state.property&&state.session?.user?.id){try{saveResume()}catch{setFlowError('Não foi possível guardar a retomada nesta aba. Acompanhe esta cobrança em Minha conta.')}}
  if(d.receiptOnly){$('#checkout-title').textContent='Consulta de pagamento';$('#checkout-summary').textContent='Cobrança anterior. Confira o chalé, as datas e os itens contratados em Minhas reservas.';}
  clearInterval(window.__quoteTimer);
  $("#quote-countdown").textContent="Pagamento iniciado · aguardando confirmação";
  const box=$("#mock-payment"),pix=d.payment.pix_code;
- box.innerHTML=(d.receiptOnly?'':window.VilleOffers.contractMarkup(state.rate?.contract_snapshot))+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
+ box.innerHTML=(d.receiptOnly?'':window.VilleOffers.contractMarkup(state.rate?.contract_snapshot))+'<div class="success-state"><small>PAGBANK SANDBOX</small><h3>'+esc(d.confirmation_code)+'</h3><p>Valor: '+brlC(d.payment.amount_cents)+(d.payment.method==='debit'?' · Cartão de débito à vista':'')+'. Esta cobrança utiliza apenas o ambiente de testes.</p></div>'+
   (pix?'<label>Pix copia e cola<textarea readonly id="sandbox-pix-code"></textarea></label><button type="button" id="sandbox-copy-pix">Copiar Pix</button>':'<p id="sandbox-provider-progress">Consultando o resultado da cobrança…</p>')+
   '<p id="sandbox-payment-result" role="status">Aguardando confirmação do PagBank.</p>';
  if(pix){$("#sandbox-pix-code").value=pix;$("#sandbox-copy-pix").onclick=async()=>{

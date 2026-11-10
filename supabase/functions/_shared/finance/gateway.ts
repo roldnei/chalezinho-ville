@@ -10,6 +10,7 @@ export interface PaymentGateway {
   readonly capabilities: { multipleCaptures: boolean; partialRefunds: boolean; multipleRefunds: boolean; releaseRemainderConfirmed: boolean };
   validatePayment(input:PaymentInput):void;
   createPix(input: PaymentInput): ReturnType<typeof createPagBankOrder>;
+  createDebitPayment(input: PaymentInput): ReturnType<typeof createPagBankOrder>;
   createCardPayment(input: PaymentInput): ReturnType<typeof createPagBankOrder>;
   authorizeCard(input: PaymentInput): ReturnType<typeof createPagBankOrder>;
   captureAuthorization(id: string, cents: number, key: string): ReturnType<typeof changePagBankCharge>;
@@ -40,6 +41,7 @@ export function paymentGateway(provider: string, token: string, fetcher: typeof 
     validatePayment: input => {pagBankOrder(input);},
     capabilities: {multipleCaptures:false, partialRefunds:true, multipleRefunds:true, releaseRemainderConfirmed:false},
     createPix: input => create({...input,method:'pix',preAuthorize:false}),
+    createDebitPayment: input => create({...input,method:'debit'}),
     createCardPayment: input => create({...input,method:'card',preAuthorize:false}),
     authorizeCard: input => create({...input,method:'card',preAuthorize:true,installments:1}),
     captureAuthorization: (id,cents,key) => change(id,'capture',cents,key),

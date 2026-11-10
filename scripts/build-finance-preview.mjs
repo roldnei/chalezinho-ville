@@ -34,6 +34,11 @@ if(process.env.VILLE_CHECKOUT_RECAPTCHA_PREVIEW==='true'){
  if(release.environment!=='development'||release.profile!=='checkout-development')throw Error('reCAPTCHA preview requires the isolated development checkout');
  config+='\nwindow.CHALEZINHO_CONFIG.checkoutPaymentEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine-recaptcha";\n';
 }
+if(process.env.VERCEL_ENV==='preview'&&process.env.VERCEL_GIT_COMMIT_REF==='feat/dev-debito-3ds'){
+ if(release.environment!=='development'||release.profile!=='checkout-development'||release.ref!=='pxfqmnhqodqyaaqeyjgr')
+  throw Error('A prévia de débito exige o projeto Supabase DEV.');
+ config+='\nwindow.CHALEZINHO_CONFIG.debitPreview=true;window.CHALEZINHO_CONFIG.checkoutPaymentEngine=window.CHALEZINHO_CONFIG.bookingEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine-debito";\n';
+}
 await writeFile(new URL('app-config.js',out),config);
 if(release.environment==='production')for(const file of ['inspection-mobile-qa.html','launch-qa.html','qa-layout.html','preview-responsive.html','villegram-media-qa.html','villegram-stories-qa.html'])await rm(new URL(file,out),{force:true});
 console.log('Release profile: '+release.profile+'; target: '+release.environment);
