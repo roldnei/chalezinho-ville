@@ -64,6 +64,15 @@ test('the home prompts once and the same saved choice applies on other pages and
   for (const [index, value] of ['accepted', 'rejected'].entries()) {
     const home = fixture(t, site + '/index.html?view=site#colecao');
     assert.ok(home.prompt());
+    assert.equal(home.prompt().firstElementChild.textContent, 'Nós usamos cookies para melhorar nosso site.');
+    assert.deepEqual(Array.from(home.prompt().querySelectorAll('button'), button => button.textContent), ['Aceitar', 'Rejeitar']);
+    const details = home.prompt().querySelector('details');
+    assert.equal(details.open, false);
+    details.querySelector('summary').click();
+    assert.equal(details.open, true);
+    assert.match(details.textContent, /Google Ads/);
+    assert.ok(details.querySelector('a[href*="privacy_policy"]'));
+    assert.equal(home.googleTag(), null);
     home.choose(index);
     const saved = home.window.localStorage.getItem(consentKey);
     assert.equal(JSON.parse(saved).value, value);
