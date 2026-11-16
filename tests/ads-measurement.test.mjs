@@ -8,8 +8,9 @@ const phone = '5593991592266';
 const pageLabel = 'kEuZCO3QvaodEPfPzeZE';
 const whatsappLabel = '0JbfCLbP0rkdEPfPzeZE';
 const site = 'https://chalezinhoville.com.br';
+const consentKey = 'ville-marketing-consent-v1';
 
-function fixture(t, url = site + '/reservar.html', setup = () => {}) {
+function fixture(t, url = site + '/', setup = () => {}) {
   const dom = new JSDOM(`<a id="contact" href="https://wa.me/${phone}?text=Resumo%0ARefer%C3%AAncia%3A%20MV-AABBCCDDEEFF">Contato</a>
     <a id="share" href="https://wa.me/?text=Compartilhar">Compartilhar</a><footer></footer>`, {
     url, runScripts: 'outside-only', virtualConsole: new VirtualConsole(),
@@ -28,6 +29,7 @@ function fixture(t, url = site + '/reservar.html', setup = () => {}) {
   }
   return {
     window, click,
+    prompt: () => find('#ville-marketing-consent'),
     googleTag: () => find('script[src*="googletagmanager"]'),
     choose: index => window.document.querySelectorAll('#ville-marketing-consent button')[index].click(),
     conversions: () => Array.from(window.dataLayer || [])
@@ -52,8 +54,31 @@ test('Ads is opt-in and does not run in previews or after a privacy signal', t =
   assert.equal(gpc.window.VilleAds, undefined);
 });
 
+test('the home prompts once and the same saved choice applies on other pages and return visits', t => {
+  const internal = fixture(t, site + '/reservar.html');
+  assert.equal(internal.prompt(), null);
+  internal.click('contact');
+  assert.equal(internal.prompt(), null);
+  assert.equal(internal.conversions().length, 0);
+
+  for (const [index, value] of ['accepted', 'rejected'].entries()) {
+    const home = fixture(t, site + '/index.html?view=site#colecao');
+    assert.ok(home.prompt());
+    home.choose(index);
+    const saved = home.window.localStorage.getItem(consentKey);
+    assert.equal(JSON.parse(saved).value, value);
+
+    for (const path of ['/', '/chale-com-hidro.html', '/reservar.html']) {
+      const returning = fixture(t, site + path, w => w.localStorage.setItem(consentKey, saved));
+      assert.equal(returning.prompt(), null);
+      assert.equal(Boolean(returning.googleTag()), value === 'accepted');
+    }
+  }
+});
+
 test('view and direct WhatsApp clicks use different labels without forwarding message or URL details', t => {
   const visitor = fixture(t, site + '/reservar.html?gclid=SampleClick123&email=private@example.com#checkout');
+  visitor.window.document.querySelector('footer button').click();
   visitor.choose(0);
   assert.match(visitor.googleTag().src, /AW-18468792311$/);
   visitor.click('share');

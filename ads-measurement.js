@@ -10,6 +10,7 @@
   const day = 86_400_000;
   const phone = window.CHALEZINHO_CONFIG?.whatsappNumber;
   const page = location.origin + location.pathname;
+  const isHome = location.pathname === '/' || location.pathname === '/index.html';
   const denied = {
     ad_storage: 'denied', ad_user_data: 'denied',
     ad_personalization: 'denied', analytics_storage: 'denied',
@@ -109,7 +110,7 @@
     box.setAttribute('aria-label', 'Preferências de medição');
     box.style.cssText = 'position:fixed;z-index:10000;inset:auto 12px max(12px,env(safe-area-inset-bottom));max-width:520px;background:#fff;color:#17130f;padding:14px;border:1px solid #b9aa94;border-radius:14px;box-shadow:0 6px 30px #0003;font:15px/1.5 system-ui';
     const copy = document.createElement('p');
-    copy.textContent = 'Autoriza cookies e o envio ao Google Ads de dados de visitas e cliques, incluindo o identificador do anúncio, para medir nossos anúncios?';
+    copy.textContent = 'Autoriza cookies e o envio ao Google Ads de dados de visitas e cliques, incluindo o identificador do anúncio, para medir nossos anúncios? Sua escolha vale para todo o site.';
     copy.style.margin = '0 0 8px';
     box.append(copy);
     for (const [label, value] of [['Aceitar medição', 'accepted'], ['Somente necessários', 'rejected']]) {
@@ -132,7 +133,7 @@
   const saved = read(consentKey);
   if (saved?.at <= Date.now() && saved.at > Date.now() - 180 * day) choice = saved.value;
   if (choice === 'accepted') start();
-  else if (choice !== 'rejected') preferences();
+  else if (choice !== 'rejected' && isHome) preferences();
 
   const settings = document.createElement('button');
   settings.type = 'button';
