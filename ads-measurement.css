@@ -1,0 +1,89 @@
+#ville-marketing-consent {
+  position: fixed;
+  z-index: 10000;
+  inset: auto max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  box-sizing: border-box;
+  width: auto;
+  max-width: 520px !important;
+  max-height: min(270px, max(142px, 39dvh));
+  margin: 0 auto;
+  padding: 12px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid #927e58;
+  border-radius: 12px;
+  background: #221d18;
+  color: #fff6e7;
+  color-scheme: only dark;
+  box-shadow: 0 4px 16px #0005;
+  font: 14px/1.4 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+
+#ville-marketing-consent > p {
+  margin: 0 0 8px;
+}
+
+#ville-marketing-consent .ville-cookie-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+#ville-marketing-consent button {
+  min-block-size: 44px;
+  padding: 8px 14px;
+  border: 1px solid #ae9870;
+  border-radius: 8px;
+  background: #31271d;
+  color: inherit;
+  font: inherit;
+  letter-spacing: normal;
+  text-transform: none;
+  cursor: pointer;
+}
+
+#ville-marketing-consent details {
+  margin-top: 8px;
+  color: #e9d9bc;
+  font-size: 13px;
+}
+
+#ville-marketing-consent summary {
+  width: fit-content;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+#ville-marketing-consent details p {
+  margin: 8px 0;
+}
+
+#ville-marketing-consent a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  /* Leave the consent controls and the immersive feed in separate viewport strips. */
+  body:has(> #ville-marketing-consent) > #villegram.vg-home {
+    height: calc(100dvh - var(--ville-cookie-space, 0px));
+    max-height: calc(100dvh - var(--ville-cookie-space, 0px));
+  }
+
+  body:has(> #ville-marketing-consent) > #villegram.vg-home .vg-purchase {
+    max-height: max(84px, calc(100% - 240px));
+  }
+
+  body:has(> #ville-marketing-consent) > .villegram-mobile-nav {
+    bottom: var(--ville-cookie-space, 0px);
+  }
+
+  body:has(> .villegram-mobile-nav):has(> #ville-marketing-consent) {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom) + var(--ville-cookie-space, 0px));
+  }
+
+  body:has(> .villegram-mobile-nav):has(> #ville-marketing-consent) > .floating-whatsapp {
+    bottom: calc(88px + env(safe-area-inset-bottom) + var(--ville-cookie-space, 0px));
+  }
+}

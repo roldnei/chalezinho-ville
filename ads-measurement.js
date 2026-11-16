@@ -19,6 +19,7 @@
   let choice;
   let started = false;
   let fromAd = false;
+  let noticeSize;
 
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
@@ -91,7 +92,7 @@
   function choose(value) {
     choice = value;
     try { localStorage.setItem(consentKey, JSON.stringify({ value, at: Date.now() })); } catch {}
-    document.getElementById('ville-marketing-consent')?.remove();
+    removeNotice();
     if (value === 'accepted') {
       start();
     } else {
@@ -103,42 +104,50 @@
     }
   }
 
-  function preferences() {
+  function removeNotice() {
+    noticeSize?.disconnect();
     document.getElementById('ville-marketing-consent')?.remove();
-    const box = document.createElement('section');
+    document.documentElement.style.removeProperty('--ville-cookie-space');
+  }
+
+  function preferences() {
+    removeNotice();
+    const box = document.createElement('aside');
     box.id = 'ville-marketing-consent';
+    box.setAttribute('role', 'region');
     box.setAttribute('aria-label', 'Preferências de medição');
-    box.style.cssText = 'position:fixed;z-index:10000;inset:auto 12px max(12px,env(safe-area-inset-bottom));max-width:520px;max-height:70dvh;overflow-y:auto;background:#fff;color:#17130f;padding:14px;border:1px solid #b9aa94;border-radius:14px;box-shadow:0 6px 30px #0003;font:15px/1.5 system-ui';
     const copy = document.createElement('p');
     copy.textContent = 'Nós usamos cookies para melhorar nosso site.';
-    copy.style.margin = '0 0 8px';
     const actions = document.createElement('div');
-    actions.style.cssText = 'display:flex;gap:8px';
+    actions.className = 'ville-cookie-actions';
     for (const [label, value] of [['Aceitar', 'accepted'], ['Rejeitar', 'rejected']]) {
       const button = document.createElement('button');
       button.type = 'button';
       button.textContent = label;
-      button.style.cssText = 'min-width:82px;padding:9px 10px;border:1px solid #78634c;background:#fff;color:#17130f;border-radius:8px;font:inherit;cursor:pointer';
       button.onclick = () => choose(value);
       actions.append(button);
     }
     const details = document.createElement('details');
-    details.style.cssText = 'margin-top:8px;color:#51402c;font-size:13px';
     const more = document.createElement('summary');
-    more.style.cssText = 'cursor:pointer;text-decoration:underline';
     more.textContent = 'Saiba mais sobre os cookies';
     const purpose = document.createElement('p');
     purpose.textContent = 'Ao aceitar, você permite o uso de cookies e o envio ao Google Ads de informações sobre as páginas visitadas e os cliques que abrem o WhatsApp. A medição pode usar o identificador do clique no anúncio para mostrar quais anúncios geram visitas e contatos. A personalização de anúncios fica desativada.';
     const control = document.createElement('p');
     control.textContent = 'Ao rejeitar, a medição do Google Ads fica desativada. Você pode navegar e usar o WhatsApp com qualquer escolha. Sua preferência vale para todo o site, fica salva neste navegador por até 180 dias e pode ser alterada no rodapé, em Preferências de medição.';
-    purpose.style.margin = control.style.margin = '8px 0';
     const policy = document.createElement('a');
     policy.href = '/documentos.html?type=privacy_policy';
     policy.textContent = 'Política de Privacidade';
-    policy.style.color = 'inherit';
     details.append(more, purpose, control, policy);
     box.append(copy, actions, details);
     document.body.append(box);
+    if ('ResizeObserver' in window) {
+      noticeSize = new ResizeObserver(() => {
+        const bottom = parseFloat(getComputedStyle(box).bottom) || 0;
+        const space = Math.ceil(box.getBoundingClientRect().height + bottom + 8);
+        document.documentElement.style.setProperty('--ville-cookie-space', space + 'px');
+      });
+      noticeSize.observe(box);
+    }
   }
 
   if (blocked() || !phone) return;
