@@ -65,6 +65,16 @@
 }
 
 @media (max-width: 700px) {
+  body:has(> #villegram.vg-home):has(> #ville-marketing-consent)::after {
+    position: fixed;
+    z-index: 999;
+    inset: auto 0 0;
+    height: var(--ville-cookie-space, 0px);
+    background: #111;
+    content: "";
+    pointer-events: none;
+  }
+
   /* Leave the consent controls and the immersive feed in separate viewport strips. */
   body:has(> #ville-marketing-consent) > #villegram.vg-home {
     height: calc(100dvh - var(--ville-cookie-space, 0px));
