@@ -47,7 +47,9 @@ document.addEventListener('DOMContentLoaded',()=>{
    err.textContent='';
    const fmt=v=>{const [y,m,d]=v.split('-');return d+'/'+m+'/'+y};
    const msg='Olá! Gostaria de verificar a disponibilidade do '+box.dataset.chalet+' para o período de '+fmt(din.value)+' a '+fmt(dout.value)+'.';
-   window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank','noopener');
+   const url=new URL('https://wa.me/'+phone);
+   url.searchParams.set('text',msg);
+   window.open((window.VilleAds?.contact(url)||url).href,'_blank','noopener');
   });
  });
 });
