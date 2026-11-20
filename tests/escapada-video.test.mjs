@@ -30,5 +30,28 @@ test('date-based tool retains exact chalet, period and offer without importing a
 });
 test('export overlay contains dates and prices with no WhatsApp call-to-action or button',()=>{
  const texts=[],ctx={canvas:{width:720,height:1280},save(){},restore(){},scale(){},fillRect(){},createLinearGradient:()=>({addColorStop(){}}),measureText:t=>({width:t.length*8}),fillText:t=>texts.push(t),beginPath(){},moveTo(){},lineTo(){},stroke(){}};
- V.drawOverlay(ctx,base);assert.ok(texts.includes(base.property_name));assert.ok(texts.some(t=>t.includes('1.194,40')));assert.ok(!texts.some(t=>/WhatsApp|Quero estes dias/i.test(t)));
+ V.drawOverlay(ctx,base);assert.ok(texts.includes(base.property_name));assert.ok(texts.includes('127,80'));assert.ok(texts.includes('10x'));assert.ok(!texts.some(t=>t.includes('1.194,40')));assert.ok(!texts.some(t=>/WhatsApp|Quero estes dias/i.test(t)));
+});
+
+test('ten installments include seven percent once, for every chalet, without altering the quote',()=>{
+ for(const property_code of ['CH1','CH2','CH3']){
+  const card={...base,property_code,total_cents:163000};
+  assert.equal(V.installment(card.total_cents).value_cents,17441);
+  assert.equal(V.installmentText(card.total_cents),'10x174,41');
+  assert.match(V.installmentHTML(card.total_cents),/>10x<.*>174,41</);
+  assert.equal(V.installment(card.total_cents).total_cents,174410);
+  assert.equal(V.installmentText(card.total_cents),'10x174,41');
+  assert.equal(card.total_cents,163000);
+ }
+ assert.equal(V.installmentText(119440),'10x127,80');
+ assert.equal(V.installmentText(118000),'10x126,26');
+});
+test('canvas preview and export show a small 10x adjoining a larger installment, with comparable crossed price',()=>{
+ const draws=[],ctx={canvas:{width:720,height:1280},save(){},restore(){},scale(){},fillRect(){},createLinearGradient:()=>({addColorStop(){}}),measureText:t=>({width:t.length*8}),fillText(t,x,y){draws.push({text:t,x,y,font:this.font})},beginPath(){},moveTo(){},lineTo(){},stroke(){}};
+ const card={...base,total_cents:163000,gross_cents:180000};V.drawOverlay(ctx,card);
+ const count=draws.find(d=>d.text==='10x'),value=draws.find(d=>d.text==='174,41');
+ assert.ok(count&&value);assert.equal(count.y,value.y);assert.ok(value.x>count.x);
+ assert.ok(parseInt(count.font.match(/(\d+)px/)[1])<parseInt(value.font.match(/(\d+)px/)[1]));
+ assert.ok(draws.some(d=>d.text==='10x192,60'));assert.ok(!draws.some(d=>d.text==='R$ 1.630,00'));
+ assert.equal(card.total_cents,163000);
 });

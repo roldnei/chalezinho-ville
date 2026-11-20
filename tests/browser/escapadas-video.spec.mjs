@@ -24,7 +24,7 @@ async function fixture(page){
 test('filters, previews and downloads the moving escapada as an actual MP4',async({page},testInfo)=>{
  const {errors,requests}=await fixture(page);await page.goto('/promocoes.html');await expect(page.locator('.escape-card')).toHaveCount(3);
  await page.locator('#escape-property').selectOption('CH2');await page.locator('#escape-from').fill('2026-11-23');await page.locator('#escape-to').fill('2026-11-23');await expect(page.locator('.escape-card')).toHaveCount(1);
- await expect(page.locator('.escape-card')).toContainText('Ville Essenza');await expect(page.locator('.escape-card')).toContainText('1.194,40');
+ await expect(page.locator('.escape-card')).toContainText('Ville Essenza');await expect(page.locator('.escape-card')).toContainText('10x127,80');
  await page.getByRole('button',{name:'Ver e baixar vídeo'}).click();await expect(page.locator('#escape-download')).toBeEnabled();
  await expect(page.locator('#escape-preview-title')).toContainText('Ville Essenza');await expect(page.locator('#escape-selected-dates')).toContainText('23');
  await page.screenshot({path:testInfo.outputPath('escapada-preview.png'),fullPage:true});

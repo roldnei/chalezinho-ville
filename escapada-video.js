@@ -1,6 +1,14 @@
 (()=>{
  'use strict';
  const money=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+ // Compute from the original quote on every render; never mark up the stored price.
+ function installment(cents){
+  if(!Number.isSafeInteger(cents)||cents<=0)throw Error('Preço inválido para parcelamento.');
+  const total=Math.round(cents*107/100),value=Math.round(total/10);
+  return {count:10,total_cents:total,value_cents:value,value:(value/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};
+ }
+ const installmentText=cents=>'10x'+installment(cents).value;
+ const installmentHTML=cents=>'<span class="escape-installments"><span class="escape-installment-count">10x</span><span class="escape-installment-value">'+installment(cents).value+'</span></span>';
  const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
  const date=v=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(v+'T12:00:00Z'));
  const range=c=>date(c.check_in)+' a '+date(c.check_out);
@@ -38,9 +46,11 @@
   label(ctx,'Chalezinho Ville',42,78,620,29,{bold:true});label(ctx,'Chalés românticos em Guarapari',42,112,620,22);label(ctx,'V I L L E  M O M E N T S',42,151,620,21,{color:'#eddcad'});
   label(ctx,card.property_name,42,691,620,25);label(ctx,(card.video_title||card.offer_name||'Escapada').split(' · ')[0],42,750,620,57,{serif:true});
   label(ctx,range(card),42,801,620,29,{bold:true});label(ctx,card.nights+' noites · '+card.guests+' hóspedes',42,838,620,23);
-  const before=Number.isSafeInteger(card.gross_cents)&&card.gross_cents>card.total_cents?money(card.gross_cents):'';
+  const before=Number.isSafeInteger(card.gross_cents)&&card.gross_cents>card.total_cents?installmentText(card.gross_cents):'';
   if(before){label(ctx,before,42,887,620,27,{color:'#ecddb9'});const width=ctx.measureText(before).width;ctx.strokeStyle='#ecddb9';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(42,877);ctx.lineTo(42+width,877);ctx.stroke();}
-  label(ctx,money(card.total_cents),42,before?955:917,620,57,{bold:true});label(ctx,'Total da escapada · hospedagem e limpeza',42,before?991:957,620,21);
+  const priceY=before?955:917,price=installment(card.total_cents);
+  label(ctx,'10x',42,priceY,620,29,{bold:true});const priceX=42+ctx.measureText('10x').width+2;
+  label(ctx,price.value,priceX,priceY,662-priceX,64,{bold:true});label(ctx,'Parcelas em reais · hospedagem e limpeza',42,before?991:957,620,21);
   const inclusions=(card.experiences||[]).flatMap(e=>e.components||[]).map(c=>c.name).filter(Boolean);
   label(ctx,inclusions.length?'Inclui '+inclusions.join(' · '):'Consulte disponibilidade e condições',42,1041,620,21);
   ctx.textAlign='center';
@@ -73,20 +83,20 @@
  }
  async function openDownloadDialog(card,media){
   const dialog=document.createElement('dialog');dialog.className='escape-editor-dialog';dialog.setAttribute('aria-label','Prévia e download da escapada em vídeo');
-  dialog.innerHTML='<header><div><small>VÍDEO DA ESCAPADA</small><h2></h2><p data-dates></p></div><button type="button" data-close>Fechar</button></header><div class="escape-editor-canvas"><canvas width="720" height="1280" role="img" aria-label="Prévia do vídeo da escapada"></canvas></div><p data-status role="status" aria-live="polite">Carregando a prévia…</p><progress max="100" value="0" hidden aria-label="Geração do vídeo"></progress><div class="escape-editor-actions"><button type="button" data-play>Reproduzir</button><button type="button" data-pause>Pausar</button><button type="button" class="escape-editor-primary" data-download disabled>Baixar vídeo MP4</button><button type="button" data-cancel hidden>Cancelar geração</button></div>';
-  const $=s=>dialog.querySelector(s);$('h2').textContent=card.property_name+' · '+(card.video_title||card.offer_name||'Escapada');$('[data-dates]').textContent=range(card)+' · '+money(card.total_cents);
+  dialog.innerHTML='<header><div><small>VÍDEO DA ESCAPADA</small><h2></h2><p data-dates></p><p data-price class="escape-dialog-price"></p></div><button type="button" data-close>Fechar</button></header><div class="escape-editor-canvas"><canvas width="720" height="1280" role="img" aria-label="Prévia do vídeo da escapada"></canvas></div><p data-status role="status" aria-live="polite">Carregando a prévia…</p><progress max="100" value="0" hidden aria-label="Geração do vídeo"></progress><div class="escape-editor-actions"><button type="button" data-play>Reproduzir</button><button type="button" data-pause>Pausar</button><button type="button" class="escape-editor-primary" data-download disabled>Baixar vídeo MP4</button><button type="button" data-cancel hidden>Cancelar geração</button></div>';
+  const $=s=>dialog.querySelector(s);$('h2').textContent=card.property_name+' · '+(card.video_title||card.offer_name||'Escapada');$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents);
   document.body.append(dialog);dialog.showModal();let player,controller,busy=false,closed=false;
   const close=new Promise(resolve=>dialog.onclose=()=>{closed=true;player?.destroy();controller?.abort();dialog.remove();resolve();});
   dialog.oncancel=e=>{if(busy)e.preventDefault();};$('[data-close]').onclick=()=>dialog.close();$('[data-play]').onclick=()=>player?.play();$('[data-pause]').onclick=()=>player?.pause();$('[data-cancel]').onclick=()=>controller?.abort();
-  try{player=await preview($('canvas'),card,media,{onError:t=>$('[data-status]').textContent=t});if(closed){player.destroy();return close;}$('[data-download]').disabled=false;$('[data-status]').textContent='Confira o chalé, os dias e o total da escapada. Este é o vídeo que será baixado.';}
+  try{player=await preview($('canvas'),card,media,{onError:t=>$('[data-status]').textContent=t});if(closed){player.destroy();return close;}$('[data-download]').disabled=false;$('[data-status]').textContent='Confira o chalé, os dias e o valor das parcelas da escapada. Este é o vídeo que será baixado.';}
   catch(e){$('[data-status]').textContent=e.message;}
   $('[data-download]').onclick=async()=>{
    if(busy)return;busy=true;controller=new AbortController();player?.pause();for(const b of dialog.querySelectorAll('button:not([data-cancel])'))b.disabled=true;$('[data-cancel]').hidden=false;$('progress').hidden=false;
-   try{Object.assign(card,await refresh(card,{signal:controller.signal}));$('[data-dates]').textContent=range(card)+' · '+money(card.total_cents);const blob=await exportVideo(card,media,{signal:controller.signal,progress:n=>{$('progress').value=n;$('[data-status]').textContent='Gerando vídeo… '+n+'%';}});download(blob,card);$('[data-status]').textContent='Vídeo baixado: '+fileName(card);}
+   try{Object.assign(card,await refresh(card,{signal:controller.signal}));$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents);const blob=await exportVideo(card,media,{signal:controller.signal,progress:n=>{$('progress').value=n;$('[data-status]').textContent='Gerando vídeo… '+n+'%';}});download(blob,card);$('[data-status]').textContent='Vídeo baixado: '+fileName(card);}
    catch(e){$('[data-status]').textContent=e.name==='AbortError'?'Geração cancelada.':e.message==='mp4_unavailable'?'Este navegador não permite gerar MP4. Use o Chrome atualizado ou Safari.':e.message;}
    finally{busy=false;controller=null;for(const b of dialog.querySelectorAll('button'))b.disabled=false;$('[data-cancel]').hidden=true;}
   };
   return close;
  }
- window.VilleEscapadaVideo={money,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
+ window.VilleEscapadaVideo={money,installment,installmentText,installmentHTML,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
 })();

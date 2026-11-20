@@ -16,7 +16,7 @@
    const input=V.dateSelection(selection,catalog);
    const card=await V.refresh(input,{signal:controller.signal});if(request!==revision||scope!==signature())return;
    const rows=V.mediaFor(card,catalog);loaded={card,scope};media=rows;
-   $('#date-result-title').textContent=card.property_name+' · '+(card.offer_name||'Escapada');$('#date-selection').textContent=V.range(card)+' · '+card.nights+' noites · '+card.guests+' hóspedes';$('#date-price').textContent=V.money(card.total_cents);$('#date-quote-time').textContent='Total da escapada consultado agora, com a oferta e a limpeza incluídas.';$('#date-result').hidden=false;
+   $('#date-result-title').textContent=card.property_name+' · '+(card.offer_name||'Escapada');$('#date-selection').textContent=V.range(card)+' · '+card.nights+' noites · '+card.guests+' hóspedes';$('#date-price').innerHTML=V.installmentHTML(card.total_cents);$('#date-quote-time').textContent='10 parcelas em reais, com acréscimo de 7% sobre a escapada consultada. Oferta e limpeza incluídas.';$('#date-result').hidden=false;
    const current=await V.preview($('#date-canvas'),card,rows,{onError:text=>{if(request===revision){$('#date-download').disabled=true;note(text);}}});
    if(request!==revision||scope!==signature()){current.destroy();return;}player=current;$('#date-download').disabled=false;note('Escapada carregada. Confira a prévia e baixe o vídeo.');
   }catch(e){if(request===revision){destroyPreview();note(e.name==='AbortError'?'Consulta cancelada.':e.message);}}
@@ -27,7 +27,7 @@
  $('#date-download').onclick=async()=>{
   if(!loaded||exporting||loaded.scope!==signature()){invalidate();return;}
   const current=loaded;controller=new AbortController();selectionLocked(true);player?.pause();$('#date-progress').value=0;note('Reconfirmando o valor da escapada…');
-  try{const fresh=await V.refresh(current.card,{signal:controller.signal});Object.assign(current.card,fresh);$('#date-price').textContent=V.money(fresh.total_cents);const blob=await V.exportVideo(current.card,media,{signal:controller.signal,progress:n=>{$('#date-progress').value=n;note('Gerando vídeo da '+current.card.property_name+' · '+n+'%');}});V.download(blob,current.card);note('Vídeo baixado: '+current.card.property_name+' · '+V.range(current.card)+'.');}
+  try{const fresh=await V.refresh(current.card,{signal:controller.signal});Object.assign(current.card,fresh);$('#date-price').innerHTML=V.installmentHTML(fresh.total_cents);const blob=await V.exportVideo(current.card,media,{signal:controller.signal,progress:n=>{$('#date-progress').value=n;note('Gerando vídeo da '+current.card.property_name+' · '+n+'%');}});V.download(blob,current.card);note('Vídeo baixado: '+current.card.property_name+' · '+V.range(current.card)+'.');}
   catch(e){note(e.name==='AbortError'?'Geração cancelada.':e.message==='mp4_unavailable'?'Este navegador não consegue gerar MP4. Abra o PMS no Chrome atualizado ou Safari.':e.message);}
   finally{controller=null;selectionLocked(false);}
  };
