@@ -13,6 +13,9 @@
     },
     "api/promotion-banner.js": {
       "maxDuration": 60
+    },
+    "api/escapada-video.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

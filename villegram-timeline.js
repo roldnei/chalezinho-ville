@@ -48,24 +48,34 @@
   seek(0);frame=requestAnimationFrame(tick);
   return {seek,setActive,setSound,get time(){return time},get total(){return total},get active(){return active},get index(){return index},setOriginal(value){original=!!value;graphs.forEach(g=>g.update(original));},elements,soundElement:audio,destroy(){dead=true;++version;cancelAnimationFrame(frame);elements.forEach(e=>{e.pause?.();e.removeAttribute('src');e.load?.()});audio.pause();audio.removeAttribute('src');graphs.forEach(g=>g.disconnect());bus?.disconnect();if(ownsContext)context?.close();host.replaceChildren();}};
  }
- async function exportSequence(media,{guest=true,signal,progress=()=>{}}={}){
+ function renderSequenceFrame(ctx,scratch,clips,elements,time,{overlay=null}={}){
+  const clip=locate(clips,time);if(!clip)return;
+  const draw=(c,target,local)=>{const m=visualState(c.media,local,c.length);window.VillegramEffects.renderFrame(target,elements[c.index],m,m.text_layers||[],{brand:!overlay});};
+  const fade=Math.min(.45,clip.length/2);
+  if(clip.index>0&&clip.local<fade&&(clip.media.transition||'fade')!=='cut'){
+   draw(clips[clip.index-1],ctx,clips[clip.index-1].length);draw(clip,scratch,clip.local);ctx.save();
+   if(clip.media.transition==='slide')ctx.translate(ctx.canvas.width*(1-clip.local/fade),0);else ctx.globalAlpha=clip.local/fade;
+   ctx.drawImage(scratch.canvas,0,0);ctx.restore();
+  }else draw(clip,ctx,clip.local);
+  overlay?.(ctx,time);
+ }
+ async function exportSequence(media,{guest=true,signal,progress=()=>{},overlay=null,sound=true}={}){
   if(!window.MediaRecorder||!HTMLCanvasElement.prototype.captureStream)throw Error('export_unavailable');
   const mime=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4;codecs=avc1.42E01E,opus','video/mp4;codecs=avc1','video/mp4'].find(v=>MediaRecorder.isTypeSupported(v));if(!mime)throw Error('mp4_unavailable');
-  const AC=window.AudioContext||window.webkitAudioContext;if(!AC)throw Error('audio_unavailable');
+  const AC=window.AudioContext||window.webkitAudioContext;if(sound&&!AC)throw Error('audio_unavailable');
   const host=document.createElement('div');host.style.cssText='position:fixed;left:-4px;bottom:0;width:2px;height:2px;opacity:.01;pointer-events:none';document.body.append(host);
   const canvas=document.createElement('canvas'),layer=document.createElement('canvas');canvas.width=layer.width=720;canvas.height=layer.height=1280;const ctx=canvas.getContext('2d'),scratch=layer.getContext('2d');let engine,context,stream,recorder,frame,watchdog,completion,failExport;
   const check=()=>{if(signal?.aborted)throw new DOMException('Cancelado','AbortError')};
-  try{check();await document.fonts?.ready;context=new AC();const dest=context.createMediaStreamDestination();engine=player({host,media,preloadAll:true,audioContext:context,audioDestination:dest,onTime:t=>{if(engine)progress(Math.min(99,Math.round(t/engine.total*100)))},onError:text=>failExport?.(Error(text))});
+  try{check();await document.fonts?.ready;context=sound?new AC():null;const dest=context?.createMediaStreamDestination();engine=player({host,media,preloadAll:true,audioContext:context,audioDestination:dest||null,onTime:t=>{if(engine)progress(Math.min(99,Math.round(t/engine.total*100)))},onError:text=>failExport?.(Error(text))});
    await Promise.all(engine.elements.map(el=>new Promise((resolve,reject)=>{if(el.tagName==='IMG'&&el.complete&&el.naturalWidth||el.tagName==='VIDEO'&&el.readyState>=2)return resolve();const event=el.tagName==='VIDEO'?'loadeddata':'load',timeout=setTimeout(()=>reject(Error('media_timeout')),20000);el.addEventListener(event,()=>{clearTimeout(timeout);resolve()},{once:true});el.addEventListener('error',()=>{clearTimeout(timeout);reject(Error('media_unavailable'))},{once:true});if(el.tagName==='VIDEO'){el.preload='auto';el.load()}})));check();
-   await context.resume();
-   stream=canvas.captureStream(30);dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));const clips=sequence(media);
-   const draw=(clip,target,local)=>{const m=visualState(clip.media,local,clip.length);window.VillegramEffects.renderFrame(target,engine.elements[clip.index],m,m.text_layers||[]);};
-   const paint=()=>{if(!recorder||recorder.state==='inactive')return;const clip=locate(clips,engine.time);if(clip){const fade=Math.min(.45,clip.length/2);if(clip.index>0&&clip.local<fade&&(clip.media.transition||'fade')!=='cut'){draw(clips[clip.index-1],ctx,clips[clip.index-1].length);draw(clip,scratch,clip.local);ctx.save();if(clip.media.transition==='slide')ctx.translate(canvas.width*(1-clip.local/fade),0);else ctx.globalAlpha=clip.local/fade;ctx.drawImage(layer,0,0);ctx.restore();}else draw(clip,ctx,clip.local);}frame=requestAnimationFrame(paint);};
+   await context?.resume();
+   stream=canvas.captureStream(30);dest?.stream.getAudioTracks().forEach(t=>stream.addTrack(t));const clips=sequence(media);
+   const paint=()=>{if(!recorder||recorder.state==='inactive')return;renderSequenceFrame(ctx,scratch,clips,engine.elements,engine.time,{overlay});frame=requestAnimationFrame(paint);};
    return await new Promise((resolve,reject)=>{const chunks=[],abort=()=>fail(new DOMException('Cancelado','AbortError')),fail=e=>{reject(e);if(recorder&&recorder.state!=='inactive')recorder.stop()};failExport=fail;signal?.addEventListener('abort',abort,{once:true});recorder=new MediaRecorder(stream,{mimeType:mime,videoBitsPerSecond:4000000});recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recorder.onerror=()=>fail(Error('export_failed'));recorder.onstop=()=>{signal?.removeEventListener('abort',abort);const blob=new Blob(chunks,{type:'video/mp4'});blob.size?resolve(blob):reject(Error('export_failed'))};watchdog=setTimeout(()=>fail(Error('export_timeout')),(engine.total+60)*1000);
     // Completion belongs to this one export, not to the public player's loop.
-    completion=setInterval(()=>{if(!engine.active&&engine.time>=engine.total-.05){clearInterval(completion);recorder.stop()}},50);recorder.addEventListener('stop',()=>clearInterval(completion),{once:true});engine.seek(0);engine.setSound(true,{strict:true}).then(()=>{check();recorder.start(250);engine.setActive(true);paint()}).catch(fail);
+    completion=setInterval(()=>{if(!engine.active&&engine.time>=engine.total-.05){clearInterval(completion);recorder.stop()}},50);recorder.addEventListener('stop',()=>clearInterval(completion),{once:true});engine.seek(0);engine.setSound(sound,{strict:true}).then(()=>{check();recorder.start(250);engine.setActive(true);paint()}).catch(fail);
    });
   }finally{clearInterval(completion);clearTimeout(watchdog);cancelAnimationFrame(frame);engine?.destroy();host.remove();if(recorder&&recorder.state!=='inactive')recorder.stop();stream?.getTracks().forEach(t=>t.stop());await context?.close();}
  }
- window.VillegramTimeline={duration,sequence,locate,enabled,fitSound,visualState,player,exportSequence};
+ window.VillegramTimeline={duration,sequence,locate,enabled,fitSound,visualState,player,renderSequenceFrame,exportSequence};
 })();
