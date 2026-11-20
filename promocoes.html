@@ -1,0 +1,48 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>Promoções | PMS Chalezinho Ville</title><link rel="icon" href="favicon.svg"><link rel="stylesheet" href="promotion-banner.css?v=1"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="app-config.js"></script></head><body id="pv-review"><nav class="promotion-nav"><a href="admin.html">Central de operações</a><a href="villegram-admin.html">Ville Moments</a></nav><main><p id="promotion-access" role="status">Verificando seu acesso ao PMS…</p><section id="pv-banners" aria-labelledby="pv-banners-title" hidden>
+  <header class="pv-page-head"><h1 id="pv-banners-title">Promoções para redes sociais</h1></header>
+  <section class="promotion-origin"><label>Começar por uma publicação do Ville Moments<select id="promotion-publication"><option value="">Nova promoção com os chalés</option></select></label><button type="button" id="promotion-use">Usar publicação</button><p id="promotion-import-note" role="status">Escolha uma publicação ou monte uma promoção com os três chalés.</p></section><div class="pv-banner-layout">
+    <form id="pv-banner-form" class="pv-card pv-banner-controls">
+      <div class="pv-card-head"><h2>Período e preços</h2></div><input id="banner-offer" type="hidden"><input id="banner-property" type="hidden">
+      <div class="pv-banner-fields"><label class="pv-field pv-banner-wide">Formato<select id="banner-format"><option value="story">Stories, Reels e Status · 9:16</option><option value="feed">Feed do Instagram · 4:5</option><option value="original">Banner completo</option></select></label>
+        <label class="pv-field">Entrada<input id="banner-from" type="date" required></label>
+        <label class="pv-field">Saída<input id="banner-to" type="date" required></label>
+        <label class="pv-field">Hóspedes<input id="banner-guests" type="number" min="1" max="16" value="2" required></label>
+        <label class="pv-field pv-banner-wide">Fonte dos preços<select id="banner-source"><option value="site">Site Chalezinho Ville</option><option value="manual">Digitar manualmente</option></select></label>
+        <label class="pv-field pv-banner-wide" id="banner-rate-field">Tarifa do site<select id="banner-rate"><option value="lowest">Menor preço disponível</option><option value="non_refundable">Não reembolsável</option><option value="refundable">Reembolsável</option></select></label>
+      </div>
+      <div class="pv-banner-query"><button type="submit" class="pv-primary" id="banner-fetch">Buscar preços</button><span id="banner-query-note" role="status"></span></div>
+      <div id="banner-properties"></div>
+      <details class="pv-banner-texts"><summary>Textos e aparência</summary>
+        <label class="pv-field">Título<input id="banner-title" maxlength="90" value="Chalezinho Ville"></label>
+        <label class="pv-field">Título do período<input id="banner-period" maxlength="160" placeholder="Automático pelas datas"></label>
+        <label class="pv-field">Noites e hóspedes<input id="banner-subtitle" maxlength="160" placeholder="Automático pelas datas e hóspedes"></label>
+        <div class="pv-banner-fields"><label class="pv-field">Horário de entrada<input id="banner-in-time" type="time" value="15:00"></label><label class="pv-field">Horário de saída<input id="banner-out-time" type="time" value="11:00"></label></div>
+        <label class="pv-field">Texto abaixo dos preços<input id="banner-price-label" maxlength="80" value="TOTAL DA ESTADIA"></label>
+        <label class="pv-field">Texto de entrada e saída<input id="banner-stay-label" maxlength="200" placeholder="Automático pelas datas e horários"></label>
+        <label class="pv-field">Condições<textarea id="banner-conditions" rows="3" maxlength="600">Valores definidos pelo anfitrião para este período.
+Sujeitos a atualização até a reserva.</textarea></label>
+        <label class="pv-field">Observação final<textarea id="banner-extras" rows="2" maxlength="300">Decoração e experiências extras não incluídas.</textarea></label>
+        <div class="pv-banner-fields"><label class="pv-field">Cor principal<input id="banner-green" type="color" value="#073b28"></label><label class="pv-field">Fundo<input id="banner-background" type="color" value="#fbf8ef"></label></div>
+      </details>
+      <details class="pv-banner-texts"><summary>Guardar e retomar edição</summary><div class="pv-banner-actions"><button type="button" class="pv-button" id="banner-save">Salvar edição</button><label class="pv-button pv-banner-file">Abrir edição<input type="file" id="banner-open" accept="application/json,.json"></label></div></details>
+    </form>
+    <aside class="pv-card pv-banner-preview" aria-label="Pré-visualização do banner">
+      <div class="pv-card-head"><h2>Pré-visualização</h2><button type="button" class="pv-button" id="banner-expand">Ampliar</button></div>
+      <p class="pv-banner-gesture-help">Toque na foto para trocar. Arraste para reposicionar e use dois dedos para ampliar.</p>
+      <div class="pv-banner-stage"><div class="pv-banner-artboard"><canvas id="banner-canvas" width="1080" height="3166" role="img" aria-label="Banner do período selecionado"></canvas><div class="pv-banner-photo-targets" id="banner-photo-targets"></div></div></div>
+      <p id="banner-preview-note" role="status"></p>
+      <div class="pv-banner-actions"><button type="button" class="pv-primary" id="banner-download" disabled>Baixar PNG</button><button type="button" class="pv-button" id="banner-jpeg" disabled>Baixar JPG</button><button type="button" class="pv-button" id="banner-video" disabled>Baixar vídeo</button></div>
+      <small id="banner-video-note">Vídeo de 8 segundos com movimento suave nas fotos.</small>
+    </aside>
+  </div>
+  <dialog id="banner-preview-dialog" aria-label="Pré-visualização ampliada"><button type="button" class="pv-button" id="banner-close-preview">Fechar</button><p class="pv-banner-gesture-help">Toque para escolher a foto. Arraste e use a pinça para enquadrar.</p><div id="banner-expanded-stage" class="pv-banner-stage"></div></dialog>
+  <dialog id="banner-photo-dialog" aria-labelledby="banner-photo-title">
+    <header class="pv-banner-gallery-head"><h2 id="banner-photo-title">Escolher foto</h2><button type="button" class="pv-button" id="banner-photo-close">Fechar</button></header>
+    <p id="banner-photo-sharing"></p>
+    <div class="pv-banner-carousel"><button type="button" class="pv-button" id="banner-photo-prev" aria-label="Foto anterior">‹</button><img id="banner-photo-selected" alt=""><button type="button" class="pv-button" id="banner-photo-next" aria-label="Próxima foto">›</button></div>
+    <p id="banner-photo-caption" aria-live="polite"></p>
+    <div id="banner-photo-strip" class="pv-banner-photo-strip" aria-label="Fotos disponíveis"></div>
+    <div class="pv-banner-gallery-actions"><button type="button" class="pv-primary" id="banner-photo-use">Usar esta foto</button><label class="pv-button pv-banner-file">Enviar foto do celular<input type="file" id="banner-photo-upload" accept="image/jpeg,image/png,image/webp"></label></div>
+  </dialog>
+</section>
+</main><script src="promotion-framing.js?v=1"></script><script src="promotion-banner.js?v=1"></script><script src="promotion-workspace.js?v=1"></script></body></html>

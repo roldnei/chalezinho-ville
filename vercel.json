@@ -10,6 +10,9 @@
     },
     "api/moments.js": {
       "maxDuration": 60
+    },
+    "api/promotion-banner.js": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
