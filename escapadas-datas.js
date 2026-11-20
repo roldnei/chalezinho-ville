@@ -16,7 +16,7 @@
    const input=V.dateSelection(selection,catalog);
    const card=await V.refresh(input,{signal:controller.signal});if(request!==revision||scope!==signature())return;
    const rows=V.mediaFor(card,catalog);loaded={card,scope};media=rows;
-   $('#date-result-title').textContent=card.property_name+' · '+(card.offer_name||'Escapada');$('#date-selection').textContent=V.range(card)+' · '+card.nights+' noites · '+card.guests+' hóspedes';$('#date-price').innerHTML=V.installmentHTML(card.total_cents);$('#date-quote-time').textContent='10 parcelas em reais, com acréscimo de 7% sobre a escapada consultada. Oferta e limpeza incluídas.';$('#date-result').hidden=false;
+   $('#date-result-title').textContent=card.property_name+' · '+(card.offer_name||'Escapada');$('#date-selection').textContent=V.range(card)+' · '+card.nights+' noites · '+card.guests+' hóspedes';$('#date-price').innerHTML=V.installmentHTML(card.total_cents);$('#date-quote-time').textContent='Oferta e limpeza incluídas.';$('#date-result').hidden=false;
    const current=await V.preview($('#date-canvas'),card,rows,{onError:text=>{if(request===revision){$('#date-download').disabled=true;note(text);}}});
    if(request!==revision||scope!==signature()){current.destroy();return;}player=current;$('#date-download').disabled=false;note('Escapada carregada. Confira a prévia e baixe o vídeo.');
   }catch(e){if(request===revision){destroyPreview();note(e.name==='AbortError'?'Consulta cancelada.':e.message);}}

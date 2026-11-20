@@ -7,8 +7,8 @@
   const total=Math.round(cents*107/100),value=Math.round(total/10);
   return {count:10,total_cents:total,value_cents:value,value:(value/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};
  }
- const installmentText=cents=>'10x'+installment(cents).value;
- const installmentHTML=cents=>'<span class="escape-installments"><span class="escape-installment-count">10x</span><span class="escape-installment-value">'+installment(cents).value+'</span></span>';
+ const installmentText=cents=>'10xR$'+installment(cents).value;
+ const installmentHTML=cents=>'<span class="escape-installments"><span class="escape-installment-count">10x</span><span class="escape-installment-value">R$'+installment(cents).value+'</span></span>';
  const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
  const date=v=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(v+'T12:00:00Z'));
  const range=c=>date(c.check_in)+' a '+date(c.check_out);
@@ -50,7 +50,7 @@
   if(before){label(ctx,before,42,887,620,27,{color:'#ecddb9'});const width=ctx.measureText(before).width;ctx.strokeStyle='#ecddb9';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(42,877);ctx.lineTo(42+width,877);ctx.stroke();}
   const priceY=before?955:917,price=installment(card.total_cents);
   label(ctx,'10x',42,priceY,620,29,{bold:true});const priceX=42+ctx.measureText('10x').width+2;
-  label(ctx,price.value,priceX,priceY,662-priceX,64,{bold:true});label(ctx,'Parcelas em reais · hospedagem e limpeza',42,before?991:957,620,21);
+  label(ctx,'R$'+price.value,priceX,priceY,662-priceX,64,{bold:true});label(ctx,'Hospedagem e limpeza incluídas',42,before?991:957,620,21);
   const inclusions=(card.experiences||[]).flatMap(e=>e.components||[]).map(c=>c.name).filter(Boolean);
   label(ctx,inclusions.length?'Inclui '+inclusions.join(' · '):'Consulte disponibilidade e condições',42,1041,620,21);
   ctx.textAlign='center';

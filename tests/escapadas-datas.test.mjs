@@ -12,7 +12,7 @@ async function page({query='',defer=false}={}){
 }
 test('loads exact dates directly, outside the automatic showcase window, without a post composer or mutations',async()=>{
  const p=await page({query:'?chalet=CH2&check_in=2026-12-14&check_out=2026-12-16&guests=2'});
- assert.equal(p.$('#date-result').hidden,false);assert.equal(p.$('#date-price').textContent,'10x127,80');assert.equal(p.$('.escape-installment-count').textContent,'10x');assert.equal(p.exports.length,0);assert.equal(p.$('#date-download').disabled,false);assert.equal(p.previews[0].card.check_in,'2026-12-14');assert.equal(p.previews[0].card.check_out,'2026-12-16');assert.equal(p.previews[0].card.property_code,'CH2');assert.equal(p.previews[0].media[0].url,'assets/essenza.webp');assert.equal(p.$('#vg-post-form'),null);
+ assert.equal(p.$('#date-result').hidden,false);assert.equal(p.$('#date-price').textContent,'10xR$127,80');assert.equal(p.$('.escape-installment-count').textContent,'10x');assert.equal(p.exports.length,0);assert.equal(p.$('#date-download').disabled,false);assert.equal(p.previews[0].card.check_in,'2026-12-14');assert.equal(p.previews[0].card.check_out,'2026-12-16');assert.equal(p.previews[0].card.property_code,'CH2');assert.equal(p.previews[0].media[0].url,'assets/essenza.webp');assert.equal(p.$('#vg-post-form'),null);
  const quote=new URL(p.calls.find(c=>c.url.startsWith('/api/escapada-video')).url,'https://pms.test');assert.equal(quote.searchParams.get('offer_id'),offer);
  p.$('#date-download').click();await tick();assert.equal(p.exports.length,1);assert.ok(p.calls.every(c=>!c.opts.body||JSON.parse(c.opts.body).operation==='admin_list'));p.dom.window.close();
 });
