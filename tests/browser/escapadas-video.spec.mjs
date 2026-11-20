@@ -24,7 +24,7 @@ async function fixture(page){
 test('filters, previews and downloads the moving escapada as an actual MP4',async({page},testInfo)=>{
  const {errors,requests}=await fixture(page);await page.goto('/promocoes.html');await expect(page.locator('.escape-card')).toHaveCount(3);
  await page.locator('#escape-property').selectOption('CH2');await page.locator('#escape-from').fill('2026-11-23');await page.locator('#escape-to').fill('2026-11-23');await expect(page.locator('.escape-card')).toHaveCount(1);
- await expect(page.locator('.escape-card')).toContainText('Ville Essenza');await expect(page.locator('.escape-card')).toContainText('10x127,80');
+ await expect(page.locator('.escape-card')).toContainText('Ville Essenza');await expect(page.locator('.escape-card')).toContainText('10xR$127,80');
  await page.getByRole('button',{name:'Ver e baixar vídeo'}).click();await expect(page.locator('#escape-download')).toBeEnabled();
  await expect(page.locator('#escape-preview-title')).toContainText('Ville Essenza');await expect(page.locator('#escape-selected-dates')).toContainText('23');
  await page.screenshot({path:testInfo.outputPath('escapada-preview.png'),fullPage:true});
@@ -32,7 +32,7 @@ test('filters, previews and downloads the moving escapada as an actual MP4',asyn
  expect(download.suggestedFilename()).toBe('escapada-ch2-2026-11-23-a-2026-11-25.mp4');
  const path=testInfo.outputPath('escapada.mp4');await download.saveAs(path);
  const info=JSON.parse(execFileSync('ffprobe',['-v','error','-show_streams','-show_format','-of','json',path],{encoding:'utf8'})),video=info.streams.find(s=>s.codec_type==='video');
- expect(video.codec_name).toBe('h264');expect(video.width).toBe(720);expect(video.height).toBe(1280);expect(Number(info.format.duration)).toBeGreaterThan(.3);expect(requests).toContain('/api/escapada-video');expect(errors).toEqual([]);
+ expect(video.codec_name).toBe('h264');expect(video.width).toBe(1080);expect(video.height).toBe(1920);expect(Math.abs(Number(info.format.duration)-15)).toBeLessThan(.3);expect(requests).toContain('/api/escapada-video');expect(errors).toEqual([]);
  await expect(page.locator('#escape-video-status')).toContainText('Vídeo baixado');
 });
 test('editing an escapada opens the date tool with its chalet and stay, without a post composer',async({page})=>{

@@ -1,5 +1,6 @@
 (()=>{
  'use strict';
+ const VIDEO_SETTINGS=Object.freeze({width:1080,height:1920,fps:30,videoBitsPerSecond:12000000,duration:15});
  const money=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
  // Compute from the original quote on every render; never mark up the stored price.
  function installment(cents){
@@ -27,12 +28,19 @@
   return cards.filter(c=>(!property||c.property_code===property)&&(!from||c.check_in>=from)&&(!to||c.check_in<=to)).sort((a,b)=>a.check_in.localeCompare(b.check_in)||String(a.property_code).localeCompare(String(b.property_code)));
  }
  function mediaFor(card,catalog){
-  if(card.publication?.media?.length)return card.publication.media.map(m=>({...m}));
+  if(card.publication?.media?.length)return prepareMedia(card,card.publication.media);
   const offer=(catalog.offers||[]).find(o=>o.id===card.offer_id)||{},property=(catalog.properties||[]).find(p=>Number(p.id)===Number(card.property_id))||{};
   const configured=(offer.villegram?.photos||[]).filter(m=>Number(m.property_id)===Number(card.property_id)),gallery=(property.gallery||[]).map(p=>typeof p==='string'?{url:p,alt:property.name}:p);
   const photos=configured.length?configured:gallery.length?gallery:[{url:card.image||property.cover_image,alt:card.property_name}];
   const rows=card.showcase_image?[{url:card.showcase_image},...photos.filter(m=>m.url!==card.showcase_image)]:photos;
-  return rows.filter(m=>m.url).slice(0,8).map(m=>({...m,kind:'photo',fit:m.fit||'cover',mode:m.mode||'breathe',clip_duration:m.clip_duration||6.5,transition:m.transition||'fade',alt:m.alt||card.property_name}));
+  return prepareMedia(card,rows.filter(m=>m.url).slice(0,8).map(m=>({...m,kind:'photo',fit:m.fit||'cover',mode:m.mode||'breathe',transition:m.transition||'fade',alt:m.alt||card.property_name})));
+ }
+ function prepareMedia(card,media){
+  const numbered=media.map((m,index)=>({...m,escapada_photo_number:m.escapada_photo_number??index+1}));
+  const rows=(card.property_code==='CH1'||Number(card.property_id)===1)?numbered.filter(m=>[1,3,5,7].includes(m.escapada_photo_number)):numbered;
+  if(!rows.length)return [];
+  const slot=VIDEO_SETTINGS.duration/rows.length;
+  return rows.map(m=>m.kind==='video'?{...m,speed:((m.trim_end??m.duration??slot)-(m.trim_start||0))/slot}:{...m,clip_duration:slot});
  }
  function assertCard(c){if(!validDate(c.check_in)||!validDate(c.check_out)||c.check_out<=c.check_in||!c.property_name||!Number.isInteger(c.guests)||!Number.isSafeInteger(c.total_cents)||c.total_cents<=0)throw Error('Confira chalé, datas, hóspedes e preço antes de baixar.');}
  function label(ctx,text,x,y,width,size,{serif=false,bold=false,color='#fff'}={}){
@@ -45,7 +53,7 @@
   const shade=ctx.createLinearGradient(0,430,0,1280);shade.addColorStop(0,'#0000');shade.addColorStop(.4,'#0007');shade.addColorStop(1,'#000e');ctx.fillStyle=shade;ctx.fillRect(0,430,720,850);
   label(ctx,'Chalezinho Ville',42,78,620,29,{bold:true});label(ctx,'Chalés românticos em Guarapari',42,112,620,22);label(ctx,'V I L L E  M O M E N T S',42,151,620,21,{color:'#eddcad'});
   label(ctx,card.property_name,42,691,620,25);label(ctx,(card.video_title||card.offer_name||'Escapada').split(' · ')[0],42,750,620,57,{serif:true});
-  label(ctx,range(card),42,801,620,29,{bold:true});label(ctx,card.nights+' noites · '+card.guests+' hóspedes',42,838,620,23);
+  label(ctx,range(card),42,801,620,29,{bold:true});label(ctx,card.nights+(card.nights===1?' noite':' noites')+' · '+card.guests+' hóspedes',42,838,620,23);
   const before=Number.isSafeInteger(card.gross_cents)&&card.gross_cents>card.total_cents?installmentText(card.gross_cents):'';
   if(before){label(ctx,before,42,887,620,27,{color:'#ecddb9'});const width=ctx.measureText(before).width;ctx.strokeStyle='#ecddb9';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(42,877);ctx.lineTo(42+width,877);ctx.stroke();}
   const priceY=before?955:917,price=installment(card.total_cents);
@@ -58,25 +66,26 @@
  }
  async function refresh(card,{signal}={}){
   const q=new URLSearchParams(Object.fromEntries(['property_id','offer_id','check_in','check_out','guests','rate_code'].map(k=>[k,card[k]??''])));
-  const r=await fetch('/api/escapada-video?'+q,{cache:'no-store',signal:signal||AbortSignal.timeout(45000)}),d=await r.json();
+  const r=await fetch('/api/escapada-video?'+q,{cache:'no-store',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(45000)]):AbortSignal.timeout(45000)}),d=await r.json();
   if(!r.ok||!d.ok||!d.card)throw Error('Esta escapada não está disponível para as mesmas datas e condições. Atualize a lista ou ajuste a seleção.');
-  const fresh={...card,...d.card,checked_at:d.checked_at};assertCard(fresh);return fresh;
+  const fresh={...card,...d.card,checked_at:d.checked_at};assertCard(fresh);if(key(fresh)!==key(card))throw Error('A cotação mudou o chalé ou as condições da estadia. Atualize a seleção.');return fresh;
  }
  function fileName(card){return 'escapada-'+String(card.property_code||card.property_name).toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+card.check_in+'-a-'+card.check_out+'.mp4';}
  async function exportVideo(card,media,options={}){
   assertCard(card);if(!media?.length)throw Error('Escolha pelo menos uma foto ou vídeo.');
-  return window.VillegramTimeline.exportSequence(media,{...options,guest:false,sound:media.some(m=>m.sound||m.kind==='video'&&m.original_volume!==0),overlay:ctx=>drawOverlay(ctx,card)});
+  media=prepareMedia(card,media);
+  return window.VillegramTimeline.exportSequence(media,{...options,...VIDEO_SETTINGS,guest:false,sound:media.some(m=>m.sound||m.kind==='video'&&m.original_volume!==0),overlay:ctx=>drawOverlay(ctx,card)});
  }
  function download(blob,card){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=fileName(card);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
  async function preview(canvas,card,media,{onError=()=>{},onTime=()=>{}}={}){
-  assertCard(card);if(!media.length)throw Error('Nenhuma mídia disponível para esta escapada.');
+  assertCard(card);media=prepareMedia(card,media);if(!media.length)throw Error('Nenhuma mídia disponível para esta escapada.');
   canvas.width=720;canvas.height=1280;const layer=document.createElement('canvas');layer.width=720;layer.height=1280;
   const host=document.createElement('div');host.className='escape-media-host';document.body.append(host);let dead=false,frame;
-  const engine=window.VillegramTimeline.player({host,media,preloadAll:true,onError,onTime,onComplete:()=>engine.setActive(false)}),clips=window.VillegramTimeline.sequence(media);
+  const engine=window.VillegramTimeline.player({host,media,preloadAll:true,renderDOM:false,onError,onTime,onComplete:()=>engine.setActive(false)}),clips=window.VillegramTimeline.sequence(media);
   const destroy=()=>{dead=true;cancelAnimationFrame(frame);engine.destroy();host.remove();};
   try{
    await Promise.all(engine.elements.map(el=>new Promise((yes,no)=>{if(el.tagName==='IMG'&&el.complete&&el.naturalWidth||el.tagName==='VIDEO'&&el.readyState>=2)return yes();const timer=setTimeout(()=>no(Error('A mídia demorou para carregar. Tente novamente.')),20000);el.addEventListener(el.tagName==='VIDEO'?'loadeddata':'load',()=>{clearTimeout(timer);yes()},{once:true});el.addEventListener('error',()=>{clearTimeout(timer);no(Error('Uma foto ou vídeo não carregou.'));},{once:true});if(el.tagName==='VIDEO'){el.preload='auto';el.load();}})));
-   if(dead)return {destroy};const ctx=canvas.getContext('2d'),scratch=layer.getContext('2d');
+   if(dead)return {destroy};const ctx=canvas.getContext('2d'),scratch=layer.getContext('2d');ctx.imageSmoothingQuality=scratch.imageSmoothingQuality='high';
    const paint=()=>{if(dead)return;try{window.VillegramTimeline.renderSequenceFrame(ctx,scratch,clips,engine.elements,engine.time,{overlay:ctx=>drawOverlay(ctx,card)});}catch(e){destroy();onError(e.message);return;}frame=requestAnimationFrame(paint);};
    engine.setActive(true);paint();return {destroy,seek:t=>engine.seek(t),pause:()=>engine.setActive(false),play:()=>{if(engine.time>=engine.total-.05)engine.seek(0);engine.setActive(true);},get total(){return engine.total;},get time(){return engine.time;}};
   }catch(e){destroy();throw e;}
@@ -98,5 +107,5 @@
   };
   return close;
  }
- window.VilleEscapadaVideo={money,installment,installmentText,installmentHTML,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
+ window.VilleEscapadaVideo={VIDEO_SETTINGS,prepareMedia,money,installment,installmentText,installmentHTML,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
 })();
