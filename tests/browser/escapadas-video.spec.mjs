@@ -12,7 +12,8 @@ async function fixture(page){
  await page.route('http://127.0.0.1:4173/**',async r=>{
   const url=new URL(r.request().url()),path=url.pathname;requests.push(path);
   const json=body=>r.fulfill({contentType:'application/json',body:JSON.stringify(body)});
-  if(path==='/functions/v1/villegram-content')return json({ok:true,properties,offers:[],publications:[],products:[],settings:{templates:{}},rows:[]});
+  if(path==='/functions/v1/villegram-content')return json({ok:true,properties,offers:[{id:offer,name:'Escapada',status:'active',showcase:{enabled:true},property_ids:[1,2,3]}],publications:[],products:[],settings:{templates:{}},rows:[]});
+  if(path==='/functions/v1/public-consultation')return json({ok:true,offers:[{id:offer,name:'Escapada',status:'active',showcase:{enabled:true},property_ids:[1,2,3]}]});
   if(path==='/api/stay-showcase')return json({ok:true,cards,properties,offers:[],window_end:'2026-12-11'});
   if(path==='/api/escapada-video')return json({ok:true,card:{...card,total_cents:118000},checked_at:new Date().toISOString()});
   if(path==='/app-config.js')return r.fulfill({contentType:'text/javascript',body:`window.CHALEZINHO_CONFIG={environment:'development',supabaseUrl:location.origin,supabaseKey:'fixture',features:{feelings:false}};window.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'fixture',user:{id:'fixture'}}}})}})};`});
@@ -34,8 +35,7 @@ test('filters, previews and downloads the moving escapada as an actual MP4',asyn
  expect(video.codec_name).toBe('h264');expect(video.width).toBe(720);expect(video.height).toBe(1280);expect(Number(info.format.duration)).toBeGreaterThan(.3);expect(requests).toContain('/api/escapada-video');expect(errors).toEqual([]);
  await expect(page.locator('#escape-video-status')).toContainText('Vídeo baixado');
 });
-test('opens the existing editor with the exact chalet, stay and photos of the selected escapada',async({page})=>{
+test('editing an escapada opens the date tool with its chalet and stay, without a post composer',async({page})=>{
  await fixture(page);await page.goto('/promocoes.html');await expect(page.locator('.escape-card')).toHaveCount(3);await page.locator('#escape-property').selectOption('CH2');await page.getByRole('button',{name:'Ver e baixar vídeo'}).click();await expect(page.locator('#escape-download')).toBeEnabled();
- await page.locator('#escape-edit').click();await expect(page).toHaveURL(/villegram-admin\.html\?escapada=import/);
- const draft=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('ville-escape-draft-v1')||'null'));expect(draft.card.property_code).toBe('CH2');expect(draft.card.check_in).toBe('2026-11-23');expect(draft.card.check_out).toBe('2026-11-25');expect(draft.media[0].kind).toBe('photo');
+ await page.locator('#escape-edit').click();await expect(page).toHaveURL(/villemoments-escapadas\.html\?/);await expect(page.locator('#date-chalet')).toHaveValue('CH2');await expect(page.locator('#date-in')).toHaveValue('2026-11-23');await expect(page.locator('#date-out')).toHaveValue('2026-11-25');await expect(page.locator('#vg-post-form')).toHaveCount(0);await expect(page.locator('#date-download')).toBeEnabled();
 });

@@ -23,3 +23,12 @@ test('reconfirmation preserves the exact property, stay, guests, offer and rate'
  for(const [key,value] of [['check_in','2026-02-30'],['check_out','2026-11-22'],['guests','0'],['property_id','0'],['offer_id','x'],['rate_code','wrong']]){const bad=new URLSearchParams(q);bad.set(key,value);assert.throws(()=>quoteInput(bad));}
  assert.throws(()=>V.assertCard({...base,total_cents:null}));
 });
+
+test('date-based tool retains exact chalet, period and offer without importing a post',()=>{
+ const url=new URL(V.dateToolURL(base),'https://pms.test');assert.equal(url.pathname,'/villemoments-escapadas.html');assert.equal(url.searchParams.get('check_in'),base.check_in);assert.equal(url.searchParams.get('check_out'),base.check_out);assert.equal(url.searchParams.get('chalet'),'CH2');assert.equal(url.searchParams.get('offer_id'),base.offer_id);
+ const result=V.dateSelection({chalet:'CH2',check_in:'2026-12-14',check_out:'2026-12-16',guests:2},{properties:[{id:2,code:'CH2',name:'Ville Essenza',active:true}],offers:[{id:base.offer_id,name:'Escapada',status:'active',showcase:{enabled:true},property_ids:[2]}]});assert.equal(result.check_in,'2026-12-14');assert.equal(result.offer_id,base.offer_id);assert.equal(result.total_cents,undefined);
+});
+test('export overlay contains dates and prices with no WhatsApp call-to-action or button',()=>{
+ const texts=[],ctx={canvas:{width:720,height:1280},save(){},restore(){},scale(){},fillRect(){},createLinearGradient:()=>({addColorStop(){}}),measureText:t=>({width:t.length*8}),fillText:t=>texts.push(t),beginPath(){},moveTo(){},lineTo(){},stroke(){}};
+ V.drawOverlay(ctx,base);assert.ok(texts.includes(base.property_name));assert.ok(texts.some(t=>t.includes('1.194,40')));assert.ok(!texts.some(t=>/WhatsApp|Quero estes dias/i.test(t)));
+});

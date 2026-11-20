@@ -26,7 +26,7 @@
  $('#escape-clear').onclick=()=>{$('#escape-filters').reset();render();};$('#escape-refresh').onclick=load;
  $('#escape-preview').addEventListener('cancel',e=>{if(exporting)e.preventDefault();});$('#escape-close').onclick=()=>$('#escape-preview').close();$('#escape-preview').onclose=()=>{++previewRevision;player?.destroy();player=null;controller?.abort();};
  $('#escape-play').onclick=()=>player?.play();$('#escape-pause').onclick=()=>player?.pause();$('#escape-seek').oninput=e=>player?.seek(Number(e.target.value));
- $('#escape-edit').onclick=()=>{sessionStorage.setItem('ville-escape-draft-v1',JSON.stringify({version:1,environment:C.environment,at:Date.now(),card:selected,media:selectedMedia}));location.href='villegram-admin.html?escapada=import';};
+ $('#escape-edit').onclick=()=>{if(!selected)return;location.href=V.dateToolURL(selected);};
  $('#escape-download').onclick=async()=>{
   if(!selected||exporting)return;controller=new AbortController();controls(true);player?.pause();$('#escape-progress').value=0;status('Reconfirmando o preço e a disponibilidade desta escapada…');
   try{const fresh=await V.refresh(selected,{signal:controller.signal});Object.assign(selected,fresh);status('Gerando o vídeo MP4. Mantenha esta tela aberta…');const blob=await V.exportVideo(selected,selectedMedia,{signal:controller.signal,progress:n=>{$('#escape-progress').value=n;status('Gerando vídeo da '+selected.property_name+' · '+n+'%');}});V.download(blob,selected);$('#escape-progress').value=100;status('Vídeo baixado: '+selected.property_name+' · '+V.range(selected)+'.');}

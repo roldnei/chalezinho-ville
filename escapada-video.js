@@ -5,6 +5,16 @@
  const date=v=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(v+'T12:00:00Z'));
  const range=c=>date(c.check_in)+' a '+date(c.check_out);
  const key=c=>[c.offer_id||'',c.property_id,c.check_in,c.check_out,c.guests||2,c.rate_code||''].join(':');
+ function dateToolURL(card){return 'villemoments-escapadas.html?'+new URLSearchParams({chalet:card.property_code,check_in:card.check_in,check_out:card.check_out,guests:String(card.guests||2),offer_id:card.offer_id||'',rate_code:card.rate_code||'non_refundable'});}
+ function dateSelection(selection,catalog){
+  const property=(catalog.properties||[]).find(p=>p.code===selection.chalet&&p.active!==false);
+  if(!property)throw Error('Escolha um chalé ativo.');
+  if(!validDate(selection.check_in)||!validDate(selection.check_out)||selection.check_out<=selection.check_in||!Number.isInteger(selection.guests)||selection.guests<1||selection.guests>2)throw Error('Confira a entrada, a saída e os hóspedes.');
+  const offers=(catalog.offers||[]).filter(o=>o.status==='active'&&o.showcase?.enabled&&(o.property_ids||[]).some(id=>Number(id)===Number(property.id)));
+  const offer=selection.offer_id?offers.find(o=>o.id===selection.offer_id):offers.length===1?offers[0]:offers.find(o=>/^escapada$/i.test(o.name));
+  if(!offer)throw Error('Este chalé não tem uma Escapada automática ativa para carregar.');
+  return {property_id:Number(property.id),property_code:property.code,property_name:property.name,image:property.cover_image,offer_id:offer.id,offer_name:offer.name,check_in:selection.check_in,check_out:selection.check_out,guests:selection.guests,rate_code:['refundable','non_refundable'].includes(selection.rate_code)?selection.rate_code:'non_refundable'};
+ }
  function filter(cards,{property='',from='',to=''}={}){
   return cards.filter(c=>(!property||c.property_code===property)&&(!from||c.check_in>=from)&&(!to||c.check_in<=to)).sort((a,b)=>a.check_in.localeCompare(b.check_in)||String(a.property_code).localeCompare(String(b.property_code)));
  }
@@ -33,7 +43,7 @@
   label(ctx,money(card.total_cents),42,before?955:917,620,57,{bold:true});label(ctx,'Total da escapada · hospedagem e limpeza',42,before?991:957,620,21);
   const inclusions=(card.experiences||[]).flatMap(e=>e.components||[]).map(c=>c.name).filter(Boolean);
   label(ctx,inclusions.length?'Inclui '+inclusions.join(' · '):'Consulte disponibilidade e condições',42,1041,620,21);
-  ctx.fillStyle='#351800';ctx.strokeStyle='#b99d59';ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(42,1080,636,76,24);ctx.fill();ctx.stroke();ctx.textAlign='center';label(ctx,'Quero estes dias · fale pelo WhatsApp',360,1128,580,26,{bold:true});
+  ctx.textAlign='center';
   label(ctx,'@chalezinhoville · chalezinhoville.com.br',360,1204,638,21);label(ctx,'Preço e disponibilidade sujeitos à confirmação.',360,1238,638,17,{color:'#e8dfcb'});ctx.restore();
  }
  async function refresh(card,{signal}={}){
@@ -78,5 +88,5 @@
   };
   return close;
  }
- window.VilleEscapadaVideo={money,range,key,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
+ window.VilleEscapadaVideo={money,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
 })();
