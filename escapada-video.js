@@ -27,17 +27,25 @@
  function filter(cards,{property='',from='',to=''}={}){
   return cards.filter(c=>(!property||c.property_code===property)&&(!from||c.check_in>=from)&&(!to||c.check_in<=to)).sort((a,b)=>a.check_in.localeCompare(b.check_in)||String(a.property_code).localeCompare(String(b.property_code)));
  }
+ // Stable PMS photo identities approved by the owner; gallery positions may change.
+ const SIGNATURE_PHOTOS=Object.freeze(['aa8c1218-7182-4eb2-94ae-c408600fb972.webp','40a6a4f3-b754-4021-a4ba-96f8bac43549.webp','05-spa-experiencia.webp','04-decoracao.webp','ch1-capa-casal-spa.webp']);
+ const isSignature=card=>card.property_code==='CH1'||Number(card.property_id)===1;
+ const photoIdentity=m=>String(m.url||'').split(/[?#]/)[0].split('/').pop();
  function mediaFor(card,catalog){
-  if(card.publication?.media?.length)return prepareMedia(card,card.publication.media);
   const offer=(catalog.offers||[]).find(o=>o.id===card.offer_id)||{},property=(catalog.properties||[]).find(p=>Number(p.id)===Number(card.property_id))||{};
   const configured=(offer.villegram?.photos||[]).filter(m=>Number(m.property_id)===Number(card.property_id)),gallery=(property.gallery||[]).map(p=>typeof p==='string'?{url:p,alt:property.name}:p);
+  if(isSignature(card))return prepareMedia(card,[...configured,...gallery].filter(m=>m.url).map(m=>({...m,kind:'photo',fit:m.fit||'cover',mode:m.mode||'breathe',transition:m.transition||'fade',alt:m.alt||card.property_name})));
+  if(card.publication?.media?.length)return prepareMedia(card,card.publication.media);
   const photos=configured.length?configured:gallery.length?gallery:[{url:card.image||property.cover_image,alt:card.property_name}];
   const rows=card.showcase_image?[{url:card.showcase_image},...photos.filter(m=>m.url!==card.showcase_image)]:photos;
   return prepareMedia(card,rows.filter(m=>m.url).slice(0,8).map(m=>({...m,kind:'photo',fit:m.fit||'cover',mode:m.mode||'breathe',transition:m.transition||'fade',alt:m.alt||card.property_name})));
  }
  function prepareMedia(card,media){
-  const numbered=media.map((m,index)=>({...m,escapada_photo_number:m.escapada_photo_number??index+1}));
-  const rows=(card.property_code==='CH1'||Number(card.property_id)===1)?numbered.filter(m=>[1,3,5,7].includes(m.escapada_photo_number)):numbered;
+  let rows=media.map(m=>({...m}));
+  if(isSignature(card)){
+   rows=SIGNATURE_PHOTOS.map(id=>rows.find(m=>m.kind!=='video'&&photoIdentity(m)===id));
+   if(rows.some(m=>!m))throw Error('Não foi possível encontrar as cinco fotos aprovadas do Signature no PMS. Atualize as escapadas e tente novamente.');
+  }
   if(!rows.length)return [];
   const slot=VIDEO_SETTINGS.duration/rows.length;
   return rows.map(m=>m.kind==='video'?{...m,speed:((m.trim_end??m.duration??slot)-(m.trim_start||0))/slot}:{...m,clip_duration:slot});
@@ -91,6 +99,7 @@
   }catch(e){destroy();throw e;}
  }
  async function openDownloadDialog(card,media){
+  if(isSignature(card)){const r=await fetch('/api/stay-showcase',{cache:'no-store',signal:AbortSignal.timeout(55000)}),catalog=await r.json();if(!r.ok||!catalog.ok)throw Error('Não foi possível atualizar as fotos do Signature no PMS.');media=mediaFor(card,catalog);}
   const dialog=document.createElement('dialog');dialog.className='escape-editor-dialog';dialog.setAttribute('aria-label','Prévia e download da escapada em vídeo');
   dialog.innerHTML='<header><div><small>VÍDEO DA ESCAPADA</small><h2></h2><p data-dates></p><p data-price class="escape-dialog-price"></p></div><button type="button" data-close>Fechar</button></header><div class="escape-editor-canvas"><canvas width="720" height="1280" role="img" aria-label="Prévia do vídeo da escapada"></canvas></div><p data-status role="status" aria-live="polite">Carregando a prévia…</p><progress max="100" value="0" hidden aria-label="Geração do vídeo"></progress><div class="escape-editor-actions"><button type="button" data-play>Reproduzir</button><button type="button" data-pause>Pausar</button><button type="button" class="escape-editor-primary" data-download disabled>Baixar vídeo MP4</button><button type="button" data-cancel hidden>Cancelar geração</button></div>';
   const $=s=>dialog.querySelector(s);$('h2').textContent=card.property_name+' · '+(card.video_title||card.offer_name||'Escapada');$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents);
@@ -107,5 +116,5 @@
   };
   return close;
  }
- window.VilleEscapadaVideo={VIDEO_SETTINGS,prepareMedia,money,installment,installmentText,installmentHTML,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
+ window.VilleEscapadaVideo={VIDEO_SETTINGS,SIGNATURE_PHOTOS,photoIdentity,prepareMedia,money,installment,installmentText,installmentHTML,range,key,dateToolURL,dateSelection,filter,mediaFor,assertCard,drawOverlay,refresh,fileName,exportVideo,download,preview,openDownloadDialog};
 })();
