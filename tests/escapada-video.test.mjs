@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {quoteInput} from '../api/escapada-video.js';
-const scope={window:{},Intl,Date,URLSearchParams};vm.runInNewContext(await readFile(new URL('../escapada-video.js',import.meta.url),'utf8'),scope);
+const scope={window:{},Intl,Date,URLSearchParams};vm.runInNewContext(await readFile(new URL('../site-prices.js',import.meta.url),'utf8'),scope);vm.runInNewContext(await readFile(new URL('../escapada-video.js',import.meta.url),'utf8'),scope);
 const V=scope.window.VilleEscapadaVideo,base={offer_id:'12345678-abcd-abcd-abcd-123456789012',property_id:2,property_code:'CH2',property_name:'Ville Essenza',check_in:'2026-11-23',check_out:'2026-11-25',guests:2,nights:2,rate_code:'non_refundable',total_cents:119440,gross_cents:124200};
 test('filters identify one chalet and arrival date without mixing different packages',()=>{
  const cards=[base,{...base,property_id:1,property_code:'CH1'},{...base,check_in:'2026-11-27',check_out:'2026-11-29'}];

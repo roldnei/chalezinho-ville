@@ -129,15 +129,15 @@ test('calibration includes repeat activity after seven days',()=>{
  assert.equal(summarizeMobile(p,events,[],{},new Date('2026-10-20T00:00:00Z')).groups.baseline.counts.property_viewed,1);
 });
 
-test('actual mobile mount opens Moments for A, conventional home for B, and does not label background failures as entry failures',async()=>{
+test('all previous A/B visitors now enter the conventional home and background feed failures do not hide it',async()=>{
  const content=readFileSync(new URL('../villegram-content.js',import.meta.url),'utf8');
  for(const variant of ['A','B']){
   const {w,calls}=await browser('https://site.example/',variant,'running');w.document.body.insertAdjacentHTML('afterbegin','<header><nav></nav></header><main><div class="hero">Site</div></main>');
   w.matchMedia=()=>({matches:true,addEventListener(){}});let opens=0;
   w.Villegram={configurePublications(){},openHome(){opens++;const node=w.document.createElement('div');node.id='villegram';w.document.body.append(node)}};
   const measurement=w.fetch;w.fetch=async(url,options)=>url.endsWith('public-consultation')?measurement(url,options):{ok:true,json:async()=>({ok:true,publications:[],products:[],offers:[],properties:[{id:'p',code:'CH1',name:'Signature',active:true,cover_image:'x.webp'}]})};
-  w.eval(content);await new Promise(r=>setTimeout(r,40));assert.equal(opens,variant==='A'?1:0);
-  const entries=calls.filter(c=>c.event_name==='entry_rendered');assert.equal(entries.length,1);assert.equal(entries[0].details.rendered,variant==='A'?'moments':'site');
+  w.eval(content);await new Promise(r=>setTimeout(r,40));assert.equal(opens,0);
+  const entries=calls.filter(c=>c.event_name==='entry_rendered');assert.equal(entries.length,1);assert.equal(entries[0].details.rendered,'site');
   w.close();
  }
  const {w,calls}=await browser('https://site.example/','B','running');w.document.body.insertAdjacentHTML('afterbegin','<header><nav></nav></header><main><div class="hero">Site</div></main>');w.matchMedia=()=>({matches:true,addEventListener(){}});w.Villegram={configurePublications(){}};const measurement=w.fetch;w.fetch=async(url,options)=>{if(url.endsWith('public-consultation'))return measurement(url,options);throw Error('feed unavailable')};w.eval(content);await new Promise(r=>setTimeout(r,40));assert.equal(calls.filter(c=>c.event_name==='entry_failed').length,0);w.close();

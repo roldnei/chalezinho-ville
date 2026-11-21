@@ -56,12 +56,13 @@ test('minimum showcase completes each chosen period with available peers instead
 test('period columns keep chalet order, unique dates, accurate links and facility photos; unavailable chalets are omitted and remaining rows fill the column',async()=>{
  const dom=new JSDOM('<main><section class="hero"></section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;
  try{
+  w.Date=class extends Date{constructor(...args){super(...(args.length?args:['2026-10-11T12:00:00Z']))}static now(){return Date.parse('2026-10-11T12:00:00Z')}};
   const properties=[1,2,3].map(id=>({id,code:'CH'+id,name:['Ville Signature','Ville Essenza','Ville Amore'][id-1]}));
   const make=(id,start,end,nights)=>({property_id:id,property_code:'CH'+id,property_name:properties[id-1].name,offer_id:'stay',offer_name:'Hospedagem e limpeza',check_in:start,check_out:end,nights,guests:2,rate_code:'non_refundable',rate_name:'Não reembolsável',total_cents:100000+id,experiences:[]});
   const cards=[make(3,'2026-10-17','2026-10-19',2),make(1,'2026-10-17','2026-10-19',2),make(2,'2026-10-17','2026-10-19',2),make(3,'2026-10-18','2026-10-21',3)];
   let opened;w.Villegram={configure:()=>{},open:c=>opened=c};w.VilleOffers={esc:s=>String(s??''),label:c=>c.name};w.CHALEZINHO_CONFIG={bookingEngine:'https://qa.example/engine',environment:'development'};w.HTMLElement.prototype.scrollTo=()=>{};
   w.fetch=async()=>({ok:true,json:async()=>({ok:true,cards,properties,offers:[],checked_at:new Date().toISOString(),period_status:[{property_code:'CH1',check_in:'2026-10-18',check_out:'2026-10-21',reason:'minimum_stay',min_stay:4}]})});
-  w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([]);
+  w.eval(await readFile(new URL('../site-prices.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([]);
   const doc=w.document,columns=[...doc.querySelectorAll('.showcase-period')];assert.equal(columns.length,2);
   assert.deepEqual([...columns[0].querySelectorAll('[data-property]')].map(e=>e.dataset.property),['CH1','CH2','CH3']);
   for(const row of columns[0].querySelectorAll('.showcase-card')){const query=new URL(row.querySelector('a').href).searchParams;assert.equal(query.get('chalet'),row.dataset.property);assert.equal(query.get('check_in'),'2026-10-17');assert.equal(query.get('check_out'),'2026-10-19');row.querySelector('[data-villegram]').click();assert.equal(opened.property_code,row.dataset.property);assert.equal(opened.check_in,'2026-10-17');assert.equal(opened.showcase_image,new URL(row.querySelector('img').src).pathname.slice(1))}
@@ -81,7 +82,7 @@ test('home renders dated price cards and duration filters; links carry explicit 
  try{
   w.VilleOffers={esc:s=>String(s??''),label:c=>c.name};w.CHALEZINHO_CONFIG={bookingEngine:'https://qa.example/engine',environment:'development'};w.HTMLElement.prototype.scrollTo=()=>{};w.Villegram={configure:()=>new Promise(()=>{})};
   w.fetch=async()=>({ok:true,json:async()=>({ok:true,checked_at:'2026-10-05T20:00:00Z',offers:[{id:'offer',name:'Escapada'}],properties:[{id:1,gallery:['cover.webp']}],cards:[2,3].map(n=>({nights:n,offer_id:'offer',offer_name:'Escapada',property_code:'CH1',property_name:'Ville',check_in:checkIn,check_out:day(2+n),guests:2,rate_code:'non_refundable',rate_name:'Não reembolsável',total_cents:123456,gross_cents:129954,discount_cents:6498,experiences:[{components:[{name:'Ambientação'}]}]}))})});
-  w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([{id:'offer',name:'Escapada'}]);
+  w.eval(await readFile(new URL('../site-prices.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));await w.VilleShowcase.load([{id:'offer',name:'Escapada'}]);
   const doc=w.document;assert.equal(doc.querySelector('.trust-strip').nextElementSibling.id,'estadias-completas');assert.equal(doc.querySelectorAll('.showcase-card').length,2);assert.equal(doc.querySelector('[name=guests]').value,'2');assert.ok(doc.querySelector('[name=purpose]'));assert.equal(doc.querySelector('[name=stay_offer]'),null);
   const q=new URL(doc.querySelector('.showcase-card a').href).searchParams;assert.equal(q.get('stay_offer'),'offer');assert.equal(q.get('check_in'),checkIn);assert.equal(q.get('rate'),'non_refundable');assert.match(doc.querySelector('.showcase-price').textContent,/1.234,56/);
   doc.querySelector('.showcase-filters [data-nights="2"]').click();assert.equal(doc.querySelector('.showcase-card[data-nights="3"]').hidden,true);
@@ -99,7 +100,7 @@ test('first visit reserves storefront space and consumes the early request witho
  try{
   w.VilleOffers={esc:s=>String(s),label:c=>c.name};w.CHALEZINHO_CONFIG={bookingEngine:'https://api',environment:'development'};
   let finish;w.VilleShowcasePrefetch=new Promise(resolve=>finish=resolve);w.fetch=()=>{throw Error('duplicate request')};
-  w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));const loading=w.VilleShowcase.load([]);
+  w.eval(await readFile(new URL('../site-prices.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../stay-showcase.js',import.meta.url),'utf8'));const loading=w.VilleShowcase.load([]);
   assert.equal(w.document.querySelector('.showcase-track').getAttribute('aria-busy'),'true');assert.equal(w.document.querySelectorAll('.showcase-placeholder').length,3);
   finish({ok:true,json:async()=>({ok:true,cards:[],offers:[],checked_at:new Date().toISOString()})});await loading;
   assert.equal(w.document.querySelector('.showcase-track').getAttribute('aria-busy'),'false');assert.equal(w.document.querySelectorAll('.showcase-placeholder').length,0);

@@ -6,7 +6,7 @@ async function fixture(lodging=false,discount=0){
  property.quote=quote();
  w.CHALEZINHO_CONFIG={releaseProfile:'whatsapp',bookingEngine:'https://qa.example/public-consultation',supabaseUrl:'https://qa.example',supabaseKey:'fixture',whatsappNumber:'5593991592266',environment:'development'};w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}})}})};w.VilleImages={set:(image,url)=>image.src=url};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.fetch=async(url,options={})=>{const body=options.body?JSON.parse(options.body):{},action=new URL(url).searchParams.get('action')||body.action;calls.push(action);if(failure&&['quote','search'].includes(action))return {ok:false,status:503,json:async()=>({ok:false,error:'unavailable'})};const data=action==='config'?{ok:true,purposes:[],experience_products:[],stay_offers:[]}:action==='property_media'?{ok:true,properties:[property]}:action==='search'?{ok:true,listings:[{...property,quote:quote()}]}:quote(body);return {ok:true,status:200,json:async()=>data};};
- w.eval(readFileSync('stay-offers.js','utf8'));w.eval(readFileSync('consultation-summary.js','utf8'));
+ w.eval(readFileSync('site-prices.js','utf8'));w.eval(readFileSync('stay-offers.js','utf8'));w.eval(readFileSync('consultation-summary.js','utf8'));
  let source=readFileSync('booking.js','utf8');const i=source.lastIndexOf('init();');source=source.slice(0,i)+"window.VilleTest={init,search,openFlow,continueWhatsApp,state,saveConsultation,restoreConsultation,copyWhatsAppSummary,renderExperienceList,renderOfferChoices,refreshStayOptions,syncStayModes};"+source.slice(i+7);w.eval(source);await w.VilleTest.init();
  w.document.querySelector('#book-in').value='2026-12-01';w.document.querySelector('#book-out').value='2026-12-03';await w.VilleTest.search();await w.VilleTest.openFlow(1);
  return {w,calls,fail:()=>failure=true,change:()=>changed=true,choose:()=>{const radio=w.document.querySelector('input[name=checkout-rate]');radio.checked=true;radio.dispatchEvent(new w.Event('change'));}};
@@ -54,7 +54,7 @@ test('first launch shows one Escapada and only the total; no tariff or experienc
  await w.VilleTest.continueWhatsApp();
  const summary=w.document.querySelector('.consultation-summary').textContent,message=new URL(w.document.querySelector('#whatsapp-open').href).searchParams.get('text');
  assert.equal(message,'Olá! Gostaria de finalizar esta hospedagem pelo atendimento.\n\n'+summary);
- assert.match(summary,/Seleção: Escapada\nTotal consultado:/);
+ assert.match(summary,/Seleção: Escapada\nPagamento no cartão: 10x R\$133,75/);
  assert.doesNotMatch(summary,/Limpeza:|Hospedagem:|Desconto:|Tarifa:|Experiência:|Condições:/);
  assert.ok(f.calls.every(a=>['config','property_media','search','quote'].includes(a)));
  }finally{f.w.close()}
@@ -69,7 +69,7 @@ test('first-launch price change requires a second explicit review and failure cl
 });
 
 test('discounted listing shows the original total above the payable total without an extra discount card',async()=>{
- const f=await fixture(false,6340);try{const card=f.w.document.querySelector('.booking-property'),before=card.querySelector('.price-before');assert.ok(before);assert.match(before.textContent,/1[.]313,40/);assert.match(card.querySelector('.booking-price').textContent,/1[.]250,00/);assert.equal(card.querySelector('.contract-inclusions'),null);assert.doesNotMatch(card.textContent,/Desconto da estadia completa/)}finally{f.w.close()}
+ const f=await fixture(false,6340);try{const card=f.w.document.querySelector('.booking-property'),before=card.querySelector('.price-before');assert.ok(before);assert.match(before.textContent,/10xR\$140,53/);assert.match(card.querySelector('.booking-price').textContent,/10xR\$133,75/);assert.equal(card.querySelector('.contract-inclusions'),null);assert.doesNotMatch(card.textContent,/Desconto da estadia completa/)}finally{f.w.close()}
 });
 
 test('new dates and a different chalet never reopen a previous consultation',async()=>{
