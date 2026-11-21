@@ -6,3 +6,4 @@
 @keyframes home-dates-breathe{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(237,220,173,0)}50%{transform:scale(1.045);box-shadow:0 0 0 8px rgba(237,220,173,.12)}}
 .home-hero-dates:hover .home-action-icon,.home-hero-dates:focus-visible .home-action-icon{animation:none}
 @media(prefers-reduced-motion:reduce){.home-hero-dates .home-action-icon{animation:none}}
+.site-pix-label{display:inline!important;font-size:.75rem;font-weight:400;margin-left:.2em}
