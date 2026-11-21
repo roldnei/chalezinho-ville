@@ -12,7 +12,7 @@ async function setup({mobile=false,reduced=false,media=null,home=true,preview=fa
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false};
  w.HTMLMediaElement.prototype.play=async()=>{};w.HTMLMediaElement.prototype.pause=()=>{};
  w.matchMedia=q=>({matches:q.includes('reduced-motion')?reduced:mobile,addEventListener(){}});
- w.CHALEZINHO_CONFIG={supabaseUrl:'https://dev.supabase.co',bookingEngine:'https://dev/engine'};
+ w.eval(await readFile(new URL('../site-prices.js',import.meta.url),'utf8'));w.CHALEZINHO_CONFIG={supabaseUrl:'https://dev.supabase.co',bookingEngine:'https://dev/engine'};
  w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:null}})}})};
  w.setTimeout=(fn,ms)=>{timers.set(ms,fn);return ms};w.clearTimeout=ms=>timers.delete(ms);
  w.VilleOffers={label:i=>i.name};w.fetch=async()=>({ok:true,json:async()=>({ok:true,publications:[],properties:[],products:[],offers:[],max_offers:3,likes:0,comments:[]})});
@@ -56,6 +56,7 @@ test('DEV escape interactions use the social service, preserving the public pric
   w.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,likes:2,comments_count:0,comments:[],liked:false})}};
   const current={...card,publication:null,publication_id:null,image:'assets/signature.webp'};w.Villegram.configurePublications([current],[],[]);w.Villegram.openHome(current);
   await new Promise(resolve=>setTimeout(resolve,20));
+  assert.match(w.document.querySelector('.vg-price').textContent,/10xR\$132,10/);assert.match(w.document.querySelector('.vg-escape-total').textContent,/1\.321,00/);assert.equal(current.total_cents,123456);
   const social=calls.filter(c=>c.body.action==='villegram');assert.ok(social.length);
   for(const call of social){assert.equal(call.url,'https://pxfqmnhqodqyaaqeyjgr.supabase.co/functions/v1/booking-engine');assert.equal(call.body.offer_id,id);assert.equal(call.body.operation,undefined)}
   assert.equal(calls.some(c=>['start_payment','hold','quote'].includes(c.body.action)),false);

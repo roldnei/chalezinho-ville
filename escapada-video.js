@@ -3,11 +3,7 @@
  const VIDEO_SETTINGS=Object.freeze({width:1080,height:1920,fps:30,videoBitsPerSecond:12000000,duration:15});
  const money=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
  // Compute from the original quote on every render; never mark up the stored price.
- function installment(cents){
-  if(!Number.isSafeInteger(cents)||cents<=0)throw Error('Preço inválido para parcelamento.');
-  const total=Math.round(cents*107/100),value=Math.round(total/10);
-  return {count:10,total_cents:total,value_cents:value,value:(value/100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})};
- }
+ const installment=cents=>window.VillePrices.installment(cents);
  const installmentText=cents=>'10xR$'+installment(cents).value;
  const installmentHTML=cents=>'<span class="escape-installments"><span class="escape-installment-count">10x</span><span class="escape-installment-value">R$'+installment(cents).value+'</span></span>';
  const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;

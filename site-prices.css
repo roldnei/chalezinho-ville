@@ -1,0 +1,8 @@
+.site-installments{display:inline-flex;align-items:baseline;gap:.12em;white-space:nowrap;font:inherit;letter-spacing:normal}
+.site-installment-count{font-size:max(.48em,.75rem);line-height:1;font-weight:500}
+.site-installment-value{font:inherit;line-height:1.15}
+.site-price-total{display:block;font-size:.8rem;line-height:1.5;font-weight:400;margin-top:.35rem}
+.home-hero-dates .home-action-icon{animation:home-dates-breathe 3.2s ease-in-out infinite;transform-origin:center}
+@keyframes home-dates-breathe{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(237,220,173,0)}50%{transform:scale(1.045);box-shadow:0 0 0 8px rgba(237,220,173,.12)}}
+.home-hero-dates:hover .home-action-icon,.home-hero-dates:focus-visible .home-action-icon{animation:none}
+@media(prefers-reduced-motion:reduce){.home-hero-dates .home-action-icon{animation:none}}

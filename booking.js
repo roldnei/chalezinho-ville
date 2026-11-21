@@ -3,6 +3,8 @@ const C=window.CHALEZINHO_CONFIG,PUBLIC=C.releaseProfile==="whatsapp",ENGINE=C.b
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const brlC=c=>(Number(c||0)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const brl=v=>Number(v||0).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const publicPrice=c=>PUBLIC?window.VillePrices.html(c):brlC(c);
+const publicText=c=>PUBLIC?window.VillePrices.text(c):brlC(c);
 const esc=v=>String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
 function downloadPolicyDocument(doc){
  const content=`Chalezinho Ville — ${doc.title}\nVersão ${doc.version}\nCódigo ${doc.code}\n\n${doc.body}\n`;
@@ -70,7 +72,7 @@ async function init(){
    const property=state.search?.find(p=>p.code===incoming.get("chalet")&&p.available&&p.quote);
    if(incoming.has("stay_offer")&&state.offerId!==incoming.get("stay_offer")){directCheckoutError();return}
    if(property){await openFlow(property.id);const rate=state.quote?.rate_options?.find(r=>r.code===incoming.get("rate")&&r.selectable);
-    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout();const reference=Number(incoming.get('expected_total'));if(reference>0&&reference!==rate.total_amount_cents)setFlowError('O preço desta oferta mudou de '+brlC(reference)+' para '+brlC(rate.total_amount_cents)+'. '+(PUBLIC?'Confira o novo total antes de continuar.':'Revise o total e escolha sua tarifa antes de continuar.'))}
+    if(rate){state.rate=rate;state.rateCode=rate.code;await openFastCheckout();const reference=Number(incoming.get('expected_total'));if(reference>0&&reference!==rate.total_amount_cents)setFlowError('O preço desta oferta mudou de '+publicText(reference)+' para '+publicText(rate.total_amount_cents)+'. '+(PUBLIC?'Confira o novo total antes de continuar.':'Revise o total e escolha sua tarifa antes de continuar.'))}
     else if(!incoming.get('rate'))await openFastCheckout();
     else directCheckoutError();
    }else directCheckoutError();
@@ -183,8 +185,8 @@ function renderResults(list,{scroll=true}={}){
   const preview=total!=null?brl(total):"—", perNight=total!=null?brl(total/stayNights()):"—";
   const fromRate=p.quote?.rate_options?.filter(x=>x.selectable).sort((a,b)=>a.total_amount_cents-b.total_amount_cents)[0];
   const offerBlocked=state.offerId&&(p.offer_issues||[]).length;
-  const discount=Number(fromRate?.contract_snapshot?.discount_cents||0),finalCents=fromRate?.total_amount_cents??Math.round((total||0)*100);const before=discount>0?'<s class="price-before" aria-label="Total antes do desconto">'+brlC(finalCents+discount)+'</s>':'';
-  const price=p.available&&!offerBlocked?'<small>TOTAL DA ESTADIA</small>'+before+'<strong>'+preview+'</strong><span class="price-note">'+(state.offerId?offerKind(selectedOffer()):(PUBLIC?'Escapada':'Somente hospedagem'))+' · '+perNight+' por noite'+(!PUBLIC&&fromRate?' · Tarifa '+esc(fromRate.name):'')+'</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
+  const discount=Number(fromRate?.contract_snapshot?.discount_cents||0),finalCents=fromRate?.total_amount_cents??Math.round((total||0)*100);const before=discount>0?'<s class="price-before" aria-label="Total antes do desconto">'+publicPrice(finalCents+discount)+'</s>':'';
+  const price=p.available&&!offerBlocked&&Number.isSafeInteger(finalCents)&&finalCents>0?'<small>'+(PUBLIC?'ESTADIA EM 10 PARCELAS':'TOTAL DA ESTADIA')+'</small>'+before+'<strong>'+(PUBLIC?publicPrice(finalCents):preview)+'</strong>'+(PUBLIC?'<span class="site-price-total">'+window.VillePrices.totalText(finalCents)+'</span>':'')+'<span class="price-note">'+(state.offerId?offerKind(selectedOffer()):(PUBLIC?'Escapada':'Somente hospedagem'))+(PUBLIC?' · hospedagem e limpeza incluídas':' · '+perNight+' por noite')+(!PUBLIC&&fromRate?' · Tarifa '+esc(fromRate.name):'')+'</span>':'<span class="price-note">Escolha outras datas para consultar o valor.</span>';
   a.innerHTML='<div class="booking-gallery"><img src="'+esc(p.cover_image)+'" alt="'+esc(p.name)+'" loading="lazy"></div><div><small>'+esc(({chalet:'Chalé',apartment:'Apartamento',house:'Casa',studio:'Studio'})[p.property_type]||'Imóvel')+'</small><h3>'+esc(p.name)+'</h3><p>'+esc(p.summary)+'</p><div class="booking-tags">'+feats+'</div>'+minNotice+'</div><div class="booking-price"><span class="availability-status '+(p.available?"available":"unavailable")+'">● '+status+'</span>'+price+'<button class="booking-select" '+(p.available||p.requestable?"":"disabled")+' data-id="'+p.id+'">'+(p.requestable?"Pedir aprovação":p.available?"Escolher esta estadia":"Indisponível")+'</button></div>';
   VilleImages.set(a.querySelector(".booking-gallery img"),p.cover_image,{sizes:"(max-width: 800px) 100vw, 240px"});
   if(offerBlocked){a.querySelector('.booking-price').insertAdjacentHTML('afterbegin','<p class="offer-unavailable-reason">'+p.offer_issues.map(x=>esc(window.VilleOffers.issues[x]||'Experiência indisponível')).join('. ')+'</p>');const b=a.querySelector('.booking-select');b.textContent='Ver somente hospedagem';b.dataset.stayOnly='1'}
@@ -710,7 +712,7 @@ function renderCheckoutRates(){
  if(!box){box=document.createElement('fieldset');box.id='checkout-rate-options';$('#summary-content').before(box)}
  const rates=state.quote.rate_options.filter(r=>r.selectable);
  if(lodgingOnly()){box.hidden=true;box.innerHTML='';return}box.hidden=false;
- box.innerHTML='<legend>Escolha a política de cancelamento</legend><p>Compare os dois preços completos. Nenhuma tarifa é escolhida automaticamente.</p>'+rates.map(r=>'<label class="checkout-rate-choice"><input type="radio" name="checkout-rate" value="'+esc(r.code)+'" '+(state.rateConfirmed&&r.code===state.rateCode?'checked':'')+'><span><strong>'+esc(r.name)+'</strong><small>Total para '+stayNights()+' noites</small></span><strong>'+brlC(r.total_amount_cents)+'</strong></label><details class="rate-policy"><summary>Condições · '+esc(r.name)+'</summary><p>'+esc(r.cancellation_policy?.body||'Condições indisponíveis.')+'</p></details>').join('');
+ box.innerHTML='<legend>Escolha a política de cancelamento</legend><p>Compare os dois preços completos. Nenhuma tarifa é escolhida automaticamente.</p>'+rates.map(r=>'<label class="checkout-rate-choice"><input type="radio" name="checkout-rate" value="'+esc(r.code)+'" '+(state.rateConfirmed&&r.code===state.rateCode?'checked':'')+'><span><strong>'+esc(r.name)+'</strong><small>Total para '+stayNights()+' noites</small></span><strong>'+publicPrice(r.total_amount_cents)+'</strong></label><details class="rate-policy"><summary>Condições · '+esc(r.name)+'</summary><p>'+esc(r.cancellation_policy?.body||'Condições indisponíveis.')+'</p></details>').join('');
  box.querySelectorAll('input').forEach(input=>input.onchange=()=>{
   if(state.fastUpdating)return;
   const rate=state.quote.rate_options.find(r=>r.code===input.value&&r.selectable);if(!rate)return;
