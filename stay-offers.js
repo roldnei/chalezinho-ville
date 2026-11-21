@@ -7,7 +7,7 @@
  window.VilleOffers={esc,components,label,issues,contractMarkup};
  let bootVersion=0;
  async function boot(){
-  const version=++bootVersion;
+  const version=++bootVersion;if(window.CHALEZINHO_CONFIG?.releaseProfile==='whatsapp')await window.VillePrices.load();
   if(!document.querySelector('.hero,[data-property-code],#property-detail'))return;
   if(document.querySelector('.hero')&&!document.querySelector('main[data-property-code],#property-detail')&&window.VilleShowcase){await window.VilleShowcase.load([]);return}
   try{
@@ -28,7 +28,7 @@
    if(property&&window.Villegram){
     const feed=await fetch(window.CHALEZINHO_CONFIG.bookingEngine+'?action=stay_showcase',{headers:{'X-Chalezinho-Env':'development'}}).then(r=>r.json()).catch(()=>({cards:[]}));
     const cards=(feed.cards||[]).filter(c=>c.property_id===property.id);await window.Villegram.configure(cards,offers);
-    section.querySelectorAll('article').forEach((article,i)=>{const c=cards.find(c=>c.offer_id===available[i]?.id);if(!c)return;const b=document.createElement('button');b.type='button';b.className='villegram-watch';b.textContent='▶ Assistir no Ville Moments · '+(window.CHALEZINHO_CONFIG.releaseProfile==='whatsapp'?window.VillePrices.text(c.total_cents):(c.total_cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));b.onclick=()=>window.Villegram.open(c);article.querySelector('div').append(b)});
+    section.querySelectorAll('article').forEach((article,i)=>{const c=cards.find(c=>c.offer_id===available[i]?.id);if(!c)return;const b=document.createElement('button');b.type='button';b.className='villegram-watch';b.textContent='▶ Assistir no Ville Moments · '+(window.CHALEZINHO_CONFIG.releaseProfile==='whatsapp'?window.VillePrices.text(c.total_cents,c):(c.total_cents/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}));b.onclick=()=>window.Villegram.open(c);article.querySelector('div').append(b)});
    }
    if(version!==bootVersion)return;document.querySelector('#estadias-completas')?.remove();
    const main=document.querySelector('main[data-property-code],#property-detail')||document.querySelector('main');

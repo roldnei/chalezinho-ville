@@ -3,9 +3,9 @@
  const VIDEO_SETTINGS=Object.freeze({width:1080,height:1920,fps:30,videoBitsPerSecond:12000000,duration:15});
  const money=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
  // Compute from the original quote on every render; never mark up the stored price.
- const installment=cents=>window.VillePrices.installment(cents);
- const installmentText=cents=>'10xR$'+installment(cents).value;
- const installmentHTML=cents=>'<span class="escape-installments"><span class="escape-installment-count">10x</span><span class="escape-installment-value">R$'+installment(cents).value+'</span></span>';
+ const installment=(cents,card)=>window.VillePrices.installment(cents,card);
+ const installmentText=(cents,card)=>installment(cents,card).count+'xR$'+installment(cents,card).value;
+ const installmentHTML=(cents,card)=>'<span class="escape-installments"><span class="escape-installment-count">'+installment(cents,card).count+'x</span><span class="escape-installment-value">R$'+installment(cents,card).value+'</span></span>';
  const validDate=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&Number.isFinite(Date.parse(v))&&new Date(v).toISOString().slice(0,10)===v;
  const date=v=>new Intl.DateTimeFormat('pt-BR',{day:'2-digit',month:'short',year:'numeric',timeZone:'UTC'}).format(new Date(v+'T12:00:00Z'));
  const range=c=>date(c.check_in)+' a '+date(c.check_out);
@@ -58,11 +58,11 @@
   label(ctx,'Chalezinho Ville',42,78,620,29,{bold:true});label(ctx,'Chalés românticos em Guarapari',42,112,620,22);label(ctx,'V I L L E  M O M E N T S',42,151,620,21,{color:'#eddcad'});
   label(ctx,card.property_name,42,691,620,25);label(ctx,(card.video_title||card.offer_name||'Escapada').split(' · ')[0],42,750,620,57,{serif:true});
   label(ctx,range(card),42,801,620,29,{bold:true});label(ctx,card.nights+(card.nights===1?' noite':' noites')+' · '+card.guests+' hóspedes',42,838,620,23);
-  const before=Number.isSafeInteger(card.gross_cents)&&card.gross_cents>card.total_cents?installmentText(card.gross_cents):'';
-  if(before){label(ctx,before,42,887,620,27,{color:'#ecddb9'});const width=ctx.measureText(before).width;ctx.strokeStyle='#ecddb9';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(42,877);ctx.lineTo(42+width,877);ctx.stroke();}
-  const priceY=before?955:917,price=installment(card.total_cents);
-  label(ctx,'10x',42,priceY,620,29,{bold:true});const priceX=42+ctx.measureText('10x').width+2;
-  label(ctx,'R$'+price.value,priceX,priceY,662-priceX,64,{bold:true});label(ctx,'Hospedagem e limpeza incluídas',42,before?991:957,620,21);
+  const priceY=917,price=installment(card.total_cents,card);
+  label(ctx,price.count+'x',42,priceY,620,29,{bold:true});const priceX=42+ctx.measureText(price.count+'x').width+2;
+  label(ctx,'R$'+price.value,priceX,priceY,662-priceX,64,{bold:true});
+  const cash='Total à vista: '+money(card.total_cents);label(ctx,cash,42,957,530,21);const cashEnd=42+ctx.measureText(cash).width+8;label(ctx,'no Pix',cashEnd,957,662-cashEnd,16);
+  label(ctx,'Hospedagem e limpeza incluídas',42,988,620,21);
   const inclusions=(card.experiences||[]).flatMap(e=>e.components||[]).map(c=>c.name).filter(Boolean);
   label(ctx,inclusions.length?'Inclui '+inclusions.join(' · '):'Consulte disponibilidade e condições',42,1041,620,21);
   ctx.textAlign='center';
@@ -72,7 +72,8 @@
   const q=new URLSearchParams(Object.fromEntries(['property_id','offer_id','check_in','check_out','guests','rate_code'].map(k=>[k,card[k]??''])));
   const r=await fetch('/api/escapada-video?'+q,{cache:'no-store',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(45000)]):AbortSignal.timeout(45000)}),d=await r.json();
   if(!r.ok||!d.ok||!d.card)throw Error('Esta escapada não está disponível para as mesmas datas e condições. Atualize a lista ou ajuste a seleção.');
-  const fresh={...card,...d.card,checked_at:d.checked_at};assertCard(fresh);if(key(fresh)!==key(card))throw Error('A cotação mudou o chalé ou as condições da estadia. Atualize a seleção.');return fresh;
+  const fresh={...card,...d.card,checked_at:d.checked_at};assertCard(fresh);
+  await window.VillePrices.load({force:true});const terms=window.VillePrices.terms(Number(fresh.property_id));if(!terms)throw Error('Configure as condições deste imóvel em Taxas e pagamento no PMS.');fresh.commercial_payment_terms={...terms};if(key(fresh)!==key(card))throw Error('A cotação mudou o chalé ou as condições da estadia. Atualize a seleção.');return fresh;
  }
  function fileName(card){return 'escapada-'+String(card.property_code||card.property_name).toLowerCase().replace(/[^a-z0-9]+/g,'-')+'-'+card.check_in+'-a-'+card.check_out+'.mp4';}
  async function exportVideo(card,media,options={}){
@@ -98,7 +99,7 @@
   if(isSignature(card)){const r=await fetch('/api/stay-showcase',{cache:'no-store',signal:AbortSignal.timeout(55000)}),catalog=await r.json();if(!r.ok||!catalog.ok)throw Error('Não foi possível atualizar as fotos do Signature no PMS.');media=mediaFor(card,catalog);}
   const dialog=document.createElement('dialog');dialog.className='escape-editor-dialog';dialog.setAttribute('aria-label','Prévia e download da escapada em vídeo');
   dialog.innerHTML='<header><div><small>VÍDEO DA ESCAPADA</small><h2></h2><p data-dates></p><p data-price class="escape-dialog-price"></p></div><button type="button" data-close>Fechar</button></header><div class="escape-editor-canvas"><canvas width="720" height="1280" role="img" aria-label="Prévia do vídeo da escapada"></canvas></div><p data-status role="status" aria-live="polite">Carregando a prévia…</p><progress max="100" value="0" hidden aria-label="Geração do vídeo"></progress><div class="escape-editor-actions"><button type="button" data-play>Reproduzir</button><button type="button" data-pause>Pausar</button><button type="button" class="escape-editor-primary" data-download disabled>Baixar vídeo MP4</button><button type="button" data-cancel hidden>Cancelar geração</button></div>';
-  const $=s=>dialog.querySelector(s);$('h2').textContent=card.property_name+' · '+(card.video_title||card.offer_name||'Escapada');$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents);
+  const $=s=>dialog.querySelector(s);$('h2').textContent=card.property_name+' · '+(card.video_title||card.offer_name||'Escapada');$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents,card);
   document.body.append(dialog);dialog.showModal();let player,controller,busy=false,closed=false;
   const close=new Promise(resolve=>dialog.onclose=()=>{closed=true;player?.destroy();controller?.abort();dialog.remove();resolve();});
   dialog.oncancel=e=>{if(busy)e.preventDefault();};$('[data-close]').onclick=()=>dialog.close();$('[data-play]').onclick=()=>player?.play();$('[data-pause]').onclick=()=>player?.pause();$('[data-cancel]').onclick=()=>controller?.abort();
@@ -106,7 +107,7 @@
   catch(e){$('[data-status]').textContent=e.message;}
   $('[data-download]').onclick=async()=>{
    if(busy)return;busy=true;controller=new AbortController();player?.pause();for(const b of dialog.querySelectorAll('button:not([data-cancel])'))b.disabled=true;$('[data-cancel]').hidden=false;$('progress').hidden=false;
-   try{Object.assign(card,await refresh(card,{signal:controller.signal}));$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents);const blob=await exportVideo(card,media,{signal:controller.signal,progress:n=>{$('progress').value=n;$('[data-status]').textContent='Gerando vídeo… '+n+'%';}});download(blob,card);$('[data-status]').textContent='Vídeo baixado: '+fileName(card);}
+   try{Object.assign(card,await refresh(card,{signal:controller.signal}));$('[data-dates]').textContent=range(card);$('[data-price]').innerHTML=installmentHTML(card.total_cents,card);const blob=await exportVideo(card,media,{signal:controller.signal,progress:n=>{$('progress').value=n;$('[data-status]').textContent='Gerando vídeo… '+n+'%';}});download(blob,card);$('[data-status]').textContent='Vídeo baixado: '+fileName(card);}
    catch(e){$('[data-status]').textContent=e.name==='AbortError'?'Geração cancelada.':e.message==='mp4_unavailable'?'Este navegador não permite gerar MP4. Use o Chrome atualizado ou Safari.':e.message;}
    finally{busy=false;controller=null;for(const b of dialog.querySelectorAll('button'))b.disabled=false;$('[data-cancel]').hidden=true;}
   };

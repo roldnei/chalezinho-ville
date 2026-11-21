@@ -1,3 +1,4 @@
+import {configurePrices,priceTerms} from './fixtures/public-price-terms.mjs';
 import test from 'node:test';import assert from 'node:assert/strict';import {readFile} from 'node:fs/promises';import {JSDOM} from 'jsdom';
 const base={property_id:1,property_code:'CH1',property_name:'Ville Signature',offer_id:null,check_in:'2026-11-27',check_out:'2026-11-28',guests:2,nights:1,rate_code:'non_refundable',total_cents:100000};
 const cards=[base,{...base,property_id:3,property_code:'CH3',property_name:'Ville Amore'}];
@@ -7,7 +8,7 @@ async function setup({fail=false,cancel=false}={}){
  w.CHALEZINHO_CONFIG={supabaseUrl:'https://site.test',environment:'production'};w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'fixture'}}})}})};
  w.fetch=async(url,opts={})=>{calls.push({url,opts});if(String(url).includes('villegram-content'))return {ok:true,json:async()=>({ok:true})};if(url==='/api/stay-showcase')return {ok:true,json:async()=>({ok:true,cards:cards.map(c=>({...c,total_cents:110000})),properties:[{id:1,code:'CH1',name:'Ville Signature',gallery:['aa8c1218-7182-4eb2-94ae-c408600fb972.webp','40a6a4f3-b754-4021-a4ba-96f8bac43549.webp','05-spa-experiencia.webp','04-decoracao.webp','ch1-capa-casal-spa.webp'].map(name=>({url:'assets/'+name}))},{id:3,code:'CH3',name:'Ville Amore',gallery:[{url:'amore.webp'}]}]})};const q=new URL(url,'https://site.test').searchParams,c=cards.find(c=>c.property_id===Number(q.get('property_id')));quotes++;if(fail&&quotes===2)return {ok:false,json:async()=>({ok:false})};return {ok:true,json:async()=>({ok:true,card:{...c,total_cents:120000+quotes},checked_at:new Date().toISOString()})};};
  for(const file of ['site-prices.js','escapada-video.js','escapadas-zip.js','escapadas-selection.js'])w.eval(await readFile(new URL('../'+file,import.meta.url),'utf8'));
- w.VilleEscapadaVideo.exportVideo=async(card,media,{signal})=>{videos.push({card:{...card},media});if(cancel)throw new DOMException('Cancelado','AbortError');return new Blob(['actual-mp4-bytes-'+card.property_code]);};
+ configurePrices(w);w.VilleEscapadaVideo.exportVideo=async(card,media,{signal})=>{videos.push({card:{...card},media});if(cancel)throw new DOMException('Cancelado','AbortError');return new Blob(['actual-mp4-bytes-'+card.property_code]);};
  w.eval(await readFile(new URL('../escapadas-workspace.js',import.meta.url),'utf8'));for(let n=0;n<50&&!w.document.querySelector('[data-escape-select]');n++)await new Promise(r=>setTimeout(r,5));
  return {d,w,calls,videos,$:s=>w.document.querySelector(s),get downloads(){return downloads}};
 }
