@@ -1,6 +1,7 @@
 (function(root){
  'use strict';
- const terms=Object.freeze({startsAt:'2026-11-23T00:00:00-03:00',endsAt:'2026-11-28T00:00:00-03:00',minNights:2,gift:'Experiência romântica exclusiva'});
+ const chaletCodes=Object.freeze(['CH1','CH2','CH3']);
+ const terms=Object.freeze({startsAt:'2026-11-23T00:00:00-03:00',endsAt:'2026-11-28T00:00:00-03:00',minNights:2,propertyCodes:chaletCodes,gift:'Experiência romântica exclusiva'});
  const active=(now=Date.now())=>now>=Date.parse(terms.startsAt)&&now<Date.parse(terms.endsAt);
  function remaining(now=Date.now()){
   let seconds=Math.max(0,Math.ceil((Date.parse(terms.endsAt)-now)/1000));
@@ -8,8 +9,8 @@
   const hours=Math.floor(seconds/3600);seconds%=3600;
   return {days,hours,minutes:Math.floor(seconds/60),seconds:seconds%60};
  }
- const eligible=(nights,now=Date.now())=>Number.isInteger(nights)&&nights>=terms.minNights&&active(now);
- const message=(nights,now=Date.now())=>eligible(nights,now)?'Black Friday: experiência romântica exclusiva de presente para reservas de 2 noites ou mais confirmadas até 27/11/2026, às 23h59 (Brasília).':'';
+ const eligible=(nights,property,now=Date.now())=>chaletCodes.includes(typeof property==='string'?property:property?.code||property?.property_code)&&(!property?.property_type||property.property_type==='chalet')&&Number.isInteger(nights)&&nights>=terms.minNights&&active(now);
+ const message=(nights,property,now=Date.now())=>eligible(nights,property,now)?'Black Friday exclusiva dos chalés Signature, Essenza e Amore: experiência romântica exclusiva de presente para reservas de 2 noites ou mais confirmadas até 27/11/2026, às 23h59 (Brasília).':'';
  root.VilleBlackFriday=Object.freeze({terms,active,remaining,eligible,message});
  if(!root.document)return;
  let timer;

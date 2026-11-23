@@ -15,12 +15,13 @@ test('the countdown ends at midnight after 27 November in Brasilia, without rest
  const fresh={};vm.runInNewContext(code,fresh);assert.equal(fresh.VilleBlackFriday.active(end+1),false);
 });
 
-test('the gift requires two nights and timely booking, without restricting future stay dates or property types',()=>{
+test('the gift requires two nights, timely booking and one of the three chalets',()=>{
  const now=Date.parse('2026-11-27T23:59:59-03:00');
- assert.equal(campaign.eligible(1,now),false);assert.equal(campaign.eligible(2,now),true);assert.equal(campaign.eligible(30,now),true);
- for(const nights of [NaN,-1,1.5,'2'])assert.equal(campaign.eligible(nights,now),false);
- assert.match(campaign.message(2,now),/experiência romântica exclusiva/);assert.match(campaign.message(2,now),/confirmadas até 27\/11\/2026/);
- assert.equal(campaign.message(2,Date.parse(campaign.terms.endsAt)), '');
+ assert.equal(campaign.eligible(1,'CH1',now),false);assert.equal(campaign.eligible(2,'CH2',now),true);assert.equal(campaign.eligible(30,'CH3',now),true);
+ for(const nights of [NaN,-1,1.5,'2'])assert.equal(campaign.eligible(nights,'CH1',now),false);
+ assert.match(campaign.message(2,'CH1',now),/experiência romântica exclusiva/);assert.match(campaign.message(2,'CH1',now),/confirmadas até 27\/11\/2026/);
+ assert.equal(campaign.message(2,'CH1',Date.parse(campaign.terms.endsAt)), '');
+ for(const property of ['AP_CENTRO','AP_MORRO',undefined,{}, {code:'CH1',property_type:'apartment'}]){assert.equal(campaign.eligible(2,property,now),false);assert.equal(campaign.message(2,property,now),'');}
 });
 
 test('expired banners remove the discount and gift and expose an ended message',()=>{
@@ -31,6 +32,16 @@ test('expired banners remove the discount and gift and expose an ended message',
   assert.ok([...w.document.querySelectorAll('[data-bf-active]')].every(node=>node.hidden));
   assert.equal(w.document.querySelector('[data-bf-ended]').hidden,false);assert.equal(w.document.querySelector('[data-bf-digit]').textContent,'00');assert.ok(w.document.body.classList.contains('bf-ended'));
  }finally{w.close();}
+});
+
+test('the gift is advertised on the chalet home and never on apartment pages',async()=>{
+ const home=new JSDOM(await readFile(new URL('../index.html',import.meta.url),'utf8'));
+ assert.match(home.window.document.querySelector('.bf-banner-gift').textContent,/Exclusivo para os chalés Signature, Essenza e Amore/);home.window.close();
+ for(const name of ['casas-e-apartamentos.html','hospedagem.html']){
+  const page=new JSDOM(await readFile(new URL('../'+name,import.meta.url),'utf8'));
+  assert.equal(page.window.document.querySelector('.bf-banner-gift'),null);
+  assert.doesNotMatch(page.window.document.body.textContent,/experiência romântica exclusiva de presente/i);page.window.close();
+ }
 });
 
 test('the current WhatsApp flow carries gift terms while active and leaves the confirmed quote unchanged',async()=>{
@@ -53,8 +64,8 @@ test('the current WhatsApp flow carries gift terms while active and leaves the c
   const source=await readFile(new URL('../booking.js',import.meta.url),'utf8'),at=source.lastIndexOf('init();');w.eval(source.slice(0,at)+'window.BfTest={init,search,openFlow,continueWhatsApp,state};'+source.slice(at+7));
   await w.BfTest.init();w.document.querySelector('#book-in').value='2026-12-01';w.document.querySelector('#book-out').value='2026-12-03';await w.BfTest.search();await w.BfTest.openFlow(1);await w.BfTest.continueWhatsApp();
   const message=()=>new URL(w.document.querySelector('#whatsapp-open').href).searchParams.get('text');
-  assert.match(message(),/Black Friday: experiência romântica exclusiva/);assert.match(message(),/01\/12\/2026/);assert.equal(w.BfTest.state.rate.total_amount_cents,125000);
-  clock=Date.parse(campaign.terms.endsAt);await w.BfTest.continueWhatsApp();assert.doesNotMatch(message(),/Black Friday:/);assert.equal(w.BfTest.state.rate.total_amount_cents,125000);
+  assert.match(message(),/Black Friday exclusiva dos chalés/);assert.match(message(),/01\/12\/2026/);assert.equal(w.BfTest.state.rate.total_amount_cents,125000);
+  clock=Date.parse(campaign.terms.endsAt);await w.BfTest.continueWhatsApp();assert.doesNotMatch(message(),/Black Friday/);assert.equal(w.BfTest.state.rate.total_amount_cents,125000);
   assert.ok(calls.every(action=>['config','property_media','search','quote'].includes(action)));
  }finally{w.close();}
 });
