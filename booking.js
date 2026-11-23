@@ -165,7 +165,7 @@ async function search({scroll=true}={}){
   const r=await fetch(ENGINE+"?"+q,{headers:{"X-Chalezinho-Env":"development"}}),d=await r.json();
   if(sequence!==searchSequence)return;
   if(!r.ok||!d.ok)throw new Error(d.error||"search_failed");
-  state.search=d.listings;document.body.classList.add("booking-results-screen");renderResults(d.listings,{scroll});error("");
+  d.listings=d.listings.filter(p=>p.property_type==='chalet');state.search=d.listings;document.body.classList.add("booking-results-screen");renderResults(d.listings,{scroll});error("");
   track("search_completed",{metadata:{nights:nights(bi,bo),guests,available_count:d.listings.filter(x=>x.available).length}});
  }catch(e){window.VilleMobileMeasurement?.track('search_failed');if(sequence===searchSequence){$('#availability-count').textContent='Consulta indisponível';$('#booking-list').innerHTML='<p role="status">Não foi possível consultar agora. Use “Alterar datas e hóspedes” para tentar novamente.</p>';error("Não foi possível consultar agora. Tente novamente.");}}
 }

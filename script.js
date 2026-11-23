@@ -64,7 +64,7 @@ function applyPropertyMedia(properties){
 
  const list=new Map(properties.map(p=>[p.code,p]));
  const cards=document.querySelector('.collection .cards');
- if(cards)properties.filter(p=>(p.cover_image||(Array.isArray(p.gallery)&&p.gallery.length))&&!cards.querySelector(`[data-property-code="${CSS.escape(p.code)}"]`)).forEach(p=>{
+ if(cards)properties.filter(p=>p.property_type==='chalet').filter(p=>(p.cover_image||(Array.isArray(p.gallery)&&p.gallery.length))&&!cards.querySelector(`[data-property-code="${CSS.escape(p.code)}"]`)).forEach(p=>{
   const article=document.createElement('article');article.dataset.propertyCode=p.code;
   const photo=document.createElement('div');photo.className='chalet-photo chalet-carousel';photo.dataset.carousel='';
   const badge=document.createElement('span');badge.className='type-badge';badge.textContent=p.property_type==='chalet'?'Chalé':p.property_type==='apartment'?'Apartamento':'Hospedagem';photo.append(badge);

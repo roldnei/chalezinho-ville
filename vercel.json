@@ -20,6 +20,10 @@
   },
   "rewrites": [
     {
+      "source": "/imoveis/:slug",
+      "destination": "/hospedagem.html?slug=:slug"
+    },
+    {
       "source": "/momentos/:trip",
       "destination": "/api/moments?trip=:trip"
     },
