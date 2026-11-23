@@ -30,5 +30,8 @@ if(release.environment==='production'){
 // operation by changing a URL because the public endpoint rejects those actions.
 config+='\nif(["admin.html","experiencias-admin.html","estadias-admin.html","pms-operacao.html","villegram-admin.html","meus-imoveis.html","ops-fase1.html"].some(p=>location.pathname.endsWith("/"+p))){window.CHALEZINHO_CONFIG.bookingEngine=window.CHALEZINHO_CONFIG.supabaseUrl+"/functions/v1/booking-engine";}\n';
 await writeFile(new URL('app-config.js',out),config);
+// This page is rendered by api/rental-page from the current public PMS catalog.
+// Removing its static copy lets the rewrite serve the same content to crawlers and visitors.
+await rm(new URL('casas-e-apartamentos.html',out), { force: true });
 if(release.environment==='production')for(const file of ['inspection-mobile-qa.html','launch-qa.html','qa-layout.html','preview-responsive.html','villegram-media-qa.html','villegram-stories-qa.html'])await rm(new URL(file,out),{force:true});
 console.log('Release profile: '+release.profile+'; target: '+release.environment);
