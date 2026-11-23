@@ -41,6 +41,8 @@ test('catalog and individual page render WhatsApp consultation with property, da
   const {window:w}=dom;w.CHALEZINHO_CONFIG={supabaseUrl:'https://test.supabase.co',whatsappNumber:'5593991592266'};
   w.VillePrices={load:async()=>[],terms:()=>null,heading:()=>'',html:c=>'R$ '+c/100,cashHTML:c=>'Total à vista: R$ '+c/100};
   const requests=[];w.fetch=async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>({ok:true,listings:[new URL(url).searchParams.get('action')==='catalog'?publicRental(property):{...publicRental(property),available:true,total_cents:65000}]})}};
+  w.HTMLElement.prototype.scrollIntoView=()=>{};w.IntersectionObserver=class{observe(){}disconnect(){}};
+  w.eval(await readFile(new URL('../rental-gallery.js',import.meta.url),'utf8'));w.eval(await readFile(new URL('../rental-showcase.js',import.meta.url),'utf8'));
   w.eval(await readFile(new URL('../rentals.js',import.meta.url),'utf8'));await new Promise(resolve=>setTimeout(resolve,30));
   assert.match(w.document.body.textContent,/Apartamento Praia do Morro/);
   const form=w.document.querySelector('form');form.elements.start.value='2026-12-04';form.elements.end.value='2026-12-06';form.elements.guests.value='6';
