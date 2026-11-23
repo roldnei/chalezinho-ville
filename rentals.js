@@ -17,6 +17,7 @@
   const dates=selection||(form.elements.start.value&&form.elements.end.value>form.elements.start.value?{start:form.elements.start.value,end:form.elements.end.value,guests:Number(form.elements.guests.value)}:null);
   if(dates)text+='\nEntrada: '+day(dates.start)+'\nSaída: '+day(dates.end)+'\nHóspedes: '+dates.guests;
   if(selection&&p.available&&Number.isSafeInteger(p.total_cents))text+='\nValor consultado: '+money(p.total_cents)+' à vista no Pix (hospedagem e limpeza).';
+  if(dates){const bonus=window.VilleBlackFriday?.message((Date.parse(dates.end)-Date.parse(dates.start))/86400000);if(bonus)text+='\n'+bonus;}
   text+='\nPodem confirmar a disponibilidade e as condições?';
   return 'https://wa.me/'+C.whatsappNumber.replace(/\D/g,'')+'?text='+encodeURIComponent(text);
  }

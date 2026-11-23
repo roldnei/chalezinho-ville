@@ -33,3 +33,32 @@
 /* Wide-photo cards place the badge beside the price, without adding a new row. */
 .showcase-period-rows:is([data-row-count="1"],[data-row-count="2"]) .showcase-card-copy{min-height:0;padding:0 106px 0 0}
 .showcase-period-rows:is([data-row-count="1"],[data-row-count="2"]) .showcase-card-copy>h4{margin-right:-106px}
+
+/* The deadline is absolute, shared with the contact summary, and never resets. */
+.bf-hero-button.bf-countdown-banner{display:grid;gap:10px;width:100%;max-width:520px;box-sizing:border-box;padding:18px 20px;border:2px solid #edc36c;border-radius:14px;background:linear-gradient(125deg,#080807,#2b2111);color:#fff6e4;box-shadow:0 8px 30px #0007;text-decoration:none;font:400 14px/1.3 'DM Sans',sans-serif}
+.bf-hero-button.bf-countdown-banner>span{font:inherit;letter-spacing:normal;color:inherit}
+.bf-countdown-banner .bf-banner-heading{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.bf-countdown-banner .bf-banner-heading>span{font-size:26px;font-weight:700;letter-spacing:.045em;color:#f5ce7c}
+.bf-countdown-banner .bf-banner-heading>b{padding:6px 10px;background:#f5ce7c;color:#20170b;border-radius:7px;font-size:28px;line-height:1}
+.bf-countdown-banner .bf-banner-deadline{font-size:12px;color:#e8d3a8}
+.bf-countdown-banner .bf-countdown{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.bf-countdown-banner .bf-countdown>span{display:grid;justify-items:center;gap:2px;padding:7px 4px;border:1px solid #b9914b80;border-radius:7px;background:#0006}
+.bf-countdown-banner .bf-countdown strong{font-size:28px;line-height:1;font-weight:600;font-variant-numeric:tabular-nums;color:#fff6df}
+.bf-countdown-banner .bf-countdown small{font-size:10px;line-height:1.2;letter-spacing:.02em;color:#d9bf8c}
+.bf-countdown-banner .bf-banner-gift{display:grid;gap:3px;padding-top:9px;border-top:1px solid #a4854a80}
+.bf-countdown-banner .bf-banner-gift strong{font-size:17px;line-height:1.25;color:#fff3d5;font-weight:600}
+.bf-countdown-banner .bf-banner-gift>span{font-size:12px;line-height:1.4;color:#e1d3b8}
+.bf-countdown-banner .bf-banner-cta{font-size:13px;font-weight:600;color:#f5ce7c}
+.bf-countdown-banner [data-bf-active][hidden],.bf-countdown-banner [data-bf-ended][hidden]{display:none!important}
+.bf-countdown-banner[data-bf-state="ended"]{border-color:#9a8054;box-shadow:none}
+.bf-countdown-banner .bf-banner-ended{font-size:18px;font-weight:600}
+.bf-ended .bf-card-promo,.bf-ended .bf-stamp,.bf-ended .bf-discount{display:none!important}
+.rental-black-friday{padding:0 24px;max-width:1248px;margin:0 auto}
+.rental-black-friday .bf-countdown-banner{margin:20px 0}
+@media(max-width:600px){
+ .bf-hero-button.bf-countdown-banner{padding:14px;gap:9px;margin:18px 0 24px}
+ .bf-countdown-banner .bf-banner-heading>span{font-size:23px}
+ .bf-countdown-banner .bf-banner-heading>b{font-size:26px}
+ .bf-countdown-banner .bf-countdown strong{font-size:26px}
+ .bf-countdown-banner .bf-banner-gift strong{font-size:16px}
+}
