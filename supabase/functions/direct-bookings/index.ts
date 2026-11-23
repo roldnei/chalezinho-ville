@@ -33,8 +33,8 @@ async function context(i:any,user:any){
  let profile=null,identity=null,attachments:any[]=[];
  if(user){
   profile=checked(await admin.from('profiles').select('full_name,phone').eq('id',user.id).maybeSingle());
-  const list=checked(await admin.rpc('guest_payment_identity',{p_user_id:user.id}));const g=Array.isArray(list)?list[0]:list;
-  identity=g?{complete:true,document_type:g.document_type,last_digits:g.document_number.slice(-4)}:{complete:false};
+  const g=checked(await admin.rpc('direct_booking_identity_snapshot',{p_user_id:user.id}));
+  identity=g?{complete:true,...g,last_digits:g.document_number.slice(-4)}:{complete:false};
   attachments=checked(await admin.from('direct_booking_attachments').select('id,content_type,size_bytes,created_at').eq('invitation_id',i.id).eq('user_id',user.id));
  }
  return {ok:true,invitation:{id:i.id,property:p,check_in:i.check_in,check_out:i.check_out,guests:i.guests,total_cents:i.total_cents,cancellation_terms:i.cancellation_terms,existing_stay:!!i.existing_stay_id,terms_snapshot:i.terms_snapshot,terms_hash:i.terms_hash,expires_at:i.expires_at},request:safeRequest(r),profile,identity,attachments};
@@ -102,7 +102,7 @@ Deno.serve(async req=>{
   const i=await invitation(b.token);
   const existing=checked(await admin.from('direct_booking_requests').select('id,user_id').eq('invitation_id',i.id).maybeSingle());
   if(existing&&existing.user_id!==user.id)throw Error('invitation_already_used');
-  if(b.action==='submit')return json({ok:true,result:checked(await admin.rpc('direct_booking_submit',{p_actor:user.id,p:{invitation_id:i.id,full_name:b.full_name,phone:String(b.phone||'').replace(/[^\d+]/g,''),check_in:b.check_in,check_out:b.check_out,guests:b.guests,accepted:b.accepted,terms_hash:b.terms_hash,verified_account:true,verified_email:user.email}}))});
+  if(b.action==='submit')return json({ok:true,result:checked(await admin.rpc('direct_booking_submit',{p_actor:user.id,p:{invitation_id:i.id,full_name:b.full_name,phone:String(b.phone||'').replace(/[^\d+]/g,''),photo_document:b.photo_document,check_in:b.check_in,check_out:b.check_out,guests:b.guests,accepted:b.accepted,terms_hash:b.terms_hash,verified_account:true,verified_email:user.email}}))});
   if(existing)throw Error('request_already_submitted');
   if(new Date(i.expires_at)<new Date())throw Error('invitation_expired');
   if(b.action==='identity'){
@@ -126,7 +126,7 @@ Deno.serve(async req=>{
   return json({ok:false,error:'invalid_action'},400);
  }catch(e){
   const message=e instanceof Error?e.message:'';
-  const errors=['admin_required','authentication_required','verified_account_required','invitation_unavailable','invitation_expired','invitation_already_used','request_already_submitted','request_not_found','document_required','document_too_large','document_limit','document_upload_failed','identity_required','invalid_document','identity_conflict','invalid_guest','terms_acceptance_required','invitation_dates_changed','existing_stay_changed','invalid_dates_or_guests','invalid_dates','invalid_total','cancellation_terms_required','manual_payment_confirmation_required','invalid_payment_method','calendar_unavailable','calendar_check_required','dates_unavailable','property_unavailable','invalid_stay','review_note_required'];
+  const errors=['admin_required','authentication_required','verified_account_required','invitation_unavailable','invitation_expired','invitation_already_used','request_already_submitted','request_not_found','document_required','document_too_large','document_limit','document_upload_failed','identity_required','photo_document_details_required','cin_must_match_cpf','passport_must_match_identity','invalid_document','identity_conflict','invalid_guest','terms_acceptance_required','invitation_dates_changed','existing_stay_changed','invalid_dates_or_guests','invalid_dates','invalid_total','cancellation_terms_required','manual_payment_confirmation_required','invalid_payment_method','calendar_unavailable','calendar_check_required','dates_unavailable','property_unavailable','invalid_stay','review_note_required'];
   const error=errors.find(k=>message.includes(k))||(message.includes('duplicate key')?'identity_conflict':'operation_unavailable');
   return json({ok:false,error},['authentication_required','admin_required'].includes(error)?403:error==='operation_unavailable'?503:409);
  }

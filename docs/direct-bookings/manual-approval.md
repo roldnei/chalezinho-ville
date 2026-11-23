@@ -25,3 +25,9 @@ O release permanece `whatsapp`: funções financeiras não foram habilitadas. O 
 ## Validação
 
 Testes de banco cobrem pendência sem inventário, conta verificada, documento e aceite obrigatórios, reenvio idempotente, convite usado/expirado/revogado, autorização administrativa, confirmação manual de pagamento, conflito com reservas/bloqueios/eventos, exclusividade do checkout, preservação de estadia existente, imutabilidade e execução pelo service_role. Testes de interface cobrem retorno do login, envio de datas e versão aceita, ausência de ações financeiras, arquivos inválidos e capacidade. Regressões das telas de operação e login também foram executadas. Prévia em navegador conferida a 320 e 390 px, com dados sintéticos.
+
+## Identificação digitada e cadastro da conta
+
+CPF ou passaporte permanecem no cadastro canônico de identidade e no snapshot da solicitação. O CPF continua disponível ao fluxo de pagamento existente; não é substituído pelo RG. Para o titular autenticado, o formulário reapresenta o número já salvo em um campo de leitura. RG, CIN, CNH ou passaporte do documento com foto têm tipo e número digitados obrigatoriamente; RG também exige órgão emissor e UF. CIN deve corresponder ao CPF e um passaporte já cadastrado deve corresponder à identificação da conta. A imagem é complementar e não preenche os campos automaticamente.
+
+Na mesma transação da submissão, nome e telefone são atualizados em `profiles`, mantendo a identidade da conta, papel, consentimentos opcionais e dados de pagamento existentes. O snapshot preserva CPF/passaporte, país emissor, documento com foto, anexos e termos. Nenhum dado foi extraído ou inventado a partir de imagens. O link já enviado e a disponibilidade do CH3 são preservados.
