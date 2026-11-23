@@ -24,7 +24,7 @@ async function page({query='?view=moments&intro=1',reduced=false,catalog=propert
  const viewed=[];w.VillegramSignals={begin(p){viewed.push(p?.id||null)},active(){},end(){},flush(){},mark(){},complete(){},declared(){return {}},interest(){return {}}};
  w.fetch=async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return {ok:true,json:async()=>({ok:true,properties:catalog,publications,products:[],offers:[],max_offers:3})}};
  const style=w.document.createElement('style');style.textContent=await source('villegram.css');w.document.head.append(style);
- for(const file of ['villegram.js','villegram-content.js'])w.eval(await source(file));
+ for(const file of ['site-prices.js','villegram.js','villegram-content.js'])w.eval(await source(file));
  await new Promise(resolve=>setTimeout(resolve,25));
  return {w,calls,timeouts,viewed,advance(ms){now+=ms;intervals.get(100)?.()},close(){w.Villegram.close();w.close()}};
 }
@@ -54,7 +54,7 @@ test('automatic scene changes synchronize names and links, pause freezes them, a
  const p=await page(),d=p.w.document;
  try{
   assert.ok(d.querySelector('.vg-swipe-hint'));assert.match(d.querySelector('.vg-swipe-hint').textContent,/Arraste para cima/);
-  p.advance(6500);assert.equal(d.querySelector('[data-intro-name]').textContent,'Ville Essenza');assert.equal(d.querySelector('[data-intro-link]:not([hidden])').getAttribute('href'),'chale-com-hidro.html');
+  d.querySelector('[data-action=pause]').click();p.advance(6500);assert.equal(d.querySelector('[data-intro-name]').textContent,'Ville Essenza');assert.equal(d.querySelector('[data-intro-link]:not([hidden])').getAttribute('href'),'chale-com-hidro.html');
   d.querySelector('[data-intro-link]:not([hidden])').focus();p.advance(6500);assert.equal(d.querySelector('[data-intro-name]').textContent,'Ville Essenza');
   d.querySelector('[data-action=pause]').click();p.advance(6500);assert.equal(d.querySelector('[data-intro-name]').textContent,'Ville Amore');
   p.w.Villegram.remember();const saved=JSON.parse(p.w.sessionStorage.getItem('villegram-position'));assert.equal(saved.id,'intro:chalets');assert.equal(saved.photo,2);
@@ -99,8 +99,25 @@ test('intro uses each real chalet publication for social reads and freezes its i
 
 test('opening Trip advances after all three chalet scenes finish',async()=>{
  const p=await page();try{
-  p.advance(19500);
+  p.w.document.querySelector('[data-action=pause]').click();p.advance(19500);
   assert.equal(p.w.document.querySelector('#villegram').classList.contains('vg-intro'),false);
   assert.match(p.w.document.querySelector('.vg-progress>span').textContent,/^2 de/);
+ }finally{p.close()}
+});
+
+// Production catalogs also include apartments, whose AP_ codes sort before CH_.
+test('mixed catalog opens on Signature and orders three chalets before short apartment buttons',async()=>{
+ const homes=[{id:4,code:'AP_CENTRO',name:'Apartamento do Centro',active:true,cover_image:'assets/rental-centro-01.webp'},{id:5,code:'AP_MORRO',name:'Apartamento Praia do Morro',active:true,cover_image:'assets/rental-praia-do-morro-01.webp'}];
+ const p=await page({catalog:[homes[1],properties[2],homes[0],properties[0],properties[1]],saved:{id:'intro:chalets',photo:3}}),d=p.w.document;
+ try{
+  p.advance(6500*5);
+  assert.equal(d.querySelector('[data-intro-name]').textContent,'Ville Signature');
+  assert.equal(d.querySelector('.vg-scene.is-visible img').getAttribute('src'),properties[0].cover_image);
+  assert.deepEqual([...d.querySelectorAll('[data-intro-scene]')].map(b=>b.textContent),['Signature','Essenza','Amore','Apto Centro','Apto Praia do Morro']);
+  assert.equal(d.querySelector('.vg-story small').textContent,'CHALÉS E APARTAMENTOS');
+  for(const [i,url] of [[3,'/imoveis/apartamento-centro-guarapari'],[4,'/imoveis/apartamento-praia-do-morro-guarapari']]){
+   d.querySelector(`[data-intro-scene="${i}"]`).click();
+   assert.equal(d.querySelector('[data-intro-link]:not([hidden])').getAttribute('href'),url);
+  }
  }finally{p.close()}
 });

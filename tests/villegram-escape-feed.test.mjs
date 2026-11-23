@@ -14,11 +14,11 @@ async function setup(t,{deferred=false,following=false}={}){
  w.matchMedia=q=>({matches:q.includes('max-width'),addEventListener(){}});w.IntersectionObserver=class{observe(){}disconnect(){}};w.HTMLDialogElement.prototype.showModal=function(){};w.HTMLMediaElement.prototype.play=async()=>{};w.HTMLMediaElement.prototype.pause=()=>{};w.VilleOffers={label:i=>i.name};w.AbortSignal.timeout=()=>undefined;
  let resolve;const ready=new Promise(r=>resolve=r),feed={ok:true,publications:[1,2,3,4].map(post),properties:[1,2,3,4].map(i=>({id:i,code:'CH'+i,name:'Ville '+i})),products:[],offers:[],max_offers:3};
  w.fetch=async()=>({ok:true,json:async()=>{if(deferred)await ready;return feed}});
- w.eval(renderer);w.eval(content);return {w,resolve,settle:()=>new Promise(r=>setTimeout(r,20))};
+ w.eval(await readFile(new URL('../site-prices.js',import.meta.url),'utf8'));w.eval(renderer);w.eval(content);return {w,resolve,settle:()=>new Promise(r=>setTimeout(r,20))};
 }
 for(const order of ['offers-first','publications-first'])test('every valid escape remains reachable when quotes arrive: '+order,async t=>{
  const {w,resolve,settle}=await setup(t,{deferred:order==='offers-first'});if(order==='publications-first')await settle();
- const old=w.document.querySelector('.vg-reel');w.Villegram.configure([...escapes,escapes[0],{...escape(),check_in:'2000-01-01'}],[],[]);resolve();await settle();
+ const old=w.document.querySelector('.vg-reel');w.Villegram.configure([...escapes,escapes[0],{...escape(),check_in:'2000-01-01'}],[],[]);resolve();await settle();w.VillegramContent.enter();await settle();
  assert.match(w.document.querySelector('.vg-progress>span').textContent,/de 28$/);
  if(old)assert.equal(w.document.querySelector('.vg-reel'),old,'delayed quotes must preserve playback');
  const seen=new Set();for(let i=0;i<28;i++){const cta=w.document.querySelector('.vg-primary');if(w.document.querySelector('.vg-escape'))seen.add(cta.getAttribute('href'));w.document.querySelector('[data-action=next]').click();}

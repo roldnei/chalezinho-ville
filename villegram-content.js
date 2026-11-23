@@ -3,15 +3,17 @@
  let data=null,offerCards=[],busy=false,home=false,lastFeed=[],offersReady=false,offerWait=null,offerCatalog=[],offerProperties=[];
  const cardKey=c=>window.Villegram.key?.(c)||c.publication_id||['escapada',c.offer_id,c.property_id,c.check_in,c.check_out,c.guests||2,c.rate_code||''].join(':');
  const liveOffers=()=>offerCards.filter(c=>c.check_in>=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()));
- const pages={CH1:'chale-premium.html',CH2:'chale-com-hidro.html',CH3:'chale-romantico.html'};
+ const pages={CH1:'chale-premium.html',CH2:'chale-com-hidro.html',CH3:'chale-romantico.html',AP_CENTRO:'/imoveis/apartamento-centro-guarapari',AP_MORRO:'/imoveis/apartamento-praia-do-morro-guarapari'};
+ const introOrder=['CH1','CH2','CH3','AP_CENTRO','AP_MORRO'];
+ const introRank=p=>{const n=introOrder.indexOf(p.code);return n<0?introOrder.length:n};
  // The opening Trip is a presentation derived from the active catalog, not a booking or guest publication.
  function introduction(){
   if(new URLSearchParams(location.search).get('feed')==='following')return null;
   // The editorial catalog owns publication eligibility. Showcase properties are
   // a pricing projection and may omit active; they must not remove the intro.
   const available=data?.properties||[];
-  const chalets=available.filter(p=>p.active===true&&p.cover_image).sort((a,b)=>String(a.code).localeCompare(String(b.code))).map(p=>({id:p.id,code:p.code,name:p.name,url:propertyURL(p),publication:(data?.publications||[]).find(x=>x.property_id===p.id&&x.type==='property'&&x.cta==='property'&&x.source!=='guest_submission'),summary:p.tagline||'',photo:{url:p.cover_image,alt:p.name,position:50}}));
-  return chalets.length?{intro:true,intro_properties:chalets,property_name:'Chalezinho Ville',offer_name:'Conheça nossos chalés',image:chalets[0].photo.url}:null;
+  const chalets=available.filter(p=>p.active===true&&p.cover_image).sort((a,b)=>introRank(a)-introRank(b)||String(a.code).localeCompare(String(b.code))).map(p=>({id:p.id,code:p.code,name:p.name,url:propertyURL(p),publication:(data?.publications||[]).find(x=>x.property_id===p.id&&x.type==='property'&&x.cta==='property'&&x.source!=='guest_submission'),summary:p.tagline||'',photo:{url:p.cover_image,alt:p.name,position:50}}));
+  return chalets.length?{intro:true,intro_properties:chalets,property_name:'Chalezinho Ville',offer_name:'Conheça nossas hospedagens',image:chalets[0].photo.url}:null;
  }
  function navigate(url){(document.documentElement.classList.contains('villegram-embed')?window.parent:window).location.href=url}
  function propertyURL(p){return pages[p?.code]||'imovel.html?chalet='+encodeURIComponent(p?.code||'')}
