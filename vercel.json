@@ -16,12 +16,20 @@
     },
     "api/escapada-video.js": {
       "maxDuration": 60
+    },
+    "api/rental-page.js": {
+      "maxDuration": 30,
+      "includeFiles": "{casas-e-apartamentos,hospedagem}.html"
     }
   },
   "rewrites": [
     {
+      "source": "/casas-e-apartamentos.html",
+      "destination": "/api/rental-page"
+    },
+    {
       "source": "/imoveis/:slug",
-      "destination": "/hospedagem.html?slug=:slug"
+      "destination": "/api/rental-page?slug=:slug"
     },
     {
       "source": "/momentos/:trip",

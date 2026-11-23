@@ -1,0 +1,20 @@
+Estrutura para apartamentos em Guarapari — 23/11/2026
+
+Preparada para a conta existente e a campanha CV | Pesquisa | Guarapari | R600.
+Este pacote NÃO foi aplicado na conta. O Google Ads bloqueou o navegador com a mensagem de acesso por agentes de IA não autorizados.
+Grupos, anúncios e palavras-chave estão PAUSADOS para revisão no Google Ads Editor.
+Nenhum orçamento, lance, localização, período ou configuração da campanha está neste pacote.
+
+Importe grupos.csv, palavras-chave.csv, negativas.csv e anuncios.csv na campanha existente.
+Confira a prévia de alterações, o mapeamento dos campos e os destinos antes de publicar.
+Antes de ativar, confira o estado atual e a data final da campanha. A última data conhecida nesta conversa era 24/11/2026.
+Revise negativas já existentes na campanha e em listas compartilhadas. Termos como apartamento, aluguel, temporada, centro e praia do morro podem impedir a entrega destes grupos.
+As negativas incluídas pertencem apenas aos grupos novos e eliminam intenção de compra, aluguel permanente e emprego.
+Palavras de hospedagem no Réveillon usam contexto de acomodação para reduzir visitas interessadas apenas em festas.
+A correspondência de frase cobre variações próximas e é combinada com uma palavra exata por grupo. Não há estimativas inventadas de procura ou CPC.
+As buscas sazonais e genéricas vão à coleção. Centro e Praia do Morro vão às páginas de cada imóvel.
+O anúncio do Centro usa Home Office Guarapari como nome de busca, preservando o cadastro do PMS.
+Capacidades e comodidades foram conferidas na página pública em 23/11/2026. Confirme-as antes de futuras importações.
+
+A reserva requer confirmação de preço, disponibilidade e estadia mínima.
+A fonte dos dados de cada página é o catálogo público atual do PMS.
