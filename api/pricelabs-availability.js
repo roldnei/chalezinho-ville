@@ -1,3 +1,5 @@
+import {publicServiceTarget} from '../scripts/public-service-target.mjs';
+import {mapListingPrices} from '../scripts/listing-prices.mjs';
 async function previewFallback(start,end){
   const u='https://chalezinhoville.com.br/api/pricelabs-availability?start='+encodeURIComponent(start)+'&end='+encodeURIComponent(end);
   const r=await fetch(u,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(8000)});
@@ -20,12 +22,12 @@ export default async function handler(req,res){
     }
     return res.status(500).json({ok:false,error:'missing_pricelabs_key'});
   }
-  const listings=[
-    {id:'1526341230074666349',pms:'airbnb',name:'Ville Signature'},
-    {id:'1547126637360310141',pms:'airbnb',name:'Ville Essenza'},
-    {id:'1745999870058886727',pms:'airbnb',name:'Ville Amore'}
-  ];
   try{
+    const target=publicServiceTarget(process.env,String(req.headers.host||''));
+    const directory=await fetch(target.endpoint.replace(/\/[^/]+$/,'/rental-catalog')+'?action=pricing_sources',{signal:AbortSignal.timeout(8000)});
+    const catalog=await directory.json();
+    if(!directory.ok||!catalog.ok||!Array.isArray(catalog.listings)||!catalog.listings.length)throw Error('pricing_directory_unavailable');
+    const listings=catalog.listings;
     const r=await fetch('https://api.pricelabs.co/v1/listing_prices',{
       method:'POST',headers:{'X-API-Key':key,'Accept':'application/json','Content-Type':'application/json'},
       body:JSON.stringify({listings:listings.map(x=>({id:x.id,pms:x.pms}))}),
@@ -34,16 +36,7 @@ export default async function handler(req,res){
     const raw=await r.json().catch(()=>null);
     if(!r.ok) return res.status(r.status).json({ok:false,error:'pricelabs_error'});
     const rows=Array.isArray(raw)?raw:Array.isArray(raw?.data)?raw.data:[];
-    const result=listings.map((listing,i)=>{
-      const row=rows.find(x=>String(x?.id)===listing.id)||rows[i]||{};
-      const days=(Array.isArray(row?.data)?row.data:[]).filter(d=>d?.date>=start&&d?.date<end);
-      const priced=days.map(d=>({date:d.date,price:Number(d?.price??d?.user_price),min_stay:Number(d?.min_stay??1)}))
-        .filter(d=>Number.isFinite(d.price)&&d.price>=0);
-      const total=priced.reduce((s,d)=>s+d.price,0);
-      const checkin=days.find(d=>d?.date===start);
-      const minStay=Math.max(1,Number(checkin?.min_stay??1));
-      return {name:listing.name,id:listing.id,days:priced,total_price:total,min_stay:minStay};
-    });
+    const result=mapListingPrices(listings,rows,start,end);
     return res.status(200).json({ok:true,start,end,listings:result});
   }catch(e){return res.status(502).json({ok:false,error:e?.name==='TimeoutError'?'pricelabs_timeout':'pricelabs_unreachable'});}
 }
