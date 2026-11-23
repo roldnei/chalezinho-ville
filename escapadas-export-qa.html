@@ -1,0 +1,29 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QA isolado da exportação de escapadas</title>
+<style>body{font:16px system-ui;margin:24px;max-width:960px;background:#faf8f4;color:#173b34}button,a{padding:12px;margin:8px;display:inline-block}video{width:270px;max-width:90vw;display:block;background:#111}output{white-space:pre-wrap;display:block;padding:16px}progress{width:300px}</style>
+<h1>QA isolado da exportação de escapadas</h1><p>Dados fictícios de teste. Sem acesso a contas, reservas, cotações ou alterações no PMS.</p>
+<label><input type="checkbox" id="legacy">Testar compatibilidade sem WebCodecs</label><br>
+<button id="generate">Gerar MP4 de teste</button><button id="cancel" disabled>Cancelar</button><progress max="100" value="0"></progress>
+<output id="result">Pronto para testar.</output><a id="download" hidden>Baixar MP4 gerado</a><video controls playsinline muted></video>
+<script src="/site-prices.js"></script><script src="/villegram-effects.js"></script><script src="/villegram-timeline.js"></script><script src="/escapada-video.js?v=quality-20261123"></script>
+<script>
+window.VillePrices.configure([{property_id:2,credit_fee_bps:700,installments_count:10,cash_price_source:'quote'}]);
+const card={property_id:2,property_code:'CH2',property_name:'Ville Essenza · TESTE',check_in:'2026-12-11',check_out:'2026-12-13',guests:2,nights:2,total_cents:129900,offer_name:'Escapada de teste'};
+const media=['essenza.webp','04-banheira-petalas.webp','03-banheira-cama.webp'].map(name=>({kind:'photo',url:'/assets/'+name,fit:'cover',mode:'breathe',transition:'fade'}));
+const $=s=>document.querySelector(s);let controller,url;
+$('#cancel').onclick=()=>controller?.abort();
+$('#generate').onclick=async()=>{
+ controller=new AbortController();$('#generate').disabled=true;$('#cancel').disabled=false;$('#download').hidden=true;$('progress').value=0;$('#result').textContent='Gerando vídeo de teste…';
+ const saved=window.VideoEncoder,legacy=$('#legacy').checked;
+ if(legacy)window.VideoEncoder=undefined;
+ try{
+  const started=performance.now();
+  const blob=await window.VilleEscapadaVideo.exportVideo(card,media,{signal:controller.signal,progress:value=>{$('progress').value=value;$('#result').textContent='Gerando vídeo de teste: '+value+'%';}});
+  if(url)URL.revokeObjectURL(url);url=URL.createObjectURL(blob);
+  const video=$('video');video.src=url;
+  await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(Error('MP4 não reproduziu'));});
+  $('#result').textContent=JSON.stringify({ok:true,path:legacy?'MediaRecorder':'WebCodecs se compatível',width:video.videoWidth,height:video.videoHeight,duration:video.duration,bytes:blob.size,generation_seconds:Math.round((performance.now()-started)/100)/10,target_bitrate:window.VilleEscapadaVideo.VIDEO_SETTINGS.videoBitsPerSecond},null,2);
+  $('#download').href=url;$('#download').download='qa-escapada-'+(legacy?'compatibilidade':'qualidade')+'.mp4';$('#download').hidden=false;
+ }catch(error){$('#result').textContent=error.name==='AbortError'?'Geração cancelada. Nenhum arquivo disponibilizado.':'ERRO: '+error.message;}
+ finally{window.VideoEncoder=saved;controller=null;$('#generate').disabled=false;$('#cancel').disabled=true;}
+};
+</script></html>

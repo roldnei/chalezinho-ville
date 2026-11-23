@@ -1,6 +1,7 @@
 (()=>{
  'use strict';
- const VIDEO_SETTINGS=Object.freeze({width:1080,height:1920,fps:30,videoBitsPerSecond:12000000,duration:15});
+ const VIDEO_SETTINGS=Object.freeze({width:1080,height:1920,fps:30,videoBitsPerSecond:20000000,duration:15});
+ let photoEncoder;
  const money=c=>(c/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
  // Compute from the original quote on every render; never mark up the stored price.
  const installment=(cents,card)=>window.VillePrices.installment(cents,card);
@@ -79,7 +80,16 @@
  async function exportVideo(card,media,options={}){
   assertCard(card);if(!media?.length)throw Error('Escolha pelo menos uma foto ou vídeo.');
   media=prepareMedia(card,media);
-  return window.VillegramTimeline.exportSequence(media,{...options,...VIDEO_SETTINGS,guest:false,sound:media.some(m=>m.sound||m.kind==='video'&&m.original_volume!==0),overlay:ctx=>drawOverlay(ctx,card)});
+  const settings={...options,...VIDEO_SETTINGS,guest:false,sound:media.some(m=>m.sound||m.kind==='video'&&m.original_volume!==0),overlay:ctx=>drawOverlay(ctx,card)};
+  if(!settings.sound&&media.every(m=>m.kind==='photo')&&window.VideoEncoder&&window.VideoFrame){
+   try{
+    photoEncoder??=import('/assets/escapada-export/mp4.js?v=quality-20261123').catch(e=>{photoEncoder=null;throw e;});
+    const blob=await (await photoEncoder).exportPhotos(media,settings);
+    if(blob)return blob;
+   }catch(e){if(options.signal?.aborted||e.name==='AbortError')throw e;options.progress?.(0);}
+  }
+  // Preserve sound/video support and older browsers at the same Full HD bitrate.
+  return window.VillegramTimeline.exportSequence(media,settings);
  }
  function download(blob,card){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=fileName(card);document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
  async function preview(canvas,card,media,{onError=()=>{},onTime=()=>{}}={}){
