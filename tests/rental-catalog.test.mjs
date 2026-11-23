@@ -37,7 +37,7 @@ test('occupied or failed calendars never expose a bookable price; quote rounds i
 test('catalog and individual page render WhatsApp consultation with property, dates and guests, without writes',async()=>{
  for(const page of ['catalog','detail']){
   const filename=page==='catalog'?'casas-e-apartamentos.html':'hospedagem.html';
-  const dom=new JSDOM(await readFile(new URL('../'+filename,import.meta.url),'utf8'),{url:'https://example.test/'+filename+(page==='detail'?'?slug='+property.slug:''),runScripts:'outside-only'});
+  const dom=new JSDOM(await readFile(new URL('../'+filename,import.meta.url),'utf8'),{url:'https://example.test/'+(page==='detail'?'imoveis/'+property.slug:filename),runScripts:'outside-only'});
   const {window:w}=dom;w.CHALEZINHO_CONFIG={supabaseUrl:'https://test.supabase.co',whatsappNumber:'5593991592266'};
   w.VillePrices={load:async()=>[],terms:()=>null,heading:()=>'',html:c=>'R$ '+c/100,cashHTML:c=>'Total à vista: R$ '+c/100};
   const requests=[];w.fetch=async(url,options)=>{requests.push({url,options});return {ok:true,json:async()=>({ok:true,listings:[{...publicRental(property),available:true,total_cents:65000}]})}};
@@ -48,6 +48,9 @@ test('catalog and individual page render WhatsApp consultation with property, da
   const link=w.document.querySelector('#rental-list a[href^="https://wa.me/"]'),message=new URL(link.href).searchParams.get('text');
   assert.match(message,/Praia do Morro/);assert.match(message,/04\/12\/2026/);assert.match(message,/Hóspedes: 6/);assert.match(message,/650,00/);
   assert.ok(requests.every(x=>!x.options?.method||x.options.method==='GET'));
+  form.elements.start.value='2026-12-07';form.elements.end.value='2026-12-09';form.elements.start.dispatchEvent(new w.Event('input',{bubbles:true}));
+  const nextMessage=new URL(w.document.querySelector('#rental-list a[href^=\"https://wa.me/\"]').href).searchParams.get('text');
+  assert.match(nextMessage,/07\/12\/2026/);assert.ok(!nextMessage.includes('Valor consultado'));assert.ok(!w.document.querySelector('.rental-price')); 
   dom.window.close();
  }
 });
