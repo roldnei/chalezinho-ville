@@ -77,6 +77,23 @@ test('concurrent home queries share a short cache and catalog edits invalidate i
  await Promise.all([cachedWeekdayShowcase(deps),cachedWeekdayShowcase(deps)]);assert.equal(calls,1);
  version++;await cachedWeekdayShowcase(deps);assert.equal(calls,2);
 });
+
+test('phone details open separately and close without expanding the card or changing its reservation dates',async()=>{
+ const dom=new JSDOM('<main><section class="hero"></section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;
+ try{
+  const date=days=>new Date(Date.now()+days*86400000).toISOString().slice(0,10);
+  const card={property_id:2,property_code:'CH2',property_name:'Ville Essenza',offer_id:'stay',offer_name:'Hospedagem e limpeza',check_in:date(2),check_out:date(4),nights:2,guests:2,rate_code:'non_refundable',rate_name:'Escapada',total_cents:119440,experiences:[]};
+  w.CHALEZINHO_CONFIG={bookingEngine:'https://qa.example/engine',releaseProfile:'whatsapp'};w.VilleOffers={esc:s=>String(s??''),label:c=>c.name};w.Villegram={configure(){}};
+  let restored;w.scrollTo=position=>restored=position;
+  w.matchMedia=()=>({matches:true});w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.dispatchEvent(new w.Event('close'));};
+  w.fetch=async()=>({ok:true,json:async()=>({ok:true,cards:[card],properties:[{id:2,code:'CH2',name:'Ville Essenza'}],offers:[],checked_at:new Date().toISOString()})});
+  for(const file of ['site-prices.js','stay-showcase.js'])w.eval(await readFile(new URL('../'+file,import.meta.url),'utf8'));
+  configurePrices(w);await w.VilleShowcase.load([]);
+  const summary=w.document.querySelector('.showcase-card summary'),details=summary.parentElement,href=w.document.querySelector('.showcase-card .primary-action').href;
+  summary.click();const dialog=w.document.querySelector('.showcase-details-dialog');assert.ok(dialog.open);assert.equal(details.open,false);assert.match(dialog.textContent,/Ville Essenza/);assert.match(dialog.textContent,/Hospedagem e limpeza incluídas/);
+  dialog.querySelector('button').click();assert.equal(w.document.querySelector('dialog'),null);assert.equal(details.open,false);assert.equal(w.document.activeElement,summary);assert.equal(restored.top,0);assert.equal(restored.behavior,'instant');assert.equal(w.document.querySelector('.showcase-card .primary-action').href,href);
+ }finally{w.close()}
+});
 test('home renders dated price cards and duration filters; links carry explicit offer and dates',async()=>{
  const day=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10),checkIn=day(2);
  const dom=new JSDOM('<main><section class="hero"></section><section class="trust-strip">4,95</section></main>',{url:'https://qa.example/',runScripts:'outside-only'}),w=dom.window;

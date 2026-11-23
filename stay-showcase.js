@@ -70,7 +70,7 @@
    track.querySelectorAll('.showcase-card>details>summary').forEach(summary=>summary.addEventListener('click',event=>{
     if(!window.matchMedia?.('(max-width:800px)').matches)return;
     event.preventDefault();
-    const card=summary.closest('.showcase-card'),period=card.closest('.showcase-period'),dialog=document.createElement('dialog');
+    const card=summary.closest('.showcase-card'),period=card.closest('.showcase-period'),dialog=document.createElement('dialog'),scroll={left:window.scrollX,top:window.scrollY,behavior:'instant'};
     dialog.className='showcase-details-dialog';dialog.setAttribute('aria-label','Detalhes da escapada · '+card.querySelector('h4').textContent);
     const close=document.createElement('button');close.type='button';close.textContent='Fechar';
     const title=document.createElement('h2');title.textContent=card.querySelector('h4').textContent;
@@ -78,7 +78,7 @@
     dialog.append(close,title,dates);
     for(const node of summary.parentElement.childNodes)if(node!==summary)dialog.append(node.cloneNode(true));
     document.body.append(dialog);close.onclick=()=>dialog.close();dialog.onclick=e=>{if(e.target===dialog)dialog.close();};
-    dialog.onclose=()=>{dialog.remove();summary.focus({preventScroll:true});};dialog.showModal();
+    dialog.onclose=()=>{dialog.remove();summary.focus({preventScroll:true});window.scrollTo(scroll);};dialog.showModal();
    }));
    const shared=new URLSearchParams(location.search);if(shared.has('villegram')){const chosen=cards.find(c=>c.offer_id===shared.get('villegram')&&(!shared.get('chalet')||c.property_code===shared.get('chalet'))&&(!shared.get('check_in')||c.check_in===shared.get('check_in'))&&(!shared.get('check_out')||c.check_out===shared.get('check_out')));if(chosen)window.Villegram?.open(chosen);else{let refreshed;try{const r=await fetch(window.CHALEZINHO_CONFIG.bookingEngine,{method:'POST',headers:{'Content-Type':'application/json','X-Chalezinho-Env':'development'},body:JSON.stringify({action:'villegram_offer',offer_id:shared.get('villegram'),property_code:shared.get('chalet'),check_in:shared.get('check_in'),check_out:shared.get('check_out')})});const d=await r.json();if(d.ok)refreshed=d.card}catch{}if(refreshed){await window.Villegram.configure([refreshed,...cards],offers);window.Villegram.open(refreshed)}else{status.textContent='A sugestão compartilhada expirou ou não está disponível. Escolha outras datas ou veja as alternativas abaixo.';const link=document.createElement('a');link.className='showcase-other-dates';link.textContent='Escolher outras datas desta experiência →';link.href='reservar.html?'+new URLSearchParams({stay_offer:shared.get('villegram'),chalet:shared.get('chalet')||''});status.after(link);return}}}
    const expiryTimer=setInterval(()=>{if(!section.isConnected){clearInterval(expiryTimer);return}const now=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());track.querySelectorAll('.showcase-period').forEach(node=>{if(node.dataset.checkIn<now)node.remove()});if(!track.querySelector('.showcase-period'))status.textContent='Estas sugestões expiraram. Atualize para consultar novas escapadas.'},60000);
