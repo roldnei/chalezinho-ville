@@ -20,6 +20,7 @@ before(async()=>{
  `);
  await db.exec(await readFile(new URL('../supabase/migrations/20261012162927_multichannel_operations.sql',import.meta.url),'utf8'));
  await db.exec(await readFile(new URL('../supabase/migrations/20261012192148_multichannel_reconciliation_hardening.sql',import.meta.url),'utf8'));
+ await db.exec(await readFile(new URL('../supabase/migrations/20261122231752_ops_calendar_poll_history_retention.sql',import.meta.url),'utf8'));
  source=await one("insert into property_calendar_sources(property_id,provider) values(1,'airbnb') returning *");
 });
 after(()=>db.close());
