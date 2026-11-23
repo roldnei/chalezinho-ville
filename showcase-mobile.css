@@ -46,3 +46,13 @@
  .stay-showcase .showcase-period>header h3{font-size:20px}
  .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card{grid-template-rows:minmax(0,1fr) auto auto 40px 24px}
 }
+@media(max-width:800px) and (max-height:600px){
+ .stay-showcase .showcase-period>header small{display:none}
+ .stay-showcase .showcase-period>header{padding:6px 12px}
+ .stay-showcase .showcase-period .showcase-card{grid-template-rows:auto minmax(0,1fr) 32px 24px;padding:5px;gap:2px 6px}
+ .stay-showcase .showcase-period .showcase-card-copy>h4{font-size:14px}
+ .stay-showcase .showcase-period .showcase-price{gap:1px}
+ .stay-showcase .showcase-period .showcase-price strong{font-size:21px;line-height:1.1}
+ .stay-showcase .showcase-period .showcase-price>span,.stay-showcase .showcase-period .site-pix-label{font-size:9px;line-height:1.2}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card{grid-template-rows:minmax(0,1fr) auto auto 36px 24px}
+}

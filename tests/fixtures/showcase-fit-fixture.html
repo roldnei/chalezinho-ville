@@ -12,5 +12,5 @@ const day=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
 const cards=[3,2,1].flatMap((count,index)=>properties.slice(0,count).map(p=>({property_id:p.id,property_code:p.code,property_name:p.name,offer_id:'qa',offer_name:'Escapada de teste',check_in:day(index+2),check_out:day(index+4),guests:2,nights:2,total_cents:p.id===1?154970:p.id===2?119440:128180,rate_code:'non_refundable',experiences:[]})));
 window.fetch=async()=>({ok:true,json:async()=>({ok:true,cards,properties,offers:[],checked_at:new Date().toISOString()})});
 </script><script src="/stay-showcase.js?v=mobile-fit-20261123"></script><script>
-window.VilleShowcase.load([]).then(async()=>{await document.fonts.ready;document.querySelector('.showcase-track').scrollIntoView({block:'start'});parent.postMessage('showcase-fixture-ready',location.origin);});
+window.VilleShowcase.load([]).then(async()=>{await document.fonts.ready;document.querySelector('.showcase-track').scrollIntoView({block:'start',behavior:'instant'});parent.postMessage('showcase-fixture-ready',location.origin);});
 </script></body></html>
