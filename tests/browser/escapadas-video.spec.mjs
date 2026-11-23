@@ -9,6 +9,7 @@ const card={category:'weekday',offer_id:offer,offer_name:'Escapada',property_id:
 const cards=[card,{...card,property_id:1,property_code:'CH1',property_name:'Ville Signature',check_in:'2026-11-27',check_out:'2026-11-29'}, {...card,property_id:3,property_code:'CH3',property_name:'Ville Amore'}];
 const properties=cards.map(c=>({id:c.property_id,code:c.property_code,name:c.property_name,active:true,cover_image:c.image,gallery:[{url:c.image,clip_duration:.65}]}));
 async function fixture(page){
+ await page.clock.setFixedTime(new Date('2026-11-23T12:00:00-03:00'));
  await buildEscapadaExport();
  const errors=[],requests=[];page.on('pageerror',e=>errors.push(e.message));
  await page.route('https://cdn.jsdelivr.net/**',r=>r.fulfill({contentType:'text/javascript',body:''}));
