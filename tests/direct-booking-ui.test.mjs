@@ -16,3 +16,12 @@ test('existing stay dates remain authoritative and capacity/total are validated'
 test('the saved numeric identity is visible as a typed field and photo document details remain required',async()=>{
  const{dom,w}=await guestPage();const f=w.document.getElementById('direct-form');assert.equal(f.elements.registered_document.value,'00000001234');assert.equal(f.elements.registered_document.readOnly,true);assert.equal(f.elements.photo_document_number.required,true);assert.equal(f.elements.photo_document_issuer.required,true);assert.equal(f.elements.photo_document_state.required,true);f.elements.photo_document_type.value='cin';f.elements.photo_document_type.dispatchEvent(new w.Event('change'));assert.equal(f.elements.photo_document_number.value,'00000001234');assert.equal(f.elements.photo_document_issuer.required,false);dom.window.close();
 });
+
+test('email request link opens the authenticated review without making a decision',async()=>{
+ const id='30000000-0000-4000-8000-000000000001',dom=new JSDOM(await readFile(new URL('../reservas-diretas-admin.html',import.meta.url),'utf8'),{url:'https://example.invalid/reservas-diretas-admin.html?request='+id,runScripts:'outside-only'}),w=dom.window,calls=[];
+ w.CHALEZINHO_CONFIG={supabaseUrl:'https://qa.invalid',supabaseKey:'public'};w.supabase={createClient:()=>({auth:{getSession:async()=>({data:{session:{access_token:'qa-admin'}}})}})};w.HTMLDialogElement.prototype.showModal=function(){this.open=true};
+ const r={id,status:'pending',property_id:1,full_name:'Hóspede sintético',check_in:'2099-11-27',check_out:'2099-11-30',guests:2,email:'guest@example.invalid',phone:'27999999999',identity_snapshot:{document_type:'cpf',document_number:'QA-ONLY'},attachment_ids:[],total_cents:100,accepted_at:'2099-01-01T12:00:00Z',cancellation_terms:'QA',terms_snapshot:{documents:[]}};
+ w.fetch=async(_,opts)=>{const b=JSON.parse(opts.body);calls.push(b);return{ok:true,json:async()=>b.action==='list'?{ok:true,properties:[{id:1,name:'QA Amore'}],requests:[r],invitations:[],stays:[]}:{ok:true,request:r,attachments:[]}}};
+ w.eval(await readFile(new URL('../direct-booking-admin.js',import.meta.url),'utf8'));await flush();await flush();
+ assert.deepEqual(calls.map(c=>c.action),['list','detail']);assert.equal(calls[1].request_id,id);assert.equal(w.document.getElementById('direct-dialog').open,true);assert.equal(w.document.querySelector('[name=payment_confirmed]').checked,false);assert.match(w.document.getElementById('dialog-content').textContent,/Hóspede sintético/);dom.window.close();
+});

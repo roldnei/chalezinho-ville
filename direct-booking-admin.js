@@ -34,5 +34,5 @@ async function detail(id){
  }catch(e){msg(errors[e.message]||errors.operation_unavailable,true);}
 }
 document.getElementById('new-invitation').onclick=()=>invitationForm();document.getElementById('refresh-direct').onclick=()=>load().then(()=>msg('Atualizado.')).catch(e=>msg(errors[e.message]||errors.operation_unavailable,true));
-load().then(()=>{msg('');if(new URLSearchParams(location.search).has('stay'))invitationForm();}).catch(e=>msg(errors[e.message]||errors.operation_unavailable,true));
+load().then(()=>{msg('');const q=new URLSearchParams(location.search),id=q.get('request');if(id&&/^[a-f0-9-]{36}$/i.test(id))return detail(id);if(q.has('stay'))invitationForm();}).catch(e=>msg(errors[e.message]||errors.operation_unavailable,true));
 })();
