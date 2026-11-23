@@ -1,0 +1,48 @@
+/* One date group fits above the phone navigation. Available cards share it. */
+@media(max-width:800px){
+ .stay-showcase{--showcase-nav-space:0px}
+ .stay-showcase .showcase-track{height:calc(100svh - var(--showcase-nav-space) - 12px);padding-bottom:0;box-sizing:border-box;align-items:stretch;scrollbar-width:none;scroll-margin-top:6px}
+ .stay-showcase .showcase-track::-webkit-scrollbar{display:none}
+ .stay-showcase .showcase-period{height:100%;align-self:stretch;display:grid;grid-template-rows:auto minmax(0,1fr)}
+ .stay-showcase .showcase-period>header{padding:8px 12px}
+ .stay-showcase .showcase-period>header small{font-size:9px;line-height:1.2}
+ .stay-showcase .showcase-period>header h3{font-size:21px;line-height:1.2;margin:4px 0}
+ .stay-showcase .showcase-period>header p{font-size:11px;line-height:1.3}
+ .stay-showcase .showcase-period-rows{min-height:0;padding:6px;gap:6px;grid-template-rows:repeat(3,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);align-content:stretch}
+ .stay-showcase .showcase-period-rows[data-row-count="2"]{grid-template-rows:repeat(2,minmax(0,1fr))}
+ .stay-showcase .showcase-period-rows[data-row-count="1"]{grid-template-rows:minmax(0,1fr)}
+ .stay-showcase .showcase-period .showcase-card{min-height:0;grid-template-columns:minmax(64px,28%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) 40px 24px;align-content:stretch;gap:4px 8px;padding:7px;box-sizing:border-box}
+ .stay-showcase .showcase-period .showcase-photo{grid-column:1;grid-row:1/3;width:100%;height:100%;min-height:0;aspect-ratio:auto}
+ .stay-showcase .showcase-period .showcase-card>.showcase-card-copy{display:contents}
+ .stay-showcase .showcase-period .showcase-card-copy>h4{grid-column:2;grid-row:1;margin:0;font-size:16px;line-height:1.2;min-width:0}
+ .stay-showcase .showcase-period .showcase-price{grid-column:2;grid-row:2;align-self:start;margin:0;gap:2px;min-width:0}
+ .stay-showcase .showcase-period .showcase-price strong{font-size:24px;line-height:1.15}
+ .stay-showcase .showcase-period .showcase-price>span{font-size:11px;line-height:1.25}
+ .stay-showcase .showcase-period .site-pix-label{font-size:10px;letter-spacing:normal;white-space:nowrap}
+ .stay-showcase .showcase-period .showcase-row-actions{grid-column:1/-1;grid-row:3;gap:6px;min-height:0}
+ .stay-showcase .showcase-period .showcase-row-actions .primary-action,.stay-showcase .showcase-period .showcase-row-actions button{min-height:0;height:100%;padding:3px 5px;font-size:11px;line-height:1.2;box-sizing:border-box}
+ .stay-showcase .showcase-period .showcase-card>details{grid-column:1/-1;grid-row:4;min-width:0;align-self:center}
+ .stay-showcase .showcase-period .showcase-card>details>summary{max-width:calc(100% - 126px);min-height:24px;line-height:24px;font-size:11px;white-space:nowrap;box-sizing:border-box}
+ .stay-showcase .showcase-period .showcase-card-copy>.bf-card-promo{grid-column:2;grid-row:4;position:static;justify-self:end;align-self:center;display:flex;align-items:center;gap:5px;width:max-content;max-width:124px;padding:3px 5px;min-height:24px;box-sizing:border-box}
+ .stay-showcase .showcase-period .bf-card-promo>.bf-stamp{gap:2px;font-size:9px;line-height:1}
+ .stay-showcase .showcase-period .bf-card-promo>.bf-discount{font-size:18px;line-height:1}
+ .stay-showcase .showcase-period-rows[data-row-count="2"] .showcase-card{grid-template-columns:minmax(80px,35%) minmax(0,1fr)}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card{grid-template-columns:1fr 1fr;grid-template-rows:minmax(0,1fr) auto auto 44px 24px}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-photo{grid-column:1/-1;grid-row:1}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card-copy>h4{grid-column:1/-1;grid-row:2;font-size:19px}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-price{grid-column:1/-1;grid-row:3}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-row-actions{grid-row:4}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card>details,.stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card-copy>.bf-card-promo{grid-row:5}
+ .showcase-details-dialog{box-sizing:border-box;width:calc(100% - 32px);max-width:480px;max-height:calc(100svh - 48px);padding:20px;border:1px solid #a88c62;border-radius:14px;background:#f3eee6;color:#30251d;font:14px/1.5 'DM Sans',sans-serif;overflow:auto}
+ .showcase-details-dialog::backdrop{background:#0009}
+ .showcase-details-dialog h2{font-size:22px;line-height:1.2;margin:0 0 8px}
+ .showcase-details-dialog>button{float:right;min-height:44px;padding:8px 12px;border:1px solid #a88c62;border-radius:7px;background:transparent;color:inherit;font:inherit}
+ .showcase-details-dialog>p{clear:both}
+ .showcase-details-dialog ul{padding-left:20px}
+}
+@media(max-width:700px){.stay-showcase{--showcase-nav-space:calc(72px + env(safe-area-inset-bottom))}}
+@media(max-width:800px) and (max-height:680px){
+ .stay-showcase .showcase-period .showcase-card{grid-template-rows:auto minmax(0,1fr) 36px 24px;padding:6px;gap:3px 7px}
+ .stay-showcase .showcase-period>header h3{font-size:20px}
+ .stay-showcase .showcase-period-rows[data-row-count="1"] .showcase-card{grid-template-rows:minmax(0,1fr) auto auto 40px 24px}
+}

@@ -1,0 +1,21 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="robots" content="noindex,nofollow"><title>QA da vitrine em uma tela</title>
+<style>body{font:15px system-ui;margin:16px;background:#e8e5df;color:#241c14}label,button{display:inline-block;margin:5px;padding:7px}iframe{display:block;border:2px solid #5b4834;background:white}output{white-space:pre-wrap;display:block;font:12px monospace;position:absolute;left:500px;top:150px;max-width:700px}select{padding:6px}</style>
+<h1>QA da vitrine em uma tela</h1><p>Dados fictícios. Os cards e estilos são os reais do site. Sem acesso ao PMS ou alterações em reservas.</p>
+<label>Tela<select id="size"><option value="390,740">390 × 740</option><option value="360,640">360 × 640</option><option value="430,860">430 × 860</option><option value="320,568">320 × 568</option><option value="800,720">800 × 720</option></select></label>
+<button data-count="3">3 disponíveis</button><button data-count="2">2 disponíveis</button><button data-count="1">1 disponível</button><button id="measure">Conferir medidas</button>
+<iframe title="Prévia móvel da vitrine" src="/showcase-fit-fixture.html" width="390" height="740"></iframe><output id="result">Carregando…</output>
+<script>
+const frame=document.querySelector('iframe'),out=document.querySelector('output');
+function measure(){
+ const w=frame.contentWindow,d=frame.contentDocument,track=d.querySelector('.showcase-track'),nav=d.querySelector('.villegram-mobile-nav');if(!track)return;
+ const bottom=getComputedStyle(nav).display==='none'?w.innerHeight:nav.getBoundingClientRect().top;
+ const data=[...d.querySelectorAll('.showcase-period')].map(period=>{
+  const rect=period.getBoundingClientRect(),header=period.querySelector('header').getBoundingClientRect(),rows=period.querySelector('.showcase-period-rows'),cards=[...period.querySelectorAll('.showcase-card')];
+  return {count:cards.length,height:rect.height,top:rect.top,bottom:rect.bottom,headerVisible:header.top>=0&&header.bottom<bottom,insideViewport:rect.top>=0&&rect.bottom<=bottom,rowOverflow:rows.scrollHeight>rows.clientHeight+1,cards:cards.map(card=>{const r=card.getBoundingClientRect();return {height:r.height,overflow:card.scrollHeight>card.clientHeight+1,controlsInside:[...card.querySelectorAll('h4,.showcase-price,.bf-card-promo,.showcase-row-actions,summary')].every(el=>{const a=el.getBoundingClientRect();return a.top>=r.top&&a.bottom<=r.bottom+1&&a.left>=r.left&&a.right<=r.right+1})};})};
+ });
+ out.textContent=JSON.stringify({viewport:[w.innerWidth,w.innerHeight],navigationTop:bottom,periods:data},null,2);
+}
+document.querySelector('#size').onchange=event=>{const [width,height]=event.target.value.split(',');frame.width=width;frame.height=height;requestAnimationFrame(()=>requestAnimationFrame(()=>{frame.contentDocument.querySelector('.showcase-track')?.scrollIntoView({block:'start'});measure();}));};
+document.querySelectorAll('[data-count]').forEach(button=>button.onclick=()=>{const d=frame.contentDocument,rows=d.querySelector('[data-row-count="'+button.dataset.count+'"]');d.querySelector('.showcase-track').scrollTo({left:rows.parentElement.offsetLeft-d.querySelector('.showcase-track').offsetLeft,behavior:'instant'});measure();});
+document.querySelector('#measure').onclick=measure;window.addEventListener('message',event=>{if(event.origin===location.origin&&event.data==='showcase-fixture-ready')measure();});
+</script></html>
