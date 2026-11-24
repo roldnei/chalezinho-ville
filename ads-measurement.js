@@ -1,16 +1,15 @@
-// Send only website interactions to Ads. Reservation confirmation happens in the PMS.
+// Visits are page views, contacts are leads. Only the PMS can confirm a reservation.
 (() => {
   if (!['chalezinhoville.com.br', 'www.chalezinhoville.com.br'].includes(location.hostname)) return;
   const adsId = 'AW-18468792311';
-  const pageLabel = 'kEuZCO3QvaodEPfPzeZE';
   const whatsappLabel = '0JbfCLbP0rkdEPfPzeZE';
   const consentKey = 'ville-marketing-consent-v1';
   const sourceKey = 'ville-google-ads-source-v1';
+  const leadKey = 'ville-google-ads-contact-v1';
   const sourceLine = 'Origem: anúncio no Google';
   const day = 86_400_000;
   const phone = window.CHALEZINHO_CONFIG?.whatsappNumber;
   const page = location.origin + location.pathname;
-  const isHome = location.pathname === '/' || location.pathname === '/index.html';
   const denied = {
     ad_storage: 'denied', ad_user_data: 'denied',
     ad_personalization: 'denied', analytics_storage: 'denied',
@@ -20,6 +19,7 @@
   let started = false;
   let fromAd = false;
   let noticeSize;
+  let lastContactAt = null;
 
   function read(key) {
     try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
@@ -75,12 +75,32 @@
     script.async = true;
     script.src = 'https://www.googletagmanager.com/gtag/js?id=' + adsId;
     document.head.append(script);
-    conversion(pageLabel, { value: 0, currency: 'BRL' });
+    // Do not send the former page-view conversion label: merely visiting must
+    // never count as a lead or a confirmed booking, regardless of Ads goal settings.
+    command('event', 'page_view', {
+      send_to: adsId, page_location: page, page_referrer: '',
+    });
+  }
+
+  function recordContact() {
+    const now = Date.now();
+    let previous = lastContactAt;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(leadKey));
+      if (Number.isFinite(saved?.at)) previous = saved.at;
+    } catch {}
+    // Repeated taps and calls from different contact handlers in the same tab
+    // are one lead within 30 minutes, including navigation and page reloads.
+    if (previous !== null && previous <= now && previous > now - 30 * 60_000) return;
+    lastContactAt = now;
+    try { sessionStorage.setItem(leadKey, JSON.stringify({ at: now })); } catch {}
+    conversion(whatsappLabel, { event_category: 'lead' });
   }
 
   function contact(url) {
     if (!started || choice !== 'accepted' || blocked()) return url;
-    conversion(whatsappLabel);
+    if (url.origin !== 'https://wa.me' || url.pathname !== '/' + phone) return url;
+    recordContact();
     if (!fromAd) return url;
     const message = url.searchParams.get('text') || 'Olá! Gostaria de informações sobre os chalés.';
     if (!message.split(/\r?\n/).includes(sourceLine)) {
@@ -98,6 +118,8 @@
     } else {
       fromAd = false;
       try { localStorage.removeItem(sourceKey); } catch {}
+      lastContactAt = null;
+      try { sessionStorage.removeItem(leadKey); } catch {}
       if (started) command('consent', 'update', denied);
       // Unload Google's script after revocation to stop future requests on this page.
       if (started) location.reload();
@@ -131,7 +153,7 @@
     const more = document.createElement('summary');
     more.textContent = 'Saiba mais sobre os cookies';
     const purpose = document.createElement('p');
-    purpose.textContent = 'Ao aceitar, você permite o uso de cookies e o envio ao Google Ads de informações sobre as páginas visitadas e os cliques que abrem o WhatsApp. A medição pode usar o identificador do clique no anúncio para mostrar quais anúncios geram visitas e contatos. A personalização de anúncios fica desativada.';
+    purpose.textContent = 'Ao aceitar, você permite o uso de cookies e o envio ao Google Ads de informações sobre as páginas visitadas e os cliques que abrem o WhatsApp. Visitas e contatos são medidos separadamente; abrir o WhatsApp não confirma uma reserva. A medição pode usar o identificador do clique no anúncio para mostrar quais anúncios geram visitas e contatos. A personalização de anúncios fica desativada.';
     const control = document.createElement('p');
     control.textContent = 'Ao rejeitar, a medição do Google Ads fica desativada. Você pode navegar e usar o WhatsApp com qualquer escolha. Sua preferência vale para todo o site, fica salva neste navegador por até 180 dias e pode ser alterada no rodapé, em Preferências de medição.';
     const policy = document.createElement('a');
@@ -154,7 +176,7 @@
   const saved = read(consentKey);
   if (saved?.at <= Date.now() && saved.at > Date.now() - 180 * day) choice = saved.value;
   if (choice === 'accepted') start();
-  else if (choice !== 'rejected' && isHome) preferences();
+  else if (choice !== 'rejected') preferences();
 
   const settings = document.createElement('button');
   settings.type = 'button';

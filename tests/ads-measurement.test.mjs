@@ -5,7 +5,6 @@ import { JSDOM, VirtualConsole } from 'jsdom';
 
 const source = readFileSync(new URL('../ads-measurement.js', import.meta.url), 'utf8');
 const phone = '5593991592266';
-const pageLabel = 'kEuZCO3QvaodEPfPzeZE';
 const whatsappLabel = '0JbfCLbP0rkdEPfPzeZE';
 const site = 'https://chalezinhoville.com.br';
 const consentKey = 'ville-marketing-consent-v1';
@@ -35,6 +34,9 @@ function fixture(t, url = site + '/', setup = () => {}) {
     conversions: () => Array.from(window.dataLayer || [])
       .filter(entry => entry[0] === 'event' && entry[1] === 'conversion')
       .map(entry => entry[2]),
+    views: () => Array.from(window.dataLayer || [])
+      .filter(entry => entry[0] === 'event' && entry[1] === 'page_view')
+      .map(entry => entry[2]),
   };
 }
 
@@ -54,13 +56,22 @@ test('Ads is opt-in and does not run in previews or after a privacy signal', t =
   assert.equal(gpc.window.VilleAds, undefined);
 });
 
-test('the home prompts once and the same saved choice applies on other pages and return visits', t => {
-  const internal = fixture(t, site + '/reservar.html');
-  assert.equal(internal.prompt(), null);
-  internal.click('contact');
-  assert.equal(internal.prompt(), null);
-  assert.equal(internal.conversions().length, 0);
+test('direct entrants get the notice on every landing page before any click or measurement', t => {
+  for (const path of ['/', '/index.html', '/reservar.html', '/chale-premium.html',
+    '/chale-com-hidro.html', '/chale-romantico.html', '/casas-e-apartamentos.html',
+    '/hospedagem.html', '/imovel.html', '/imoveis/apartamento-centro-guarapari',
+    '/imoveis/apartamento-praia-do-morro-guarapari']) {
+    const visitor = fixture(t, site + path + '?utm_source=google&utm_medium=cpc');
+    assert.ok(visitor.prompt(), path);
+    assert.equal(visitor.googleTag(), null);
+    assert.equal(visitor.views().length, 0);
+    visitor.click('contact');
+    assert.equal(visitor.conversions().length, 0);
+    assert.equal(visitor.window.localStorage.getItem('ville-google-ads-source-v1'), null);
+  }
+});
 
+test('one choice applies to the whole site and is not requested again on other pages', t => {
   for (const [index, value] of ['accepted', 'rejected'].entries()) {
     const home = fixture(t, site + '/index.html?view=site#colecao');
     assert.ok(home.prompt());
@@ -77,7 +88,8 @@ test('the home prompts once and the same saved choice applies on other pages and
     const saved = home.window.localStorage.getItem(consentKey);
     assert.equal(JSON.parse(saved).value, value);
 
-    for (const path of ['/', '/chale-com-hidro.html', '/reservar.html']) {
+    for (const path of ['/', '/chale-com-hidro.html', '/reservar.html',
+      '/imoveis/apartamento-centro-guarapari', '/imoveis/apartamento-praia-do-morro-guarapari']) {
       const returning = fixture(t, site + path, w => w.localStorage.setItem(consentKey, saved));
       assert.equal(returning.prompt(), null);
       assert.equal(Boolean(returning.googleTag()), value === 'accepted');
@@ -85,25 +97,28 @@ test('the home prompts once and the same saved choice applies on other pages and
   }
 });
 
-test('view and direct WhatsApp clicks use different labels without forwarding message or URL details', t => {
+test('visits are not conversions, contacts are leads and no message or URL details are forwarded', t => {
   const visitor = fixture(t, site + '/reservar.html?gclid=SampleClick123&email=private@example.com#checkout');
-  visitor.window.document.querySelector('footer button').click();
   visitor.choose(0);
   assert.match(visitor.googleTag().src, /AW-18468792311$/);
   visitor.click('share');
-  assert.equal(visitor.conversions().length, 1);
+  assert.equal(visitor.conversions().length, 0);
+  assert.equal(visitor.views().length, 1);
   assert.equal(visitor.click('contact'), 'Resumo\nReferência: MV-AABBCCDDEEFF\nOrigem: anúncio no Google');
   assert.equal(visitor.click('contact').match(/Origem/g).length, 1);
   const events = visitor.conversions();
-  assert.deepEqual(events.map(e => e.send_to.split('/')[1]), [pageLabel, whatsappLabel, whatsappLabel]);
+  assert.deepEqual(events.map(e => e.send_to.split('/')[1]), [whatsappLabel]);
+  assert.equal(events[0].event_category, 'lead');
   assert.ok(events.every(e => e.page_location === site + '/reservar.html'));
-  assert.doesNotMatch(JSON.stringify(events), /private@example|SampleClick123|Resumo|booking_confirmed/);
+  assert.equal(visitor.views()[0].page_location, site + '/reservar.html');
+  assert.doesNotMatch(JSON.stringify([...events, ...visitor.views()]), /private@example|SampleClick123|Resumo|booking_confirmed|purchase|kEuZCO3QvaodEPfPzeZE/);
 
   visitor.window.document.querySelector('footer button').click();
   visitor.choose(1);
   visitor.click('contact');
   assert.equal(visitor.window.localStorage.getItem('ville-google-ads-source-v1'), null);
-  assert.equal(visitor.conversions().length, 3);
+  assert.equal(visitor.window.sessionStorage.getItem('ville-google-ads-contact-v1'), null);
+  assert.equal(visitor.conversions().length, 1);
 });
 
 test('date buttons can record the direct contact without marking an organic visitor as paid', t => {
@@ -111,5 +126,57 @@ test('date buttons can record the direct contact without marking an organic visi
   visitor.choose(0);
   const url = new URL('https://wa.me/' + phone + '?text=Consulta');
   assert.equal(visitor.window.VilleAds.contact(url).searchParams.get('text'), 'Consulta');
-  assert.equal(visitor.conversions()[1].send_to.split('/')[1], whatsappLabel);
+  assert.equal(visitor.conversions()[0].send_to.split('/')[1], whatsappLabel);
+});
+
+test('contact deduplication survives navigation and expires after thirty minutes', t => {
+  const visitor = fixture(t);
+  visitor.choose(0);
+  visitor.click('contact');
+  visitor.window.VilleAds.contact(new URL('https://wa.me/' + phone + '?text=Outra%20consulta'));
+  assert.equal(visitor.conversions().length, 1);
+  const consent = visitor.window.localStorage.getItem(consentKey);
+  const lead = visitor.window.sessionStorage.getItem('ville-google-ads-contact-v1');
+  const returning = fixture(t, site + '/casas-e-apartamentos.html', w => {
+    w.localStorage.setItem(consentKey, consent);
+    w.sessionStorage.setItem('ville-google-ads-contact-v1', lead);
+  });
+  returning.click('contact');
+  assert.equal(returning.conversions().length, 0);
+  returning.window.Date.now = () => JSON.parse(lead).at + 30 * 60_000;
+  returning.click('contact');
+  assert.equal(returning.conversions().length, 1);
+});
+
+test('unrelated URLs never create contact conversions through the public helper', t => {
+  const visitor = fixture(t);
+  visitor.choose(0);
+  for (const url of ['https://example.com/', 'https://wa.me/?text=Compartilhar', 'https://wa.me/5511111111111']) {
+    const input = new URL(url);
+    assert.equal(visitor.window.VilleAds.contact(input), input);
+  }
+  assert.equal(visitor.conversions().length, 0);
+});
+
+test('expired consent prompts again on a direct apartment entry and repeated acceptance does not duplicate a view', t => {
+  const visitor = fixture(t, site + '/imoveis/apartamento-centro-guarapari', w => {
+    w.localStorage.setItem(consentKey, JSON.stringify({ value: 'accepted', at: Date.now() - 181 * 86_400_000 }));
+  });
+  assert.ok(visitor.prompt());
+  assert.equal(visitor.views().length, 0);
+  visitor.choose(0);
+  visitor.window.document.querySelector('footer button').click();
+  visitor.choose(0);
+  assert.equal(visitor.views().length, 1);
+  assert.equal(visitor.conversions().length, 0);
+});
+
+test('lead deduplication still works when session storage is unavailable', t => {
+  const visitor = fixture(t, site, w => Object.defineProperty(w, 'sessionStorage', {
+    get() { throw new Error('Storage blocked'); },
+  }));
+  visitor.choose(0);
+  visitor.click('contact');
+  visitor.click('contact');
+  assert.equal(visitor.conversions().length, 1);
 });
