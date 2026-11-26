@@ -2,6 +2,8 @@ import {publicServiceTarget} from '../scripts/public-service-target.mjs';
 // Public merchandising only. Booking still rechecks and contracts in the engine.
 export default async function handler(req,res){
  res.setHeader('Cache-Control','no-store');
+ // This JSON feed is consumed by the storefront, not a search landing page.
+ res.setHeader('X-Robots-Tag','noindex');
  if(req.method!=='GET')return res.status(405).json({ok:false,error:'method_not_allowed'});
  const host=String(req.headers.host||'');
  let target;try{target=publicServiceTarget(process.env,host)}catch{return res.status(403).json({ok:false,error:'release_not_enabled'})}

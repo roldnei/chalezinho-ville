@@ -44,3 +44,28 @@ test('commercial fallback uses one card belonging to the current chalet even whe
  for(const prop of props){const result=rankedGallery([],fallback,prop.code,props,[]);assert.equal(result.length,1);assert.equal(result[0].property_id,prop.id);assert.equal(result[0].id,'offer:'+prop.code);}
  const result=rankedGallery([post],fallback,'CH3',props,[]);assert.equal(result.length,2);assert.equal(result[0].id,post.id);assert.equal(result[1].property_id,3);
 });
+
+
+test('emoji-only Moments have descriptive text without changing the guest caption',()=>{
+ const p={...post,is_guest:true,property_code:'CH3',author_name:'Merielen Barreto',title:'🛁',caption:'🛁'};
+ const d=new JSDOM(watchPage(p,'https://chalezinhoville.com.br')).window.document;
+ assert.match(d.title,/Fotos de Merielen Barreto no Ville Amore em Guarapari/);
+ assert.equal(d.querySelector('h1').textContent,d.title.replace(' | Chalezinho Ville',''));
+ assert.equal(d.querySelector('.moments-caption').textContent,'🛁');
+ assert.match(d.querySelector('meta[name="description"]').content,/hidromassagem privativa/);
+ assert.match(d.querySelector('.moments-context').textContent,/Ville Amore.*Guarapari/);
+ const schema=JSON.parse(d.querySelector('[type="application/ld+json"]').textContent);
+ assert.equal(schema.name,d.querySelector('h1').textContent);
+ assert.equal(schema.caption,'🛁');
+ assert.match(schema.description,/Merielen Barreto/);
+ assert.match(galleryPage('CH3',[p],'https://chalezinhoville.com.br'),/Fotos de Merielen Barreto/);
+});
+
+test('descriptive Moments titles keep the guest wording and escape author text',()=>{
+ const p={...post,is_guest:true,property_code:'CH1',author_name:'<img src=x onerror="bad()">',media:[{kind:'video',url:'https://private.example/video',poster:'https://private.example/photo'}]};
+ const d=new JSDOM(watchPage(p,'https://chalezinhoville.com.br')).window.document;
+ assert.equal(d.querySelector('h1').textContent,'Café no chalé · Ville Signature');
+ assert.equal(d.querySelector('.moments-caption').textContent,post.caption);
+ assert.match(d.querySelector('.moments-context').textContent,/piscina aquecida privativa e spa/);
+ assert.equal(d.querySelectorAll('[onerror]').length,0);
+});

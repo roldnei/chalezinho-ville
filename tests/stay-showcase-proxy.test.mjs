@@ -9,7 +9,7 @@ test('storefront proxy rechecks eligibility without CDN caching and isolates the
   let forwarded;globalThis.fetch=async(url,options)=>{forwarded={url,options};return new Response(JSON.stringify({ok:true,cards:[{total_cents:123456}]}),{headers:{'Server-Timing':'showcase;dur=12'}})};
   res=make();await handler({method:'GET',headers:{host:'chalezinho-ville-123456789-roldneicosta-4140.vercel.app'}},res);
   assert.equal(res.code,200);assert.equal(res.headers['Cache-Control'],'no-store');assert.match(forwarded.url,/pxfqmnhqodqyaaqeyjgr/);assert.equal(forwarded.options.headers['X-Chalezinho-Env'],'development');assert.equal(res.body.cards[0].total_cents,123456);
-  assert.equal(res.headers['Server-Timing'],'showcase;dur=12');
+  assert.equal(res.headers['Server-Timing'],'showcase;dur=12');assert.equal(res.headers['X-Robots-Tag'],'noindex');
   res=make();await handler({method:'GET',headers:{host:'chalezinho-ville-git-feature-romantic-fdde70-roldneicosta-4140.vercel.app'}},res);assert.equal(res.code,200);
   res=make();await handler({method:'GET',headers:{host:'unrelated.vercel.app'}},res);assert.equal(res.code,403);
   globalThis.fetch=async()=>{throw Error('unavailable')};res=make();await handler({method:'GET',headers:{host:'chalezinho-ville-123456789-roldneicosta-4140.vercel.app'}},res);assert.equal(res.code,503);assert.equal(res.headers['Cache-Control'],'no-store');
